@@ -1,0 +1,11 @@
+{
+  "name": "aetheria",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Aetheria — Arena dos Ecos: RPG de arena com classes, itens, spirits, PvE e PvP",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"tests/*.test.js\""
+  }
+}

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aetheria — Arena dos Ecos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Nunito:wght@400;600;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="hud-player">
+      <div class="portrait" id="hud-portrait" data-action="toggle" data-arg="character"></div>
+      <div class="bars">
+        <div class="name-row"><span id="hud-name"></span><span id="hud-level"></span></div>
+        <div class="bar hp"><div class="fill" id="hud-hp"></div><div class="fill shield" id="hud-shield"></div><span id="hud-hp-text"></span></div>
+        <div class="bar xp"><div class="fill" id="hud-xp"></div><span id="hud-xp-text"></span></div>
+      </div>
+    </div>
+    <div id="hud-gold"></div>
+    <div id="hud-zone">
+      <div id="zone-name"></div>
+      <canvas id="minimap" width="200" height="140"></canvas>
+      <div class="menu-btns">
+        <button data-action="toggle" data-arg="inventory" title="Inventário (I)">🎒</button>
+        <button data-action="toggle" data-arg="character" title="Personagem (C)">🧙</button>
+        <button data-action="toggle" data-arg="spirits" title="Spirits (P)">🔮</button>
+      </div>
+    </div>
+    <div id="boss-bar" class="hidden"><div id="boss-name"></div><div class="bar"><div class="fill" id="boss-fill"></div></div></div>
+    <div id="arena-banner" class="hidden"></div>
+    <div id="skillbar"></div>
+    <div id="log"></div>
+  </div>
+
+  <div id="panel-layer"></div>
+  <div id="tooltip" class="hidden"></div>
+  <div id="toast-layer"></div>
+  <div id="screen"></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
