@@ -39,6 +39,16 @@ export const ZONES = {
     treeColors: ['#3f8a52', '#55a464', '#79c283'],
     flowerColors: ['#fff6a8', '#ffb3c7', '#ffffff', '#c7b3ff'],
     decor: { trees: 85, rocks: 18, bushes: 30, flowers: 200 },
+    // Cenário rico (ver render/scenery.js): trilha, lagoas, variedade de árvores e luz de floresta.
+    scenery: {
+      kind: 'forest', ponds: 3, trailAmp: 260, accent: ['#cf9c4a', '#dcb165', '#ecd08e'],
+      extras: [['stump', 14, 14, 20, 0.6], ['log', 9, 14, 20, 0], ['fern', 46, 12, 18, 0], ['mushrooms', 16, 9, 13, 0]],
+    },
+    atmosphere: {
+      tint: 'rgba(255,222,150,0.07)', edge: 'rgba(12,44,34,0.34)', rays: 0.05,
+      motes: { n: 34, color: '255,240,170', drift: 6, rise: 5 },
+      leaves: { n: 12, colors: ['#e0a840', '#c9783a', '#8fc062'] },
+    },
     portals: [
       { x: 40, y: 950, to: 'town', tx: 1560, ty: 620, label: 'Vila de Lúmen' },
       { x: 2760, y: 950, to: 'plains', tx: 110, ty: 950, label: 'Planície de Cristal · Nv 6-12' },
@@ -64,11 +74,21 @@ export const ZONES = {
     name: 'Ruínas Sombrias', w: 2800, h: 1900, border: true, level: [12, 20], scale: true,
     mobs: [['wraith', 3], ['knight', 3], ['gargoyle', 3]], count: 28,
     boss: { id: 'guardian', level: 21, x: 2350, y: 950 },
-    palette: { ground: '#b7b4c6', ground2: '#aaa6bb', outside: '#3f3c4d' },
-    treeColors: ['#4e5f63', '#5f7377', '#7a9094'],
+    palette: { ground: '#8d89ac', ground2: '#837fa4', outside: '#2b2840' },
+    treeColors: ['#46565f', '#587077', '#789098'],
     treeType: 'pine', rockType: 'pillar',
     flowerColors: ['#c9b6ff', '#9f8fd6', '#e6dcff'],
     decor: { trees: 26, rocks: 40, bushes: 10, flowers: 90 },
+    // Cenário rico: estrada de lajes até o Guardião, círculos rúnicos, braseiros, estátuas e névoa.
+    scenery: {
+      kind: 'ruins', runes: 3, trailAmp: 200,
+      extras: [['rubble', 30, 16, 26, 0], ['brazier', 9, 14, 16, 0.9], ['statue', 5, 22, 28, 0.9], ['deadtree', 8, 26, 34, 0.5], ['runestone', 6, 22, 28, 0.6]],
+    },
+    atmosphere: {
+      tint: 'rgba(110,100,190,0.05)', edge: 'rgba(8,6,28,0.60)',
+      fog: { n: 8, color: '205,200,238', alpha: 0.09 },
+      motes: { n: 28, color: '170,150,255', drift: 4, rise: 9 },
+    },
     portals: [{ x: 40, y: 950, to: 'plains', tx: 2690, ty: 950, label: 'Planície de Cristal' }],
   },
 

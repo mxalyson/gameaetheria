@@ -5,6 +5,7 @@ import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
 import { RARITY } from '../data/items.js';
 import { makeRng, hashString } from '../core/rng.js';
+import { paintGroundScenery, drawGroundLife, drawAtmosphere, drawTreeRich, drawPineRich, drawSceneryDecor, sceneryShadow } from './scenery.js';
 
 const TAU = Math.PI * 2;
 const SKIN = '#f3d2b3';
@@ -33,7 +34,7 @@ export class Renderer {
     this.vh = innerHeight;
     this.c.width = Math.round(this.vw * this.dpr);
     this.c.height = Math.round(this.vh * this.dpr);
-    this.vignette = null;
+    this.vignettes = {};
   }
 
   groundFor(world) {
@@ -58,6 +59,7 @@ export class Renderer {
 
     const x0 = cam.x - 120, y0 = cam.y - 120, x1 = cam.x + this.vw + 120, y1 = cam.y + this.vh + 200;
     const vis = (x, y) => x > x0 && x < x1 && y > y0 && y < y1;
+    if (z.scenery) drawGroundLife(g, world, t, vis);
 
     for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortal(g, p, t);
     for (const ar of world.areas) drawArea(g, ar, t);
@@ -117,18 +119,20 @@ export class Renderer {
     g.globalAlpha = 1;
     g.restore();
 
-    if (!this.vignette) {
+    drawAtmosphere(g, z, cam, this.vw, this.vh, t);
+    let vignette = this.vignettes[world.zoneId];
+    if (!vignette) {
       const v = document.createElement('canvas');
       v.width = this.vw; v.height = this.vh;
       const vg = v.getContext('2d');
       const grd = vg.createRadialGradient(this.vw / 2, this.vh / 2, Math.min(this.vw, this.vh) * 0.35, this.vw / 2, this.vh / 2, Math.max(this.vw, this.vh) * 0.75);
       grd.addColorStop(0, 'rgba(0,0,0,0)');
-      grd.addColorStop(1, 'rgba(10,15,30,0.38)');
+      grd.addColorStop(1, z.atmosphere?.edge ?? 'rgba(10,15,30,0.38)');
       vg.fillStyle = grd;
       vg.fillRect(0, 0, this.vw, this.vh);
-      this.vignette = v;
+      vignette = this.vignettes[world.zoneId] = v;
     }
-    g.drawImage(this.vignette, 0, 0, this.vw, this.vh);
+    g.drawImage(vignette, 0, 0, this.vw, this.vh);
     if (view.lowHp) {
       g.fillStyle = `rgba(200,30,40,${0.12 + Math.sin(t * 5) * 0.06})`;
       g.fillRect(0, 0, this.vw, this.vh);
@@ -209,6 +213,8 @@ function buildGround(world) {
     g.fillRect(x - r, y - r, r * 2, r * 2);
   }
 
+  if (z.scenery) paintGroundScenery(g, world, rng);
+
   if (z.plaza) {
     g.fillStyle = P.path; circle(g, z.plaza.x, z.plaza.y, z.plaza.r); g.fill();
     g.fillStyle = P.path2; circle(g, z.plaza.x, z.plaza.y, z.plaza.r - 12); g.fill();
@@ -252,12 +258,14 @@ function drawShadow(g, it) {
   else if (o.type === 'tree' || o.type === 'pine') { ellipse(g, o.x + 8, o.y + 2, o.s * 0.85, o.s * 0.32); g.fill(); }
   else if (o.type === 'rock' || o.type === 'crystal' || o.type === 'bush' || o.type === 'pillar') { ellipse(g, o.x + 4, o.y + o.s * 0.35, o.s * 0.9, o.s * 0.3); g.fill(); }
   else if (o.type === 'house') { g.fillRect(o.x + 8, o.y - 6, o.w, 14); }
+  else sceneryShadow(g, o);
 }
 
 // ---------------- decoração ----------------
 function drawDecor(g, d, t, z, player) {
   switch (d.type) {
     case 'tree': {
+      if (z.scenery) { drawTreeRich(g, d, t, z, player); break; }
       const [c0, c1, c2] = z.treeColors;
       g.fillStyle = '#7a5a40';
       g.fillRect(d.x - 4, d.y - 16, 8, 16);
@@ -271,6 +279,7 @@ function drawDecor(g, d, t, z, player) {
       break;
     }
     case 'pine': {
+      if (z.scenery) { drawPineRich(g, d, t, z, player); break; }
       const [c0, c1, c2] = z.treeColors;
       g.fillStyle = '#5a4535';
       g.fillRect(d.x - 3, d.y - 12, 6, 12);
@@ -391,6 +400,7 @@ function drawDecor(g, d, t, z, player) {
       }
       break;
     }
+    default: drawSceneryDecor(g, d, t);
   }
 }
 

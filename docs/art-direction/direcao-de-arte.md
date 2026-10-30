@@ -1,14 +1,9 @@
 # Direção de arte
-Alvo: FANTASY MINIATURE DIORAMA + ANIME ISOMETRIC RPG, em Canvas 2D.
+Referência aprovada: o estilo atual do jogo (top-down 2D, pastel limpo, procedural em Canvas 2D). Ver `docs/decisions/0003-estilo-visual-atual.md`. O diorama isométrico (protótipo `/vale.html`) foi rejeitado.
 
-**Estado atual (honesto):** o renderer é top-down 2D em estilo pastel limpo; **ainda não** é isométrico nem diorama. Isso é a meta, não o que existe.
-
-Meta: maquete viva (bordas de terra/rocha, altura, sombras), vegetação variada, ruínas e cristais, luz atmosférica; heróis anime com silhueta por classe; sem chibi, sem cenário vazio, sem UI genérica.
-
-Regra: validar em UM cenário/personagem antes de replicar. Legibilidade de combate vem primeiro.
-
-## Protótipo do Vale de Auren (Fase 3)
-Página separada: `/vale.html` (`public/src/render/vale.js`), sem ligação com o jogo. Projeção isométrica 2:1 real, altura em degraus, luz vinda da esquerda.
-Contém: terreno em camadas (grama, terra, rocha), rio com cachoeiras e queda pela borda, ruínas em platô com altar rúnico, ponte, 4 cristais, árvores (pinheiro/carvalho), arbustos, rochas, flores, partículas e névoa, e uma figura de herói para escala.
-Limites conhecidos: o herói é só uma figura estática de escala (sem rig nem andar); os degraus do rio ficam discretos; terreno é gerado por fórmula, ainda sem editor de mapa; nada disso está integrado ao jogo.
-Decisão tomada: isometria real (não ilusão de altura). Integrar ao renderer principal exige trocar a lógica de câmera, picking do mouse e ordenação, e fica para aprovação à parte.
+## Cenário rico (pacote A, 2026-10-30)
+Ativado por zona em `data/zones.js` (`scenery`, `atmosphere`); código em `render/scenery.js` e `game/layout.js`.
+- **Bosque Verdejante:** trilha de terra sinuosa entre os portais, 3 lagoas com colisão (vitórias-régias, juncos, brilho e ondas), 4 variações de árvore (redonda, alta, dupla, dourada) com tom individual, tocos, troncos caídos, samambaias, cogumelos, clareiras, raios de sol, pólen e folhas caindo.
+- **Ruínas Sombrias:** estrada de lajes até o Guardião, áreas de lajes rachadas, musgo, círculos rúnicos pulsantes, braseiros com luz, estátuas com olhos brilhantes, pedras rúnicas, árvores mortas, entulho, névoa e partículas roxas. Paleta do chão mais escura para dar contraste.
+- **Ainda sem cenário rico:** Vila, Planície de Cristal e Arenas (permanecem idênticas ao que eram; verificado por comparação de layout).
+Limites: os efeitos de luz e névoa são sobrepostos em 2D (não há iluminação real); colisão das lagoas é aproximada por círculos; avaliação visual feita só em capturas 1280×720.
