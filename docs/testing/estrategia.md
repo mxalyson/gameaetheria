@@ -7,6 +7,9 @@
 - Celular (`tests/e2e/mobile.spec.js`, emulação 844×390 com toque): interface de toque, cabe na tela sem sobreposição, joystick, ataque/skill/poção com multitoque e auto-mira, painéis e opções (escala/qualidade, persistência), item em 2 toques, aviso de rotação, telas de título e criação. Unitários novos: `tests/touch.test.js` (joystick, mira, preferências). Totais na última rodada: 31 unitários e 13 no navegador, todos passando.
   Limite: é emulação do Chrome, NÃO um aparelho real; desempenho em celular não medido.
 
+- PoC isométrico: `tests/iso-poc.test.js` (8 unitários: projeção ida e volta em 2:1 e 30°, 8 setores de direção, profundidade, câmera, animação) e `tests/e2e/iso-poc.spec.js` (7: carga com simulação real, 8 direções, ataque e Bola de Fogo reais com dano da simulação, morte com fantasma, ordem de profundidade, formato de atlas PNG+JSON, câmera e 2:1×30°). Última rodada: **39 unitários e 20 no navegador**, estáveis em 3 execuções seguidas.
+- Desempenho (`npm run perf:poc`, `tests/perf/`): FPS reais na GPU; resultado arquivado em `docs/roadmap/iso-poc/perf-poc.json`. Lição: testes que dependem de tempo fixo oscilam quando o FPS cai (a simulação roda mais devagar que o relógio com passo máximo de 5 por quadro); esperar o **efeito** em vez de um tempo.
+
 Lacunas: habilidades, esquiva, colisões, chefes, PvP, ondas, UI e desempenho não têm teste automatizado.
 
 Hook de teste: `window.game`.

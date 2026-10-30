@@ -309,3 +309,17 @@ Ordem: (1) módulos puros + testes → (2) protótipo isolado → (3) personagem
 - Renderizadores detectados: software = ANGLE/Vulkan **SwiftShader**; GPU = ANGLE **Intel(R) UHD Graphics (0x9A78) Direct3D11**.
 - Comparação de uma cena de 400 sprites 128 px em 720p: software 45 ms/quadro; Intel UHD 20,2 ms/quadro (com leitura de pixels forçando sincronia, o que superestima).
 - Não medidos: PixiJS; memória real de texturas; aparelhos móveis; GPU dedicada.
+
+---
+
+## 16. Atualização pós-PoC (30/10/2026)
+Resultados completos: `docs/roadmap/iso-poc-report.md`. O que muda neste plano:
+- **Seção 1, item 5 e seção 7 (Canvas × PixiJS):** o Canvas 2D foi medido na GPU Intel UHD e atingiu a meta em 1080p (75 FPS em uso; 64 FPS com 120 monstros; 39–46 FPS em 4K). PixiJS continua **não medido**; a recomendação passa a ser **adiar** o PoC de PixiJS (decisão 0005, em proposta).
+- **Nova regra de desempenho:** `imageSmoothingQuality = 'low'` sempre. Com `high`/`medium` o desempenho cai ~14×.
+- **Seção 4.9 (sincronia animação × dano):** o PoC provou que dá para sincronizar sem alterar a simulação (o comando vai à simulação no quadro de disparo da animação). Isso é um atraso de gameplay; o desenho definitivo é um dado `hitAt` por ataque/skill na simulação, com testes. **Os monstros ainda não têm isso.**
+- **Seção 4.8 (efeitos):** o PoC leu `fx`, `particles`, `projectiles` e `texts` direto do `World` sem problemas; a separação de efeitos continua recomendada para a fase de combate, não é bloqueio.
+- **Novo achado:** a simulação remove o monstro 0,6 s após a morte; o renderer precisa de "fantasmas" para animações de morte mais longas (implementado e testado no PoC).
+- **Seção 8 (memória de texturas):** confirmada na prática (Mago ≈60 MiB a 1,5×, ≈107 MiB a 2×); o custo cresce com o quadrado da resolução.
+- **Seção 9 (arte):** o caminho A (código) **não** atingiu "anime HD" para heróis; serve de andaime e para criaturas simples. Decisão de arte continua em aberto e é o maior risco.
+- **Seção 14 (decisões):** itens 1 (arte), 2 (ângulo), 4 (PixiJS) e 7 (`hitAt`) têm agora evidências; ver seção 10 do relatório do PoC.
+

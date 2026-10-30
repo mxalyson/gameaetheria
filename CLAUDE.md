@@ -8,9 +8,13 @@ RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro), itens por rari
 - **Motor de renderização:** Canvas 2D segue válido (0001) até a decisão Canvas 2D × PixiJS por prova de conceito. Plano e riscos em `docs/roadmap/isometric-migration.md`. A simulação (`core/`, `data/`, `game/`) não deve ser alterada pela migração visual; a renderização consome o estado, não controla regras.
 - Trabalho em fases; ao fim de cada fase, relatar e aguardar aprovação.
 
+## Laboratório isométrico (isolado, não faz parte do jogo)
+`public/labs/iso-poc/` é a prova de conceito da direção visual isométrica (decisão 0004). **Nada em `public/src/` importa essa pasta.** Usa a simulação real em modo somente leitura. Relatório: `docs/roadmap/iso-poc-report.md`; formato de sprites: `docs/art-direction/pipeline-sprites.md`; backend de renderização: decisão 0005 (**proposta**, não aprovada). Regra de desempenho medida: `imageSmoothingQuality = 'low'` (com `high`/`medium` o Canvas fica ~14× mais lento). O visual de herói por código **não** atingiu o padrão "HD anime": não tratar como arte final.
+
 ## Comandos
 - `npm start` — servidor estático em http://localhost:5174 (`server.js`)
 - `npm test` — testes unitários do núcleo/simulação (`node:test`, `tests/*.test.js`)
+- `npm run perf:poc` — mede FPS reais do PoC isométrico com GPU (Direct3D11); grava `test-results/perf-poc.json`. Não usar o Chromium padrão do Playwright para medir desempenho (renderiza por CPU).
 - `npm run test:e2e` — Playwright (`tests/e2e`); sobe o servidor sozinho; o jogo expõe `window.game`. `tests/e2e/mobile.spec.js` emula celular em paisagem (844×390) com toque real via protocolo do Chrome.
 
 ## Arquitetura (`public/src`)

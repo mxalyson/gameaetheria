@@ -1,0 +1,125 @@
+{
+  "quando": "2026-10-30T19:56:59.043Z",
+  "gpu": "ANGLE (Intel, Intel(R) UHD Graphics (0x00009A78) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "casos": [
+    {
+      "nome": "720p 2:1",
+      "parado": {
+        "fps": 159.17,
+        "drawMs": 1.57,
+        "simMs": 0.29,
+        "sprites": 208,
+        "atores": 11
+      },
+      "emUso": {
+        "fps": 139.86,
+        "drawMs": 1.57,
+        "simMs": 0.15,
+        "particulas": 10
+      },
+      "errosDeConsole": 0
+    },
+    {
+      "nome": "1080p 2:1",
+      "parado": {
+        "fps": 81.44,
+        "drawMs": 2.21,
+        "simMs": 0.62,
+        "sprites": 299,
+        "atores": 11
+      },
+      "emUso": {
+        "fps": 75.46,
+        "drawMs": 2.87,
+        "simMs": 0.53,
+        "particulas": 12
+      },
+      "errosDeConsole": 0
+    },
+    {
+      "nome": "1080p 40 monstros",
+      "parado": {
+        "fps": 80.52,
+        "drawMs": 2.55,
+        "simMs": 0.74,
+        "sprites": 317,
+        "atores": 41
+      },
+      "emUso": {
+        "fps": 73.65,
+        "drawMs": 2.89,
+        "simMs": 0.8,
+        "particulas": 11
+      },
+      "errosDeConsole": 0
+    },
+    {
+      "nome": "1080p 120 monstros",
+      "parado": {
+        "fps": 69.88,
+        "drawMs": 2.85,
+        "simMs": 1.88,
+        "sprites": 372,
+        "atores": 121
+      },
+      "emUso": {
+        "fps": 64,
+        "drawMs": 4.07,
+        "simMs": 2.03,
+        "particulas": 10
+      },
+      "errosDeConsole": 0
+    },
+    {
+      "nome": "canvas 4K (1080p CSS, DPR 2)",
+      "parado": {
+        "fps": 46.21,
+        "drawMs": 6.37,
+        "simMs": 1.47,
+        "sprites": 299,
+        "atores": 11
+      },
+      "emUso": {
+        "fps": 38.84,
+        "drawMs": 5.86,
+        "simMs": 0.78,
+        "particulas": 14
+      },
+      "errosDeConsole": 0
+    },
+    {
+      "nome": "720p 30 graus",
+      "parado": {
+        "fps": 164.84,
+        "drawMs": 1.33,
+        "simMs": 0.28,
+        "sprites": 179,
+        "atores": 11
+      },
+      "emUso": {
+        "fps": 147.65,
+        "drawMs": 1.15,
+        "simMs": 0.26,
+        "particulas": 20
+      },
+      "errosDeConsole": 0
+    },
+    {
+      "nome": "720p zoom 1,5",
+      "parado": {
+        "fps": 169.02,
+        "drawMs": 1.31,
+        "simMs": 0.31,
+        "sprites": 133,
+        "atores": 11
+      },
+      "emUso": {
+        "fps": 155.18,
+        "drawMs": 1.24,
+        "simMs": 0.26,
+        "particulas": 11
+      },
+      "errosDeConsole": 0
+    }
+  ]
+}

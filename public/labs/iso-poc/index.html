@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aetheria — PoC isométrico (laboratório)</title>
+  <style>
+    :root { --glass: rgba(18, 22, 40, .82); --line: rgba(255,255,255,.12); --text: #eceaf6; --muted: #a9a6c2; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #101a26; color: var(--text); font-family: Nunito, system-ui, sans-serif; user-select: none; }
+    canvas { position: fixed; inset: 0; display: block; cursor: crosshair; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #101a26; font-size: 18px; z-index: 5; }
+    .panel { position: fixed; background: var(--glass); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(6px); }
+    #hud-hp { left: 16px; top: 16px; padding: 10px 14px; width: 270px; }
+    #hud-hp .name { font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .bar { position: relative; height: 16px; border-radius: 8px; background: rgba(0,0,0,.45); overflow: hidden; }
+    .bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(180deg, #7ff0a6, #3fb46a); transition: width .12s; }
+    .bar span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 800; text-shadow: 0 1px 2px #000; }
+    #hud-skills { left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; border-radius: 18px; }
+    .slot { --p: 0; position: relative; width: 58px; height: 58px; border-radius: 14px; background: linear-gradient(180deg, #3a3d63, #2a2c4a); border: 1px solid rgba(255,255,255,.14); display: grid; place-items: center; overflow: hidden; }
+    .slot .ic { font-size: 26px; }
+    .slot .key { position: absolute; left: 5px; top: 3px; font-size: 10px; font-weight: 900; color: var(--muted); }
+    .slot .cd { position: absolute; inset: 0; background: conic-gradient(rgba(10,10,25,.74) calc(var(--p) * 360deg), transparent 0); }
+    .slot .cdt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; font-weight: 900; text-shadow: 0 1px 4px #000; }
+    #hud-stats { right: 16px; top: 16px; padding: 10px 14px; font-size: 12px; line-height: 1.6; color: var(--muted); max-width: 440px; }
+    #hud-stats b { color: var(--text); }
+    #hud-help { left: 16px; bottom: 18px; padding: 8px 12px; font-size: 12px; color: var(--muted); max-width: 340px; line-height: 1.5; }
+    #hud-help b { color: var(--text); }
+    #tag { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); font: 800 12px/1 system-ui; letter-spacing: .12em; color: #ffd98a; opacity: .8; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="loading">Assando sprites e cenário…</div>
+  <canvas id="view"></canvas>
+  <div id="tag">LABORATÓRIO · PoC ISOMÉTRICO · NÃO FAZ PARTE DO JOGO</div>
+  <div id="hud-hp" class="panel"><div class="name"><span>Aren · Mago Nv 8</span><span>simulação real</span></div><div class="bar"><i id="hp-fill"></i><span id="hp-text"></span></div></div>
+  <div id="hud-skills" class="panel"></div>
+  <div id="hud-stats" class="panel"></div>
+  <div id="hud-help" class="panel"><b>WASD</b> mover (relativo à tela) · <b>mouse</b> mira · <b>clique</b> ataque · <b>1 2 3</b> Bola de Fogo / Nova de Gelo / Teleporte · <b>roda</b> ou <b>+ −</b> zoom · <b>T</b> alterna 2:1 / 30°</div>
+  <script type="module" src="poc.js"></script>
+</body>
+</html>
