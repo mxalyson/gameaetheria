@@ -107,3 +107,32 @@ Fonte: `mcp.scenario.com` e páginas oficiais (docs, preços, termos v2.1.1 de 1
 
 **Leitura honesta:** nenhuma das três promete "sprites HD anime em 8 direções prontos". O **Scenario** é a mais promissora para **fixar a identidade do Mago** (modelo treinado) e abre o caminho **imagem → 3D → renderizar as 8 direções**, que é a forma de obter consistência perfeita; **mas** não confirmei qualidade do 3D para personagem anime nem animação/rig, e o Blender não está instalado. O **SpriteCook** tende a servir melhor a criaturas e a estilo mais simples. A **API direta** é a mais barata para um teste de conceito.
 **Sugestão de ordem:** (1) Scenario no plano Free **só para avaliar** o conceito do Mago e a consistência entre vistas; (2) se o conceito agradar, decidir entre Starter/Pro para treino e 3D; (3) SpriteCook para criaturas, depois.
+
+---
+
+## 11. Terceira alternativa indicada pelo proprietário: Meshy (3D por IA), 30/10/2026
+Fonte: página oficial de preços `meshy.ai/pt-BR/pricing`, **lida por mim diretamente** (não por agente). O workspace (`meshy.ai/workspace`) foi aberto no navegador embutido e **não estava logado** ("Entrar" / "Inscreva-se grátis"); entrar ou criar conta é ação do proprietário.
+
+**O que é.** Caixa de ferramentas de IA para criar **modelos 3D** a partir de texto ou imagem, com texturização, **rigging e biblioteca de animações**. Encaixa no **caminho C** do relatório (3D → renderizar 8 direções → sprites), que dá consistência perfeita entre direções.
+
+**Plano Free (lido na página):**
+- 100 créditos/mês (redefinem no dia 1, 00:00 UTC), "até 10" gerações de ativos por mês, 1 tarefa por vez, prioridade baixa.
+- Inclui **Imagem→3D, Texto→3D, Texturização por IA, Rigging e animação** (biblioteca de **20** animações no Free; "mais de 500" nos pagos).
+- **Não** inclui: Imagem multivista→3D, Texto→Imagem, Remesh, edição de textura, API, retenção de ativos, ativos privados.
+- Downloads: **10 por mês, só do modelo "Meshy 6 Lite"** (qualidade menor).
+- **Licença: CC BY 4.0** (exige atribuição ao Meshy). FAQ: no Free você "também é bem-vindo para vender", pedindo crédito ao Meshy. Planos pagos: ativos **privados e de propriedade do cliente**.
+- Formatos de download: FBX, OBJ, USDZ, GLB, STL, BLEND.
+**Pagos:** Starter (250 créditos/mês, 25 gerações, 20 downloads, ativos privados), Pro (1.000 créditos, API), Premium (3.000), Studio (5.500). Preço em reais: a página mostra moeda BRL, mas o valor não veio no texto lido.
+
+**Limites e riscos honestos (a validar com o teste):**
+- Qualidade do 3D de **personagem anime** (rosto, mãos, mangas): **não verificada**. Costuma ser o ponto fraco de 3D por IA.
+- O Free baixa só o "Lite" e só 10 vezes por mês.
+- Para virar sprites ainda faltam **ferramentas**: renderizar o GLB em 8 direções exige Blender (não instalado) ou um renderizador (por exemplo three.js, que seria uma dependência a aprovar; **não instalada**).
+- Atribuição obrigatória (CC BY 4.0) enquanto o plano for Free; pagar muda a licença.
+- A versão com rigging/animação do Free tem só 20 animações prontas; ataque de mago específico pode não existir.
+
+**Teste proposto (cabe no Free, ≈1–3 gerações):**
+1. **Texto→3D** do Mago (sem enviar imagem), com o design original da seção 5, estilo estilizado/anime, pose em T ou A.
+2. Se o resultado servir como base, **rigging + 1 animação de andar e 1 idle** da biblioteca.
+3. Baixar **1 GLB** (conta como 1 dos 10 downloads) e avaliar: silhueta, rosto, mãos, materiais, deformação ao animar.
+Critérios: os mesmos C1–C6 da seção 6, mais **qualidade do rig** e **peso do modelo**. Subir uma imagem de referência (por exemplo o Mago do PoC) para Imagem→3D é um **envio a serviço externo e só com seu OK separado**.
