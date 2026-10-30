@@ -136,3 +136,24 @@ Fonte: página oficial de preços `meshy.ai/pt-BR/pricing`, **lida por mim diret
 2. Se o resultado servir como base, **rigging + 1 animação de andar e 1 idle** da biblioteca.
 3. Baixar **1 GLB** (conta como 1 dos 10 downloads) e avaliar: silhueta, rosto, mãos, materiais, deformação ao animar.
 Critérios: os mesmos C1–C6 da seção 6, mais **qualidade do rig** e **peso do modelo**. Subir uma imagem de referência (por exemplo o Mago do PoC) para Imagem→3D é um **envio a serviço externo e só com seu OK separado**.
+
+---
+
+## 12. Avaliação do mago 3D que o proprietário já gerou no Meshy (30/10/2026)
+Observado por mim no navegador (extensão Claude in Chrome, **somente visualização; nenhum crédito gasto, nada baixado**). Conta no plano Free, saldo de **155 créditos** (o painel mostra 0 durante o carregamento; o valor real aparece depois). Modelo "Meshy 7.1 – Flagship", criado em **29/10/2026**, na biblioteca da conta. Ao lado do modelo aparecem 4 miniaturas (três poses e o cajado), que parecem ser a referência de entrada. **A origem dessa referência não foi confirmada** (ver abaixo).
+
+**O que se vê:** personagem anime estilizado: chapéu de mago pontudo com faixa decorada, cabelo escuro curto, olhos azuis, manto longo em camadas azul e branco com acabamentos dourados, cinto com bolsas, botas, cajado ornamentado em anel com pontas. Texturizado. **1.384.564 faces e 750.945 vértices**.
+
+**Critérios (fixados na seção 6):**
+| # | Critério | Resultado |
+|---|---|---|
+| C1 | Silhueta a ~130 px | **Passa** (chapéu + cajado + manto, muito mais distinta que a arte por código) |
+| C2 | Rosto legível a 180–250 px | **Provável**: no visualizador (~330 px) olhos, cabelo e nariz são legíveis e a aba **não** cobre o rosto; a 180–250 px fica no limite, **a confirmar com um teste de renderização** |
+| C3 | Consistência entre vistas | **Passa por construção** (é um modelo 3D; todas as direções vêm do mesmo objeto) |
+| C4 | Fundo isolável | Passa (renderização de 3D tem alfa) |
+| C5 | Direitos de uso | **Pendente:** plano Free = CC BY 4.0 (exige crédito ao Meshy); e a **origem da imagem de referência** precisa ser confirmada pelo proprietário |
+| C6 | Caminho de produção | Viável **em tese**: rig + animações + renderização em 8 direções. **Não testado.** |
+
+**Riscos e limites:** modelo muito pesado (1,4 mi de faces; irrelevante para sprites pré-renderizados, ruim para uso direto no jogo; "Remesh" não está no plano Free); o visual é de **PBR semi-realista, não cel-shading** (para parecer anime em sprite, é preciso sombreamento de desenho animado e contorno na renderização); capa/manto longo e cajado podem **deformar ou atravessar o corpo** ao animar; rig automático e as 20 animações do Free **não foram testados**; renderizar em 8 direções exige Blender ou three.js (**nenhum instalado**).
+
+**Pendências que dependem do proprietário:** (1) origem da referência; (2) autorizar rig/animações (custo em créditos a confirmar na tela antes de clicar); (3) autorizar o download de 1 GLB (tamanho a informar antes); (4) escolher a ferramenta de renderização (Blender × three.js) e autorizar a instalação.
