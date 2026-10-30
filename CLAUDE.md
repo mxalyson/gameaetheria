@@ -10,7 +10,7 @@ RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro), itens por rari
 ## Comandos
 - `npm start` — servidor estático em http://localhost:5174 (`server.js`)
 - `npm test` — testes unitários do núcleo/simulação (`node:test`, `tests/*.test.js`)
-- `npm run test:e2e` — Playwright (`tests/e2e`); sobe o servidor sozinho; o jogo expõe `window.game`
+- `npm run test:e2e` — Playwright (`tests/e2e`); sobe o servidor sozinho; o jogo expõe `window.game`. `tests/e2e/mobile.spec.js` emula celular em paisagem (844×390) com toque real via protocolo do Chrome.
 
 ## Arquitetura (`public/src`)
 - `core/` — regras puras: combate, stats, loot, progressão, rival, RNG com semente. Sem DOM.
@@ -18,6 +18,7 @@ RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro), itens por rari
 - `game/` — `sim.js` (World: atores, projéteis, áreas, drops), `ai.js` (intenções de mobs/rival), `layout.js` (decoração e colisões determinísticas por zona). Sem DOM nem canvas.
 - `render/renderer.js` — única camada que desenha (funções `draw*`). Procedural, sem imagens.
 - `ui/ui.js` + `style.css` — HUD e painéis em DOM, ações via `data-action`.
+- `touch.js` + `touch-logic.js` — controles de toque (joystick, botões, auto-mira); a lógica pura fica em `touch-logic.js` (testada em Node). `prefs.js` — opções do aparelho (escala da UI, qualidade, tipo de controle), salvas à parte do personagem.
 - `main.js` — classe `Game`: loop, modos (`title | explore | pvp | waves | ended`), ações da UI. `input.js`, `save.js` (localStorage `aetheria_save_v1`), `shop.js`.
 - Princípio: simulação por "intenções" (as mesmas que um cliente enviaria a um servidor) para permitir multiplayer autoritativo no futuro. Manter determinismo (RNG com semente) e não vazar DOM para `core/`, `data/`, `game/`.
 

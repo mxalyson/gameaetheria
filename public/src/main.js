@@ -10,6 +10,8 @@ import { generateRival } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
 import { loadChar, saveChar } from './save.js';
 import { PRICES } from './shop.js';
+import { TouchControls } from './touch.js';
+import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
 import { CLASSES } from './data/classes.js';
 import { MOBS, NORMAL_MOBS, BOSS_MOBS } from './data/mobs.js';
 import { ZONES } from './data/zones.js';
@@ -24,6 +26,10 @@ class Game {
     this.renderer = new Renderer(this.canvas);
     this.input = new Input(this.canvas);
     this.ui = new UI(this);
+    this.prefs = loadPrefs();
+    this.touch = new TouchControls(this);
+    this.portrait = matchMedia('(orientation: portrait) and (pointer: coarse)');
+    this.applyPrefs();
     this.minimap = document.getElementById('minimap');
     this.rng = makeRng();
     this.char = null;
@@ -53,11 +59,13 @@ class Game {
       const cam = this.renderer.camera(w, { x: 850 + Math.cos(w.time * 0.1) * 320, y: 640 + Math.sin(w.time * 0.13) * 200 });
       this.renderer.draw(w, cam, {});
     } else {
-      this.step(dt);
+      // Celular em retrato: a tela pede para girar o aparelho; o mundo fica parado até voltar à horizontal.
+      if (!this.portrait.matches) this.step(dt);
       const p = this.player;
       this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, lowHp: !p.dead && p.hp < p.maxHp * 0.25 });
       if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
       this.ui.updateHud(this);
+      this.touch.update(this);
     }
     this.input.endFrame();
     requestAnimationFrame((t) => this.frame(t));
@@ -81,6 +89,8 @@ class Game {
       case 'unequip': this.unequip(arg); break;
       case 'alloc': this.alloc(arg); break;
       case 'sort-inv': this.sortInventory(); break;
+      case 'pref': this.setPref(arg); break;
+      case 'fullscreen': this.toggleFullscreen(); break;
       case 'buy-potion': this.buyPotion(Number(arg)); break;
       case 'buy-item': this.buyItem(Number(arg)); break;
       case 'sell-bulk': this.sellBulk(Number(arg)); break;
@@ -113,6 +123,7 @@ class Game {
     this.char = char;
     this.ui.hideScreen();
     this.ui.setupHud(char);
+    this.touch.setup(char);
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
       this.ui.toast(`Bem-vindo, ${char.name}!`, 'Siga o portal a leste para o Bosque Verdejante', 'gold');
@@ -162,6 +173,29 @@ class Game {
     p.level = this.char.level;
   }
 
+  // ---------------- preferências do aparelho ----------------
+  applyPrefs() {
+    const p = this.prefs;
+    document.documentElement.style.setProperty('--ui', String(p.scale / 100));
+    this.renderer.setQuality(resolveQuality(p, this.touch.coarse));
+    this.touch.setMode(p.controls);
+  }
+
+  setPref(arg) {
+    this.prefs = changePref(this.prefs, arg);
+    savePrefs(this.prefs);
+    this.applyPrefs();
+    if (this.ui.isOpen('options')) this.ui.render();
+  }
+
+  toggleFullscreen() {
+    const d = document;
+    if (d.fullscreenElement) { d.exitFullscreen?.(); return; }
+    d.documentElement.requestFullscreen?.()
+      .then(() => screen.orientation?.lock?.('landscape').catch(() => {}))
+      .catch(() => this.ui.log('Tela cheia não disponível neste navegador.', '#ffb4a8'));
+  }
+
   // ---------------- loop de jogo ----------------
   step(dt) {
     const p = this.player, w = this.world, inp = this.input;
@@ -181,14 +215,17 @@ class Game {
     } else {
       const intents = {};
       if (!p.dead) {
-        let cast = null;
-        ['1', '2', '3'].forEach((k, i) => { if (inp.hit(k)) cast = i; });
-        intents[p.id] = {
-          mx: (inp.held('d', 'arrowright') ? 1 : 0) - (inp.held('a', 'arrowleft') ? 1 : 0),
-          my: (inp.held('s', 'arrowdown') ? 1 : 0) - (inp.held('w', 'arrowup') ? 1 : 0),
-          aimX: inp.mouse.x + this.cam.x, aimY: inp.mouse.y + this.cam.y,
-          attack: inp.mouse.down, cast,
-        };
+        if (this.touch.active) intents[p.id] = this.touch.read(p, w);
+        else {
+          let cast = null;
+          ['1', '2', '3'].forEach((k, i) => { if (inp.hit(k)) cast = i; });
+          intents[p.id] = {
+            mx: (inp.held('d', 'arrowright') ? 1 : 0) - (inp.held('a', 'arrowleft') ? 1 : 0),
+            my: (inp.held('s', 'arrowdown') ? 1 : 0) - (inp.held('w', 'arrowup') ? 1 : 0),
+            aimX: inp.mouse.x + this.cam.x, aimY: inp.mouse.y + this.cam.y,
+            attack: inp.mouse.down, cast,
+          };
+        }
       }
       w.update(dt, intents);
       this.handleEvents();

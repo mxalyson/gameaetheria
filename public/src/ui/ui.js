@@ -6,6 +6,7 @@ import { computeStats, canEquip, itemScore } from '../core/stats.js';
 import { xpToNext, spiritXpToNext, spiritPower, MAX_LEVEL } from '../core/progression.js';
 import { tierFor } from '../core/combat.js';
 import { PRICES } from '../shop.js';
+import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -26,6 +27,13 @@ export class UI {
       const el = e.target.closest('[data-action]');
       if (!el) return;
       e.preventDefault();
+      // No toque não existe "passar o mouse": o 1º toque num item mostra os detalhes, o 2º executa a ação.
+      const tip = el.dataset.tip;
+      if (game.touch?.active && tip?.startsWith('item:') && this.armedTip !== tip) {
+        this.armedTip = tip;
+        this.showTooltip(tip, e);
+        return;
+      }
       this.hideTooltip();
       game.act(el.dataset.action, el.dataset.arg);
     });
@@ -206,7 +214,8 @@ export class UI {
   anyOpen() { return this.open.size > 0; }
   toggle(id) { this.isOpen(id) ? this.close(id) : this.openPanel(id); }
   openPanel(id) {
-    if (['shop', 'arena', 'sage'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'spirits', 'character']) this.open.delete(p);
+    if (['shop', 'arena', 'sage'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'spirits', 'character', 'options']) this.open.delete(p);
+    if (id === 'options') this.open.clear();
     this.open.add(id);
     if (id === 'shop') this.open.add('inventory');
     this.render();
@@ -220,7 +229,7 @@ export class UI {
 
   render() {
     this.hideTooltip();
-    const order = ['character', 'arena', 'sage', 'shop', 'spirits', 'inventory'];
+    const order = ['character', 'arena', 'sage', 'shop', 'spirits', 'inventory', 'options'];
     this.layer.innerHTML = order.filter((p) => this.open.has(p)).map((p) => this['panel_' + p]()).join('');
   }
 
@@ -350,6 +359,21 @@ export class UI {
       <div class="row-btns"><button class="btn small" data-action="toggle" data-arg="spirits">Ver meus spirits (P)</button></div>`);
   }
 
+  panel_options() {
+    const pr = this.game.prefs;
+    const seg = (key, items) => `<div class="seg">${items.map(([v, label]) => `<button class="btn small ${pr[key] === v ? 'sel' : ''}" data-action="pref" data-arg="${key}:${v}">${label}</button>`).join('')}</div>`;
+    return this.frame('options', 'Opções', `
+      <div class="opt-row"><b>Tamanho da interface</b>
+        <div class="seg"><button class="btn small" data-action="pref" data-arg="scale:-10" ${pr.scale <= SCALE_MIN ? 'disabled' : ''}>−</button>
+        <span class="opt-val">${pr.scale}%</span>
+        <button class="btn small" data-action="pref" data-arg="scale:+10" ${pr.scale >= SCALE_MAX ? 'disabled' : ''}>+</button></div></div>
+      <div class="opt-row"><b>Qualidade gráfica</b>${seg('quality', [['auto', 'Auto'], ['high', 'Alta'], ['medium', 'Média'], ['low', 'Baixa']])}</div>
+      <p class="hint">Baixa e média reduzem névoa, partículas e resolução: ajudam em celulares fracos e economizam bateria.</p>
+      <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Auto'], ['touch', 'Toque'], ['keyboard', 'Teclado e mouse']])}</div>
+      <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
+      <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>`);
+  }
+
   // ---------------- tooltips ----------------
   showTooltip(tip, e) {
     const html = this.tooltipHtml(tip);
@@ -358,7 +382,7 @@ export class UI {
     this.tooltip.classList.remove('hidden');
     this.placeTooltip(e);
   }
-  hideTooltip() { this.tooltip.classList.add('hidden'); }
+  hideTooltip() { this.armedTip = null; this.tooltip.classList.add('hidden'); }
   placeTooltip(e) {
     const r = this.tooltip.getBoundingClientRect();
     let x = e.clientX + 16, y = e.clientY + 16;
@@ -414,10 +438,11 @@ export class UI {
     const equipped = Object.values(char.equipment).some((e) => e?.id === it.id);
     const inShop = this.game.shopStock.some((s) => s.id === it.id);
     let action = '';
+    const again = this.game.touch?.active ? 'Toque de novo' : 'Clique';
     if (inShop) action = `Preço: 🪙 ${it.value * PRICES.itemMarkup}`;
-    else if (equipped) action = 'Clique para desequipar';
-    else if (this.isOpen('shop')) action = `Clique para vender por 🪙 ${it.value}`;
-    else if (ok.ok) action = 'Clique para equipar';
+    else if (equipped) action = `${again} para desequipar`;
+    else if (this.isOpen('shop')) action = `${again} para vender por 🪙 ${it.value}`;
+    else if (ok.ok) action = `${again} para equipar`;
     return `<div class="tt-name" style="color:${R.color}">${esc(it.name)}</div><div class="tt-sub">${sub}</div>${lines}
       ${ok.ok ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
       <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? ` · vale 🪙 ${it.value}` : ''}</div>`;

@@ -519,11 +519,12 @@ export function drawSceneryDecor(g, d, t) {
 }
 
 // ---------- atmosfera em espaço de tela ----------
-export function drawAtmosphere(g, z, cam, vw, vh, t) {
+// q: qualidade 0 (baixa) a 2 (alta). Baixa corta névoa, raios e folhas; média corta os raios e reduz partículas.
+export function drawAtmosphere(g, z, cam, vw, vh, t, q = 2) {
   const a = z.atmosphere;
   if (!a) return;
   if (a.tint) { g.fillStyle = a.tint; g.fillRect(0, 0, vw, vh); }
-  if (a.rays) {
+  if (a.rays && q >= 2) {
     g.globalCompositeOperation = 'lighter';
     for (let i = 0; i < 4; i++) {
       const x = vw * (0.05 + i * 0.27) + Math.sin(t * 0.15 + i * 2) * 26 - cam.x * 0.03, len = vh * 0.9, w = 60 + i * 22;
@@ -533,8 +534,8 @@ export function drawAtmosphere(g, z, cam, vw, vh, t) {
     }
     g.globalCompositeOperation = 'source-over';
   }
-  if (a.fog) {
-    for (let i = 0; i < a.fog.n; i++) {
+  if (a.fog && q >= 1) {
+    for (let i = 0; i < Math.ceil(a.fog.n * (q >= 2 ? 1 : 0.6)); i++) {
       const wx = mod(hash(i, 1) * z.w + t * (6 + (i % 3) * 5), z.w + 600) - 300, wy = z.h * (0.1 + hash(i, 2) * 0.8) + Math.sin(t * 0.12 + i) * 50;
       const r = 240 + (i % 4) * 70, sx = wx - cam.x, sy = wy - cam.y;
       if (sx < -r || sx > vw + r || sy < -r || sy > vh + r) continue;
@@ -546,7 +547,7 @@ export function drawAtmosphere(g, z, cam, vw, vh, t) {
   if (a.motes) {
     const m = a.motes;
     g.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < m.n; i++) {
+    for (let i = 0; i < Math.ceil(m.n * [0.3, 0.6, 1][q]); i++) {
       const u = hash(i, 3), w = hash(i, 4);
       const x = mod(u * (vw + 200) + Math.sin(t * 0.5 + i) * 20 - cam.x * 0.35 + t * m.drift * (0.5 + w), vw + 200) - 100;
       const y = mod(w * (vh + 200) - t * m.rise * (0.3 + u) - cam.y * 0.35, vh + 200) - 100;
@@ -556,7 +557,7 @@ export function drawAtmosphere(g, z, cam, vw, vh, t) {
     }
     g.globalCompositeOperation = 'source-over';
   }
-  if (a.leaves) {
+  if (a.leaves && q >= 1) {
     for (let i = 0; i < a.leaves.n; i++) {
       const u = hash(i, 5), w = hash(i, 6);
       const x = mod(u * (vw + 120) + Math.sin(t * 0.8 + i * 2) * 40 - cam.x * 0.5, vw + 120) - 60;

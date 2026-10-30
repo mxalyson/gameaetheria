@@ -41,7 +41,8 @@ SUMARIO
 10. Roteiro sugerido (ordem, dependencias, esforco)
 11. Riscos
 12. Decisoes que dependem de voce
-13. Anexos (tabelas de dados e estado do projeto)
+13. Registro de execucao (Fase 1: celular e HUD)
+14. Anexos (tabelas de dados e estado do projeto)
 
 
 ================================================================================
@@ -567,11 +568,14 @@ PROXIMO PASSO RECOMENDADO
 --------------------------------------------------------------------------------
  DIAGNOSTICO HOJE
   [EXISTE] meta viewport no HTML e canvas redimensionado ao tamanho da janela.
-  [NAO EXISTE] eventos de toque ou de ponteiro (so mouse e teclado), regras de
-  media query/orientacao no CSS, manifesto de aplicativo, service worker,
-  icones de aplicativo. Interface com tamanhos em pixels fixos (barra de
-  habilidades, paineis, registro de mensagens de 380 px de largura).
-  Resultado: hoje o jogo abre no celular mas nao e jogavel.
+  [CORRECAO 30/10/2026] A versao anterior deste texto dizia que nao havia
+  nenhuma media query; havia UMA (largura <= 900 px: grade de classes em 2
+  colunas, painel em coluna, registro de mensagens escondido). Nenhuma regra de
+  toque, orientacao ou ponteiro existia.
+  [ANTES DA FASE 1 DO ROTEIRO] nao havia eventos de toque (so mouse e teclado),
+  manifesto, service worker nem icones; interface em pixels fixos.
+  [AGORA, apos a Fase 1: ver secao 13] ha controles de toque, HUD compacta em
+  paisagem, aviso de rotacao, opcoes, manifesto e icone (sem service worker).
 
  [PROPOSTA] CONTROLES DE TOQUE (modo paisagem)
   - Esquerda: joystick virtual dinamico (aparece onde o polegar toca).
@@ -796,7 +800,34 @@ PROXIMO PASSO RECOMENDADO
 
 
 ================================================================================
-13. ANEXOS
+13. REGISTRO DE EXECUCAO: FASE 1 (CELULAR E HUD) - 30/10/2026
+================================================================================
+ FEITO E TESTADO (emulacao de celular em paisagem 844x390 com toque real do Chrome)
+  - Controles de toque: joystick dinamico analogico (esquerda); botao de ataque
+    (segurar), 3 habilidades, pocao, voltar a vila e interagir (direita).
+    Mira automatica no inimigo mais proximo; arrastar o botao de uma skill mira
+    na mao; esquiva/teleporte seguem a direcao do movimento. Multitoque.
+  - HUD compacta em paisagem de pouca altura; paineis lado a lado; criacao de
+    personagem em 4 colunas; centralizacao do minimapa.
+  - Aviso "gire o aparelho" em retrato (o jogo pausa enquanto isso).
+  - Toque em item do inventario: 1o toque mostra detalhes, 2o executa a acao.
+  - Painel Opcoes: tamanho da interface (70%-150%), qualidade grafica
+    (auto/alta/media/baixa), tipo de controle (auto/toque/teclado), tela cheia.
+    Salvo por aparelho (localStorage), separado do personagem.
+  - Qualidade grafica de verdade: limita a resolucao e corta nevoa, raios e
+    folhas nas qualidades menores.
+  - PWA minimo: manifesto (tela cheia, paisagem) e icone SVG.
+ NAO FEITO / LIMITES
+  - Nao testado em aparelho fisico nem em Android real; so emulacao do Chrome.
+  - Desempenho em celular NAO medido.
+  - Sem service worker (nao funciona offline); fontes ainda vem do Google Fonts;
+    icone so em SVG (a Play Store exigira PNG de 192/512 px) [VERIFICAR].
+  - Painel de personagem ainda rola dentro da janela em telas baixas.
+  - Gamepad, remapeamento de teclas, vibracao e idiomas: nao feitos.
+  - Passo de simulacao fixo e camera suave: nao feitos (itens 1.1 do roteiro).
+
+================================================================================
+14. ANEXOS
 ================================================================================
  ANEXO A - CLASSES E HABILIDADES [EXISTE]
  ---------------------------------------------------------------------------

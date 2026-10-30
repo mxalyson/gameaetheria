@@ -24,17 +24,26 @@ export class Renderer {
     this.c = canvas;
     this.g = canvas.getContext('2d');
     this.grounds = new Map();
+    this.dprCap = 2;
+    this.quality = 2; // 0 baixa, 1 média, 2 alta
     this.resize();
     addEventListener('resize', () => this.resize());
   }
 
   resize() {
-    this.dpr = Math.min(2, devicePixelRatio || 1);
+    this.dpr = Math.min(this.dprCap, devicePixelRatio || 1);
     this.vw = innerWidth;
     this.vh = innerHeight;
     this.c.width = Math.round(this.vw * this.dpr);
     this.c.height = Math.round(this.vh * this.dpr);
     this.vignettes = {};
+  }
+
+  // Qualidade gráfica: limita a resolução e corta efeitos de atmosfera mais caros (para celulares).
+  setQuality(level) {
+    this.quality = { low: 0, medium: 1, high: 2 }[level] ?? 2;
+    this.dprCap = [1, 1.5, 2][this.quality];
+    this.resize();
   }
 
   groundFor(world) {
@@ -119,7 +128,7 @@ export class Renderer {
     g.globalAlpha = 1;
     g.restore();
 
-    drawAtmosphere(g, z, cam, this.vw, this.vh, t);
+    drawAtmosphere(g, z, cam, this.vw, this.vh, t, this.quality);
     let vignette = this.vignettes[world.zoneId];
     if (!vignette) {
       const v = document.createElement('canvas');
