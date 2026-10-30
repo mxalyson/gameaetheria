@@ -3,6 +3,9 @@
 // Projeção isométrica 2:1; altura em "degraus" (HZ px). Luz vem da esquerda: face esquerda clara, direita escura.
 import { makeRng, hashString } from '../core/rng.js';
 import { shade } from './renderer.js';
+import { IsoHero, PX_PER_TILE } from '../game/iso-hero.js';
+import { newCharacter } from '../core/progression.js';
+import { SKILLS } from '../data/skills.js';
 
 // shade() monta strings de cor; memoizar evita refazê-las a cada quadro.
 const shadeCache = new Map();
@@ -65,6 +68,7 @@ export class Vale {
     this.fixedTime = fixedTime;
     this.stats = { frames: 0, avgMs: 0, maxMs: 0 };
     this.build();
+    this.setupPlay();
     this.resize();
     addEventListener('resize', () => this.resize());
     this.t0 = performance.now();
@@ -150,7 +154,18 @@ export class Vale {
     ruin({ k: 'fallen', x: 7.0, y: 6.7 });
     // Ponte sobre o rio, na altura das margens.
     props.push({ k: 'bridge', x: 11.35, y: 8.2, z: 3 });
-    props.push({ k: 'hero', x: HERO.x, y: HERO.y, z: this.at(6, 9).h });
+    this.dummy = add({ k: 'dummy', x: 7.7, y: 10.1, r: 0.3, def: 5, dr: 0, hitT: 0, hits: 0, total: 0, dir: 1 });
+    for (let i = props.length - 1; i >= 0; i--) {
+      const o = props[i];
+      if (o !== this.dummy && o.k !== 'bridge' && (Math.hypot(o.x - HERO.x, o.y - HERO.y) < 0.9 || Math.hypot(o.x - 7.7, o.y - 10.1) < 0.9)) props.splice(i, 1);
+    }
+    this.circles = []; this.boxes = [];
+    const SOLID = { tree: (o) => 0.2 * o.s + 0.05, bush: (o) => 0.25 * o.s, rock: (o) => 0.3 * o.s, crystal: () => 0.3, column: () => 0.3, altar: () => 0.6, dummy: () => 0.3 };
+    for (const o of props) {
+      if (SOLID[o.k]) this.circles.push({ x: o.x, y: o.y, r: SOLID[o.k](o) });
+      else if (o.k === 'box') this.boxes.push({ x0: o.x, x1: o.x + o.w, y0: o.y, y1: o.y + o.d });
+      else if (o.k === 'fallen') this.boxes.push({ x0: o.x, x1: o.x + 1.5, y0: o.y, y1: o.y + 0.34 });
+    }
     props.forEach((o) => {
       const fx = o.k === 'box' ? o.x + o.w - 0.01 : o.k === 'bridge' ? 13.64 : o.x;
       const fy = o.k === 'box' ? o.y + o.d - 0.01 : o.k === 'bridge' ? 8.79 : o.y;
@@ -176,6 +191,9 @@ export class Vale {
   loop() {
     const now = performance.now();
     const time = this.fixedTime ?? (now - this.t0) / 1000;
+    const dt = Math.min(0.05, (now - (this.lastNow ?? now)) / 1000);
+    this.lastNow = now;
+    this.update(dt);
     this.draw(time);
     const ms = performance.now() - now;
     const s = this.stats;
@@ -199,10 +217,18 @@ export class Vale {
     sh.addColorStop(0, 'rgba(5,8,18,0.7)'); sh.addColorStop(1, 'rgba(5,8,18,0)');
     g.fillStyle = sh; g.beginPath(); g.arc(0, 0, 700, 0, TAU); g.fill(); g.restore();
 
+    const H = this.player;
+    const hd = Math.min(2 * N - 2, Math.floor(H.x) + Math.floor(H.y)), hs = H.x + H.y;
     for (let d = 0; d < 2 * N - 1; d++) {
       for (const t of this.byDepth[d]) this.drawTile(g, t, time);
-      for (const o of this.propsByDepth[d] ?? []) this.drawProp(g, o, time);
+      let drawn = d !== hd;
+      for (const o of this.propsByDepth[d] ?? []) {
+        if (!drawn && o.sort > hs) { this.hero(g, H, time); drawn = true; }
+        this.drawProp(g, o, time);
+      }
+      if (!drawn) this.hero(g, H, time);
     }
+    this.drawFx(g, time);
     this.drawFallMist(g, time);
     this.drawMotes(g, time);
 
@@ -222,6 +248,7 @@ export class Vale {
     const vg = g.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * 0.4, vw / 2, vh / 2, Math.max(vw, vh) * 0.78);
     vg.addColorStop(0, 'rgba(8,10,24,0)'); vg.addColorStop(1, 'rgba(8,10,24,0.55)');
     g.fillStyle = vg; g.fillRect(0, 0, vw, vh);
+    this.drawHud(g);
   }
 
   face(g, side, t, zTop, zBot) {
@@ -406,7 +433,7 @@ export class Vale {
       case 'altar': return this.altar(g, o, time);
       case 'fallen': return this.fallen(g, o);
       case 'bridge': return this.bridge(g, o);
-      case 'hero': return this.hero(g, o, time);
+      case 'dummy': return this.dummyDraw(g, o);
     }
   }
 
@@ -569,58 +596,248 @@ export class Vale {
     isoBox(g, x0, y1 - 0.06, z + 0.4, x1 - x0, 0.06, 0.06, WOOD, false);
   }
 
-  // Herói: proporção anime (~7 cabeças), sem chibi. Figura de referência de escala, ainda sem rig.
-  hero(g, o, time) {
+  // ---------- jogo: entrada, terreno caminhável, atualização ----------
+  setupPlay() {
+    const char = newCharacter('Aren', 'warrior', makeRng(7));
+    this.player = new IsoHero(char, HERO.x, HERO.y, { seed: 11 });
+    this.player.gz = this.player.z = this.heightAt(HERO.x, HERO.y);
+    this.keys = new Set();
+    this.mouse = { x: 0, y: 0, down: false };
+    this.skillPressed = false;
+    this.fx = [];
+    this.log = [];
+    addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (!this.keys.has(k) && k === '1') this.skillPressed = true;
+      this.keys.add(k);
+      if ([' ', 'tab', 'arrowup', 'arrowdown'].includes(k)) e.preventDefault();
+    });
+    addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
+    addEventListener('blur', () => { this.keys.clear(); this.mouse.down = false; });
+    addEventListener('mousemove', (e) => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+    this.c.addEventListener('mousedown', (e) => { if (e.button === 0) this.mouse.down = true; });
+    addEventListener('mouseup', (e) => { if (e.button === 0) this.mouse.down = false; });
+    this.c.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  // Terreno visto pelo herói: altura do chão ou null se intransponível (água, fora do mapa, laterais da ponte).
+  heightAt(x, y) {
+    if (x < 0.15 || y < 0.15 || x > N - 0.15 || y > N - 0.15) return null;
+    const t = this.at(Math.floor(x), Math.floor(y));
+    if (t.river >= 0) return t.x === 12 && t.y === 8 && y > 8.2 && y < 8.8 ? 3 : null;
+    return t.h;
+  }
+
+  blocked(x, y, r) {
+    for (const c of this.circles) { const dx = c.x - x, dy = c.y - y, rr = c.r + r; if (dx * dx + dy * dy < rr * rr) return true; }
+    for (const b of this.boxes) if (x > b.x0 - r && x < b.x1 + r && y > b.y0 - r && y < b.y1 + r) return true;
+    return false;
+  }
+
+  // Pixel da tela -> posição no chão à altura z (inverso da projeção isométrica).
+  screenToWorld(px, py, z) {
+    const s = this.scale;
+    const sx = (px - this.vw / 2) / s, sy = (py - (this.vh / 2 - 290 * s)) / s;
+    const u = 2 * sx / TW, v = 2 * (sy + z * HZ) / TH;
+    return { x: (u + v) / 2, y: (v - u) / 2 };
+  }
+
+  update(dt) {
+    const H = this.player, k = this.keys;
+    let mx = 0, my = 0;
+    if (k.has('w') || k.has('arrowup')) { mx -= 1; my -= 1; }
+    if (k.has('s') || k.has('arrowdown')) { mx += 1; my += 1; }
+    if (k.has('a') || k.has('arrowleft')) { mx -= 1; my += 1; }
+    if (k.has('d') || k.has('arrowright')) { mx += 1; my -= 1; }
+    const aim = this.screenToWorld(this.mouse.x, this.mouse.y, H.z);
+    const events = H.update(dt, { mx, my, aimX: aim.x, aimY: aim.y, attack: this.mouse.down, skill: this.skillPressed }, this, [this.dummy]);
+    this.skillPressed = false;
+    for (const e of events) {
+      if (e.type === 'swing' && e.kind === 'skill') this.fx.push({ k: 'ring', x: H.x, y: H.y, z: H.z, r: SKILLS[H.skillId].radius / PX_PER_TILE, t: 0, life: 0.55 });
+      if (e.type === 'hit') {
+        const t = e.target;
+        t.hitT = 0.3; t.hits++; t.total += e.amount; t.dir = H.flip;
+        this.fx.push({ k: 'text', x: t.x, y: t.y, z: this.dummy.z + 1.7, t: 0, life: 0.9, text: String(e.amount), crit: e.crit });
+        this.fx.push({ k: 'spark', x: t.x, y: t.y, z: this.dummy.z + 1.0, t: 0, life: 0.25 });
+        this.log.push({ kind: e.kind, amount: e.amount, crit: e.crit });
+        if (this.log.length > 50) this.log.shift();
+      }
+    }
+    this.dummy.hitT = Math.max(0, this.dummy.hitT - dt);
+    for (const f of this.fx) f.t += dt;
+    this.fx = this.fx.filter((f) => f.t < f.life);
+  }
+
+  // ---------- efeitos e HUD ----------
+  drawFx(g) {
+    g.globalCompositeOperation = 'lighter';
+    for (const f of this.fx) {
+      const e = f.t / f.life;
+      if (f.k === 'ring') {
+        for (const [k, a] of [[1, 0.75], [0.72, 0.4]]) {
+          const r = f.r * k * (0.3 + 0.7 * Math.sqrt(e));
+          const pts = Array.from({ length: 48 }, (_, i) => P(f.x + Math.cos(i / 48 * TAU) * r, f.y + Math.sin(i / 48 * TAU) * r, f.z + 0.03));
+          g.strokeStyle = `rgba(190,240,255,${a * (1 - e)})`; g.lineWidth = 5 * (1 - e) + 1; poly(g, pts); g.stroke();
+        }
+      } else if (f.k === 'spark') {
+        const [px, py] = P(f.x, f.y, f.z);
+        g.strokeStyle = `rgba(255,236,170,${1 - e})`; g.lineWidth = 2;
+        g.beginPath();
+        for (let i = 0; i < 8; i++) { const a = i / 8 * TAU, r0 = 4 + e * 6, r1 = 10 + e * 16; g.moveTo(px + Math.cos(a) * r0, py + Math.sin(a) * r0 * 0.7); g.lineTo(px + Math.cos(a) * r1, py + Math.sin(a) * r1 * 0.7); }
+        g.stroke();
+      }
+    }
+    g.globalCompositeOperation = 'source-over';
+    for (const f of this.fx) {
+      if (f.k !== 'text') continue;
+      const e = f.t / f.life, [px, py] = P(f.x, f.y, f.z);
+      const size = f.crit ? 24 : 17, pop = e < 0.12 ? 1 + (0.12 - e) * 4 : 1;
+      g.save(); g.translate(px, py - e * 30); g.scale(pop, pop);
+      g.globalAlpha = 1 - Math.max(0, (e - 0.6) / 0.4);
+      g.font = `800 ${size}px Nunito, system-ui, sans-serif`; g.textAlign = 'center';
+      g.lineWidth = 4; g.strokeStyle = 'rgba(20,20,35,0.8)'; g.strokeText(f.text, 0, 0);
+      g.fillStyle = f.crit ? '#ffd45a' : '#ffffff'; g.fillText(f.text, 0, 0);
+      g.restore();
+    }
+    g.globalAlpha = 1;
+  }
+
+  drawHud(g) {
+    const H = this.player, vw = this.vw, vh = this.vh;
+    const slots = [
+      { key: 'Clique', icon: '⚔️', name: 'Ataque', cd: H.cds.basic, max: H.cooldownMax.basic },
+      { key: '1', icon: SKILLS[H.skillId].icon, name: SKILLS[H.skillId].name, cd: H.cds.skill, max: H.cooldownMax.skill },
+    ];
+    const w = 64, gap = 14, x0 = vw / 2 - (slots.length * w + (slots.length - 1) * gap) / 2, y0 = vh - w - 34;
+    g.textAlign = 'center';
+    slots.forEach((sl, i) => {
+      const x = x0 + i * (w + gap);
+      g.fillStyle = 'rgba(16,20,40,0.78)'; g.strokeStyle = sl.cd > 0 ? 'rgba(160,170,210,0.5)' : 'rgba(150,235,255,0.9)'; g.lineWidth = 2;
+      g.beginPath(); g.roundRect(x, y0, w, w, 12); g.fill(); g.stroke();
+      g.font = '28px system-ui, sans-serif'; g.fillStyle = '#fff'; g.fillText(sl.icon, x + w / 2, y0 + 40);
+      if (sl.cd > 0) {
+        g.save(); g.beginPath(); g.roundRect(x, y0, w, w, 12); g.clip();
+        g.fillStyle = 'rgba(8,10,22,0.7)'; g.fillRect(x, y0, w, w * Math.min(1, sl.cd / sl.max));
+        g.restore();
+        g.font = '800 18px Nunito, system-ui, sans-serif'; g.fillStyle = '#e9e4ff'; g.fillText(sl.cd.toFixed(1), x + w / 2, y0 + 38);
+      }
+      g.font = '800 11px Nunito, system-ui, sans-serif'; g.fillStyle = '#c9c4e8'; g.fillText(sl.key, x + w / 2, y0 + w + 14);
+      g.fillStyle = '#9aa0c8'; g.font = '600 10px system-ui, sans-serif'; g.fillText(sl.name, x + w / 2, y0 + w + 27);
+    });
+    g.textAlign = 'right'; g.font = '800 14px Nunito, system-ui, sans-serif'; g.fillStyle = '#e9e4ff';
+    g.fillText(`${H.char.name} · ${H.cls.name} Nv ${H.char.level}`, vw - 20, 28);
+    g.font = '600 12px system-ui, sans-serif'; g.fillStyle = '#9aa0c8';
+    g.fillText(`Poder ${H.stats.power} · Velocidade ${Math.round(H.stats.moveSpeed)}`, vw - 20, 46);
+    g.fillText('WASD mover · mouse mira · clique ataca · 1 golpe giratório', vw - 20, 64);
+    g.textAlign = 'left';
+  }
+
+  dummyDraw(g, o) {
     const [sx, sy] = P(o.x, o.y, o.z);
-    const bob = Math.sin(time * 2) * 0.8, sway = Math.sin(time * 2.4);
+    const w = o.hitT > 0 ? Math.sin(o.hitT * 40) * o.hitT * 14 * o.dir : 0;
+    ell(g, sx + 8, sy + 2, 17, 6, 'rgba(12,20,40,0.3)');
+    g.fillStyle = '#6e4a2a'; g.fillRect(sx - 2.5, sy - 16, 5, 16);
+    g.save(); g.translate(sx, sy - 16); g.rotate(w * Math.PI / 180);
+    g.fillStyle = '#7a5535'; g.fillRect(-2.5, -28, 5, 28);
+    g.fillRect(-14, -24, 28, 4);
+    poly(g, [[-9, -32], [9, -32], [11, -12], [-11, -12]], o.hitT > 0 ? '#ffe0c0' : '#d9bb7a');
+    poly(g, [[1, -32], [9, -32], [11, -12], [1, -12]], o.hitT > 0 ? '#f2c9a0' : '#b99a5c');
+    ell(g, 0, -40, 7, 7, o.hitT > 0 ? '#ffe0c0' : '#d9bb7a');
+    g.strokeStyle = '#b8453a'; g.lineWidth = 2;
+    for (const r of [8, 5, 2]) { g.beginPath(); g.arc(0, -22, r, 0, TAU); g.stroke(); }
+    g.restore();
+  }
+
+  // Herói: proporção anime (~7 cabeças), sem chibi. Poses procedurais: parado, andando, ataque e giro.
+  hero(g, H, time) {
+    const [sx, sy] = P(H.x, H.y, H.z);
+    const p = H.progress, flip = H.flip, back = H.fx + H.fy < -0.15;
+    const walking = H.state === 'walk', acting = H.state === 'attack' || H.state === 'skill';
+    const wc = H.walkT * 9, step = walking ? Math.sin(wc) : 0;
+    const bob = walking ? Math.abs(Math.sin(wc)) * 1.4 : Math.sin(time * 2) * 0.7;
+    const cape = Math.sin(time * 2.4) * 2 + (walking ? -3 : 0);
     const blink = (time % 4.2) < 0.12;
+    const squash = H.state === 'skill' ? 0.7 + 0.3 * Math.abs(Math.cos(p * TAU * 2.2)) : 1;
     ell(g, sx + 5, sy + 1, 13, 4.5, 'rgba(12,20,40,0.38)');
-    g.save(); g.translate(sx, sy + bob * 0.3);
-    // capa
-    poly(g, [[-7, -41], [7, -41], [10 + sway * 2, -14], [-1, -10], [-10 + sway * 2, -15]], '#7d2a3c');
-    poly(g, [[-1, -41], [7, -41], [10 + sway * 2, -14], [-1, -10]], '#5e1d2e');
-    // espada nas costas
-    poly(g, [[3, -38], [5, -36], [13, -57], [11, -58]], '#cfd6e6');
-    poly(g, [[9, -50], [15, -52], [16, -50], [10, -48]], '#d8b25a');
-    // pernas e botas
-    poly(g, [[-6, -22], [-1, -22], [-1.5, -5], [-6, -5]], '#2b3354');
-    poly(g, [[1, -22], [6, -22], [6.5, -5], [1.5, -5]], '#222a46');
-    poly(g, [[-7, -6], [-1, -6], [-0.5, 0], [-8, 0]], '#5b3b2b');
-    poly(g, [[1, -6], [7, -6], [8, 0], [0.5, 0]], '#4a2f22');
-    // túnica
+    if (H.state === 'skill') ell(g, sx, sy, 22, 8, `rgba(190,240,255,${0.3 * Math.sin(p * Math.PI)})`);
+    g.save(); g.translate(sx, sy - bob * 0.5); g.scale(flip * squash, 1);
+
+    const capePoly = (c1, c2) => {
+      poly(g, [[-7, -41], [7, -41], [10 + cape, -14], [-1, -10], [-10 + cape, -15]], c1);
+      poly(g, [[-1, -41], [7, -41], [10 + cape, -14], [-1, -10]], c2);
+    };
+    if (!back) capePoly('#7d2a3c', '#5e1d2e');
+    if (!acting) {
+      poly(g, [[3, -38], [5, -36], [13, -57], [11, -58]], '#cfd6e6');
+      poly(g, [[9, -50], [15, -52], [16, -50], [10, -48]], '#d8b25a');
+    }
+    const leg = (x0, off, lift, c1, c2) => {
+      poly(g, [[x0, -22], [x0 + 5, -22], [x0 + 4.5 + off * 0.6, -5 - lift], [x0 - 0.5 + off * 0.6, -5 - lift]], c1);
+      poly(g, [[x0 - 1 + off, -6 - lift], [x0 + 5 + off, -6 - lift], [x0 + 6 + off, -lift], [x0 - 2 + off, -lift]], c2);
+    };
+    leg(-6, step * 3.4, Math.max(0, -step) * 2.4, '#2b3354', '#5b3b2b');
+    leg(1, -step * 3.4, Math.max(0, step) * 2.4, '#222a46', '#4a2f22');
     poly(g, [[-8, -42], [8, -42], [9, -26], [11, -17], [-11, -17], [-9, -26]], '#2f93a3');
     poly(g, [[1, -42], [8, -42], [9, -26], [11, -17], [1, -17]], '#237787');
     poly(g, [[-11, -17], [11, -17], [11, -15], [-11, -15]], '#e0c06a');
     poly(g, [[-9, -28], [9, -28], [9, -25.5], [-9, -25.5]], '#d2a94c');
     poly(g, [[-1, -42], [1, -42], [1, -17], [-1, -17]], '#e8d38a');
-    // braços
-    poly(g, [[-10, -41], [-7, -41], [-8, -27], [-11, -27]], '#2f93a3');
-    poly(g, [[7, -41], [10, -41], [11, -27], [8, -27]], '#237787');
-    ell(g, -9.5, -26, 2.4, 2.6, '#f6d5bd'); ell(g, 9.5, -26, 2.4, 2.6, '#e8c0a6');
-    // lenço
+    if (back) capePoly('#7d2a3c', '#5e1d2e');
+    const sw = walking ? step * 2.5 : 0;
+    poly(g, [[-10, -41], [-7, -41], [-8, -27 + sw], [-11, -27 + sw]], '#2f93a3');
+    ell(g, -9.5, -26 + sw, 2.4, 2.6, '#f6d5bd');
+    if (!acting) {
+      poly(g, [[7, -41], [10, -41], [11, -27 - sw], [8, -27 - sw]], '#237787');
+      ell(g, 9.5, -26 - sw, 2.4, 2.6, '#e8c0a6');
+    }
     poly(g, [[-6, -44], [6, -44], [7, -40], [-7, -40]], '#d9524a');
-    poly(g, [[3, -41], [7, -40], [9 + sway * 2, -31], [5 + sway * 2, -32]], '#b83d3b');
-    // cabeça
+    poly(g, [[3, -41], [7, -40], [9 + cape, -31], [5 + cape, -32]], '#b83d3b');
+
     const hy = -51;
     poly(g, [[-3, -46], [3, -46], [3, -43], [-3, -43]], '#e8c0a6');
     g.fillStyle = '#f6d5bd'; g.beginPath(); g.ellipse(0, hy, 5.4, 6.4, 0, 0, TAU); g.fill();
-    // cabelo: franja em pontas, rabo de cavalo
-    const hair = '#262b63', hl = '#8fa2ff';
-    poly(g, [[5, hy - 4], [11 + sway * 2, hy + 2], [14 + sway * 3, hy + 14], [8, hy + 3], [5, hy + 2]], hair);
+    const hair = '#262b63', hl = '#8fa2ff', hs = cape * 0.8;
+    poly(g, [[5, hy - 4], [11 + hs, hy + 2], [14 + hs * 1.5, hy + 14], [8, hy + 3], [5, hy + 2]], hair);
     g.fillStyle = hair; g.beginPath(); g.ellipse(0, hy - 2.5, 6.2, 5.2, 0, Math.PI, TAU); g.fill();
-    poly(g, [[-6, hy - 2], [-3, hy + 2], [-5, hy + 6]], hair);
-    poly(g, [[-3, hy - 2], [0, hy + 3.5], [1.5, hy - 2]], hair);
-    poly(g, [[1.5, hy - 2], [4, hy + 3], [6, hy - 2]], hair);
-    poly(g, [[-4, hy - 7], [0, hy - 8.5], [-1, hy - 5]], hl);
-    // olhos
-    if (blink) { g.strokeStyle = '#2a2250'; g.lineWidth = 1; g.beginPath(); g.moveTo(-3.8, hy + 1.2); g.lineTo(-1.4, hy + 1.2); g.moveTo(1.4, hy + 1.2); g.lineTo(3.8, hy + 1.2); g.stroke(); }
+    if (back) { g.beginPath(); g.ellipse(0, hy, 5.9, 6.7, 0, 0, TAU); g.fill(); poly(g, [[-4, hy - 7], [0, hy - 8.5], [-1, hy - 5]], hl); }
     else {
-      for (const ex of [-2.6, 2.6]) {
-        ell(g, ex, hy + 1.2, 1.6, 2.1, '#3ac3df');
-        ell(g, ex, hy + 1.6, 0.8, 1.3, '#16336a');
-        ell(g, ex - 0.5, hy + 0.5, 0.5, 0.5, '#fff');
+      poly(g, [[-6, hy - 2], [-3, hy + 2], [-5, hy + 6]], hair);
+      poly(g, [[-3, hy - 2], [0, hy + 3.5], [1.5, hy - 2]], hair);
+      poly(g, [[1.5, hy - 2], [4, hy + 3], [6, hy - 2]], hair);
+      poly(g, [[-4, hy - 7], [0, hy - 8.5], [-1, hy - 5]], hl);
+      if (blink) { g.strokeStyle = '#2a2250'; g.lineWidth = 1; g.beginPath(); g.moveTo(-3.8, hy + 1.2); g.lineTo(-1.4, hy + 1.2); g.moveTo(1.4, hy + 1.2); g.lineTo(3.8, hy + 1.2); g.stroke(); }
+      else for (const ex of [-2.6, 2.6]) {
+        ell(g, ex, hy + 1.2, 1.6, 2.1, '#3ac3df'); ell(g, ex, hy + 1.6, 0.8, 1.3, '#16336a'); ell(g, ex - 0.5, hy + 0.5, 0.5, 0.5, '#fff');
       }
+    }
+
+    // Espada na mão durante ataque/habilidade, com rastro de luz.
+    if (acting) {
+      const lx = (H.fx - H.fy) * flip, ly = (H.fx + H.fy) / 2, a0 = Math.atan2(ly, Math.abs(lx) < 0.01 ? 0.01 : lx);
+      let th, from;
+      if (H.state === 'attack') {
+        const w = 0.15, e = p < w ? -(p / w) * 0.35 : 1 - (1 - Math.min(1, (p - w) / 0.5)) ** 3;
+        th = a0 - 1.1 + (e >= 0 ? e * 2.2 : e); from = a0 - 1.1;
+      } else { th = a0 + p * TAU * 2.2; from = th - 1.4; }
+      const px = 7, py = -37, c = Math.cos(th), s = Math.sin(th);
+      g.strokeStyle = '#f6d5bd'; g.lineWidth = 3; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(px - 1, py + 2); g.lineTo(px + c * 7, py + s * 7); g.stroke();
+      const vis = H.state === 'skill' ? 1 : Math.max(0, Math.min(1, (p - 0.15) * 4)) * (1 - p);
+      if (vis > 0.02 && th > from) {
+        g.globalCompositeOperation = 'lighter';
+        g.strokeStyle = `rgba(190,240,255,${0.75 * vis})`; g.lineWidth = 6;
+        g.beginPath(); g.arc(px, py, 23, from, th); g.stroke();
+        g.strokeStyle = `rgba(255,255,255,${0.6 * vis})`; g.lineWidth = 2;
+        g.beginPath(); g.arc(px, py, 23, from + (th - from) * 0.5, th); g.stroke();
+        g.globalCompositeOperation = 'source-over';
+      }
+      poly(g, [[px + c * 6 - s * 2.3, py + s * 6 + c * 2.3], [px + c * 29, py + s * 29], [px + c * 6 + s * 2.3, py + s * 6 - c * 2.3]], '#dfe6f4');
+      poly(g, [[px + c * 6, py + s * 6], [px + c * 29, py + s * 29], [px + c * 6 + s * 2.3, py + s * 6 - c * 2.3]], '#a9b4cc');
+      g.strokeStyle = '#d8b25a'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(px + c * 6 - s * 4.5, py + s * 6 + c * 4.5); g.lineTo(px + c * 6 + s * 4.5, py + s * 6 - c * 4.5); g.stroke();
+      ell(g, px + c * 7, py + s * 7, 2.4, 2.4, '#e8c0a6');
     }
     g.restore();
   }
+
 }
