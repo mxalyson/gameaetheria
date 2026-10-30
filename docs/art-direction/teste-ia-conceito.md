@@ -80,3 +80,30 @@ Fonte: repositório `github.com/SpriteCook/claude-plugin` (licença MIT segundo 
 2. Duas variações usando o herói como `reference_asset_id` (pose de andar; pose de ataque).
 3. Se sobrarem créditos, 1 animação `walk` para ver quadros, tamanho e consistência.
 Avaliar pelos critérios C1–C6 da seção 6, mais: **quantas direções saem de fato**, **o tamanho em pixels** e **se o rosto é legível a 180–250 px**. Cada geração consome créditos: **peço sua confirmação antes de cada lote**.
+
+---
+
+## 9. Segunda alternativa indicada pelo proprietário: Scenario MCP (30/10/2026)
+Fonte: `mcp.scenario.com` e páginas oficiais (docs, preços, termos v2.1.1 de 16/07/2026, privacidade, changelog), lidas por um agente de leitura. [CITADO] = veio dessa leitura e **deve ser conferido por você no site**. Não estava disponível como ferramenta nesta sessão.
+
+**O que é.** Plataforma generativa **geral** (imagem, vídeo, 3D, áudio) com servidor MCP remoto (~97–99 ferramentas, v0.36.0; as páginas divergem no número). Não é focada em sprites.
+**Instalação (só você pode):** Claude Desktop → *Customize → Connectors → Add → Add custom connector* → URL `https://mcp.scenario.com/mcp` → concluir o login (OAuth) no navegador. Claude Code: `claude mcp add --transport http scenario https://mcp.scenario.com/mcp`. Conta em `app.scenario.com`. **Não usar chave de API fixa em conector de organização** (dá o acesso dela a todos os membros) e nunca colar chave/token no chat.
+
+**Capacidades confirmadas** [CITADO]: gerar imagens por vários modelos (`model_run`, com `dry_run` para estimar o custo antes); **treinar modelo próprio** de personagem com 5–15 imagens (plano **Pro**); imagem de referência; remover fundo e ampliar; **imagem → 3D** (GLB, OBJ, FBX); vídeo; áudio. **Não confirmados:** spritesheet, folha de rotação (turnaround), ferramenta de animação de personagem, PNG com transparência explícita, resolução máxima.
+
+**Preços** [CITADO]: Free "50 créditos" (a página diverge entre diário e único); Starter US$ 15/mês (1.500 créditos, todos os modelos, gerações privadas, **sem** treino); **Pro US$ 45/mês (5.000 créditos, treino de modelo)**; Max US$ 75. Créditos não acumulam. Custo por imagem/treino **não encontrado** (usar `dry_run`).
+**Licença** [CITADO]: "You own your Generated Assets", uso comercial permitido (seção 4.3), **mas** "Free plan outputs are for personal and evaluation use only": **o plano Free serve para avaliar, não para arte do jogo**. Sem garantia de unicidade nem de direito autoral (4.5). Termos 4.6 permitem usar seu conteúdo para melhorar a IA nos planos comuns, enquanto o rodapé diz "No data reuse" (**contradição**). Dados processados em servidores nos EUA.
+
+## 10. Comparação das três opções
+| | Scenario | SpriteCook | API direta (Gemini/OpenRouter) |
+|---|---|---|---|
+| Foco | geral (imagem, 3D, vídeo) | **pixel art** e sprites | imagem |
+| Consistência do personagem | **treino de modelo próprio** (Pro) + referência | referência/tema, sem garantia | só referência na imagem |
+| Direções/animação | não confirmado | 3–4 direções, animações curtas | nenhuma |
+| 3D (caminho C) | **sim** (imagem → GLB) | não | não |
+| Free serve para o jogo? | **não** (só avaliação) | sim (mas pública e sem spritesheet) | depende do provedor |
+| Custo para um teste sério | Starter US$ 15 / Pro US$ 45 | Free (≈3–5 imagens) ou US$ 8 | ≈ US$ 0,5 por 6 imagens |
+| Pior risco | termos de dados contraditórios | foco pixel, sem 8 direções | sem chave configurada |
+
+**Leitura honesta:** nenhuma das três promete "sprites HD anime em 8 direções prontos". O **Scenario** é a mais promissora para **fixar a identidade do Mago** (modelo treinado) e abre o caminho **imagem → 3D → renderizar as 8 direções**, que é a forma de obter consistência perfeita; **mas** não confirmei qualidade do 3D para personagem anime nem animação/rig, e o Blender não está instalado. O **SpriteCook** tende a servir melhor a criaturas e a estilo mais simples. A **API direta** é a mais barata para um teste de conceito.
+**Sugestão de ordem:** (1) Scenario no plano Free **só para avaliar** o conceito do Mago e a consistência entre vistas; (2) se o conceito agradar, decidir entre Starter/Pro para treino e 3D; (3) SpriteCook para criaturas, depois.
