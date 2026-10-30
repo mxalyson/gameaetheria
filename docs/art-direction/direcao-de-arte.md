@@ -1,3 +1,5 @@
+> **Atualização 2026-10-30:** a direção visual agora é **Isometric HD Anime Fantasy** (decisão 0004). O texto abaixo descreve o estado e a direção **anteriores** (0003) e permanece como histórico; o cenário rico top-down existente é transitório.
+
 # Direção de arte
 Referência aprovada: o estilo atual do jogo (top-down 2D, pastel limpo, procedural em Canvas 2D). Ver `docs/decisions/0003-estilo-visual-atual.md`. O diorama isométrico (protótipo `/vale.html`) foi rejeitado.
 

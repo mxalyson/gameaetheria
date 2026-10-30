@@ -4,7 +4,8 @@ RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro), itens por rari
 
 ## Decisões fixas
 - **Motor: Canvas 2D próprio.** Babylon.js/3D/GLB/Blender foram recusados (ver `docs/decisions/0001-manter-canvas-2d.md`). Não reintroduzir sem autorização do usuário.
-- **Direção de arte: o estilo atual do jogo (top-down 2D, pastel limpo, procedural) é a referência aprovada pelo usuário.** O diorama isométrico do Vale de Auren foi testado nas Fases 3-4 e **rejeitado** (ver `docs/decisions/0003-estilo-visual-atual.md`). Melhorias visuais devem evoluir o estilo existente, não trocá-lo. A skill `aetheria-art-direction` ainda descreve a meta antiga e deve ser revisada antes de ser usada.
+- **Direção de arte: ISOMETRIC HD ANIME FANTASY** (decisão 0004, do proprietário). Câmera isométrica real; personagens anime fantasy HD; produção híbrida (sprites originais + efeitos/ambiente procedurais); prioridade em personagens, animações e combate; PC primeiro, Android depois. O estilo pastel top-down anterior (0003) é histórico e **não é a direção definitiva**; o Vale de Auren foi rejeitado e fica arquivado (não importar em `main.js`, não apagar, não reaproveitar visual automaticamente). Não reverter essas decisões sem nova aprovação.
+- **Motor de renderização:** Canvas 2D segue válido (0001) até a decisão Canvas 2D × PixiJS por prova de conceito. Plano e riscos em `docs/roadmap/isometric-migration.md`. A simulação (`core/`, `data/`, `game/`) não deve ser alterada pela migração visual; a renderização consome o estado, não controla regras.
 - Trabalho em fases; ao fim de cada fase, relatar e aguardar aprovação.
 
 ## Comandos

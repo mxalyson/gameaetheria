@@ -9,3 +9,5 @@ Consequências:
 - O estilo atual é a referência; melhorias evoluem esse estilo.
 - O protótipo do Vale fica no repositório (commits 19598a2 e 41553c7) apenas como experimento isolado; não está ligado ao jogo. Remoção só com autorização.
 - A skill `aetheria-art-direction` e `docs/art-direction/direcao-de-arte.md` descrevem a meta antiga e precisam ser revisados com o usuário.
+
+> **Atualização 2026-10-30:** substituída pela decisão 0004 (Isometric HD Anime Fantasy). Mantida como histórico.

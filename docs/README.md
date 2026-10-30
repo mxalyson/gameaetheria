@@ -6,3 +6,4 @@
 - `decisions/` — registros de decisão (ADR)
 
 Pastas adicionais (characters, creatures, environments, animation, vfx, performance) serão criadas quando houver conteúdo a documentar.
+- `roadmap/` — planos técnicos (migração isométrica)
