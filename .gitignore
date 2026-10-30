@@ -4,3 +4,5 @@ playwright-report/
 .env
 *.log
 art-tests/
+public/labs/iso-poc/art-local/
+/*.glb

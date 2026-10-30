@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-br"><head><meta charset="utf-8"><title>Atlas viewer (laboratório)</title>
+<style>body{margin:0;background:#2a2d36;color:#ddd;font:13px system-ui;padding:12px}canvas{background:#3a3f4c;border-radius:8px;margin:4px}label{margin-right:10px}</style></head><body>
+<div id="bar"></div><div id="row"></div><pre id="info"></pre>
+<script type="module">
+// Mostra os atlas gerados por tools/bake-atlas.mjs (art-local/atlas/<id>/): cada personagem animando um clipe nas 8 direções.
+// ?who=paladino,aprendiz,franco,sacerdote&clip=walk   — usa loadAtlas/drawFrame do próprio laboratório (mesmo formato do jogo).
+import { loadAtlas, drawFrame, atlasMiB } from './src/atlas.js';
+const q = new URLSearchParams(location.search);
+const who = (q.get('who') || 'paladino,aprendiz,franco,sacerdote').split(','), clip = q.get('clip') || 'idle', zoom = +(q.get('zoom') || 1);
+const row = document.getElementById('row'), info = document.getElementById('info'), cells = [];
+let mib = 0;
+for (const id of who) {
+  const meta = await (await fetch(`./art-local/atlas/${id}/${id}.json`)).json();
+  const urls = Object.fromEntries(Object.keys(meta.clips).map((c) => [c, `./art-local/atlas/${id}/${c}.png`]));
+  const atlas = await loadAtlas(meta, urls); mib += atlasMiB(atlas);
+  for (let v = 0; v < 8; v++) { const cv = document.createElement('canvas'); cv.width = 132 * zoom; cv.height = 132 * zoom; row.appendChild(cv); cells.push({ cv, atlas, v }); }
+  row.appendChild(document.createElement('br'));
+}
+info.textContent = `clip=${clip}  texturas: ${mib} MiB (${who.length} personagens, todos os clipes)`;
+window.atlasView = { ready: true, mib, clip };
+const t0 = performance.now();
+function loop() {
+  const t = (performance.now() - t0) / 1000;
+  for (const { cv, atlas, v } of cells) {
+    const c = atlas.meta.clips[clip], g = cv.getContext('2d');
+    const f = Math.floor(t * c.fps) % c.frames;
+    g.clearRect(0, 0, cv.width, cv.height);
+    drawFrame(g, atlas, clip, v, f, 66 * zoom, 120 * zoom, zoom);
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script></body></html>

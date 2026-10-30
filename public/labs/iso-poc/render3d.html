@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-br"><head><meta charset="utf-8"><title>Render 3D → sprites (laboratório)</title>
+<style>body{margin:0;background:#2a2d36;color:#ddd;font:12px system-ui}#sheet{display:block}</style>
+<script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js"}}</script>
+</head><body>
+<canvas id="sheet"></canvas>
+<script type="module">
+// Fotografa um GLB (sem esqueleto) em 8 direções (0 S,1 SE,2 E,3 NE,4 N,5 NW,6 W,7 SW) com câmera ortográfica a 30° de elevação.
+// Modo vistas:  ?model=paladino&size=192            -> window.render3d.views (8 PNGs)
+// Modo clipes:  ?model=paladino&size=160&clips=1    -> window.render3d.sheets { clipe: dataURL } + meta (formato de src/atlas.js)
+// A animação é CORPO RÍGIDO (balanço, pulo, inclinação, achatar/esticar) aplicada ao modelo inteiro em torno dos pés: não há esqueleto.
+// ?clip=0.035 corta tudo abaixo de 3,5% da altura (remove pedestais que a IA 3D modelou junto com o personagem).
+import * as THREE from 'three';
+import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from './vendor/three/examples/jsm/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search);
+const model = q.get('model') || 'paladino', size = +(q.get('size') || 192), aa = +(q.get('aa') || 2);
+const EL = THREE.MathUtils.degToRad(+(q.get('el') || 30));
+const out = (window.render3d = { ready: false, views: [], sheets: {}, meta: null, info: {} });
+
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(size * aa, size * aa);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;
+const scene = new THREE.Scene();
+const pm = new THREE.PMREMGenerator(renderer);
+scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+const key = new THREE.DirectionalLight(0xfff1dc, 2.4); key.position.set(-3, 5, 4); scene.add(key); // luz principal: alto-esquerda-frente (igual ao jogo)
+const rim = new THREE.DirectionalLight(0xbcd4ff, 0.9); rim.position.set(3, 2, -4); scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8fa8, 0.7));
+
+const rig = q.get('rig'); // ?rig=1 -> GLB com esqueleto/animações do Blender (art-local/rigged/<id>.glb); sem ele, animação rígida
+const gltf = await new GLTFLoader().loadAsync(rig ? `./art-local/rigged/${model}.glb` : `./art-local/${model}.glb`);
+const obj = gltf.scene;
+const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+obj.position.set(-c.x, -box.min.y, -c.z); // pés em y=0, centro em x/z
+const clip = +(q.get('clip') || 0);
+if (clip > 0) { renderer.localClippingEnabled = true; renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -clip * sz.y)]; }
+const anim = new THREE.Group(); anim.rotation.order = 'YXZ'; anim.add(obj);   // transformações do clipe (em torno dos pés)
+const pivot = new THREE.Group(); pivot.add(anim); scene.add(pivot);             // yaw da direção de vista
+const mixer = rig ? new THREE.AnimationMixer(obj) : null;
+const acts = rig ? Object.fromEntries(gltf.animations.map((c) => [c.name, mixer.clipAction(c)])) : {};
+if (rig) out.info.anims = gltf.animations.map((c) => `${c.name}:${c.duration.toFixed(2)}s`);
+function setAnim(name, f) { // posiciona o esqueleto no quadro f (autoria a 24 fps)
+  if (!mixer) return;
+  for (const a of Object.values(acts)) a.stop();
+  const a = acts[name]; a.reset().play(); mixer.setTime(f / 24);
+}
+const H = +(q.get('h') || sz.y * (q.get('clips') ? 1.32 : 1.18)); // clipes têm mais margem: pulo/inclinação não podem cortar o quadro // altura visível da câmera ortográfica (margem para chapéus/plumas/armas)
+const cam = new THREE.OrthographicCamera(-H / 2, H / 2, H / 2, -H / 2, 0.1, 50);
+const dist = 10;
+cam.position.set(0, sz.y / 2 + Math.sin(EL) * dist, Math.cos(EL) * dist);
+cam.lookAt(0, sz.y * 0.5, 0);
+out.info = { size: sz.toArray(), tris: 0, H };
+obj.traverse((o) => { if (o.isMesh) out.info.tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+
+const work = document.createElement('canvas'); work.width = work.height = size; const wg = work.getContext('2d'); wg.imageSmoothingQuality = 'high';
+const h = sz.y;
+// Poses por clipe. Unidades: ângulos em rad (rx>0 inclina para a FRENTE do personagem), deslocamentos em fração da altura.
+const KEY = {
+  attack: { rx: [-0.12, -0.2, 0.02, 0.3, 0.18, 0.05], tz: [-0.02, -0.04, 0.04, 0.12, 0.08, 0.02], y: [0, 0, 0.02, 0.03, 0.01, 0], sy: [1, 0.95, 1.04, 0.97, 1, 1] },
+  skill: { rx: [-0.1, -0.22, -0.1, 0.1, 0.3, 0.2, 0.1, 0], tz: [0, -0.03, 0.02, 0.06, 0.14, 0.09, 0.03, 0], y: [0, -0.02, 0.04, 0.07, 0.02, 0, 0, 0], sy: [1, 0.9, 1.06, 1.08, 0.9, 0.98, 1, 1], ry: [0, 0, 0.25, 0.5, 0.5, 0.25, 0, 0] },
+  hit: { rx: [-0.22, -0.3, -0.1], tz: [-0.05, -0.09, -0.03], y: [0, 0.01, 0], sy: [0.92, 0.9, 0.98], tint: [0.6, 0.35, 0] },
+};
+function pose(name, f, n) {
+  const P = { y: 0, tz: 0, rx: 0, ry: 0, rz: 0, sy: 1, tint: 0 }, p = (Math.PI * 2 * f) / n;
+  if (rig) { P.tint = name === 'hit' ? [0.6, 0.35, 0][f] : 0; setAnim(name, f); return P; } // com esqueleto, o movimento vem do mixer
+  if (name === 'idle') Object.assign(P, { y: Math.sin(p) * 0.012, sy: 1 + Math.sin(p + 0.6) * 0.02, rz: Math.sin(p) * 0.02 });
+  else if (name === 'walk') Object.assign(P, { y: Math.abs(Math.sin(p)) * 0.05, sy: 1 - 0.04 * (1 - Math.abs(Math.sin(p))), rx: 0.1, rz: Math.sin(p) * 0.07, ry: Math.sin(p) * 0.08 });
+  else { const k = KEY[name]; for (const [a, arr] of Object.entries(k)) P[a] = arr[f]; }
+  P.y *= h; P.tz *= h;
+  return P;
+}
+const CLIPS = { idle: { frames: 6, fps: 8, loop: true }, walk: { frames: 8, fps: 12, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false } };
+const yaws = [0, 45, 90, 135, 180, 225, 270, 315]; // 0 = de frente para a câmera; +90 = olhando para a direita da tela
+
+function shoot(P, deg, dst, dx, dy) {
+  anim.position.set(0, P.y, P.tz); anim.rotation.set(P.rx, P.ry, P.rz);
+  const s = 1 / Math.sqrt(P.sy); anim.scale.set(s, P.sy, s);
+  pivot.rotation.y = THREE.MathUtils.degToRad(deg);
+  if (clip > 0) { // o corte acompanha o modelo (balanço/inclinação), senão o pedestal reaparece quando o personagem sobe
+    pivot.updateMatrixWorld(true);
+    const n = new THREE.Vector3(0, 1, 0).applyQuaternion(anim.getWorldQuaternion(new THREE.Quaternion()));
+    renderer.clippingPlanes[0].setFromNormalAndCoplanarPoint(n, anim.localToWorld(new THREE.Vector3(0, clip * h, 0)));
+  }
+  renderer.render(scene, cam);
+  wg.globalCompositeOperation = 'source-over'; wg.clearRect(0, 0, size, size); wg.drawImage(renderer.domElement, 0, 0, size, size);
+  if (P.tint > 0) { wg.globalCompositeOperation = 'source-atop'; wg.fillStyle = `rgba(255,255,255,${P.tint})`; wg.fillRect(0, 0, size, size); wg.globalCompositeOperation = 'source-over'; }
+  dst.drawImage(work, dx, dy);
+}
+
+if (q.get('clips')) {
+  const px = size * (0.5 + 0.5 * Math.cos(EL) * (sz.y / H)); // y dos pés no quadro (px físicos)
+  const scale = size / 128;
+  out.meta = { name: model, frame: { w: 128, h: 128 }, pivot: { x: 64, y: +(px / scale).toFixed(1) }, scale, views: 8, clips: {} };
+  for (const [name, cd] of Object.entries(CLIPS)) {
+    const sh = document.createElement('canvas'); sh.width = size * cd.frames; sh.height = size * 8; const sg = sh.getContext('2d');
+    yaws.forEach((deg, v) => { for (let f = 0; f < cd.frames; f++) shoot(pose(name, f, cd.frames), deg, sg, f * size, v * size); });
+    out.sheets[name] = sh.toDataURL('image/png');
+    out.meta.clips[name] = { frames: cd.frames, fps: cd.fps, loop: !!cd.loop, release: cd.release ?? null };
+  }
+} else {
+  const sheet = document.getElementById('sheet'); sheet.width = size * 8; sheet.height = size; const sg = sheet.getContext('2d');
+  yaws.forEach((deg, i) => { shoot(pose('idle', 0, 6), deg, sg, i * size, 0); out.views.push(sheet.toDataURL('image/png')); });
+  // vista individual: re-renderiza cada direção para exportar PNG isolado
+  out.views = [];
+  const one = document.createElement('canvas'); one.width = one.height = size; const og = one.getContext('2d');
+  yaws.forEach((deg) => { shoot({ y: 0, tz: 0, rx: 0, ry: 0, rz: 0, sy: 1, tint: 0 }, deg, og, 0, 0); out.views.push(one.toDataURL('image/png')); og.clearRect(0, 0, size, size); });
+}
+out.ready = true;
+</script></body></html>
