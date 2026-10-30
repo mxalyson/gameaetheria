@@ -1,0 +1,875 @@
+================================================================================
+AETHERIA - ARENA DOS ECOS
+GUIA COMPLETO: COMO O JOGO E HOJE, LIMITACOES, DIAGNOSTICO E ROTEIRO DE MELHORIAS
+================================================================================
+Gerado em 30/10/2026 a partir da leitura do codigo real do projeto (H:\aetheria),
+de capturas de tela do jogo rodando e dos testes automaticos.
+
+COMO LER ESTE DOCUMENTO
+Cada afirmacao carrega uma etiqueta:
+  [EXISTE]       -> confirmado no codigo ou em captura de tela.
+  [NAO EXISTE]   -> procurei no codigo e nao encontrei (busca por texto).
+  [PROPOSTA]     -> ideia minha, ainda nao implementada. Nomes, numeros e prazos
+                    de propostas sao pontos de partida, nao decisoes.
+  [VERIFICAR]    -> depende de informacao externa que eu nao conferi (regras da
+                    Play Store, precos, bibliotecas). Confirmar antes de decidir.
+Nada aqui promete algo que ja esteja pronto se nao estiver marcado [EXISTE].
+
+
+--------------------------------------------------------------------------------
+SUMARIO
+--------------------------------------------------------------------------------
+ 1. Resumo em uma pagina
+ 2. Como o jogo e hoje
+ 3. Tecnologia e arquitetura
+ 4. O que esta pronto, testado e validado (e o que nao)
+ 5. Limitacoes atuais
+ 6. Diagnostico: graficos
+ 7. Diagnostico: jogabilidade
+ 8. Diagnostico: usabilidade
+ 9. Propostas de melhoria, por tema
+     9.1  Personagens: estilo anime com muito mais detalhe, "mini" com detalhes
+     9.2  Movimentacao dos personagens
+     9.3  Mecanica de skills
+     9.4  Evolucao de classes
+     9.5  Inventario e desenhos de itens
+     9.6  Ambientacao dia/noite
+     9.7  Quests
+     9.8  Celular (tela horizontal) e Play Store
+     9.9  Multiplayer
+     9.10 Audio, opcoes, acessibilidade, salvamento
+10. Roteiro sugerido (ordem, dependencias, esforco)
+11. Riscos
+12. Decisoes que dependem de voce
+13. Anexos (tabelas de dados e estado do projeto)
+
+
+================================================================================
+1. RESUMO EM UMA PAGINA
+================================================================================
+Aetheria e um RPG de acao/arena para navegador, visto de cima, com 4 classes,
+equipamentos por raridade, "spirits" (companheiros), 3 regioes de caca com
+chefes, uma vila, duelo PvP contra "ecos" de aventureiros e desafio de ondas.
+Roda em JavaScript puro (sem bibliotecas) desenhando tudo em Canvas 2D, sem
+nenhuma imagem pronta: todo o visual e gerado por codigo.
+
+PONTOS FORTES
+ - Base de codigo limpa: a simulacao nao toca no desenho nem na interface, o que
+   e exatamente o que se precisa para multiplayer e para portar para celular.
+ - Sistemas de RPG ja completos no basico: classes, atributos, loot com
+   afixos, spirits, progressao ate o nivel 30, loja, arena com Elo.
+ - Visual pastel coeso e interface (HUD) bonita e legivel.
+ - Cenarios das 4 zonas principais agora com variedade e atmosfera (pacote feito
+   nesta sessao).
+ - Ambiente de trabalho organizado: Git, 25 testes unitarios, 6 testes no
+   navegador, documentacao, agentes e skills do projeto.
+
+PONTOS FRACOS (os maiores)
+ - Personagens e monstros pequenos (~35 px de altura), pouco detalhados e
+   parecidos entre si; sem animacao de andar de verdade.
+ - Nao funciona no celular: so aceita teclado e mouse, interface em pixels fixos.
+ - Sem audio nenhum (musica, efeitos).
+ - Sem quests, sem evolucao de classe, sem dia/noite, sem multiplayer.
+ - Salvamento so no navegador (um unico personagem, perde-se ao limpar dados).
+ - Habilidades: so 3 por classe, sem evolucao, sem recurso (mana/energia).
+
+PROXIMO PASSO RECOMENDADO
+ Celular + HUD adaptavel (abre o caminho da Play Store), depois personagens
+ detalhados, depois sistemas de conteudo (quests, evolucao de classe, dia/noite),
+ e por fim multiplayer comecando pelo PvP assincrono. Ver secao 10.
+
+
+================================================================================
+2. COMO O JOGO E HOJE
+================================================================================
+2.1 LOOP DE JOGO [EXISTE]
+ Criar personagem -> vila de Lumen (zona segura) -> portal a leste -> cacar nas
+ regioes -> loot, XP e ouro -> equipar/vender/comprar -> subir de nivel e gastar
+ pontos de atributo -> enfrentar chefes -> testar-se na Arena (duelo e ondas).
+ Nivel maximo: 30. Cada nivel da 5 pontos de atributo.
+ Morte em zona de caca: perde 10% do ouro e renasce na vila. Na arena, apenas
+ encerra o duelo/desafio.
+
+2.2 CONTROLES (TECLADO E MOUSE) [EXISTE]
+ WASD            mover
+ Mouse           mirar
+ Clique esquerdo ataque basico
+ 1 / 2 / 3       habilidades da classe
+ E               conversar com NPC proximo
+ I (ou B)        inventario        C  personagem/atributos
+ P               spirits           Q  pocao (recarga de 8 s)
+ H               voltar a vila
+ [NAO EXISTE] qualquer controle por toque, gamepad ou remapeamento de teclas.
+
+2.3 CLASSES (4) [EXISTE]
+ Guerreiro  corpo a corpo, muita vida/defesa, golpes em area. Atributo principal: Forca.
+ Mago       magia a distancia, fragil, dano em area.            Principal: Inteligencia.
+ Arqueiro   ataque rapido a distancia e mobilidade.             Principal: Agilidade.
+ Clerigo    corpo a corpo sagrado, cura, escudo e controle.     Principal: Inteligencia.
+ Cada classe tem 1 ataque basico e exatamente 3 habilidades (ver Anexo A).
+ Atributos: Forca, Agilidade, Inteligencia, Vitalidade. Cada um tem valor base
+ e crescimento por nivel, mais pontos distribuidos pelo jogador e bonus de itens.
+ [NAO EXISTE] evolucao/promocao de classe, arvore de talentos, nivel de skill,
+ recurso de habilidade (mana/energia/foco): so recarga (cooldown).
+
+2.4 EQUIPAMENTOS E LOOT [EXISTE]
+ 6 espacos: arma, elmo, armadura, botas, anel, amuleto. 4 tipos de arma (espada,
+ cajado, arco, maca), cada um preso a uma classe.
+ 5 raridades: Comum, Incomum, Raro, Epico, Lendario (0 a 4 afixos aleatorios).
+ Afixos: atributos, vida, defesa, critico, velocidade de ataque/movimento, roubo
+ de vida. Itens raros ou melhores ganham um epiteto ("da Aurora", "do Lobo"...).
+ Inventario de 30 espacos, com ordenar e vender em lote por raridade.
+ Chefes sempre dropam item; elites 60% de chance; mobs comuns 14%.
+ [EXISTE] O item exige nivel e (arma) a classe certa.
+ [NAO EXISTE] conjuntos (sets), encantamento/melhoria, gemas, equipamentos
+ aparecendo no corpo do personagem (so a arma da classe e desenhada).
+
+2.5 SPIRITS (COMPANHEIROS) [EXISTE]
+ 4 tipos: Fagulha (fogo, dano), Ondina (agua, cura), Rochedo (terra, defesa),
+ Zefiro (vento, +12% de velocidade). 5 raridades; ate 12 spirits guardados.
+ Um spirit ativo acompanha e ajuda. Nivel do spirit nunca passa o do dono.
+ Novos spirits vem de essencias (comprar com ouro, Sabia Yun) e de drops raros.
+
+2.6 MUNDO [EXISTE]
+ Vila de Lumen (segura, 3 NPCs: Mercadora Lia = loja, Mestre Doran = arena,
+ Sabia Yun = spirits) -> Bosque Verdejante (Nv 1-6, chefe Carvalho Ancestral)
+ -> Planicie de Cristal (Nv 6-12, chefe Colosso de Cristal) -> Ruinas Sombrias
+ (Nv 12-20+, chefe Guardiao das Ruinas). Mais duas arenas circulares.
+ Zonas de 2800x1900 px (vila 1700x1300). Portais ligam as regioes.
+ Monstros: Geleia, Lobo Cinzento, Cogumelo Esporento, Lobo de Cristal, Golem de
+ Quartzo, Fogo-fatuo, Espectro, Cavaleiro Caido, Gargula + 3 chefes. Existem
+ versoes "elite" (mais fortes). Chefes usam golpe em area com aviso no chao.
+
+2.7 ARENA [EXISTE]
+ Duelo ranqueado: enfrenta um "eco" gerado pelo jogo (nunca um jogador real),
+ com Elo e ligas (Bronze, Prata, Ouro, Platina, Diamante). Dano entre jogadores
+ e reduzido a 45%.
+ Desafio de ondas (PvE): ondas infinitas, 2+N inimigos (maximo 14), elite a cada
+ 5 ondas, chefe a cada 10, recompensa em ouro e 20% de vida por onda vencida.
+ Recorde de ondas guardado no personagem.
+
+2.8 ECONOMIA [EXISTE]
+ Pocao: 15 + 3 x nivel. Essencia de spirit: 250 + 20 x nivel. Prisma: 1500 +
+ 60 x nivel. Compra de itens custa 4 x o valor; venda pelo valor base.
+ Ouro vem de mobs, ondas e venda de itens.
+
+2.9 INTERFACE [EXISTE]
+ HUD: retrato e barras de vida/XP (com escudo), ouro, minimapa com portais e
+ inimigos, nome da zona, barra de chefe, faixa de arena, barra de habilidades
+ (clique, 1, 2, 3, pocao, voltar a vila, spirits), registro de mensagens.
+ Paineis: inventario, personagem (atributos e equipamento), spirits, loja,
+ arena, spirits (sabia). Tooltips de item, avisos (toasts), tela de titulo e de
+ criacao de personagem, tela de resultado/derrota.
+ Icones de habilidades, espacos e armas sao EMOJIS do sistema, nao desenhos.
+
+2.10 PERSISTENCIA [EXISTE]
+ Salva automaticamente a cada 15 s e ao fechar a aba, em localStorage
+ (chave aetheria_save_v1). Um unico personagem por navegador.
+
+
+================================================================================
+3. TECNOLOGIA E ARQUITETURA
+================================================================================
+ Linguagem   JavaScript puro, modulos ES, sem dependencias de execucao.
+ Desenho     Canvas 2D, tudo procedural (sem imagens/sprites).
+ Servidor    server.js: servidor estatico minimo (Node), porta 5174.
+ Testes      node:test (unitarios) e Playwright (navegador). Ver secao 4.
+
+ Camadas (public/src):
+  core/    regras puras: combate, atributos, loot, progressao, rival, RNG
+  data/    dados: classes, skills, mobs, itens, spirits, zonas
+  game/    sim.js (mundo), ai.js (IA), layout.js (cenario e colisoes)
+  render/  renderer.js (desenho), scenery.js (cenario rico e atmosfera)
+  ui/      interface em DOM; style.css
+  main.js  laco do jogo e acoes da interface
+
+ Principios ja respeitados (muito bons para o futuro):
+  - A simulacao nao usa DOM nem canvas. Recebe "intencoes" (mover, mirar, atacar,
+    usar skill), as mesmas que um cliente mandaria a um servidor.
+  - RNG com semente e layout de zona deterministico (mesmo mapa em qualquer cliente).
+  - O personagem e um documento JSON (char), pronto para ser salvo em servidor.
+  - Atributos dos mobs, skills e itens sao dados, nao codigo.
+
+ Pontos a corrigir antes de multiplayer [EXISTE como pendencia]:
+  - Contador global de ids (nextId) e sementes baseadas em Date.now/Math.random
+    em alguns lugares (uid de itens, flutuacao de spirits).
+  - Camera sem suavizacao; render e simulacao no mesmo passo de tempo variavel
+    (dt limitado a 50 ms), sem passo fixo.
+  - Buscas lineares em World.actors (ok hoje; custa com muitos atores).
+
+
+================================================================================
+4. O QUE ESTA PRONTO, TESTADO E VALIDADO
+================================================================================
+ Legenda: implementado = codigo existe; testado = ha teste automatico; validado
+ = alguem jogou/viu funcionando alem do teste.
+
+ Sistema                                   Impl.  Testado          Validado
+ ---------------------------------------   -----  ---------------  ----------
+ Atributos, dano, defesa, Elo              sim    sim (unitario)   parcial
+ Loot, raridades, equipar                  sim    sim (unitario)   parcial
+ Progressao e spirits                      sim    sim (unitario)   parcial
+ Simulacao: matar um mob                   sim    sim (unitario)   parcial
+ Habilidades das 4 classes                 sim    NAO              capturas
+ Chefes e golpes em area                   sim    NAO              capturas
+ IA de mobs (perseguir, voltar, ranged)    sim    NAO              capturas
+ Duelo PvP e ondas                         sim    NAO              capturas*
+ Loja, venda em lote, paineis              sim    NAO              capturas
+ Cenarios novos (4 zonas)                  sim    sim (layout e    capturas
+                                                  abertura sem
+                                                  erros)
+ Salvamento                                sim    NAO              nao
+ Desempenho                                -      medido so no     nao em GPU
+                                                  Bosque, sem GPU  real/celular
+ * duelo foi aberto e capturado; nao joguei partidas completas.
+
+ TESTES ATUAIS: 25 unitarios + 6 no navegador, todos passando na ultima rodada
+ (o teste de fumaca ja estourou tempo uma vez por lentidao da maquina e passou
+ na repeticao: sao testes de carga/UI, sensiveis a PC ocupado).
+
+
+================================================================================
+5. LIMITACOES ATUAIS (RESUMO HONESTO)
+================================================================================
+ Conteudo
+  - So 4 classes e 3 habilidades por classe; sem evolucao de classe.
+  - Sem quests, historia, NPCs alem de 3, nem objetivos alem de "cacar e subir".
+  - Ate o nivel 30 e 3 regioes; depois nao ha o que fazer (alem de arena).
+  - Chefes com 1 golpe; mobs com comportamentos simples.
+ Tecnica
+  - Nao funciona em celular (sem toque, interface fixa).
+  - Sem audio.
+  - Um personagem por navegador; salvamento fragil (localStorage).
+  - Sem multiplayer: os "rivais" sao gerados pelo proprio jogo.
+  - Fonte vinda do Google Fonts (internet necessaria; atrapalha modo offline/PWA).
+  - Icones em emoji variam por sistema operacional.
+  - Animacao simples: personagens quase sempre deslizam; falta ciclo de andar.
+ Visual
+  - Personagens pequenos e pouco detalhados (ver secao 6).
+  - Iluminacao plana; sem ciclo dia/noite.
+  - Arenas continuam simples (so atmosfera leve).
+  - Efeitos de habilidade discretos.
+ Processo
+  - Sem integracao continua; testes rodam so manualmente.
+  - Deploy nao existe (apenas servidor local). Nada foi publicado.
+
+
+================================================================================
+6. DIAGNOSTICO: GRAFICOS
+================================================================================
+ O QUE JA FUNCIONA BEM [EXISTE]
+  - Paleta pastel coesa, formas arredondadas, sombras suaves; leitura clara.
+  - HUD escura arredondada, tipografia (Cinzel nos titulos, Nunito no texto).
+  - Vila agradavel; apos o pacote de cenarios, Bosque, Ruinas, Planicie e Vila
+    tem trilhas, lagoas, vegetacao variada, objetos e particulas proprios.
+
+ PROBLEMAS (observados em capturas 1280x720)
+  G1. Personagem do jogador ~35 px de altura numa tela de 720 px: detalhe
+      (cabelo, roupa, rosto, arma) se perde. Classes se distinguem mais pela
+      cor do que pela silhueta.
+  G2. Monstros comuns pequenos e pouco expressivos; sem ciclo de animacao
+      (andar, atacar, tomar dano, morrer) alem de pequenas deformacoes.
+  G3. Spirits muito pequenos (esferas com brilho); pouco "personagem".
+  G4. Sem direcao de olhar em 8 direcoes: o desenho gira/espelha de forma simples.
+  G5. Iluminacao: so camadas translucidas (tom, vinheta, raios). Nao ha luz
+      dinamica, sombras direcionais coerentes, nem noite.
+  G6. Efeitos de combate: arcos e circulos claros, pouco impacto (falta tremor
+      de tela, "hit stop", faiscas, rastros por elemento).
+  G7. Arenas: chao liso, pouca identidade; so duas colunas e aneis.
+  G8. Icones emoji (habilidades, itens, botoes): inconsistentes e fora do estilo.
+  G9. Retrato do HUD e do painel de personagem: icone da classe, nao um desenho.
+  G10. Renderizacao em resolucao proporcional a tela (DPR limitado a 2); sem
+       niveis de qualidade para aparelhos fracos.
+
+ MEDICAO DE DESEMPENHO [EXISTE, LIMITADA]
+  Bosque com cenario rico: ~1,6 ms de desenho por quadro (mediana) no Chromium
+  sem GPU, contra ~1 ms antes. NAO medido em outras zonas, em celular, nem com
+  muitos monstros e efeitos ao mesmo tempo.
+
+
+================================================================================
+7. DIAGNOSTICO: JOGABILIDADE
+================================================================================
+ PONTOS BONS [EXISTE]
+  - Controle direto (WASD + mouse) e responsivo; cada classe tem estilo distinto.
+  - Habilidades variadas (area, dash, buff, projetil, perfurante, cura, escudo).
+  - Chefes com golpe telegrafado; elites; ondas escalonadas.
+  - Spirits dao sensacao de progressao e colecao.
+
+ PROBLEMAS
+  J1. Poucas decisoes taticas: 3 skills com recarga fixa, sem recurso, sem
+      combos; o jogo tende a "apertar tudo quando disponivel".
+  J2. Esquiva: so o Arqueiro tem uma (Rolamento, invulneravel). As outras
+      classes nao tem como evitar golpes, so aguentar ou usar skill de
+      movimento (Investida, Teleporte) sem invulnerabilidade.
+  J3. Inimigos pouco variados em comportamento (perseguir e bater; alguns
+      atiram). Sem formacoes, invocacoes, fases de chefe, fraquezas elementais.
+  J4. Chefes tem um unico golpe especial; luta curta e repetitiva.
+  J5. Sem objetivos alem de matar: nao ha quests, exploracao com recompensa,
+      segredos, masmorras.
+  J6. Progressao termina no nivel 30; pontos de atributo sem "build" real alem
+      de somar numeros; sem talentos nem escolhas marcantes.
+  J7. Economia simples: ouro serve principalmente para pocoes/itens/essencias;
+      poucos "sumidouros" e poucas metas de longo prazo.
+  J8. Morte quase sem consequencia (10% do ouro): pouca tensao.
+  J9. PvP so contra IA; sem equilibrio testado entre as 4 classes (nao ha
+      testes automaticos de balanceamento).
+  J10. Camera segue o heroi sem suavizacao; sensacao de movimento rigida.
+
+ BALANCEAMENTO [NAO VERIFICADO]
+  Nao simulei combates em massa. Qualquer afirmacao de que uma classe e mais
+  forte que outra seria palpite. Proposta: criar um simulador automatico
+  (a simulacao ja roda sem tela) para medir tempo de abate e vitorias em duelos.
+
+
+================================================================================
+8. DIAGNOSTICO: USABILIDADE
+================================================================================
+ PONTOS BONS [EXISTE]
+  - HUD limpa e informativa; minimapa; barra de habilidades com teclas e recarga.
+  - Tooltips de item e comparacao de pontuacao; ordenar e vender em lote.
+  - Avisos de nova zona e de eventos; mensagens de ajuda na primeira entrada.
+
+ PROBLEMAS
+  U1. Celular/toque: inexistente (secao 9.8). Interface em pixels fixos, sem
+      tratamento de tela horizontal, entalhe (notch) ou tamanho de toque.
+  U2. Tutorial: so duas linhas de texto no registro de mensagens; nao ha
+      introducao guiada nem objetivos iniciais claros.
+  U3. Sem menu de opcoes: nao encontrei volume (nao ha audio), qualidade grafica,
+      remapeamento de teclas, tamanho de texto, idioma. Apenas portugues.
+  U4. Um unico personagem/slot; sem exportar/importar save; sem nuvem.
+  U5. Inventario: icones emoji, sem filtros, sem "travar item", sem comparacao
+      lado a lado visual com o equipamento atual (existe pontuacao, nao um
+      painel de comparacao).
+  U6. Informacao de combate: dano e cura aparecem como numeros flutuantes; falta
+      painel de resumo, historico, indicador de recarga em mais lugares.
+  U7. Acessibilidade: cores de raridade dependem so de cor (daltonismo); sem
+      opcao de reduzir efeitos (brilho, particulas) nem de aumentar texto.
+  U8. Avisos centrais (nome da zona, boas-vindas) se empilham no meio da tela
+      e cobrem parte da area de jogo por alguns segundos.
+  U9. Dependencia de internet por causa da fonte externa.
+
+
+================================================================================
+9. PROPOSTAS DE MELHORIA, POR TEMA
+================================================================================
+ Todas as propostas respeitam o estilo aprovado: visao de cima, pastel limpo,
+ desenhado por codigo em Canvas 2D (decisoes 0001 e 0003 em docs/decisions).
+
+--------------------------------------------------------------------------------
+9.1 PERSONAGENS: ESTILO ANIME COM MUITO DETALHE E ASPECTO "MINI" DETALHADO
+--------------------------------------------------------------------------------
+ INTERPRETACAO DO PEDIDO (confirme): manter o aspecto "mini" (personagens
+ compactos e fofos de visao de cima, como hoje) mas com muito mais detalhe, em
+ estilo anime. Nao e chibi exagerado nem realista.
+
+ [PROPOSTA] Pacote "Personagens":
+  a) Tamanho e zoom: aumentar o desenho do heroi (de ~35 px para ~56-72 px de
+     altura) e/ou dar zoom de camera configuravel (ex.: 1.0x, 1.25x, 1.5x). Em
+     celular, zoom maior ajuda a leitura.
+  b) Construcao em camadas (cada parte desenhada por codigo, trocavel):
+     corpo, pernas/botas, roupa base, armadura/peitoral, capa, ombreiras,
+     cinto, bracos, maos, cabeca, rosto, franja, cabelo traseiro, acessorios,
+     arma, escudo, brilho de borda (rim light). Camadas permitem que
+     equipamentos aparecam no corpo (hoje so a arma aparece).
+  c) Detalhes anime: olhos grandes com reflexo (2 brilhos), sobrancelhas,
+     boca expressiva, mechas de cabelo que balancam, cor de cabelo/olhos por
+     personagem, sombras de cel-shading em 2 tons, contorno fino mais escuro
+     que a cor (nao preto puro).
+  d) 8 direcoes de olhar (cima, baixo, laterais, diagonais): rosto visivel
+     de frente, nuca de costas, perfil de lado.
+  e) Silhuetas por classe: Guerreiro (ombreiras largas, espada grande),
+     Mago (chapeu e manto longo), Arqueiro (capuz curto, aljava), Clerigo
+     (tunica com simbolo sagrado, aureola sutil). Diferenca clara mesmo em
+     preto-e-branco.
+  f) Criacao de personagem: escolher rosto, cabelo, cor de cabelo/olhos/pele,
+     acessorio. Salvar no personagem (campo novo no JSON, com migracao).
+  g) Retrato anime (busto) no HUD e na tela de personagem, desenhado por
+     codigo a partir das mesmas camadas, ampliado.
+  h) Spirits: corpo proprio com cara e animacao (flutuar, piscar, seguir com
+     atraso), tamanho maior; estagios visuais por raridade.
+  i) Monstros: 2-3 variacoes de cor/forma por especie, expressoes, olhos,
+     idle animado, anim. de ataque (antecipacao + golpe), de dano (piscar e
+     recuo) e de morte (desfazer em particulas).
+  j) NPCs: cada um com rosto e roupa unicos (hoje reutilizam o desenho das
+     classes), animacao de idle e icone de missao.
+
+ [PROPOSTA] Como produzir sem arte pronta: gerador procedural por camadas,
+ com paletas por personagem; depois, opcionalmente, trocar por sprites feitos
+ por artista (a interface dos desenhos pode ficar a mesma). Cada novo visual
+ deve ser validado em UM personagem antes de replicar para os demais.
+ Limite honesto: desenhar rostos anime bonitos por codigo e dificil; o
+ resultado depende de varias rodadas de ajuste com voce olhando as capturas.
+
+--------------------------------------------------------------------------------
+9.2 MOVIMENTACAO DOS PERSONAGENS
+--------------------------------------------------------------------------------
+ HOJE [EXISTE]: velocidade fixa (200 px/s base), parada imediata, camera presa
+ ao heroi, sem animacao de andar de verdade; lentidao por efeitos (slow).
+
+ [PROPOSTA]
+  - Aceleracao e desaceleracao curtas (sensacao de peso) sem perder resposta.
+  - Ciclo de andar/correr por camadas (pernas, balanco do corpo, capa, cabelo),
+    sincronizado com a velocidade real.
+  - Poeira/folhas nos pes conforme o chao (grama, pedra, agua rasa).
+  - Esquiva universal (ver 9.3) com estamina curta.
+  - Camera com suavizacao (lerp), leve antecipacao na direcao do movimento e
+    tremor em impactos grandes; zoom dinamico em chefes.
+  - Empurrao (knockback) e "hit stop" (pausa de 40-80 ms ao acertar) para dar
+    peso aos golpes.
+  - Colisao mais agradavel: deslizar em obstaculos (ja existe parcialmente) e
+    tratamento dos cantos.
+  - Transicao entre zonas com fade e animacao do portal.
+
+--------------------------------------------------------------------------------
+9.3 MECANICA DE SKILLS
+--------------------------------------------------------------------------------
+ HOJE [EXISTE]: 3 skills fixas por classe + ataque basico; so recarga; tipos:
+ area em volta, dash, buff, projetil, projetil perfurante, chuva de area, teleporte.
+
+ [PROPOSTA]
+  1. Recurso: barra de energia/foco por classe (ou mana para Mago/Clerigo), com
+     regeneracao, para criar decisao entre usar skill forte ou economizar.
+  2. Niveis de skill: pontos de habilidade (ganhos por nivel) para subir cada
+     skill (dano, area, recarga) e escolher "runas" que mudam o comportamento
+     (ex.: Bola de Fogo que racha em 3; Nova de Gelo que congela).
+  3. Mais skills por classe: 3 ativas iniciais + slots que desbloqueiam em
+     niveis 5, 10, 20 (total 5-6) e 1 definitiva (ultimate) com recarga longa.
+  4. Esquiva para todos: botao dedicado (espaco) com recarga curta; skills de
+     movimento atuais continuam como ferramentas.
+  5. Combos e encadeamento: ataque basico em 3 golpes (o terceiro mais forte),
+     bonus se usar skills em sequencia (ex.: congelar e depois quebrar).
+  6. Elementos: fogo, agua, terra, vento ligados aos spirits (ja existem
+     elementos); sinergias e fraquezas por inimigo.
+  7. Leitura de combate: indicadores no chao para skills de area, previa de
+     alcance ao segurar, cores consistentes por elemento, sons por skill.
+  8. Telegrafar ataques de monstros (hoje so o golpe em area dos chefes tem
+     aviso): linhas de investida, circulos, cones.
+  9. Auto-mira opcional (essencial no celular): mirar no inimigo mais proximo.
+  10. Balanceamento medido: simulador automatico de duelos entre classes e
+      tabela de tempo-para-matar; ajustar numeros por dados (skills.js).
+ Cada skill nova precisa de: objetivo, dados, desenho/efeito, teste e criterio
+ de aceitacao (ex.: "tempo para matar um lobo nivel 5 entre 6 e 10 s").
+
+--------------------------------------------------------------------------------
+9.4 EVOLUCAO DE CLASSES
+--------------------------------------------------------------------------------
+ HOJE [EXISTE]: 4 classes, evolucao so por nivel e pontos de atributo. Nao ha
+ promocao, subclasse nem arvore de talentos [NAO EXISTE].
+
+ [PROPOSTA] Estrutura em 3 tiers (nomes sao ideias, a definir com voce):
+  Tier 1 (nivel 1)   Classe base, como hoje.
+  Tier 2 (nivel 10)  Quest de promocao; escolher UMA de 2 especializacoes.
+  Tier 3 (nivel 25)  Segunda quest; aprimora a especializacao e libera ultimate.
+
+  Exemplos (apenas ilustrativos):
+   Guerreiro -> Cavaleiro Runico (defesa, escudo, controle) ou Berserker (dano
+                alto, vida como recurso).
+   Mago      -> Piromante (dano em area) ou Criomante (controle e congelamento).
+   Arqueiro  -> Franco-atirador (dano concentrado) ou Cacador (armadilhas,
+                feras e mobilidade).
+   Clerigo   -> Curandeiro (suporte) ou Inquisidor (dano sagrado e punicao).
+
+  O que muda por promocao: skills novas, ajuste de atributos e crescimento,
+  visual (roupa/aura/arma), titulo, retrato, e novos itens exclusivos.
+  Implementacao [PROPOSTA]: campo "tier" e "subclasse" no personagem (com
+  migracao de saves antigos); dados em data/ (nao em codigo); arvore de
+  talentos simples (pontos por nivel) para ajuste fino dentro da subclasse.
+  Limite de risco: dobra o numero de combinacoes a balancear (4 classes x 2
+  subclasses = 8 builds), por isso o simulador de balanceamento (9.3) vem antes.
+
+--------------------------------------------------------------------------------
+9.5 INVENTARIO E DESENHOS DE ITENS
+--------------------------------------------------------------------------------
+ HOJE [EXISTE]: grade de 30 espacos, icone emoji por tipo de espaco/arma, cor da
+ borda por raridade, tooltip, ordenar, vender em lote. Painel de personagem
+ separado.
+
+ [PROPOSTA]
+  a) Icones desenhados por codigo, um por TIPO e FAIXA (tier) de item: espadas
+     curtas/longas/runicas, cajados, arcos, macas, elmos (capuz a coroa),
+     armaduras, botas, aneis, amuletos. Variacoes de cor por raridade e brilho
+     animado para epico/lendario. Cache em canvas para nao custar desempenho.
+  b) Moldura por raridade (cantos, brilho), selo de nivel, marca "equipado" e
+     "melhor que o atual" (seta verde) usando a pontuacao ja existente.
+  c) Boneco de equipamento (paperdoll) no painel do personagem com preview em
+     tempo real, mostrando os itens no corpo.
+  d) Comparacao lado a lado no tooltip (item novo x equipado, diferencas em
+     verde/vermelho).
+  e) Filtros e busca (por espaco, raridade, classe), travar item, descartar,
+     empilhar pocoes/consumiveis, aba de materiais.
+  f) Estilo de interface: painel de madeira/pergaminho ou vidro fosco coerente
+     com a HUD atual; icones de habilidade tambem desenhados (substituem emoji).
+  g) Nomes e descricoes com sabor (hoje ha nomes base + epiteto).
+  h) Mais profundidade: sets de equipamento, gemas, encantamento e melhoria
+     (sumidouro de ouro com sentido).
+  i) Para celular: celulas maiores, toque longo para tooltip, arrastar para
+     equipar, botao "equipar melhor" automatico.
+
+--------------------------------------------------------------------------------
+9.6 AMBIENTACAO DIA/NOITE
+--------------------------------------------------------------------------------
+ HOJE [NAO EXISTE]: cada zona tem uma iluminacao fixa (tom, vinheta, raios de
+ sol, nevoa/particulas). Existe um relogio interno do mundo (tempo decorrido),
+ mas nao ha hora do dia.
+
+ [PROPOSTA]
+  - Relogio do dia (ex.: ciclo de 12-20 minutos reais) com 4 fases:
+    amanhecer, dia, entardecer, noite. Hora exibida no HUD (icone sol/lua).
+  - Gradacao de cor por fase usando o sistema de atmosfera que ja existe
+    (tom, vinheta): dourado ao amanhecer, claro ao meio-dia, laranja ao
+    entardecer, azul-escuro a noite.
+  - Noite de verdade: camada de escuridao com "buracos de luz" (lanternas da
+    vila, bracadeiras, cristais, runas, tochas, magias, o proprio heroi), feita
+    em canvas separado para ser barata. Sombras longas ao entardecer.
+  - Elementos noturnos: vaga-lumes, estrelas, luar, lampioes acesos, janelas
+    das casas brilhando, cristais e flores luminosas mais fortes.
+  - Efeito em jogo: monstros noturnos ou mais fortes a noite (ex.: espectros),
+    drops/XP diferenciados, NPCs que dormem/mudam de lugar, eventos especiais.
+  - Clima: chuva, neblina e vento por zona, combinaveis com a fase do dia.
+  - Opcao nas configuracoes para reduzir efeitos e economizar bateria.
+  - Multiplayer: hora definida pelo servidor, igual para todos.
+  Riscos: legibilidade (noite muito escura atrapalha combate; manter o heroi e
+  os inimigos sempre visiveis) e custo de desenho no celular (testar nivel de
+  qualidade).
+
+--------------------------------------------------------------------------------
+9.7 QUESTS
+--------------------------------------------------------------------------------
+ HOJE [NAO EXISTE]: nenhum sistema de missoes; os NPCs so abrem loja, arena e
+ spirits.
+
+ [PROPOSTA] Sistema de quests orientado a dados:
+  Tipos: matar N de X; coletar item/drop; chegar a um local; derrotar chefe;
+  entregar item a NPC; escoltar; sobreviver a N ondas; vencer N duelos; alcancar
+  nivel ou liga.
+  Estrutura (JSON em data/quests.js): id, titulo, descricao, NPC que da e que
+  recebe, requisitos (nivel, quest anterior), objetivos com contadores, recompensas
+  (XP, ouro, itens, essencias, spirits, desbloqueio de classe/zona/skill).
+  Interface: marcador "!" (ja existe sobre NPCs) e "?" ao concluir; diario de
+  quests (tecla J); rastreador de objetivos no HUD; setas/ponto no minimapa.
+  Eventos: a simulacao ja emite eventos de morte; basta o sistema de quests
+  escutar (matar mob, pegar drop, entrar em zona) sem acoplar ao desenho.
+  Salvamento: lista de quests ativas e concluidas dentro do char (com migracao).
+  Conteudo inicial [PROPOSTA, ilustrativo]:
+   Bosque: "Geleias demais" (matar 10), "Lobo na estrada" (elite), "Carvalho
+     Ancestral" (chefe); recompensa inclui um spirit.
+   Planicie: "Cristais em risco" (coletar), "Guardas de quartzo".
+   Ruinas: "O ultimo guardiao", e as quests de promocao de classe (9.4).
+   Vila: diarias (cacar, ondas), semanais (chefes), conquistas.
+  Cada quest com criterios de aceitacao e teste automatico (ex.: "matar 3
+  geleias incrementa o contador de 0 a 3 e libera a recompensa").
+  NPCs novos: 3 a 5 (ferreiro, guarda, aldeao, historiadora, pescador), cada um
+  com rosto e fala unicos.
+
+--------------------------------------------------------------------------------
+9.8 CELULAR (TELA HORIZONTAL) E PLAY STORE
+--------------------------------------------------------------------------------
+ DIAGNOSTICO HOJE
+  [EXISTE] meta viewport no HTML e canvas redimensionado ao tamanho da janela.
+  [NAO EXISTE] eventos de toque ou de ponteiro (so mouse e teclado), regras de
+  media query/orientacao no CSS, manifesto de aplicativo, service worker,
+  icones de aplicativo. Interface com tamanhos em pixels fixos (barra de
+  habilidades, paineis, registro de mensagens de 380 px de largura).
+  Resultado: hoje o jogo abre no celular mas nao e jogavel.
+
+ [PROPOSTA] CONTROLES DE TOQUE (modo paisagem)
+  - Esquerda: joystick virtual dinamico (aparece onde o polegar toca).
+  - Direita: botao grande de ataque; 3 botoes de skill em arco; botao de
+    esquiva; pocao; (opcional) botao de interagir quando ha NPC proximo.
+  - Mira: auto-mira no inimigo mais proximo (padrao) + arrastar o botao de skill
+    para mirar manualmente em skills de area/projetil.
+  - Toque em NPC/portal/item para interagir; toque longo em item para tooltip.
+  - Haptico (vibracao curta) em acertos e skills (configuravel).
+  - Alvos de toque de pelo menos ~48 px (equivalente a 48 dp) e espacamento
+    para evitar toques errados; zonas seguras para areas de entalhe (notch).
+  - Bloqueio de rolagem/zoom da pagina; tela cheia; manter tela ligada.
+  - Detectar toque x mouse e mostrar a interface correspondente; permitir
+    gamepad/teclado Bluetooth.
+
+ [PROPOSTA] HUD E PAINEIS RESPONSIVOS
+  - Escala de interface ajustavel (80% a 140%).
+  - Retrato e barras menores; barra de skills substituida pelos botoes de toque;
+    registro de mensagens recolhivel; minimapa menor ou em toque.
+  - Paineis (inventario, personagem, loja) em tela cheia ou meia tela com
+    abas, rolagem por toque, celulas maiores.
+  - Texto minimo legivel (>= 14 px) e contraste suficiente.
+
+ [PROPOSTA] DESEMPENHO NO CELULAR
+  - Niveis de qualidade (alto/medio/baixo): reduz particulas, nevoa, raios de
+    sol, camadas de atmosfera e resolucao (DPR 1 a 1,5).
+  - Orcamento de quadro: alvo 30 fps estaveis em aparelhos medios, 60 em
+    bons; medir em aparelhos reais (hoje nao ha nenhuma medicao em celular).
+  - Cache de sprites/icones, menos alocacao por quadro, limite de atores e
+    efeitos simultaneos, pausar ao perder foco, economia de bateria.
+  - Passo de simulacao fixo para comportamento igual em qualquer taxa de quadros.
+
+ [PROPOSTA] CAMINHO ATE A PLAY STORE
+  Etapas (as exigencias da loja mudam; tudo abaixo marcado [VERIFICAR]):
+   1. Transformar em PWA: manifesto (nome, icones, orientacao paisagem), service
+      worker (cache offline), fontes locais (sem Google Fonts), tela inicial.
+   2. Empacotar. Duas rotas comuns:
+      a) TWA (Trusted Web Activity): o site/PWA aberto dentro de um app Android,
+         com Bubblewrap/PWABuilder. Mais simples; exige o jogo hospedado em
+         HTTPS e verificacao de dominio. [VERIFICAR ferramentas atuais]
+      b) Capacitor (ou similar): empacota o jogo como app nativo com acesso a
+         recursos do aparelho (vibracao, compras no app, notificacoes).
+         Mais flexivel; mais manutencao. [VERIFICAR]
+   3. Conta de desenvolvedor no Google Play Console (ha taxa unica de
+      inscricao; conferir valor e exigencias de verificacao atuais) [VERIFICAR].
+   4. Itens obrigatorios da publicacao [VERIFICAR lista atual]: pacote assinado
+      (formato AAB), politica de privacidade com URL, questionario de
+      classificacao etaria, declaracao de seguranca de dados, requisito de
+      versao minima/alvo do Android, icone, imagem de destaque, capturas de
+      tela, descricao em portugues (e outros idiomas).
+   5. Testes fechados/abertos antes da producao (regras da loja para contas
+      novas podem exigir periodo de testadores) [VERIFICAR].
+   6. Monetizacao (se houver): compras no app exigem o sistema de cobranca do
+      Google; anuncios exigem SDK e politica. Decidir se o jogo sera gratuito
+      sem compras, pago, ou com compras cosmeticas. Evitar mecanicas de
+      sorte paga (caixas de loot) sem estudar a regulacao.
+   7. Atualizacoes: versionamento, notas de versao, painel de falhas.
+  Dependencia importante: se houver multiplayer ou conta, aplicam-se regras de
+  privacidade e dados de usuarios (LGPD no Brasil).
+  Observacao: iOS nao foi pedido; seria outro processo (conta paga e revisao).
+
+--------------------------------------------------------------------------------
+9.9 MULTIPLAYER
+--------------------------------------------------------------------------------
+ HOJE: [NAO EXISTE]. O codigo ja foi pensado para isso (secao 3): simulacao sem
+ DOM, entradas como intencoes, layout deterministico, personagem como JSON.
+ O comentario em rival.js diz que, quando houver servidor, um rival real sera
+ um personagem salvo de outro jogador no mesmo formato.
+
+ [PROPOSTA] EM FASES (cada fase entrega valor sozinha)
+  Fase M0 - Preparacao (sem servidor ainda)
+    - Passo de simulacao fixo (ex.: 20-30 ticks/s) separado do desenho.
+    - Ids de entidade e sementes controlados pela simulacao (nada de
+      Date.now/Math.random no estado do jogo).
+    - Serializar/deserializar o estado do mundo; testes de determinismo.
+    - Formalizar o protocolo de intencoes (mover, mirar, atacar, skill, usar item).
+  Fase M1 - Contas e nuvem
+    - Servidor (Node) com login e armazenamento do personagem (banco de dados).
+    - Salvamento na nuvem, varios personagens por conta, validacao de dados
+      (o servidor nao confia no cliente).
+  Fase M2 - PvP assincrono ("ecos" de jogadores reais)
+    - O rival da arena passa a ser o personagem salvo de outro jogador
+      controlado pela IA (ja e quase o que existe). Ranking real, sem latencia.
+  Fase M3 - Arena em tempo real 1x1
+    - Servidor autoritativo via WebSocket; cliente envia intencoes e recebe
+      estado; interpolacao das entidades remotas, previsao do proprio jogador,
+      reconciliacao; fila de partidas por Elo.
+  Fase M4 - Zonas compartilhadas e grupos (co-op)
+    - Varios jogadores na mesma regiao, grupos de 2-4, drops e XP por
+      participacao, chat basico, indicador de jogadores no minimapa.
+  Fase M5 - Social e eventos
+    - Amigos, guildas, chefes de mundo, eventos sazonais, leaderboards.
+
+  Decisoes tecnicas a tomar [VERIFICAR opcoes]: biblioteca de tempo real
+  (WebSocket puro com a biblioteca "ws" ou frameworks de salas como Colyseus),
+  banco de dados (SQLite/PostgreSQL), hospedagem (custo mensal), regioes e
+  latencia, anti-trapaca.
+  Riscos: trapaca (por isso servidor autoritativo), custo de hospedagem e
+  suporte, moderacao de chat e nomes, privacidade/LGPD, complexidade de
+  balancear PvP com 8+ builds, desempenho no celular com muitos jogadores.
+  Dica de ordem: M0 e M1 antes de qualquer conteudo grande, pois mudam o
+  formato do save; M2 antes de M3 (testa o mercado de jogadores sem exigir
+  jogo em tempo real).
+
+--------------------------------------------------------------------------------
+9.10 AUDIO, OPCOES, ACESSIBILIDADE, SALVAMENTO
+--------------------------------------------------------------------------------
+ AUDIO [NAO EXISTE: nenhuma musica, nenhum efeito sonoro]
+  [PROPOSTA] musica por zona e por fase do dia, musica de chefe e de arena;
+  efeitos por skill, golpe, passo, loot, UI, nivel acima; mixagem com volumes
+  separados (musica, efeitos, interface); Web Audio API; pausar ao perder
+  foco. Verificar licencas de qualquer audio de terceiros (CC0, CC-BY etc.).
+ OPCOES [NAO EXISTE]
+  [PROPOSTA] menu com volume, qualidade grafica, reduzir efeitos, escala de
+  interface, remapear teclas, controle (toque/teclado/gamepad), idioma, texto
+  maior, modo daltonico (formas/icones alem de cores nas raridades).
+ SALVAMENTO
+  [EXISTE] um slot em localStorage.
+  [PROPOSTA] varios slots, exportar/importar arquivo, copia de seguranca
+  automatica, versao de formato com migracao (ja ha migracao leve), e nuvem
+  (fase M1).
+ IDIOMAS [PROPOSTA] extrair textos para arquivos de idioma (portugues e ingles).
+ DESEMPENHO E ESTABILIDADE [PROPOSTA] relatorios de erro, medidor de quadros
+  opcional, teste de desempenho automatico por zona.
+
+
+================================================================================
+10. ROTEIRO SUGERIDO
+================================================================================
+ Esforco: P (poucos dias), M (1-3 semanas), G (varias semanas). Estimativas
+ grosseiras para um desenvolvedor focado, sujeitas a mudar apos o primeiro
+ prototipo de cada item.
+
+ FASE 1 - FUNDACAO DE JOGABILIDADE (base de tudo)
+   1.1 Passo de simulacao fixo + camera suave + zoom ............ P
+   1.2 Controles de toque, HUD responsivo, modo paisagem ......... M
+   1.3 Menu de opcoes, escala de UI, qualidade grafica ......... P
+   1.4 Fontes locais e PWA basico (manifesto, offline) .......... P
+   Entrega: o jogo jogavel no celular. Primeiro teste em aparelhos reais.
+
+ FASE 2 - PERSONAGENS E INVENTARIO (visual)
+   2.1 Personagem anime em camadas (1 classe como prova) ........ M
+   2.2 Replicar para as 4 classes, NPCs, spirits e monstros ..... G
+   2.3 Animacoes: andar, atacar, dano, morte ..................... M
+   2.4 Icones desenhados de itens/skills e inventario novo ...... M
+   2.5 Criacao de personagem com personalizacao ................. P/M
+
+ FASE 3 - PROFUNDIDADE DE JOGO
+   3.1 Simulador de balanceamento automatico .................... P/M
+   3.2 Recurso de habilidade, niveis de skill, esquiva universal  M
+   3.3 Evolucao de classes (2 tiers) + talentos .................. G
+   3.4 Quests e NPCs novos ...................................... G
+   3.5 Chefes com fases, inimigos variados, mais conteudo ........ G
+
+ FASE 4 - ATMOSFERA
+   4.1 Ciclo dia/noite com iluminacao e luzes locais ............ M
+   4.2 Clima por zona (chuva, neblina) ........................... P/M
+   4.3 Audio: musica e efeitos .................................. M
+   4.4 Efeitos de combate e feedback de impacto .................. M
+
+ FASE 5 - ONLINE
+   5.1 M0 (preparacao) e M1 (contas e nuvem) ..................... G
+   5.2 M2 PvP assincrono ......................................... M
+   5.3 M3 arena em tempo real .................................... G
+   5.4 M4 co-op em zonas compartilhadas .......................... G
+
+ FASE 6 - PUBLICACAO
+   6.1 Empacotamento (TWA ou Capacitor), icones, telas, textos ... M
+   6.2 Conta no Play Console, politica de privacidade, testes .... P/M
+   6.3 Lancamento fechado -> aberto -> producao .................. P
+
+ REGRAS DO PROCESSO (ja combinadas)
+  - Uma fase por vez, com resultado e aprovacao antes da proxima.
+  - Nada e declarado "funcionando" sem teste ou validacao registrada.
+  - Backup e Git antes de mudancas estruturais; nada publicado sem autorizacao.
+
+
+================================================================================
+11. RISCOS
+================================================================================
+ R1  Escopo: lista muito grande. Mitigacao: fases curtas e entregas jogaveis.
+ R2  Arte procedural: rosto anime por codigo exige muitas iteracoes visuais;
+     pode exigir um artista (sprites) no futuro. Mitigacao: validar em um
+     personagem primeiro.
+ R3  Desempenho no celular desconhecido. Mitigacao: medir cedo em aparelhos
+     reais; niveis de qualidade.
+ R4  Balanceamento: mais classes/subclasses/skills multiplicam combinacoes.
+     Mitigacao: simulador automatico antes de expandir.
+ R5  Formato de save: cada novo sistema (quests, subclasse, aparencia) altera o
+     personagem salvo. Mitigacao: campo de versao e migracoes testadas.
+ R6  Multiplayer: custo, trapaca, moderacao, privacidade. Mitigacao: servidor
+     autoritativo, fases, assincrono primeiro.
+ R7  Play Store: regras mudam; conta nova pode exigir prazos de teste.
+     Mitigacao: conferir exigencias oficiais atuais na hora.
+ R8  Licencas: qualquer audio, fonte ou imagem de terceiros precisa de licenca
+     compativel com uso comercial. Mitigacao: registrar origem e licenca.
+ R9  Direcao visual: mudar de estilo no meio custa caro (ja aconteceu uma vez,
+     com o prototipo isometrico rejeitado). Mitigacao: aprovar cada visual novo
+     em amostra antes de aplicar em todos.
+
+
+================================================================================
+12. DECISOES QUE DEPENDEM DE VOCE
+================================================================================
+ D1  "Aspecto mini com mais detalhes": confirma a interpretacao da secao 9.1
+     (personagens compactos de visao de cima, mais detalhados e maiores na
+     tela, em estilo anime)? Ou voce imagina algo diferente?
+ D2  Ordem: concorda em comecar por celular + HUD (Fase 1) antes dos
+     personagens, ou prefere o visual dos personagens primeiro?
+ D3  Modelo de negocio na Play Store: gratuito sem compras, pago, ou compras
+     cosmeticas? Isso afeta o que construir e a conta de desenvolvedor.
+ D4  Multiplayer: quer comecar so com PvP assincrono (mais barato e seguro) ou
+     almeja co-op/tempo real desde cedo?
+ D5  Arte: aceita arte 100% gerada por codigo, ou pretende contratar/produzir
+     sprites no futuro?
+ D6  Idiomas: so portugues ou tambem ingles?
+ D7  Dia/noite: noite deve ser mais perigosa (mecanica) ou so atmosfera?
+ D8  Evolucao de classes: gosta do modelo de 2 especializacoes por classe?
+ D9  Prototipo isometrico do Vale (fora do jogo, rejeitado): quer que eu
+     remova os arquivos (public/vale.html, public/src/render/vale.js,
+     public/src/game/iso-hero.js e seus testes)? Hoje continuam no Git.
+
+
+================================================================================
+13. ANEXOS
+================================================================================
+ ANEXO A - CLASSES E HABILIDADES [EXISTE]
+ ---------------------------------------------------------------------------
+ Guerreiro   Vida base 120 | Forca 9 (+2/nivel), Agilidade 4 (+1), Int 2, Vit 9 (+2)
+   Basico    melee, alcance 74, arco 1,8 rad, recarga 0,6 s, mult 1,0
+   1 Golpe Giratorio  recarga 5 s, area em volta (raio 110), mult 1,7
+   2 Investida        recarga 7 s, avanca 240, mult 1,3, atordoa 0,8 s
+   3 Grito de Guerra  recarga 14 s, 6 s: +35% dano, -25% dano recebido
+ Mago        Vida base 85 | Int 10 (+3/nivel), Agi 4 (+1), Str 2, Vit 6 (+1)
+   Basico    projetil, alcance 520, recarga 0,7 s, mult 1,0
+   1 Bola de Fogo     recarga 3,5 s, projetil que explode (raio 80), mult 2,1
+   2 Nova de Gelo     recarga 8 s, area (raio 150), mult 1,0, lentidao 50% por 3 s
+   3 Teleporte        recarga 6 s, 260 de distancia
+ Arqueiro    Vida base 90 | Agi 10 (+3/nivel), Str 3, Int 3, Vit 6 (+1)
+   Basico    projetil rapido, alcance 560, recarga 0,5 s, mult 0,85
+   1 Chuva de Flechas recarga 8 s, area de cursor (raio 100), 6 pulsos de mult 0,55
+   2 Tiro Perfurante  recarga 5 s, atravessa inimigos, mult 2,3
+   3 Rolamento        recarga 4 s, esquiva invulneravel de 200
+ Clerigo     Vida base 110 | Int 7 (+2/nivel), Vit 9 (+2), Str 5 (+1), Agi 3
+   Basico    melee, alcance 68, arco 1,5 rad, recarga 0,7 s, mult 1,05
+   1 Luz Sagrada      recarga 8 s, cura 22% e fere em volta (raio 130)
+   2 Escudo Divino    recarga 15 s, escudo = 35% da vida maxima por 6 s
+   3 Julgamento       recarga 6 s, projetil, mult 1,9, atordoa 1 s
+
+ ANEXO B - FORMULAS PRINCIPAIS [EXISTE]
+ ---------------------------------------------------------------------------
+ XP para o proximo nivel     60 x nivel^1,55
+ Vida maxima                 vida base + Vitalidade x 12 + (nivel-1) x 8 + bonus
+ Poder (dano)                ataque da arma + atributo principal x 2,2 + nivel x 1,5
+ Defesa                      bonus + Vitalidade x 0,4 + Agilidade x 0,2
+ Critico                     5% + Agilidade x 0,25 + bonus (maximo 60%); mult 1,6
+ Velocidade de movimento     200 x (1 + bonus ate 40%)
+ Dano final                  poder x mult x (1 + bonus) x variacao 0,9-1,1,
+                             reduzido por defesa: dano x 100 / (100 + defesa)
+ Vida de mob                 (40 + nivel x 28) x multiplicador da especie
+                             (elite x3)
+ PvP                         dano entre jogadores x 0,45
+
+ ANEXO C - MONSTROS [EXISTE] (multiplicadores de vida/ataque; velocidade)
+ ---------------------------------------------------------------------------
+ Geleia 0,75/0,7 v85 | Lobo Cinzento 0,9/1,0 v150 | Cogumelo Esporento 0,9/0,85
+ v70 (atira) | Carvalho Ancestral (chefe) 9/1,5
+ Lobo de Cristal 1/1,05 v160 | Golem de Quartzo 1,6/1,2 v65 (def 1,6) | Fogo-fatuo
+ 0,7/1 v110 (atira) | Colosso de Cristal (chefe) 10/1,6
+ Espectro 0,85/1,1 v120 (atira) | Cavaleiro Caido 1,4/1,25 v105 | Gargula
+ 1,3/1,15 v125 | Guardiao das Ruinas (chefe) 12/1,7
+
+ ANEXO D - RARIDADES [EXISTE]
+ ---------------------------------------------------------------------------
+ Comum (60%, 0 afixos, x1,0) | Incomum (26%, 1, x1,15) | Raro (10%, 2, x1,3)
+ Epico (3,5%, 3, x1,5) | Lendario (0,5%, 4, x1,8)   [pesos base de sorteio]
+
+ ANEXO E - ESTADO DO PROJETO (30/10/2026)
+ ---------------------------------------------------------------------------
+ Pasta            H:\aetheria
+ Git              ativo; historico por fase (8 commits ate este documento)
+ Backup           H:\aetheria-backups\aetheria-pre-fase1-20261030.zip
+ Testes           npm test (25 unitarios) | npm run test:e2e (6 no navegador)
+ Comandos         npm start  -> http://localhost:5174
+ Documentacao     CLAUDE.md, docs/ (arquitetura, arte, jogabilidade, testes,
+                  decisoes 0001-0003)
+ Agentes          .claude/agents: game-director, render-engineer, art-animator,
+                  gameplay-level-designer, qa-tester
+ Skills           aetheria-art-direction, aetheria-playtest
+ Decisoes         0001 manter Canvas 2D | 0002 ambiente da fase 1 |
+                  0003 manter o estilo visual atual
+ Prototipo rejeitado  Vale de Auren isometrico (/vale.html): fora do jogo
+ Arquivo solto    "Novo(a) Documento de Texto.txt" na raiz: nao foi criado por
+                  mim, nao esta no Git; nao li.
+ Nao instalado    Blender e MCPs (nao se aplicam ao motor 2D atual), Context7 nao
+                  verificado.
+ Nao publicado    nenhum deploy; nada foi enviado para fora deste computador.
+
+--------------------------------------------------------------------------------
+FIM DO DOCUMENTO
+--------------------------------------------------------------------------------
