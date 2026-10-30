@@ -5,6 +5,7 @@ const ARENA = {
   palette: { ground: '#ead9b0', ground2: '#e0cd9f', outside: '#2d2a36', ring: '#b9a37a' },
   pillars: [{ x: 330, y: 330 }, { x: 770, y: 330 }, { x: 330, y: 770 }, { x: 770, y: 770 }],
   decor: { trees: 0, rocks: 0, bushes: 0, flowers: 0 },
+  atmosphere: { tint: 'rgba(255,214,150,0.04)', edge: 'rgba(18,10,36,0.50)', motes: { n: 18, color: '255,226,150', drift: 3, rise: 8 } },
 };
 
 export const ZONES = {
@@ -14,6 +15,18 @@ export const ZONES = {
     treeColors: ['#4f9a5e', '#63b06f', '#83c98a'],
     flowerColors: ['#fff6a8', '#ffb3c7', '#ffffff', '#c7b3ff', '#ffcf99'],
     decor: { trees: 22, rocks: 6, bushes: 16, flowers: 140 },
+    // Cenário rico: lanternas nos caminhos, bancos na praça, canteiros, caixas e placa (ver render/scenery.js).
+    scenery: {
+      kind: 'town', beds: true,
+      along: [['lantern', 240, 64, 11, 0.5]],
+      fixed: [['bench', 645, 620, 22, 0.5], ['bench', 705, 765, 22, 0.5], ['bench', 995, 765, 22, 0.5],
+        ['crates', 505, 615, 14, 0.8], ['signpost', 1575, 690, 16, 0.5]],
+    },
+    atmosphere: {
+      tint: 'rgba(255,226,170,0.06)', edge: 'rgba(28,46,40,0.30)', rays: 0.04,
+      motes: { n: 22, color: '255,240,190', drift: 5, rise: 4 },
+      leaves: { n: 6, colors: ['#f2a2b8', '#ffd27a', '#9fd48a'] },
+    },
     paths: [[850, 620, 1700, 620], [850, 620, 850, 1080], [850, 620, 620, 520], [850, 620, 1080, 520]],
     plaza: { x: 850, y: 620, r: 170 },
     fountain: { x: 850, y: 620 },
@@ -64,6 +77,15 @@ export const ZONES = {
     rockType: 'crystal',
     flowerColors: ['#ffffff', '#d8c8ff', '#b8e8ff'],
     decor: { trees: 40, rocks: 34, bushes: 20, flowers: 160 },
+    // Cenário rico: trilha clara, lagoas cristalinas, árvores de flor rosa, flores luminosas e geodos.
+    scenery: {
+      kind: 'plains', ponds: 2, trailAmp: 240, accent: ['#e59bb9', '#f1b8d0', '#fcd9e6'],
+      extras: [['glowflower', 64, 8, 12, 0], ['tallgrass', 70, 14, 22, 0], ['geode', 12, 16, 24, 0.7], ['mushrooms', 8, 9, 13, 0]],
+    },
+    atmosphere: {
+      tint: 'rgba(170,230,255,0.06)', edge: 'rgba(16,48,70,0.32)', rays: 0.045,
+      motes: { n: 40, color: '190,235,255', drift: 5, rise: 7 },
+    },
     portals: [
       { x: 40, y: 950, to: 'forest', tx: 2690, ty: 950, label: 'Bosque Verdejante' },
       { x: 2760, y: 950, to: 'ruins', tx: 110, ty: 950, label: 'Ruínas Sombrias · Nv 12-20+' },

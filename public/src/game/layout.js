@@ -118,6 +118,27 @@ export function buildLayout(zoneId) {
       i++;
     }
   };
+  // Objetos ao longo dos caminhos (ex.: lanternas), alternando os lados. Vêm antes da vegetação para ela os contornar.
+  for (const [type, step, off, s, collR] of sc?.along ?? []) {
+    for (const [x1, y1, x2, y2] of z.paths ?? []) {
+      const len = Math.hypot(x2 - x1, y2 - y1), nx = -(y2 - y1) / len, ny = (x2 - x1) / len;
+      for (let d = z.plaza ? z.plaza.r + 35 : step * 0.6; d < len - 40; d += step) {
+        for (const side of [1, -1]) {
+          const x = x1 + (x2 - x1) * d / len + nx * off * side, y = y1 + (y2 - y1) * d / len + ny * off * side;
+          if (!free(x, y, s)) continue;
+          decor.push({ type, x, y, s, v: srng.next() });
+          if (collR) obstacles.push({ x, y, r: s * collR, block: true });
+        }
+      }
+    }
+  }
+  // Objetos em posições fixas e canteiros na frente das casas.
+  for (const [type, x, y, s, collR] of sc?.fixed ?? []) {
+    decor.push({ type, x, y, s, v: srng.next() });
+    if (collR) obstacles.push({ x, y, r: s * collR, block: true });
+  }
+  if (sc?.beds) for (const h of z.houses ?? []) for (const bx of [h.x + 38, h.x + h.w - 38]) { decor.push({ type: 'flowerbed', x: bx, y: h.y + h.h + 30, s: 20, v: srng.next() }); obstacles.push({ x: bx, y: h.y + h.h + 30, r: 20 }); }
+
   place(z.treeType ?? 'tree', z.decor.trees, 28, 42, 0.45);
   const rockType = z.rockType ?? 'rock';
   place(rockType, z.decor.rocks, rockType === 'pillar' ? 22 : 12, rockType === 'pillar' ? 30 : 22, rockType === 'pillar' ? 0.95 : 0.85);
