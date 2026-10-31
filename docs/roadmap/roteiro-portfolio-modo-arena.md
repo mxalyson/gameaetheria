@@ -103,3 +103,8 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 3. Conta **obrigatória ou opcional**; e-mail ou Google.
 4. **Como produzir a arte fina** (item 5) e jogos de referência *seus* (a pesquisa web foi limitada).
 5. Teste no seu celular real: o zoom parou? o minimapa aparece? FPS?
+
+## 10. Andamento da Fase 1 (2026-10-31, após aprovação)
+- **Implementado e testado:** `core/power.js` (`playerPower`, `PVP_MIN_LEVEL = 10`, `pvpUnlocked`, `matchOk`) com teste em `tests/core.test.js` (62 unitários passam); simulador `npm run balance` (`tools/balance.mjs`, usa a simulação real e o `rivalIntent` como piloto dos dois lados).
+- **Primeira medição (nível 10, 30 duelos por par, equipamento incomum):** Arqueiro 98%, Mago 62%, Guerreiro 23%, Clérigo 19% de vitórias; duelos de 9–15 s (meta: 20–40 s). **Fora da meta em todas as classes.** Ressalva: o piloto é a IA do rival (que mantém distância com ranged), então parte do viés é da IA, não só dos números das classes.
+- **Pendente:** ajustar `data/classes.js`/`skills.js` e a IA até 45–55%, subir o tempo do duelo, e só então ligar o PvP ao PWR/pareamento no jogo (nada disso está ligado ao jogo ainda).

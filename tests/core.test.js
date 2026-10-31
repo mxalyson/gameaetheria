@@ -100,3 +100,18 @@ test('simulação: jogador derrota um mob e o evento de morte é emitido', () =>
   }
   assert.ok(died);
 });
+
+test('poder (PWR) cresce com nível e equipamento; PvP libera no nível 10', async () => {
+  const { playerPower, pvpUnlocked, matchOk, PVP_MIN_LEVEL } = await import('../public/src/core/power.js');
+  const c = newCharacter('T', 'mage', makeRng(3));
+  const p1 = playerPower(c);
+  c.level = 10;
+  assert.ok(playerPower(c) > p1);
+  assert.equal(pvpUnlocked({ level: PVP_MIN_LEVEL - 1 }), false);
+  assert.equal(pvpUnlocked({ level: PVP_MIN_LEVEL }), true);
+  // pareamento: janela estreita no início, abre com a espera
+  const a = { rating: 1000, power: 500 }, b = { rating: 1120, power: 500 };
+  assert.equal(matchOk(a, b, 0), false);
+  assert.equal(matchOk(a, b, 30), true);
+  assert.equal(matchOk(a, { rating: 1000, power: 800 }, 0), false);
+});
