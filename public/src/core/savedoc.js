@@ -6,6 +6,8 @@ import { SLOTS, RARITY, WEAPON_TYPES, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, SPIRIT_RARITY_MUL, MAX_SPIRITS } from '../data/spirits.js';
 import { MAX_LEVEL, POINTS_PER_LEVEL, SAVE_VERSION } from './progression.js';
 import { SPECS, SPEC_LEVEL } from '../data/specs.js';
+import { QUESTS } from '../data/quests.js';
+import { ACH, STAT_KEYS_PROGRESS } from '../data/achievements.js';
 
 export { SAVE_VERSION };
 export const SAVE_FORMAT = 'aetheria-save';
@@ -40,6 +42,14 @@ const MIGRATIONS = {
     d.arena = { rating: 1000, wins: 0, losses: 0, bestWave: 0, ratings: {}, ...(isObj(d.arena) ? d.arena : {}) };
     d.arena.ratings ??= {};
     d.spec ??= null;
+    return d;
+  },
+  // v2 → v3: missões, contadores, conquistas, título e baús
+  2: (d) => {
+    d.quests = isObj(d.quests) ? d.quests : { active: {}, done: {} };
+    d.stats = isObj(d.stats) ? d.stats : {};
+    d.achievements = isObj(d.achievements) ? d.achievements : {};
+    d.title ??= null; d.chests = isObj(d.chests) ? d.chests : {};
     return d;
   },
 };
@@ -132,8 +142,25 @@ export function validate(doc) {
   const spec = doc.spec && SPECS[doc.classId]?.[doc.spec] && level >= SPEC_LEVEL ? doc.spec : null;
   if (doc.spec && !spec) warnings.push('especialização inválida removida');
 
+  // ---- diário (v3): tudo é reconstruído a partir de listas brancas ----
+  const quests = { active: {}, done: {} };
+  const qin = isObj(doc.quests) ? doc.quests : {};
+  for (const [id, v] of Object.entries(isObj(qin.done) ? qin.done : {})) if (QUESTS[id]) quests.done[id] = int(v, 0, 4e12, 0);
+  for (const [id, v] of Object.entries(isObj(qin.active) ? qin.active : {})) {
+    const q = QUESTS[id];
+    if (!q || quests.done[id] != null || Object.keys(quests.active).length >= 5) { warnings.push('missão inválida removida'); continue; }
+    quests.active[id] = { p: q.objectives.map((o, i) => int(Array.isArray(v?.p) ? v.p[i] : 0, 0, o.count ?? 1, 0)), at: int(v?.at, 0, 4e12, 0) };
+  }
+  const stats = {};
+  for (const k of STAT_KEYS_PROGRESS) stats[k] = int(isObj(doc.stats) ? doc.stats[k] : 0, 0, 1e8, 0);
+  const achievements = {};
+  for (const [id, v] of Object.entries(isObj(doc.achievements) ? doc.achievements : {})) if (ACH[id]) achievements[id] = int(v, 0, 4e12, 0);
+  const title = typeof doc.title === 'string' && ACH[doc.title]?.title && achievements[doc.title] != null ? doc.title : null;
+  const chests = {};
+  for (const [id, v] of Object.entries(isObj(doc.chests) ? doc.chests : {}).slice(0, 200)) if (/^[a-z0-9_:-]{1,40}$/.test(id)) chests[id] = int(v, 0, 4e12, 0);
+
   const char = {
-    version: SAVE_VERSION, name: cleanName(doc.name), classId: doc.classId, level,
+    version: SAVE_VERSION, name: cleanName(doc.name), quests, stats, achievements, title, chests, classId: doc.classId, level,
     xp: int(doc.xp, 0, 1e9, 0), statPoints, alloc,
     gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0),
     equipment, inventory, spirits, activeSpirit, spec,

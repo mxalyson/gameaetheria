@@ -10,7 +10,7 @@ import { paintGroundScenery, drawGroundLife, drawAtmosphere, drawTreeRich, drawP
 
 const TAU = Math.PI * 2;
 const SKIN = '#f3d2b3';
-const NPC_LOOK = { shop: 'archer', arena: 'warrior', spirit: 'mage' };
+const NPC_LOOK = { shop: 'archer', arena: 'warrior', spirit: 'mage', guard: 'warrior', herbalist: 'cleric' };
 
 export function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
@@ -85,6 +85,7 @@ export class Renderer {
     const items = [];
     for (const d of world.layout.decor) if (d.type === 'house' || vis(d.x, d.y)) items.push({ y: d.y, k: 'decor', o: d });
     for (const n of z.npcs ?? []) if (vis(n.x, n.y)) items.push({ y: n.y, k: 'npc', o: n });
+    for (const c of z.chests ?? []) if (vis(c.x, c.y)) items.push({ y: c.y, k: 'chest', o: c });
     for (const a of world.actors) if (!a.hidden && vis(a.x, a.y)) items.push({ y: a.y + (a.kind === 'spirit' ? 26 : 0), k: 'actor', o: a });
     for (const d of world.drops) if (vis(d.x, d.y)) items.push({ y: d.y - 4, k: 'drop', o: d });
     items.sort((a, b) => a.y - b.y);
@@ -96,7 +97,8 @@ export class Renderer {
     for (const it of items) {
       const o = it.o;
       if (it.k === 'decor') drawDecor(g, o, t, z, player);
-      else if (it.k === 'npc') drawHero(g, { ...o, facing: Math.PI / 2, walk: 0, id: o.x }, NPC_LOOK[o.role], t, o.color, o.accent);
+      else if (it.k === 'npc') drawHero(g, { ...o, facing: Math.PI / 2, walk: 0, id: o.x }, NPC_LOOK[o.id] ?? NPC_LOOK[o.role], t, o.color, o.accent);
+      else if (it.k === 'chest') drawChest(g, o, !view.chestsOpen?.has(o.id), t);
       else if (it.k === 'drop') drawDrop(g, o, t);
       else if (o.kind === 'mob') drawMob(g, o, t);
       else if (o.kind === 'spirit') drawSpirit(g, o, t);
@@ -118,7 +120,8 @@ export class Renderer {
 
     // Barras e nomes por cima de tudo.
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y)) drawBars(g, a, a === player);
-    for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t);
+    for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id]);
+    for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : '[E] Abrir baú');
     for (const tx of world.texts) {
       const a = 1 - Math.max(0, (tx.t - tx.life * 0.6) / (tx.life * 0.4));
       g.globalAlpha = a;
@@ -902,7 +905,26 @@ function drawBars(g, a, isPlayer) {
   }
 }
 
-function drawNpcTag(g, n, near, t) {
+// Baú: caixa de madeira com ferragem dourada; brilha quando está pronto para abrir. Prop de cenário desenhado por código (como as árvores).
+function drawChest(g, c, ready, t) {
+  g.save(); g.translate(c.x, c.y);
+  g.fillStyle = 'rgba(30,40,40,0.25)'; g.beginPath(); g.ellipse(0, 12, 20, 7, 0, 0, TAU); g.fill();
+  g.fillStyle = ready ? '#9a6a34' : '#6f5a46'; g.strokeStyle = '#3d2a14'; g.lineWidth = 2;
+  g.beginPath(); g.roundRect(-17, -6, 34, 18, 3); g.fill(); g.stroke();
+  g.fillStyle = ready ? '#b98245' : '#85705b'; g.beginPath(); g.roundRect(-18, -16, 36, 12, [8, 8, 2, 2]); g.fill(); g.stroke();
+  g.fillStyle = ready ? '#ffd34d' : '#a39a82'; g.fillRect(-3, -8, 6, 9); g.fillRect(-18, -5, 36, 3);
+  if (ready) { g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,214,120,' + (0.12 + 0.08 * Math.sin(t * 3 + c.x)) + ')'; g.beginPath(); g.arc(0, -4, 30, 0, TAU); g.fill(); }
+  g.restore();
+}
+
+function drawPrompt(g, x, y, txt) {
+  g.font = '800 13px Nunito, system-ui, sans-serif'; g.textAlign = 'center';
+  const w = g.measureText(txt).width + 16;
+  g.fillStyle = 'rgba(25,22,45,0.75)'; g.beginPath(); g.roundRect(x - w / 2, y, w, 22, 11); g.fill();
+  g.fillStyle = '#ffffff'; g.fillText(txt, x, y + 16);
+}
+
+function drawNpcTag(g, n, near, t, mark) {
   g.font = '800 12px Nunito, system-ui, sans-serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
@@ -910,9 +932,12 @@ function drawNpcTag(g, n, near, t) {
   g.fillStyle = '#fff3c4';
   g.fillText(n.name, n.x, n.y - 44);
   const by = n.y - 66 + Math.sin(t * 3) * 3;
-  g.fillStyle = '#ffd34d'; circle(g, n.x, by, 9); g.fill();
-  g.fillStyle = '#5a3d00'; g.font = '900 13px Nunito, system-ui, sans-serif';
-  g.fillText('!', n.x, by + 5);
+  // marca de missão: '!' = tem missão para você, '?' = pronta para entregar, 'none' = nada a fazer (esconde); sem informação = '!' de serviço
+  if (mark !== 'none') {
+    g.fillStyle = mark === 'ready' ? '#7dffb0' : '#ffd34d'; circle(g, n.x, by, 9); g.fill();
+    g.fillStyle = '#5a3d00'; g.font = '900 13px Nunito, system-ui, sans-serif';
+    g.fillText(mark === 'ready' ? '?' : '!', n.x, by + 5);
+  }
   if (near) {
     g.font = '800 13px Nunito, system-ui, sans-serif';
     const txt = '[E] Conversar';

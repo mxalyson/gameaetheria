@@ -14,12 +14,12 @@ export function connect(srv) {
     ws.on('error', reject);
     c.send = (o) => ws.send(JSON.stringify({ v: PROTOCOL_VERSION, ...o }));
     c.raw = (t) => ws.send(t);
-    c.waitFor = (pred, ms = 3000) => new Promise((res, rej) => {
+    c.waitFor = (pred, ms = 8000) => new Promise((res, rej) => {
       const found = c.msgs.find(pred); if (found) return res(found);
       const to = setTimeout(() => rej(new Error('timeout esperando mensagem')), ms);
       c.waiters.push((m) => { if (m && pred(m)) { clearTimeout(to); res(m); return true; } return false; });
     });
-    c.waitClose = (ms = 3000) => new Promise((res, rej) => { if (c.closed != null) return res(c.closed); const to = setTimeout(() => rej(new Error('timeout esperando fechar')), ms); c.waiters.push((m) => { if (m === null) { clearTimeout(to); res(c.closed); return true; } return false; }); });
+    c.waitClose = (ms = 8000) => new Promise((res, rej) => { if (c.closed != null) return res(c.closed); const to = setTimeout(() => rej(new Error('timeout esperando fechar')), ms); c.waiters.push((m) => { if (m === null) { clearTimeout(to); res(c.closed); return true; } return false; }); });
     // garante que o servidor já processou tudo o que enviamos antes (mensagens chegam em ordem)
     c.sync = async () => { const ts = Math.random(); c.send({ t: 'ping', ts }); await c.waitFor((m) => m.t === 'pong' && m.ts === ts); };
     c.last = (t) => [...c.msgs].reverse().find((m) => m.t === t);

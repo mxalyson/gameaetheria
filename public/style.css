@@ -357,3 +357,9 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 .char-pick .cc-name { font-weight: 800; }
 .char-pick .cc-desc { font-size: 12px; opacity: .8; }
 .char-pick:hover, .char-pick:focus-visible { filter: brightness(1.15); outline: none; }
+
+/* Missões, diário e mapa (P8) */
+.qlist { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.qlist li { opacity: .92; } .qlist li.done { color: #9be8b0; } .qlist li b { margin-left: 4px; }
+.map-link { text-align: center; color: var(--muted, #9aa3b8); font-size: 12px; margin: 2px 0; }
+.shop-item.locked { opacity: .6; } .shop-item.sel { outline: 2px solid #ffcf4a; border-radius: 12px; }

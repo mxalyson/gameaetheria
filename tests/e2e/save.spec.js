@@ -24,7 +24,7 @@ test('save v1 antigo: migra para a versão atual, mostra aviso e o jogo continua
   await expect(page.locator('[data-action="continue"]')).toContainText('Veterano');
   await expect(page.locator('.toast')).toContainText('Save atualizado');
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('aetheria_save_v1')));
-  expect(saved.version).toBe(2);
+  expect(saved.version).toBe(3);
   expect(saved.arena.rating).toBe(1180); expect(saved.arena.ratings).toEqual({});
   expect(await page.evaluate(() => !!localStorage.getItem('aetheria_save_v1_backup'))).toBe(true); // cópia do original
   await page.click('[data-action="continue"]');

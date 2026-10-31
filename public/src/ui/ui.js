@@ -7,8 +7,14 @@ import { computeStats, canEquip, itemScore } from '../core/stats.js';
 import { xpToNext, spiritXpToNext, spiritPower, MAX_LEVEL } from '../core/progression.js';
 import { tierFor } from '../core/combat.js';
 import { MODES, getRating } from '../core/match.js';
+import { MOBS } from '../data/mobs.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
 import { PRICES } from '../shop.js';
+import { QUESTS } from '../data/quests.js';
+import { ACHIEVEMENTS } from '../data/achievements.js';
+import { DIALOGS } from '../data/dialogs.js';
+import { ZONES } from '../data/zones.js';
+import { offeredBy, readyFor, activeFor, titleText, achievementProgress, ensureJournal } from '../core/journal.js';
 import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
 
 const $ = (id) => document.getElementById(id);
@@ -231,7 +237,7 @@ export class UI {
   updateHud(game) {
     const { char, player, world } = game;
     if (!player) return;
-    this.set('hud-name', 'text', char.name);
+    this.set('hud-name', 'text', char.name + (titleText(char) ? ' · ' + titleText(char) : ''));
     this.set('hud-level', 'text', `Nv ${char.level}`);
     this.set('hud-hp', 'width', `${(100 * player.hp) / player.maxHp}%`);
     this.set('hud-shield', 'width', `${Math.min(100, (100 * player.shield) / player.maxHp)}%`);
@@ -303,7 +309,7 @@ export class UI {
   anyOpen() { return this.open.size > 0; }
   toggle(id) { this.isOpen(id) ? this.close(id) : this.openPanel(id); }
   openPanel(id) {
-    if (['shop', 'arena', 'sage', 'party'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'party', 'spirits', 'character', 'options']) this.open.delete(p);
+    if (['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map', 'spirits', 'character', 'options']) this.open.delete(p);
     if (id === 'options') this.open.clear();
     this.open.add(id);
     if (id === 'shop') this.open.add('inventory');
@@ -318,7 +324,7 @@ export class UI {
 
   render() {
     this.hideTooltip();
-    const order = ['character', 'arena', 'party', 'sage', 'shop', 'spirits', 'inventory', 'options'];
+    const order = ['character', 'arena', 'party', 'dialog', 'journal', 'map', 'sage', 'shop', 'spirits', 'inventory', 'options'];
     this.layer.innerHTML = order.filter((p) => this.open.has(p)).map((p) => this['panel_' + p]()).join('');
   }
 
@@ -477,6 +483,55 @@ export class UI {
       ${p ? '<button class="btn small" data-action="party-leave">Sair do grupo</button>' : ''}
       ${notes}
       <p class="hint">O líder do grupo (👑) escolhe a fila; o grupo joga junto no mesmo time.</p>`);
+  }
+
+  // ---- diálogo com NPC (missões) ----
+  panel_dialog() {
+    const g = this.game, char = g.char, npc = (g.world.zone.npcs ?? []).find((n) => n.id === g.dialogNpc);
+    if (!npc) return '';
+    const D = DIALOGS[npc.id] ?? { greet: '…', service: null };
+    ensureJournal(char);
+    const ready = readyFor(char, npc.id)[0], offer = offeredBy(char, npc.id, { server: !!g.online })[0], active = activeFor(char, npc.id)[0];
+    let text = D.greet, body = '';
+    const rewardLine = (q) => { const r = q.reward; return `<p class="hint">Recompensa: ${[r.gold ? `🪙 ${r.gold}` : '', r.xp ? `${r.xp} XP` : '', r.potions ? `🧪 ${r.potions}` : '', ...(r.items ?? []).map((i) => `item ${RARITY[i.rarity]?.name ?? ''}`)].filter(Boolean).join(' · ')}</p>`; };
+    if (ready) { const q = QUESTS[ready]; text = q.text.done; body = `<h3>✔ ${q.name}</h3>${rewardLine(q)}<button class="btn primary wide" data-action="quest-turnin" data-arg="${q.id}">Entregar missão</button>`; }
+    else if (offer) { const q = offer; text = q.text.offer; body = `<h3>❗ ${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
+    else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>⏳ ${q.name}</h3>${this.questLines(char, active)}`; }
+    const more = (offeredBy(char, npc.id, { server: !!g.online }).length > (offer ? 1 : 0)) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
+    const svc = D.service ? `<button class="btn wide" data-action="dialog-service" data-arg="${D.service.panel}">${D.service.label}</button>` : '';
+    return this.frame('dialog', npc.name, `<p class="npc-line">"${esc(text)}"</p>${body}${more}${svc}`);
+  }
+
+  questLines(char, id) {
+    const q = QUESTS[id], a = char.quests.active[id];
+    return '<ul class="qlist">' + q.objectives.map((o, i) => { const max = o.count ?? 1, v = a?.p[i] ?? 0; return `<li class="${v >= max ? 'done' : ''}">${esc(o.label)} <b>${v}/${max}</b>${o.type === 'pvp' || o.type === 'coop' ? ' <small>(contado pelo servidor)</small>' : ''}</li>`; }).join('') + '</ul>';
+  }
+
+  // ---- diário: missões e conquistas ----
+  panel_journal() {
+    const g = this.game, char = g.char;
+    ensureJournal(char);
+    const act = Object.keys(char.quests.active);
+    const missions = act.length ? act.map((id) => `<div class="shop-item"><div><div class="nm">${esc(QUESTS[id].name)}</div>${this.questLines(char, id)}<div class="sub">${esc(QUESTS[id].text.progress)}</div></div>
+      <button class="btn small" data-action="quest-abandon" data-arg="${id}">Abandonar</button></div>`).join('') : '<p class="hint">Nenhuma missão ativa. Converse com Guarda Ren, Herbalista Mel, Mestre Doran e Sábia Yun.</p>';
+    const done = Object.keys(char.quests.done).length;
+    const ach = ACHIEVEMENTS.map((a) => { const p = achievementProgress(char, a); return `<div class="shop-item ${p.earned ? '' : 'locked'}"><div class="cell ${p.earned ? 'r-epic' : ''}"><span class="ic">${p.earned ? '🏆' : '🔒'}</span></div>
+      <div><div class="nm">${esc(a.name)}</div><div class="sub">${esc(a.desc)} ${p.earned ? '' : `(${p.value}/${p.min})`}</div></div>
+      ${p.earned && a.title ? `<button class="btn small ${char.title === a.id ? 'primary' : ''}" data-action="set-title" data-arg="${a.id}">${char.title === a.id ? 'Título ✔' : 'Usar título'}</button>` : ''}</div>`; }).join('');
+    return this.frame('journal', 'Diário', `<h3>Missões ativas <span class="pts">${act.length}/5</span></h3>${missions}<p class="hint">Concluídas: ${done} · Baús abertos: ${char.stats.chests} · Criaturas derrotadas: ${char.stats.kills}</p>
+      <h3>Conquistas <span class="pts">${Object.keys(char.achievements).length}/${ACHIEVEMENTS.length}</span></h3>${ach}
+      ${char.title ? '<button class="btn small" data-action="set-title" data-arg="">Remover título</button>' : ''}`);
+  }
+
+  // ---- mapa-múndi ----
+  panel_map() {
+    const g = this.game, here = g.world.zoneId;
+    const route = ['town', 'forest', 'plains', 'ruins'];
+    const rows = route.map((id, i) => { const z = ZONES[id]; const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura'; const boss = z.boss ? `Chefe: ${esc(MOBS[z.boss.id].name)}` : '';
+      return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : ['🏠', '🌲', '💎', '🏚️'][i]}</span></div>
+      <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div></div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
+    const arenas = '<div class="shop-item"><div class="cell"><span class="ic">⚔️</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>';
+    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas. Tecla <b>H</b> volta à vila fora de combate.</p>${rows}${arenas}`);
   }
 
   panel_sage() {

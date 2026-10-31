@@ -19,6 +19,9 @@ import { apiUrl, Online, CloudSave } from './online.js';
 import { NetClient } from './net/client.js';
 import { noticeText } from './ui/ui.js';
 import { skillOf } from './core/specs.js';
+import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady } from './core/journal.js';
+import { QUESTS } from './data/quests.js';
+import { ACH } from './data/achievements.js';
 import { PRICES } from './shop.js';
 import { TouchControls } from './touch.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
@@ -87,7 +90,9 @@ class Game {
       // Celular em retrato: a tela pede para girar o aparelho; o mundo fica parado até voltar à horizontal.
       if (!this.portrait.matches) this.step(dt);
       const p = this.player;
-      this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, lowHp: !p.dead && p.hp < p.maxHp * 0.25 });
+      if (this.mode === 'explore' && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
+      const exploring = this.mode === 'explore';
+      this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: exploring ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, chestsOpen: exploring ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25 });
       if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
       this.ui.updateHud(this);
       this.touch.update(this);
@@ -104,6 +109,11 @@ class Game {
   act(action, arg) {
     switch (action) {
       case 'continue': this.loadGame(loadChar()); break;
+      case 'quest-accept': this.questAccept(arg); break;
+      case 'quest-turnin': this.questTurnIn(arg); break;
+      case 'quest-abandon': abandonQuest(this.char, arg); this.save(); this.ui.render(); break;
+      case 'set-title': setTitle(this.char, arg || null); this.save(); this.ui.render(); break;
+      case 'dialog-service': this.ui.openPanel(arg); break;
       case 'net-queue': this.netQueue(arg); break;
       case 'net-cancel': this.net?.cancelQueue(); break;
       case 'net-leave': this.leaveNetMatch(); break;
@@ -171,6 +181,7 @@ class Game {
     char.spirits ??= [];
     char.inventory ??= [];
     char.alloc ??= { str: 0, agi: 0, int: 0, vit: 0 };
+    ensureJournal(char);
     this.char = char;
     this.ui.hideScreen();
     this.ui.setupHud(char);
@@ -661,7 +672,9 @@ class Game {
     if (inp.hit('q')) this.usePotion();
     if (inp.hit('h')) this.hearth();
     if (inp.hit('g') && this.online) this.ui.toggle('party');
-    if (inp.hit('e') && this.nearNpc) this.talk(this.nearNpc);
+    if (inp.hit('e')) { if (this.nearNpc) this.talk(this.nearNpc); else if (this.nearChest) this.useChest(this.nearChest); }
+    if (inp.hit('j') && this.mode === 'explore') this.ui.toggle('journal');
+    if (inp.hit('m') && this.mode === 'explore') this.ui.toggle('map');
 
     if (this.mode === 'net') { this.netStep(dt); return; }
     if (this.mode === 'ended') {
@@ -692,6 +705,7 @@ class Game {
     }
 
     this.nearNpc = (w.zone.npcs ?? []).find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 80) ?? null;
+    this.nearChest = (w.zone.chests ?? []).find((c) => Math.hypot(c.x - p.x, c.y - p.y) < 70)?.id ?? null;
     // morto numa partida por times: a câmera segue um aliado vivo
     const focus = p.dead && this.match ? (this.match.team1.find((a) => !a.dead) ?? p) : p;
     const target = this.renderer.camera(w, focus), k = Math.min(1, dt * 8);
@@ -736,10 +750,67 @@ class Game {
     if (safe || this.world.time - p.lastCombat > 5) this.world.heal(p, p.maxHp * (safe ? 0.25 : 0.03) * dt, true);
   }
 
+  // NPC: com missão para oferecer/entregar/acompanhar abre o diálogo; sem missão, abre direto o serviço (como antes).
   talk(npc) {
+    const c = this.char;
+    const hasQuest = npc.role === 'quest' || offeredBy(c, npc.id, { server: !!this.online }).length || readyFor(c, npc.id).length || activeFor(c, npc.id).length;
+    if (hasQuest) { this.dialogNpc = npc.id; this.ui.openPanel('dialog'); return; }
     if (npc.role === 'shop') this.ui.openPanel('shop');
     else if (npc.role === 'arena') this.ui.openPanel('arena');
     else if (npc.role === 'spirit') this.ui.openPanel('sage');
+  }
+
+  // marca sobre o NPC: '!' tem missão, '?' pronta para entregar, 'none' nada (só para quem existe só por missões)
+  computeMarks() {
+    const marks = {};
+    for (const n of this.world.zone.npcs ?? []) {
+      if (readyFor(this.char, n.id).length) marks[n.id] = 'ready';
+      else if (offeredBy(this.char, n.id, { server: !!this.online }).length) marks[n.id] = 'offer';
+      else if (n.role === 'quest') marks[n.id] = 'none';
+    }
+    return marks;
+  }
+
+  // eventos do jogo → diário (contadores, missões, conquistas) e avisos ao jogador
+  gameEvent(ev) {
+    const out = recordEvent(this.char, ev);
+    for (const q of out.quests) if (q.complete) this.ui.toast('Missão pronta!', QUESTS[q.id].name + ' — volte ao NPC (marca ?)', 'gold');
+    this.announceAchievements(out.achievements);
+    if (out.quests.length || out.achievements.length) { this.save(); if (this.ui.isOpen('journal')) this.ui.render(); }
+    return out;
+  }
+  announceAchievements(list) { for (const id of list) this.ui.toast('Conquista!', ACH[id].name + (ACH[id].title ? ` · título "${ACH[id].title}"` : ''), 'gold'); }
+
+  questAccept(id) {
+    const r = acceptQuest(this.char, id);
+    if (!r.ok) return this.ui.toast('Missão', r.reason, '');
+    this.ui.toast('Missão aceita', QUESTS[id].name, 'gold');
+    this.save(); this.ui.render();
+  }
+  questTurnIn(id) {
+    const r = turnInQuest(this.char, id, this.rng);
+    if (!r.ok) return this.ui.toast('Missão', r.reason, '');
+    const R = r.reward;
+    this.ui.toast('Missão concluída!', [QUESTS[id].name, R.gold ? `+${R.gold} 🪙` : '', R.xp ? `+${R.xp} XP` : ''].filter(Boolean).join(' · '), 'gold');
+    for (const it of R.items) this.ui.log(`Recompensa: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
+    if (R.levels) this.onLevelUp();
+    this.refreshStats();
+    this.announceAchievements(r.achievements);
+    this.save(); this.ui.render();
+  }
+
+  useChest(id) {
+    const chest = (this.world.zone.chests ?? []).find((c) => c.id === id);
+    if (!chest || this.mode !== 'explore') return;
+    const r = openChest(this.char, chest, this.world.zoneId, this.rng);
+    if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
+    this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
+    this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${r.gold} 🪙`, size: 15, color: '#ffd34d' });
+    this.ui.toast('Baú aberto!', r.item ? `+${r.gold} 🪙 e ${r.item.name}${r.item.converted ? ' (virou ouro: mochila cheia)' : ''}` : `+${r.gold} 🪙`, 'gold');
+    for (const q of r.quests) if (q.complete) this.ui.toast('Missão pronta!', QUESTS[q.id].name, 'gold');
+    this.announceAchievements(r.achievements);
+    this.chestsOpen = null; this.marksT = 0;
+    this.save(); if (this.ui.anyOpen()) this.ui.render();
   }
 
   usePotion() {
@@ -765,6 +836,7 @@ class Game {
     const M = MOBS[m.mobId];
     this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? 10 : m.elite ? 3 : 1)));
     for (const l of rollMobLoot(this.rng, m, this.char.classId)) this.dropAt(m.x, m.y, l);
+    this.gameEvent({ type: 'kill', mobId: m.mobId, zoneId: this.world.zoneId, boss: !!m.boss });
     if (m.boss) {
       this.ui.toast(`${M.name} derrotado!`, 'Tesouros caíram no chão', 'gold');
       this.ui.log(`Você derrotou <b>${M.name}</b>! Ele retorna em 90s.`, '#ffd27a');
@@ -791,6 +863,7 @@ class Game {
     this.world.burst(p.x, p.y, '#ffd34d', 40, 260);
     this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o personagem (C)`, 'gold');
     this.ui.log(`Você alcançou o nível <b>${this.char.level}</b>.`, '#ffd34d');
+    this.gameEvent({ type: 'level', level: this.char.level });
     if (this.ui.anyOpen()) this.ui.render();
     this.save();
   }
@@ -841,6 +914,7 @@ class Game {
       return false;
     }
     c.spirits.push(sp);
+    this.gameEvent({ type: 'spirit', count: c.spirits.length });
     const S = SPIRITS[sp.type], R = RARITY[sp.rarity];
     this.ui.toast(`Novo spirit: ${S.name}`, `${R.name} · ${S.element} · ${S.role}`, 'gold');
     this.ui.log(`Essência despertou <b style="color:${S.color}">${S.name}</b> (${R.name})! Veja em <b>P</b>.`, S.color);

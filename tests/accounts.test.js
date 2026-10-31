@@ -5,7 +5,7 @@ import { openDb } from '../server/db.js';
 import { createApi, newOfficialCharacter } from '../server/api.js';
 import { verifyGoogleIdToken, passwordProblem, hashPassword, verifyPassword, validEmail } from '../server/auth.js';
 import { checkSave } from '../server/plausible.js';
-import { exportSave } from '../public/src/core/savedoc.js';
+import { exportSave, SAVE_VERSION } from '../public/src/core/savedoc.js';
 
 // ---------- utilitários ----------
 const CLIENT_ID = 'cliente-teste.apps.googleusercontent.com';
@@ -183,7 +183,7 @@ test('personagem criado pelo servidor: oficial, nome limpo, único; limite de 4 
   const a = await register(s, 'a@exemplo.com'), b = await register(s, 'b@exemplo.com');
   const c = await s.call('POST', '/api/characters', { name: '<b>Zé</b>', classId: 'mage' }, a.token);
   assert.equal(c.status, 201);
-  assert.equal(c.body.character.name, 'bZéb'); assert.equal(c.body.character.level, 1); assert.equal(c.body.character.version, 2);
+  assert.equal(c.body.character.name, 'bZéb'); assert.equal(c.body.character.level, 1); assert.equal(c.body.character.version, SAVE_VERSION);
   assert.equal(c.body.character.spirits.length, 1);
   assert.equal((await s.call('POST', '/api/characters', { name: 'bzéb', classId: 'mage' }, b.token)).body.error, 'name_taken', 'nome único sem diferenciar maiúsculas');
   assert.equal((await s.call('POST', '/api/characters', { name: 'X', classId: 'dragon' }, a.token)).status, 400);

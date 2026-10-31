@@ -287,3 +287,10 @@ P0 Auditoria ──▶ P1 Classes+combate estável ──┬──▶ P3 Save ve
 - **Testes executados:** 169 unitários (9 novos de cooperativo) e 68 e2e (4 novos no **jogo real**: 1×1 em dois navegadores, grupo + 2×2 em quatro, cooperativo até o chefe, servidor indisponível). Última execução completa: 67 passaram e 1 oscilou (laboratório; passou sozinho). Capturas de tela da arena e do cooperativo conferidas.
 - **Defeitos encontrados e corrigidos na P7:** (1) a recompensa chegava antes do snapshot "over" e era sobrescrita por "Calculando…" (corrida); (2) o teste de perseguição travava nos pilares (a IA já os contornava; o cliente de teste não).
 - **Limites:** projéteis do cliente são só visuais; **cooperativo ainda sem balanceamento** (recompensa provavelmente generosa); zonas de exploração continuam sem servidor; sem chat, amigos, guildas; nada medido em rede real ou com carga.
+
+---
+## Atualização — P8 concluída (2026-10-31): mundo, missões e progressão ampliada
+- **Implementado e testado (local):** documento do personagem **v3** (missões, contadores, conquistas, título, baús); **12 missões** em dados com diálogos de NPC (2 NPCs novos), **16 conquistas** com títulos, **baús** (4 por zona), **mapa-múndi** (M) e **diário** (J); progresso de arena/cooperativo e conquistas **do servidor**; plausibilidade do salvamento estendida; **economia documentada** (`docs/gameplay/economia.md`, `npm run economy`) e **cooperativo rebalanceado** (XP ≤ 30% de um nível). Decisão **0012**.
+- **Testes executados:** 179 unitários (10 novos de diário/plausibilidade) e 72 e2e (3 novos de missões no jogo real + verificações de missão de arena no online). Todos passaram na última execução completa.
+- **Defeito encontrado na própria fase:** a recompensa de XP do cooperativo era ≈ 75% de um nível (generosa demais) — corrigida com tetos e testada.
+- **Limites:** PvE de exploração segue calculado no cliente (com tetos); sem mercado/leilão (decidido); sem ralos de fim de jogo (aprimoramento de equipamento); sem eventos mundiais, masmorras instanciadas, áreas secretas nem novas zonas; NPCs e baús novos usam arte provisória do estilo atual.

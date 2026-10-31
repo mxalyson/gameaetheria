@@ -7,6 +7,7 @@ import { makeRng } from '../public/src/core/rng.js';
 import { mobXp } from '../public/src/core/progression.js';
 import { rollMobLoot } from '../public/src/core/loot.js';
 import { applyCoopResult } from '../public/src/core/rewards.js';
+import { coopRewardPlan } from '../public/src/core/economy.js';
 import { NORMAL_MOBS, BOSS_MOBS } from '../public/src/data/mobs.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { wire } from './wire.js';
@@ -134,8 +135,9 @@ export class CoopRoom {
     const crew = this.players.size, victory = result === 'victory';
     for (const p of this.players.values()) {
       if (p.left || !p.charId) continue;
-      const xp = Math.round(this.pool.xp * (1 + 0.15 * (crew - 1)) / crew);
-      const items = [], potions = this.pool.bossDown ? 3 : 0;
+      // valores pela regra de economia (core/economy.js): tetos de XP por nível, ouro das ondas e bônus de chefe
+      const plan = coopRewardPlan({ level: this.avgLevel, crew, wavesCleared: this.pool.wavesCleared, bossDown: this.pool.bossDown, poolXp: this.pool.xp, victory });
+      const xp = plan.xp, items = [], potions = plan.potions;
       if (this.pool.bossDown) {
         const rng = makeRng(this.rng.int(1, 0x3fffffff));
         for (const d of rollMobLoot(rng, { level: Math.min(30, this.avgLevel + 2), boss: true }, p.classId)) {
@@ -143,7 +145,7 @@ export class CoopRoom {
         }
       }
       try {
-        const out = this.db.applyOperation(`coop:${this.matchId}:${p.charId}`, p.charId, 'coop', (doc) => applyCoopResult(doc, { gold: this.pool.gold, xp, items, potions }));
+        const out = this.db.applyOperation(`coop:${this.matchId}:${p.charId}`, p.charId, 'coop', (doc) => applyCoopResult(doc, { gold: plan.gold, xp, items, potions, victory }));
         if (!out.duplicate) {
           this.db.audit('coop_reward', { accountId: p.accountId, detail: JSON.stringify({ match: this.matchId, char: p.charId, victory, waves: this.pool.wavesCleared, ...out.summary }) });
           if (p.session?.ws && p.session.player === p) this.send.to(p.session, { t: 'reward', ...out.summary, won: victory, result, waves: this.pool.wavesCleared });

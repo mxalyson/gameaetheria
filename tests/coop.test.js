@@ -5,6 +5,8 @@ import { createGameServer } from '../server/game-server.js';
 import { newOfficialCharacter } from '../server/api.js';
 import { COOP_WAVES } from '../server/coop.js';
 import { COOP_WAIT } from '../server/hub.js';
+import { coopRewardPlan, COOP } from '../public/src/core/economy.js';
+import { xpToNext } from '../public/src/core/progression.js';
 import { INVENTORY_SIZE } from '../public/src/data/items.js';
 import { connect, closeAll } from './helpers/net.js';
 
@@ -80,7 +82,8 @@ test('vitória: 5 ondas, chefe na última; o servidor grava ouro, XP, itens e po
   assert.deepEqual([...seen].sort(), [1, 2, 3, 4, 5]); assert.ok(bossSeen, 'o chefe apareceu na onda 5');
   srv.step(6); await Promise.all(cs.map((c) => c.sync()));
   const avg = Math.round((10 + 12) / 2);
-  let goldExpected = 0; for (let n = 1; n <= COOP_WAVES; n++) goldExpected += 15 + n * avg * 2;
+  const plan = coopRewardPlan({ level: avg, crew: 2, wavesCleared: COOP_WAVES, bossDown: true, poolXp: 1e9 });
+  const goldExpected = plan.gold;
   for (let i = 0; i < 2; i++) {
     const d = db.character(chars[i].charId).doc, before = chars[i].doc;
     assert.ok(d.gold >= before.gold + goldExpected, 'ouro das ondas (mais itens convertidos, se houver)');
@@ -90,6 +93,7 @@ test('vitória: 5 ondas, chefe na última; o servidor grava ouro, XP, itens e po
     assert.equal(d.potions, before.potions + 3);
     assert.equal(d.arena.rating, 1000, 'cooperativo não mexe no rating');
     const rw = await cs[i].waitFor((m) => m.t === 'reward');
+    assert.ok(rw.xp > 0 && rw.xp <= Math.round(xpToNext(avg) * COOP.xpCapPct * (1 + COOP.groupBonus)) + 1, 'XP respeita o teto da economia: ' + rw.xp);
     assert.equal(rw.mode, 'coop'); assert.equal(rw.won, true); assert.equal(rw.waves, COOP_WAVES); assert.ok(rw.items >= 1);
   }
   assert.equal(db.raw.prepare("select count(*) n from operations where kind = 'coop'").get().n, 2);

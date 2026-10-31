@@ -65,6 +65,7 @@ test('1×1 no jogo real: fila pelo painel, partida renderizada, dano confirmado 
   test.setTimeout(120000);
   const A = await entrar(browser, await conta('a1@x.com', 'Alfa', 'warrior'));
   const B = await entrar(browser, await conta('b1@x.com', 'Beta', 'warrior'));
+  await A.page.evaluate(() => window.game.questAccept('coragem_na_arena'));
   await fila(A, '1v1'); await fila(B, '1v1');
   await naPartida(A); await naPartida(B);
   for (const c of [A, B]) {
@@ -84,6 +85,7 @@ test('1×1 no jogo real: fila pelo painel, partida renderizada, dano confirmado 
   await A.page.screenshot({ path: 'test-results/real-1v1.png' });
   await parar(A);
   // trapaça pelo console do navegador: o servidor recusa e a vida não muda
+  await B.page.waitForTimeout(900); // os últimos golpes já confirmados terminam de chegar
   const hp0 = await B.page.evaluate(() => window.game.player.hp);
   await A.page.evaluate(() => window.game.net.send({ t: 'damage', target: 1, amount: 99999 }));
   await B.page.waitForTimeout(400);
@@ -100,6 +102,12 @@ test('1×1 no jogo real: fila pelo painel, partida renderizada, dano confirmado 
   expect(await A.page.evaluate(() => window.game.char.gold)).toBeGreaterThan(gold0);        // personagem OFICIAL do servidor adotado
   expect(await A.page.evaluate(() => window.game.char.arena.wins)).toBe(1);
   expect(db.character(A.who.id).doc.arena.wins).toBe(1);
+  // missão e contadores de arena são do SERVIDOR: a vitória real completou a missão e contou para a conquista
+  const q = await A.page.evaluate(() => ({ p: window.game.char.quests.active.coragem_na_arena?.p, wins: window.game.char.stats.pvpWins, games: window.game.char.stats.pvpGames }));
+  expect(q).toEqual({ p: [1], wins: 1, games: 1 });
+  await A.page.evaluate(() => window.game.questTurnIn('coragem_na_arena'));
+  expect(await A.page.evaluate(() => window.game.flushCloud())).toBe(true);
+  expect(db.character(A.who.id).doc.quests.done.coragem_na_arena).toBeGreaterThan(0);
   expect(A.errors).toEqual([]); expect(B.errors).toEqual([]);
   await A.ctx.close(); await B.ctx.close();
 });
@@ -166,4 +174,21 @@ test('servidor de partidas indisponível: o jogo avisa e continua (PvP online de
   await expect(page.locator('.panel')).toContainText('Conectando');
   expect(errors).toEqual([]);
   await ctx.close();
+});
+
+test('missão de arena não pode ser forjada pelo cliente: o servidor recusa e restaura o progresso oficial', async ({ browser }) => {
+  const A = await entrar(browser, await conta('forja@x.com', 'Forjador', 'mage'));
+  await A.page.evaluate(() => window.game.questAccept('coragem_na_arena'));
+  expect(await A.page.evaluate(() => window.game.flushCloud())).toBe(true);
+  // trapaça: marcar como concluída sem nenhuma vitória no servidor
+  await A.page.evaluate(() => { const c = window.game.char; delete c.quests.active.coragem_na_arena; c.quests.done.coragem_na_arena = Date.now(); c.stats.pvpWins = 50; window.game.save(); });
+  expect(await A.page.evaluate(() => window.game.flushCloud())).toBe(false);
+  await A.page.waitForFunction(() => window.game.char.quests.active.coragem_na_arena && !window.game.char.quests.done.coragem_na_arena, null, { timeout: 8000 });
+  expect(await A.page.evaluate(() => window.game.char.stats.pvpWins)).toBe(0);
+  expect(db.audits('save_rejected').some((a) => /quest_server_objective/.test(a.detail))).toBe(true);
+  // forjar só o progresso também não passa: o servidor descarta
+  await A.page.evaluate(() => { window.game.char.quests.active.coragem_na_arena.p[0] = 1; window.game.save(); });
+  expect(await A.page.evaluate(() => window.game.flushCloud())).toBe(true);
+  expect(db.character(A.who.id).doc.quests.active.coragem_na_arena.p[0]).toBe(0);
+  await A.ctx.close();
 });

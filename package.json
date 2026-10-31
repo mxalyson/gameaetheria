@@ -13,7 +13,8 @@
     "server:poc": "node server/start-poc.js",
     "server": "node server/start.js",
     "db:backup": "node tools/db-backup.mjs",
-    "bench:net": "node tools/net-bench.mjs"
+    "bench:net": "node tools/net-bench.mjs",
+    "economy": "node tools/economy.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"

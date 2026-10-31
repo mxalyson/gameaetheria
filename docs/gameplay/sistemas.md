@@ -28,3 +28,6 @@ Controles: WASD (eixos isométricos: W sobe na tela), mouse mira, clique ataca, 
 
 ## Salvamento
 Documento do personagem versionado (v2), validado e com backup; exportar/importar em Opções e na tela de título. Ver `core/savedoc.js`, `save.js`.
+
+## Mundo e progressão (P8)
+Missões (12), diálogos, baús, mapa (M), diário (J), conquistas e títulos: ver decisão 0012. Economia: `docs/gameplay/economia.md`.

@@ -149,3 +149,6 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 
 ### 10.10 P7 — arena PvP e cooperativo no jogo real (2026-10-31)
 - Partidas com jogadores reais e cooperativo (ondas + chefe) no cliente principal, grupos e fila no jogo, servidor autoritativo com loot e XP. **169 unitários e 68 e2e.** Detalhes e limites: decisão 0011.
+
+### 10.11 P8 — mundo, missões e progressão (2026-10-31)
+- Missões e diálogos por dados, baús, mapa-múndi, diário, conquistas e títulos, documento v3, economia documentada e cooperativo rebalanceado. **179 unitários e 72 e2e.** Detalhes: decisão 0012 e `docs/gameplay/economia.md`.
