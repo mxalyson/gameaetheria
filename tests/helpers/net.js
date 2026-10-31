@@ -1,14 +1,20 @@
 // Ajudantes dos testes de rede: cliente WebSocket de teste, atalhos de mensagens e uma "perseguição" que contorna pilares.
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION } from '../../public/src/core/protocol.js';
+import { SnapshotDecoder } from '../../public/src/core/snapshot.js';
 
 export { PROTOCOL_VERSION };
 
 export function connect(srv) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${srv.port}`);
-    const c = { ws, msgs: [], closed: null, waiters: [] };
-    ws.on('message', (d) => { const m = JSON.parse(d.toString()); c.msgs.push(m); c.waiters = c.waiters.filter((w) => !w(m)); });
+    const c = { ws, msgs: [], closed: null, waiters: [], dec: new SnapshotDecoder(), snapBytes: 0, snapCount: 0 };
+    ws.on('message', (d) => {
+      const raw = d.toString(); let m = JSON.parse(raw);
+      if (m.t === 'match_found') c.dec.init(m); // estáticos dos jogadores; os snapshots seguintes são deltas
+      else if (m.t === 'snap') { c.snapBytes += raw.length; c.snapCount++; m = c.dec.apply(m); }
+      c.msgs.push(m); c.waiters = c.waiters.filter((w) => !w(m));
+    });
     ws.on('close', (code) => { c.closed = code; c.waiters = c.waiters.filter((w) => !w(null)); });
     ws.on('open', () => resolve(c));
     ws.on('error', reject);

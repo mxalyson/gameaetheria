@@ -152,3 +152,6 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 
 ### 10.11 P8 — mundo, missões e progressão (2026-10-31)
 - Missões e diálogos por dados, baús, mapa-múndi, diário, conquistas e títulos, documento v3, economia documentada e cooperativo rebalanceado. **179 unitários e 72 e2e.** Detalhes: decisão 0012 e `docs/gameplay/economia.md`.
+
+### 10.12 P9 — otimização, segurança e carga (2026-10-31)
+- Snapshots por delta (−82% de banda), alocações reduzidas, teste de carga com clientes reais, limites de conexão, auditoria de abuso, fuzz e varredura de segredos. **196 unitários e 72 e2e.** Medições e limites: decisão 0013.

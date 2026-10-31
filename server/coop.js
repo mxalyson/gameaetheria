@@ -11,6 +11,7 @@ import { coopRewardPlan } from '../public/src/core/economy.js';
 import { NORMAL_MOBS, BOSS_MOBS } from '../public/src/data/mobs.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { wire } from './wire.js';
+import { DeltaEncoder, actorTuple, mobTuple, mobStatic } from './snapshot.js';
 
 export const COOP_WAVES = 5;   // a 5ª onda traz o chefe
 const FIRST_REST = 3, REST = 4, RESULT_SHOW = 6;
@@ -25,7 +26,7 @@ export class CoopRoom {
     this.rng = makeRng(seed);
     this.world = new World('waves', { seed, visuals: false });
     this.state = 'countdown'; this.countdown = 3; this.resultT = 0; this.winner = 0; this.reason = null; this.closed = false;
-    this.clock = 0; this.tick = 0; this.events = [];
+    this.clock = 0; this.tick = 0; this.events = []; this.enc = new DeltaEncoder();
     this.wave = { n: 0, state: 'rest', t: FIRST_REST, total: COOP_WAVES };
     this.pool = { xp: 0, gold: 0, bossDown: false, wavesCleared: 0 };
     this.players = new Map();
@@ -155,25 +156,38 @@ export class CoopRoom {
     }
   }
 
-  // ---- snapshots ----
-  snapshotJson() {
-    const actors = [...this.players.values()].filter((p) => !p.left).map((p) => {
-      const a = p.actor;
-      return { id: a.id, team: 1, name: p.name, classId: p.classId, level: a.level, x: r1(a.x), y: r1(a.y), hp: Math.round(a.hp), maxHp: a.maxHp, dead: a.dead,
-        facing: Math.round(a.facing * 100) / 100, spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), moving: a.moving, swing: a.swing > 0,
-        stun: a.stunT > 0, shield: Math.round(a.shield), online: !!p.session?.ws, bot: false,
-        cds: { basic: r1(a.cds.basic), s0: r1(a.cds.s0), s1: r1(a.cds.s1), s2: r1(a.cds.s2) } };
-    });
-    const mobs = this.mobs().filter((m) => !m.dead || m.deadT < 0.6).map((m) => ({ id: m.id, mob: m.mobId, level: m.level, boss: !!m.boss, elite: !!m.elite, x: r1(m.x), y: r1(m.y), hp: Math.round(m.hp), maxHp: m.maxHp, dead: m.dead,
-      facing: Math.round(m.facing * 100) / 100, moving: m.moving, swing: m.swing > 0 }));
-    const ev = this.events; this.events = [];
-    return JSON.stringify({ v: PROTOCOL_VERSION, t: 'snap', room: this.id, mode: 'coop', tick: this.tick, state: this.state, countdown: r1(Math.max(0, this.countdown)),
-      winner: this.winner, reason: this.reason, coop: { wave: this.wave.n, total: COOP_WAVES, rest: this.wave.state === 'rest' ? r1(Math.max(0, this.wave.t)) : 0, mobs: mobs.filter((m) => !m.dead).length, gold: this.pool.gold },
-      actors, mobs, events: ev });
+
+  // ---- snapshots (compactos e por delta: ver core/snapshot.js) ----
+  meta() {
+    return { v: PROTOCOL_VERSION, t: 'snap', room: this.id, mode: this.mode, tick: this.tick, state: this.state, countdown: r1(Math.max(0, this.countdown)), winner: this.winner, reason: this.reason, coop: { wave: this.wave.n, total: COOP_WAVES, rest: this.wave.state === 'rest' ? r1(Math.max(0, this.wave.t)) : 0, mobs: this.mobs().filter((m) => !m.dead).length, gold: this.pool.gold } };
   }
+  // dados só do dono: velocidade e recargas (os outros jogadores não precisam deles)
+  meJson(p) {
+    const a = p.actor;
+    return JSON.stringify({ spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), c: [r1(a.cds.basic), r1(a.cds.s0), r1(a.cds.s1), r1(a.cds.s2)] });
+  }
+  frameFor(commit) {
+    const tuples = [...this.players.values()].filter((p) => !p.left).map((p) => actorTuple(p.actor, !!p.session?.ws));
+    const ms = this.mobs().filter((m) => !m.dead || m.deadT < 0.6);
+    return this.enc.frame(tuples, ms.map(mobTuple), new Map(ms.map((m) => [m.id, mobStatic(m)])), { commit, forceKey: !commit });
+  }
+
   broadcast() {
-    const head = this.snapshotJson().slice(0, -1);
-    this.bytes = head.length;
-    for (const p of this.humans()) if (p.session.ws && p.session.player === p) this.send.raw(p.session, head + `,"ack":${p.lastSeq}}`);
+    const f = this.frameFor(true);
+    const ev = this.events; this.events = [];
+    const head = JSON.stringify({ ...this.meta(), ...f, events: ev }).slice(0, -1);
+    for (const p of this.humans()) {
+      if (!(p.session.ws && p.session.player === p)) continue;
+      const msg = head + `,"ack":${p.lastSeq},"me":${this.meJson(p)}}`;
+      this.bytes = msg.length;
+      this.send.raw(p.session, msg);
+    }
+  }
+  // quem reconecta no meio da partida recebe um quadro-chave completo (sem mexer no estado dos outros)
+  sendKeyframe(session) {
+    const p = session.player;
+    if (!p) return;
+    const f = this.frameFor(false);
+    this.send.raw(session, JSON.stringify({ ...this.meta(), ...f, events: [] }).slice(0, -1) + `,"ack":${p.lastSeq},"me":${this.meJson(p)}}`);
   }
 }

@@ -17,6 +17,7 @@ import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.
 import { cleanName } from './core/savedoc.js';
 import { apiUrl, Online, CloudSave } from './online.js';
 import { NetClient } from './net/client.js';
+import { SnapshotDecoder } from './core/snapshot.js';
 import { noticeText } from './ui/ui.js';
 import { skillOf } from './core/specs.js';
 import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady } from './core/journal.js';
@@ -366,8 +367,9 @@ class Game {
   }
 
   enterNetMatch(m) {
-    if (this.mode === 'net' && this.netInfo?.room === m.room) { this.netInfo = m; return; } // reconexão na mesma sala
+    if (this.mode === 'net' && this.netInfo?.room === m.room) { this.netInfo = m; this.netDec = new SnapshotDecoder().init(m); return; } // reconexão na mesma sala: o servidor manda um quadro-chave em seguida
     this.ui.closePanels(); this.ui.hideScreen();
+    this.netDec = new SnapshotDecoder().init(m);
     if (this.cloud) this.cloud.paused = true; // durante a partida o servidor é quem altera o personagem
     const w = new World(m.mode === 'coop' ? 'waves' : 'arena_team', { visuals: true });
     this.world = w; this.mode = 'net'; this.netInfo = m; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
@@ -388,8 +390,9 @@ class Game {
   }
 
   // snapshot do servidor: guarda para interpolar e dispara os efeitos dos EVENTOS confirmados (a apresentação nunca decide dano)
-  onNetSnap(s) {
-    if (this.mode !== 'net' || s.room !== this.netInfo?.room) return;
+  onNetSnap(raw) {
+    if (this.mode !== 'net' || raw.room !== this.netInfo?.room || !this.netDec) return;
+    const s = this.netDec.apply(raw); // delta → quadro completo (mesmo formato de antes)
     s.at = performance.now();
     this.netSnaps.push(s); if (this.netSnaps.length > 24) this.netSnaps.shift();
     this.netLast = s;

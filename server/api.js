@@ -45,7 +45,9 @@ export function createApi(db, { googleClientId = null, origins = [], trustProxy 
   const limited = (map, key, max) => { let l = map.get(key); if (!l) map.set(key, (l = new RateLimiter(max))); return !l.allow(now()); };
   if (typeof setInterval === 'function') setInterval(() => { if (ipLimit.size > 5000) ipLimit.clear(); if (authLimit.size > 5000) authLimit.clear(); }, 60_000).unref?.();
 
-  const json = (res, status, body, headers = {}) => { const s = JSON.stringify(body); res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers }); res.end(s); };
+  // Cabeçalhos de segurança: a API só devolve JSON (nada de HTML/script), não deve ser embutida nem interpretada como outro tipo.
+  const SEC = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'", 'Cross-Origin-Resource-Policy': 'cross-origin' };
+  const json = (res, status, body, headers = {}) => { const s = JSON.stringify(body); res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...SEC, ...headers }); res.end(s); };
   const err = (res, status, error, message, h) => json(res, status, { error, message }, h);
 
   async function readJson(req, limit) {
@@ -61,7 +63,7 @@ export function createApi(db, { googleClientId = null, origins = [], trustProxy 
     if (!url.pathname.startsWith('/api/')) return false;
     const origin = req.headers.origin;
     const cors = origin && origins.includes(origin) ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS' } : {};
-    if (req.method === 'OPTIONS') { res.writeHead(cors['Access-Control-Allow-Origin'] ? 204 : 403, cors); res.end(); return true; }
+    if (req.method === 'OPTIONS') { res.writeHead(cors['Access-Control-Allow-Origin'] ? 204 : 403, { ...SEC, ...cors }); res.end(); return true; }
     if (origin && !cors['Access-Control-Allow-Origin']) { err(res, 403, 'bad_origin', 'Origem não permitida.'); return true; }
     const ip = (trustProxy && String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
     if (limited(ipLimit, ip, 240)) { err(res, 429, 'rate_limit', 'Muitas requisições.', cors); return true; }

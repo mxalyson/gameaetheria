@@ -2,7 +2,7 @@
 // Regras: toda mensagem é JSON { v, t, ... }; `v` é a versão do protocolo; o cliente só envia INTENÇÕES (nunca dano, posição final, loot).
 import { CLASSES } from '../data/classes.js';
 
-export const PROTOCOL_VERSION = 3; // v2: hello autenticado e reward · v3: lobby, fila, grupos e salas por modo (1v1/2v2/4v4)
+export const PROTOCOL_VERSION = 4; // v2: hello autenticado e reward · v3: lobby, fila, grupos e salas por modo · v4: snapshots compactos por delta (core/snapshot.js)
 export const MAX_PARTY = 4;
 export const QUEUE_MODES = ['1v1', '2v2', '4v4', 'coop']; // coop = PvE cooperativo (ondas + chefe) no servidor
 export const TICK_HZ = 60;                    // simulação (igual ao FIXED_DT do cliente)

@@ -21,6 +21,6 @@ const gameUrl = env.GAME_URL || `ws://${host}:${gamePort}`; // URL que o NAVEGAD
 const api = createApi(db, { googleClientId: env.GOOGLE_CLIENT_ID || null, origins, trustProxy: env.TRUST_PROXY === '1', gameUrl });
 const http = api.server();
 http.listen(apiPort, host, () => console.log(`API de contas em http://${host}:${apiPort}  (origens: ${origins.join(', ')})`));
-const game = createGameServer({ port: gamePort, host, db, allowedOrigins: origins });
+const game = createGameServer({ port: gamePort, host, db, allowedOrigins: origins, trustProxy: env.TRUST_PROXY === '1', maxPerIp: Number(env.MAX_PER_IP) || 20 });
 game.ready.then(() => console.log(`Servidor de jogo em ws://${host}:${game.port}  · banco: ${dbPath} · Google: ${env.GOOGLE_CLIENT_ID ? 'ligado' : 'desligado'}`));
 setInterval(() => db.purgeSessions(), 3600_000).unref();

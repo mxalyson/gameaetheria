@@ -30,14 +30,25 @@ export function createGameServer({
   maxMsgPerSec = 120, maxErrors = 5, reconnectSec = 30, heartbeatMs = 10000,
   db = null,                 // com banco: conta + personagem do servidor e recompensas gravadas
   allowGuests = !db,         // sem banco aceita convidados com personagem padrão; com banco, conta é obrigatória
+  maxConnections = 2000,     // conexões simultâneas no processo (acima disso: recusa com 1013)
+  maxPerIp = 20,             // por endereço (jogadores atrás do mesmo roteador/NAT cabem; inundação a partir de um IP, não)
+  helloTimeoutMs = 10000,    // quem não se identifica a tempo é desconectado (conexões ociosas gastam recursos)
+  trustProxy = false,        // atrás de proxy reverso: usa X-Forwarded-For para o IP
 } = {}) {
   const rng = makeRng(seed);
-  const stats = { connections: 0, messages: 0, rejected: 0, kicked: 0 };
+  const stats = { connections: 0, messages: 0, rejected: 0, kicked: 0, refused: 0, helloTimeouts: 0 };
+  const perIp = new Map();
   const send = (ws, msg) => { if (ws && ws.readyState === 1) ws.send(encode(msg)); };
   const reject = (ws, code, close = false, extra = {}) => {
     stats.rejected++;
     send(ws, { t: 'reject', code, ...extra });
-    if (close) { stats.kicked++; ws.close(1008, code); }
+    if (close) {
+      if (ws.ctx?.kicked) return; // já foi derrubada: não conta nem registra de novo
+      if (ws.ctx) ws.ctx.kicked = true;
+      stats.kicked++; ws.close(1008, code);
+      // abuso fica no registro de auditoria (quem, de onde, por quê); erros comuns de login não entram aqui
+      if (db && [REJECT.RATE_LIMIT, REJECT.TOO_MANY_ERRORS, REJECT.BAD_SESSION, REJECT.BAD_TOKEN].includes(code)) db.audit('ws_abuse', { accountId: ws.ctx?.session?.accountId ?? null, ip: ws.ctx?.ip ?? null, detail: code });
+    }
   };
   const hub = new Hub({ db, seed, reconnectSec, out: { send: (s, m) => send(s.ws, m), raw: (s, text) => { if (s.ws && s.ws.readyState === 1) s.ws.send(text); } } });
   Object.defineProperty(stats, 'staleInputs', { get: () => hub.stats.staleInputs, enumerable: true });
@@ -84,6 +95,7 @@ export function createGameServer({
 
   function onMessage(ws, data) {
     const c = ws.ctx;
+    if (c.kicked) return; // conexão já derrubada: ignora o que ainda chegar
     stats.messages++;
     if (!c.limiter.allow(Date.now())) return reject(ws, REJECT.RATE_LIMIT, true);
     const r = decodeClient(typeof data === 'string' ? data : data.toString('utf8'));
@@ -97,9 +109,14 @@ export function createGameServer({
     hub.handle(c.session, m);
   }
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
+    const ip = (trustProxy && String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
+    if (wss.clients.size > maxConnections || (perIp.get(ip) ?? 0) >= maxPerIp) { stats.refused++; ws.close(1013, 'busy'); return; } // 1013 = tente mais tarde
+    perIp.set(ip, (perIp.get(ip) ?? 0) + 1);
     stats.connections++;
-    ws.ctx = { session: null, errors: 0, limiter: new RateLimiter(maxMsgPerSec), alive: true };
+    ws.ctx = { session: null, errors: 0, limiter: new RateLimiter(maxMsgPerSec), alive: true, ip };
+    ws.ctx.helloTimer = setTimeout(() => { if (!ws.ctx.session) { stats.helloTimeouts++; ws.close(1008, 'hello_timeout'); } }, helloTimeoutMs);
+    ws.once('close', () => { clearTimeout(ws.ctx.helloTimer); const n = (perIp.get(ip) ?? 1) - 1; if (n <= 0) perIp.delete(ip); else perIp.set(ip, n); });
     ws.on('pong', () => { ws.ctx.alive = true; });
     ws.on('message', (data) => onMessage(ws, data));
     ws.on('close', () => { const s = ws.ctx.session; if (s && s.ws === ws) hub.disconnected(s); });

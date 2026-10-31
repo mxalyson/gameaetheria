@@ -155,8 +155,9 @@ export class World {
   update(dt, intents = {}) {
     this.time += dt;
     if (this.frozen > 0) { this.frozen -= dt; this.updateVisuals(dt); return; }
+    let prune = false;
     for (const a of this.actors) {
-      if (a.dead) { a.deadT += dt; continue; }
+      if (a.dead) { a.deadT += dt; if (a.deadT > 0.6 && a.kind !== 'player') prune = true; continue; }
       this.tickTimers(a, dt);
       if (a.kind === 'spirit') { this.updateSpirit(a, dt); continue; }
       const intent = intents[a.id] ?? (a.kind === 'mob' ? mobIntent(a, this, dt) : a.kind === 'rival' ? rivalIntent(a, this, dt) : null);
@@ -166,14 +167,15 @@ export class World {
     this.updateProjectiles(dt);
     this.updateAreas(dt);
     this.updateTelegraphs(dt);
-    this.actors = this.actors.filter((a) => !(a.dead && a.deadT > 0.6 && a.kind !== 'player'));
+    if (prune) this.actors = this.actors.filter((a) => !(a.dead && a.deadT > 0.6 && a.kind !== 'player'));
     this.updateVisuals(dt);
     if (this.events.length > 2000) this.events.splice(0, this.events.length - 2000);
   }
 
   tickTimers(a, dt) {
     for (const k in a.cds) a.cds[k] = Math.max(0, a.cds[k] - dt);
-    a.buffs = a.buffs.filter((b) => (b.t -= dt) > 0);
+    const bs = a.buffs; // compactação no lugar: sem alocar um array novo por ator por tick
+    if (bs.length) { let w = 0; for (let i = 0; i < bs.length; i++) { const b = bs[i]; if ((b.t -= dt) > 0) bs[w++] = b; } bs.length = w; }
     if (a.shieldT > 0) { a.shieldT -= dt; if (a.shieldT <= 0) a.shield = 0; }
     a.slowT = Math.max(0, a.slowT - dt);
     a.stunT = Math.max(0, a.stunT - dt);
@@ -227,7 +229,9 @@ export class World {
   }
 
   separate() {
-    const list = this.actors.filter((a) => !a.dead && a.kind !== 'spirit');
+    const list = (this._sep ??= []);
+    list.length = 0;
+    for (const a of this.actors) if (!a.dead && a.kind !== 'spirit') list.push(a);
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
         const a = list[i], b = list[j];
@@ -451,7 +455,7 @@ export class World {
         else this.burst(p.x, p.y, p.color, 5, 90);
       }
     }
-    this.projectiles = this.projectiles.filter((p) => !p.dead);
+    if (this.projectiles.some((p) => p.dead)) this.projectiles = this.projectiles.filter((p) => !p.dead);
   }
 
   explode(p) {
@@ -480,7 +484,7 @@ export class World {
         }
       }
     }
-    this.areas = this.areas.filter((ar) => ar.ticks > 0 || ar.next > -0.3);
+    if (this.areas.length) this.areas = this.areas.filter((ar) => ar.ticks > 0 || ar.next > -0.3);
   }
 
   updateTelegraphs(dt) {
@@ -497,7 +501,7 @@ export class World {
         }
       }
     }
-    this.telegraphs = this.telegraphs.filter((tg) => !tg.done);
+    if (this.telegraphs.length) this.telegraphs = this.telegraphs.filter((tg) => !tg.done);
   }
 
   // ---------- spirits ----------
@@ -565,6 +569,7 @@ export class World {
   }
 
   updateVisuals(dt) {
+    if (!this.visuals && !this.drops.length) return; // servidor: nada de efeitos para atualizar
     for (const f of this.fx) { f.t += dt; if (f.follow) { f.x = f.follow.x; f.y = f.follow.y; } }
     this.fx = this.fx.filter((f) => f.t < f.life);
     for (const p of this.particles) {

@@ -265,7 +265,8 @@ export class Hub {
   sendMatchFound(s, room, p) {
     this.out.send(s, { t: 'match_found', room: room.id, mode: room.mode, you: p.actor.id, team: p.team, slot: p.team, arena: { w: room.world.zone.w, h: room.world.zone.h, radius: room.world.zone.radius },
       objective: room.world.objective ? { x: room.world.objective.x, y: room.world.objective.y, r: room.world.objective.r } : null,
-      players: [...room.players.values()].filter((q) => !q.left).map((q) => ({ id: q.actor.id, team: q.team, name: q.name, classId: q.classId, level: q.actor.level, bot: q.bot })) });
+      players: [...room.players.values()].filter((q) => !q.left).map((q) => ({ id: q.actor.id, team: q.team, name: q.name, classId: q.classId, level: q.actor.level, maxHp: q.actor.maxHp, bot: q.bot })) });
+    room.sendKeyframe?.(s); // reconexão: quadro-chave completo para o decodificador recomeçar
   }
 
   // ---------- relógio ----------

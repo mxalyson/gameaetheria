@@ -294,3 +294,12 @@ P0 Auditoria ──▶ P1 Classes+combate estável ──┬──▶ P3 Save ve
 - **Testes executados:** 179 unitários (10 novos de diário/plausibilidade) e 72 e2e (3 novos de missões no jogo real + verificações de missão de arena no online). Todos passaram na última execução completa.
 - **Defeito encontrado na própria fase:** a recompensa de XP do cooperativo era ≈ 75% de um nível (generosa demais) — corrigida com tetos e testada.
 - **Limites:** PvE de exploração segue calculado no cliente (com tetos); sem mercado/leilão (decidido); sem ralos de fim de jogo (aprimoramento de equipamento); sem eventos mundiais, masmorras instanciadas, áreas secretas nem novas zonas; NPCs e baús novos usam arte provisória do estilo atual.
+
+---
+## Atualização — P9 concluída (2026-10-31): otimização, segurança e testes de carga
+- **Banda:** snapshots compactos por delta (protocolo **v4**): de ≈ 45 KB/s para **≈ 8,5 KB/s por jogador** (−82%), com o estado do cliente conferido contra o do servidor ao longo de partidas inteiras e após reconexão.
+- **CPU:** alocações por tick reduzidas (≈ 6% de ganho medido); picos de GC/JIT permanecem (p99 ≈ 8 ms, máx. 20–30 ms com 40 salas). **Carga com clientes reais** (16 a 400): estável até ≈ 160 clientes por processo; com 400, p99 de RTT 274 ms e laço de eventos até 162 ms. Detalhes e ressalvas de método em `docs/decisions/0013-otimizacao-seguranca-e-carga.md`.
+- **Segurança:** limites de conexão (por IP e total), tempo para se identificar, auditoria de abuso, cabeçalhos da API, varredura de segredos; fuzz (30 000 entradas no protocolo + 6 000 mensagens hostis no servidor vivo), SQL, protótipo e travessia de caminho **sem falhas encontradas**; `npm audit` com 0 vulnerabilidades.
+- **Testes executados:** 196 unitários (17 novos: snapshots e segurança) e 72 e2e (71 passaram e 1 oscilante de laboratório que passa sozinho).
+- **Defeitos encontrados na própria fase:** (1) conexão derrubada por abuso continuava sendo processada e gerava **uma linha de auditoria por mensagem** (spam de log) — corrigido; (2) no teste, o limite de listagem da auditoria escondia registros — consequência do item anterior.
+- **Não feito:** Canvas 2D × PixiJS (decisão 0001 mantida), medição em celular real, perfil de CPU em carga longa, TLS/WSS, teste de rede com perda/latência.

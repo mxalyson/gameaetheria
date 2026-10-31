@@ -6,6 +6,7 @@ import { MODES, newMatch, controlTick, matchWinner, spawnSlots } from '../public
 import { applyMatchResult } from '../public/src/core/rewards.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { wire } from './wire.js';
+import { DeltaEncoder, actorTuple } from './snapshot.js';
 
 export const COUNTDOWN = 3;   // s
 export const RESULT_SHOW = 5; // s com o resultado na tela antes de fechar a sala
@@ -22,7 +23,7 @@ export class MatchRoom {
     this.world.objective = { ...z.objective, owner: 0, contested: false };
     this.match = newMatch(mode);
     this.state = 'countdown'; this.countdown = COUNTDOWN; this.resultT = 0; this.winner = 0; this.reason = null;
-    this.clock = 0; this.tick = 0; this.events = []; this.closed = false;
+    this.clock = 0; this.tick = 0; this.events = []; this.closed = false; this.enc = new DeltaEncoder();
     this.players = new Map(); // actorId -> jogador da sala
     const next = { 1: 0, 2: 0 };
     const slots = { 1: spawnSlots(1, this.size, z.w / 2, z.spawns.south, z.spawns.north), 2: spawnSlots(2, this.size, z.w / 2, z.spawns.south, z.spawns.north) };
@@ -90,15 +91,18 @@ export class MatchRoom {
   }
 
   judge() {
-    const ob = this.world.objective, all = [...this.players.values()];
-    const inside = (a) => !a.dead && Math.hypot(a.x - ob.x, a.y - ob.y) < ob.r + a.r;
-    const t1 = all.filter((p) => p.team === 1).map((p) => p.actor), t2 = all.filter((p) => p.team === 2).map((p) => p.actor);
-    const in1 = t1.filter(inside).length, in2 = t2.filter(inside).length;
+    const ob = this.world.objective;
+    let in1 = 0, in2 = 0, n1 = 0, n2 = 0, hp1 = 0, hp2 = 0; // contagem direta: sem arrays temporários por tick
+    for (const p of this.players.values()) {
+      const a = p.actor;
+      if (a.dead) continue;
+      const inside = Math.hypot(a.x - ob.x, a.y - ob.y) < ob.r + a.r;
+      if (p.team === 1) { n1++; hp1 += a.hp; if (inside) in1++; } else { n2++; hp2 += a.hp; if (inside) in2++; }
+    }
     controlTick(this.match, TICK_DT, in1, in2);
     ob.owner = this.match.owner; ob.contested = in1 > 0 && in2 > 0;
-    const a1 = t1.filter((a) => !a.dead), a2 = t2.filter((a) => !a.dead);
-    const w = matchWinner(this.match, a1.length, a2.length, a1.reduce((s, a) => s + a.hp, 0), a2.reduce((s, a) => s + a.hp, 0));
-    if (w) this.end(w, w === 3 ? 'draw' : a1.length === 0 || a2.length === 0 ? 'elimination' : this.match.time >= this.match.limit ? 'time' : 'score');
+    const w = matchWinner(this.match, n1, n2, hp1, hp2);
+    if (w) this.end(w, w === 3 ? 'draw' : n1 === 0 || n2 === 0 ? 'elimination' : this.match.time >= this.match.limit ? 'time' : 'score');
   }
 
   // ---- fim e recompensas ----
@@ -123,24 +127,37 @@ export class MatchRoom {
     }
   }
 
-  // ---- snapshots ----
-  snapshotJson() {
-    const m = this.match;
-    const actors = [...this.players.values()].map((p) => {
-      const a = p.actor;
-      return { id: a.id, team: p.team, name: p.name, classId: p.classId, x: r1(a.x), y: r1(a.y), hp: Math.round(a.hp), maxHp: a.maxHp, dead: a.dead,
-        facing: Math.round(a.facing * 100) / 100, spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), moving: a.moving, swing: a.swing > 0,
-        stun: a.stunT > 0, shield: Math.round(a.shield), online: p.bot || !!p.session?.ws, bot: p.bot,
-        cds: { basic: r1(a.cds.basic), s0: r1(a.cds.s0), s1: r1(a.cds.s1), s2: r1(a.cds.s2) } };
-    });
-    const ev = this.events; this.events = [];
-    return JSON.stringify({ v: PROTOCOL_VERSION, t: 'snap', room: this.id, mode: this.mode, tick: this.tick, state: this.state, countdown: r1(Math.max(0, this.countdown)),
-      winner: this.winner, reason: this.reason, match: { score: { 1: Math.floor(m.score[1]), 2: Math.floor(m.score[2]) }, owner: m.owner, left: Math.max(0, Math.ceil(m.limit - m.time)) },
-      actors, events: ev });
+
+  // ---- snapshots (compactos e por delta: ver core/snapshot.js) ----
+  meta() {
+    return { v: PROTOCOL_VERSION, t: 'snap', room: this.id, mode: this.mode, tick: this.tick, state: this.state, countdown: r1(Math.max(0, this.countdown)), winner: this.winner, reason: this.reason, match: { score: { 1: Math.floor(this.match.score[1]), 2: Math.floor(this.match.score[2]) }, owner: this.match.owner, left: Math.max(0, Math.ceil(this.match.limit - this.match.time)) } };
   }
+  // dados só do dono: velocidade e recargas (os outros jogadores não precisam deles)
+  meJson(p) {
+    const a = p.actor;
+    return JSON.stringify({ spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), c: [r1(a.cds.basic), r1(a.cds.s0), r1(a.cds.s1), r1(a.cds.s2)] });
+  }
+  frameFor(commit) {
+    const tuples = [...this.players.values()].map((p) => actorTuple(p.actor, p.bot || !!p.session?.ws));
+    return this.enc.frame(tuples, [], new Map(), { commit, forceKey: !commit });
+  }
+
   broadcast() {
-    const head = this.snapshotJson().slice(0, -1);
-    this.bytes = head.length;
-    for (const p of this.humans()) if (p.session.ws && p.session.player === p) this.send.raw(p.session, head + `,"ack":${p.lastSeq}}`);
+    const f = this.frameFor(true);
+    const ev = this.events; this.events = [];
+    const head = JSON.stringify({ ...this.meta(), ...f, events: ev }).slice(0, -1);
+    for (const p of this.humans()) {
+      if (!(p.session.ws && p.session.player === p)) continue;
+      const msg = head + `,"ack":${p.lastSeq},"me":${this.meJson(p)}}`;
+      this.bytes = msg.length;
+      this.send.raw(p.session, msg);
+    }
+  }
+  // quem reconecta no meio da partida recebe um quadro-chave completo (sem mexer no estado dos outros)
+  sendKeyframe(session) {
+    const p = session.player;
+    if (!p) return;
+    const f = this.frameFor(false);
+    this.send.raw(session, JSON.stringify({ ...this.meta(), ...f, events: [] }).slice(0, -1) + `,"ack":${p.lastSeq},"me":${this.meJson(p)}}`);
   }
 }

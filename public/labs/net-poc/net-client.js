@@ -2,6 +2,7 @@
 // Envia só intenções; desenha o que o servidor confirma. Interpolação dos outros jogadores (100 ms no passado) e predição suave do próprio
 // movimento. Marcadores simples de depuração — NÃO é arte do jogo.
 import { PROTOCOL_VERSION } from '../../src/core/protocol.js';
+import { SnapshotDecoder } from '../../src/core/snapshot.js';
 
 const $ = (id) => document.getElementById(id);
 const cv = $('c'), g = cv.getContext('2d');
@@ -51,7 +52,7 @@ function open(token) {
 function onMessage(m) {
   switch (m.t) {
     case 'welcome': net.joined = true; net.token = m.token; net.name = m.name; setStatus(`${m.name} — no lobby`); break;
-    case 'snap': onSnap(m); break;
+    case 'snap': if (net.dec) onSnap(net.dec.apply(m)); break; // delta → quadro completo
     case 'pong': net.rtt = Math.round(performance.now() - m.ts); break;
     case 'reject': net.rejects.push(m.code); setStatus('recusado: ' + m.code); note('Recusado: ' + m.code + (m.minLevel ? ` (nível ${m.minLevel})` : '')); break;
     case 'queue': net.queue = m.state === 'cancelled' ? null : { mode: m.mode, waited: m.waited ?? 0 }; renderLobby(); break;
@@ -59,6 +60,7 @@ function onMessage(m) {
     case 'invite': net.invites.push({ partyId: m.partyId, from: m.from }); renderLobby(); break;
     case 'notice': note(m.code + (m.name ? ': ' + m.name : '')); break;
     case 'match_found':
+      net.dec = new SnapshotDecoder().init(m);
       Object.assign(net, { me: m.you, team: m.team, mode: m.mode, room: m.room, arena: m.arena, objective: m.objective, players: m.players, state: 'countdown', queue: null, snaps: [], pred: null, srv: null, seq: 0, reward: null });
       setStatus(`partida ${m.mode} — time ${m.team}`); renderLobby(); break;
     case 'match_end': net.state = 'lobby'; net.me = null; net.room = null; net.matchInfo = null; setStatus(`${net.name} — no lobby`); renderLobby(); break;
