@@ -39,7 +39,7 @@
 4. **Apresentação dentro da simulação**: `particles`, `texts`, `fx`, `bob = Math.random()`, `Math.random()` em `updateProjectiles`/`updateAreas`/`burst`. As ocorrências de `Math.random` em `game/sim.js` são **só visuais** (partículas, balanço do spirit) [LIDO], então não alteram dano — mas impedem rodar a mesma simulação idêntica em dois lugares e inflam a memória no servidor.
 5. **IDs de item e entidade** (`core/loot.js uid()` usa `Date.now()` + `Math.random()`): ok para cliente, **inaceitável como identidade de item em servidor** (precisa de ID gerado e registrado no servidor).
 6. **`window.game`** exposto globalmente (hook de teste) — inofensivo localmente, deve sumir no build de produção.
-7. **UI com `innerHTML`**: 10 usos; `esc()` aplicado em poucos. `ui.js:76` imprime `c.name` **sem escape** (nome do personagem vem de `localStorage`). Hoje é "auto-XSS"; com nomes de **outros jogadores** vira XSS armazenado. [LIDO — a confirmar com teste antes de corrigir]
+7. **UI com `innerHTML`**: 10 usos em `ui.js`; o nome do personagem é escapado na tela de título (`ui.js:58`, `esc()`) e entra como texto no HUD (`ui.js:147`), **mas** `main.js:135` o envia a `toast()`, que usa `innerHTML` (`Bem-vindo, ${char.name}!`) **sem escape**. Hoje é "auto-XSS" (o nome vem do próprio jogador/`localStorage`); com nomes de **outros jogadores** viraria XSS armazenado. [LIDO — a confirmar com teste antes de corrigir]
 8. **`save.js`** persiste o objeto `char` inteiro sem validação (`JSON.parse` direto); `version: 1` existe no personagem, mas **não há migração**. [LIDO]
 
 ### 2.4 Determinismo da simulação
@@ -159,7 +159,7 @@ Cliente (Canvas)                     Servidor Node (autoritativo)
 | Velocidade/teleporte | possível | servidor integra movimento; limite de velocidade e colisão |
 | Spam de skill / replay | — | cooldown no servidor; `seq` monotônico por sessão; rejeitar duplicatas |
 | Mensagem inválida / enorme | — | schema, tamanho máximo, rate limit por conexão e por tipo |
-| XSS via nome | `ui.js:76` sem escape (a confirmar) | escapar sempre; whitelist de caracteres no servidor |
+| XSS via nome | `main.js:135` → `toast()` com `innerHTML` sem escape (a confirmar) | escapar sempre; whitelist de caracteres no servidor |
 | Duplicação de item | — | IDs de item do servidor + operações idempotentes |
 | Segredos no frontend | nenhum hoje | segredos só no servidor (`.env` fora do Git); WSS/TLS |
 | Isolamento de salas | — | cada sala com seu `World`; mensagens validadas contra a sala da sessão |
