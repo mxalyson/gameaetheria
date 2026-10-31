@@ -137,3 +137,6 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 ### 10.6 P3 — salvamento versionado (2026-10-31)
 - Documento do personagem na **versão 2** (ratings por modo e especialização), migração a partir de saves v1 e saves sem versão, validação com lista branca, backup e recuperação, exportar/importar. Detalhes e limites (validação local não é anti-trapaça) em `docs/roadmap/auditoria-p0-e-plano-multiplayer.md` (atualização P3).
 - **Testes:** 101 unitários e 56 e2e passam (última execução completa).
+
+### 10.7 P4 — servidor autoritativo (PoC), 2026-10-31
+- `ws` + protocolo JSON v1 + sala de duelo para 2 jogadores reais com a simulação do jogo; detalhes, limites e como rodar em `docs/architecture/servidor-poc.md` e decisão 0008. **118 unitários e 57 e2e passam.** Sem contas/persistência (P5); sem teste de carga ou rede real.

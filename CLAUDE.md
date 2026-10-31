@@ -1,6 +1,6 @@
 # Aetheria — Arena dos Ecos
 
-RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro, Clérigo), itens por raridade, spirits, PvE (bosques, chefes, ondas) e PvP contra rival com Elo. JavaScript puro (módulos ES), **Canvas 2D**, zero dependências de runtime. (O briefing o chamava de "Projeto Arcana"; o nome no código e na UI é Aetheria.)
+RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro, Clérigo), itens por raridade, spirits, PvE (bosques, chefes, ondas) e PvP contra rival com Elo. JavaScript puro (módulos ES), **Canvas 2D**, zero dependências de runtime **no navegador** (o servidor da PoC multiplayer usa `ws`, ver decisão 0008). (O briefing o chamava de "Projeto Arcana"; o nome no código e na UI é Aetheria.)
 
 ## Decisões fixas
 - **Motor: Canvas 2D próprio.** Babylon.js/3D/GLB/Blender foram recusados (ver `docs/decisions/0001-manter-canvas-2d.md`). Não reintroduzir sem autorização do usuário.
@@ -16,6 +16,8 @@ RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro, Clérigo), iten
 - `npm start` — servidor estático em http://localhost:5174 (`server.js`)
 - `npm test` — testes unitários do núcleo/simulação (`node:test`, `tests/*.test.js`)
 - `npm run perf:poc` — mede FPS reais do PoC isométrico com GPU (Direct3D11); grava `test-results/perf-poc.json`. Não usar o Chromium padrão do Playwright para medir desempenho (renderiza por CPU).
+- `npm run server:poc` — servidor autoritativo da prova de conceito (ws://127.0.0.1:5175; `server/`, protocolo em `public/src/core/protocol.js`, doc em `docs/architecture/servidor-poc.md`). Cliente de laboratório: `/labs/net-poc/index.html`. **PoC: sem contas nem persistência; não é produção.**
+- `npm run balance` — duelos simulados classe×classe (meta 45–55% de vitórias, 20–40 s).
 - `npm run test:e2e` — Playwright (`tests/e2e`); sobe o servidor sozinho; o jogo expõe `window.game`. `tests/e2e/mobile.spec.js` emula celular em paisagem (844×390) com toque real via protocolo do Chrome.
 
 ## Arquitetura (`public/src`)

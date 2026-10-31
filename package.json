@@ -9,9 +9,13 @@
     "test": "node --test \"tests/*.test.js\"",
     "test:e2e": "playwright test",
     "perf:poc": "playwright test --config=tests/perf/playwright.config.js",
-    "balance": "node tools/balance.mjs"
+    "balance": "node tools/balance.mjs",
+    "server:poc": "node server/start-poc.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"
+  },
+  "dependencies": {
+    "ws": "8.22.1"
   }
 }
