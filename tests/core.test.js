@@ -115,3 +115,45 @@ test('poder (PWR) cresce com nível e equipamento; PvP libera no nível 10', asy
   assert.equal(matchOk(a, b, 30), true);
   assert.equal(matchOk(a, { rating: 1000, power: 800 }, 0), false);
 });
+
+test('partida por times: ponto de controle, vitória por eliminação, pontos e tempo', async () => {
+  const { newMatch, controlTick, matchWinner, SCORE_TARGET, getRating, setRating, spawnSlots } = await import('../public/src/core/match.js');
+  const m = newMatch('2v2');
+  controlTick(m, 10, 2, 0);
+  assert.equal(m.owner, 1); assert.equal(m.score[1], 20);
+  controlTick(m, 10, 1, 1); // disputado não pontua
+  assert.equal(m.score[1], 20); assert.equal(m.score[2], 0);
+  controlTick(m, 5, 0, 1);
+  assert.equal(m.owner, 2); assert.equal(m.score[2], 10);
+  assert.equal(matchWinner(m, 2, 2), 0);
+  assert.equal(matchWinner(m, 0, 2), 2);
+  assert.equal(matchWinner(m, 2, 0), 1);
+  assert.equal(matchWinner(m, 0, 0), 3);
+  m.score[1] = SCORE_TARGET;
+  assert.equal(matchWinner(m, 1, 2), 1);
+  const t = newMatch('1v1'); t.time = t.limit; t.score[2] = 5;
+  assert.equal(matchWinner(t, 1, 1), 2); // fim do tempo: lidera nos pontos
+  t.score[2] = 0;
+  assert.equal(matchWinner(t, 1, 1, 100, 300), 2); // empate de pontos: mais vida
+  assert.equal(matchWinner(t, 1, 1, 100, 100), 3);
+  // rating separado por modo; 1v1 mantém o campo antigo
+  const c = { arena: { rating: 1100 } };
+  assert.equal(getRating(c, '1v1'), 1100); assert.equal(getRating(c, '4v4'), 1000);
+  setRating(c, '4v4', 1250);
+  assert.equal(getRating(c, '4v4'), 1250); assert.equal(c.arena.rating, 1100);
+  const s = spawnSlots(1, 4, 900, 1480, 320);
+  assert.equal(s.length, 4); assert.ok(s.every((p) => p.y === 1480)); assert.equal(Math.round((s[0].x + s[3].x) / 2), 900);
+});
+
+test('IA do rival vai ao ponto de controle quando o inimigo está longe, e luta quando está perto', () => {
+  const w = new World('arena_team', { seed: 5 });
+  w.objective = { ...w.zone.objective, owner: 0, contested: false };
+  const a = w.add(makeHeroActor(newCharacter('A', 'warrior', makeRng(1)), 900, 1480, 'rival', 1));
+  const b = w.add(makeHeroActor(newCharacter('B', 'warrior', makeRng(2)), 900, 320, 'rival', 2));
+  const y0 = a.y;
+  for (let i = 0; i < 60; i++) w.update(1 / 30);
+  assert.ok(a.y < y0 - 30, 'o bot anda rumo ao centro');
+  assert.ok(Math.hypot(a.x - 900, a.y - 900) < Math.hypot(900 - 900, y0 - 900));
+  for (let i = 0; i < 30 * 40 && !a.dead && !b.dead; i++) w.update(1 / 30);
+  assert.ok(a.hp < a.maxHp && b.hp < b.maxHp, 'ao se encontrarem, trocam golpes');
+});

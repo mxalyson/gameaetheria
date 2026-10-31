@@ -10,6 +10,8 @@ import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpT
 import { generateItem, rollMobLoot, rollRarity } from './core/loot.js';
 import { generateRival } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
+import { MODES, newMatch, controlTick, matchWinner, getRating, setRating, spawnSlots } from './core/match.js';
+import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from './core/power.js';
 import { loadChar, saveChar } from './save.js';
 import { PRICES } from './shop.js';
 import { TouchControls } from './touch.js';
@@ -99,7 +101,8 @@ class Game {
       case 'buy-essence': this.buyEssence(arg); break;
       case 'spirit-on': this.setSpirit(arg); break;
       case 'spirit-free': this.freeSpirit(arg); break;
-      case 'duel': this.startDuel(); break;
+      case 'duel': this.startMatch('1v1'); break;
+      case 'match': this.startMatch(arg); break;
       case 'waves': this.startWaves(); break;
       case 'return-town': this.ui.hideScreen(); this.enterZone('town', TOWN.x, TOWN.y); break;
     }
@@ -147,6 +150,7 @@ class Game {
     this.spawnSpirit(this.player, this.char);
     this.world.populate(this.char.level);
     this.rival = null;
+    this.match = null;
     this.waves = null;
     this.portalCd = 1;
     this.cam = this.renderer.camera(this.world, this.player);
@@ -234,12 +238,14 @@ class Game {
       this.handleEvents();
       if (this.mode === 'explore') { w.updateSpawns(dt, p); this.checkPortals(); this.regen(dt); }
       else if (this.mode === 'waves') this.updateWaves(dt);
-      else if (this.mode === 'pvp') this.updateDuel(dt);
+      else if (this.mode === 'pvp') this.updateMatch(dt);
       this.collectDrops();
     }
 
     this.nearNpc = (w.zone.npcs ?? []).find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 80) ?? null;
-    const target = this.renderer.camera(w, p), k = Math.min(1, dt * 8);
+    // morto numa partida por times: a câmera segue um aliado vivo
+    const focus = p.dead && this.match ? (this.match.team1.find((a) => !a.dead) ?? p) : p;
+    const target = this.renderer.camera(w, focus), k = Math.min(1, dt * 8);
     this.cam = { x: this.cam.x + (target.x - this.cam.x) * k, y: this.cam.y + (target.y - this.cam.y) * k };
     if ((this.saveT -= dt) <= 0) { this.save(); this.saveT = 15; }
   }
@@ -251,7 +257,7 @@ class Game {
       const a = ev.actor;
       if (a.kind === 'mob') this.onMobKilled(a);
       else if (a === this.player) this.onPlayerDeath();
-      else if (a.kind === 'rival') this.endDuel(true);
+      // rival/aliado caindo não encerra nada: updateMatch conta os vivos de cada time
     }
   }
 
@@ -519,44 +525,88 @@ class Game {
     this.save();
   }
 
-  // ---------------- arena PvP ----------------
-  startDuel() {
-    this.ui.closePanels();
-    const rc = generateRival(this.rng, this.char);
-    this.enterZone('arena', 550, 840, 'pvp');
-    this.player.facing = -Math.PI / 2;
-    const r = this.world.add(makeHeroActor(rc, 550, 260, 'rival', 2));
-    this.spawnSpirit(r, rc);
-    this.rival = r;
-    this.rivalChar = rc;
-    this.world.frozen = 3.2;
-    this.duelGo = 0;
-    this.ui.log(`Oponente: <b>${rc.name}</b> — ${CLASSES[rc.classId].name} Nv ${rc.level} · rating ${rc.arena.rating}`, '#ffb4a8');
-  }
-
-  updateDuel(dt) {
-    const w = this.world;
-    if (w.frozen > 0) {
-      const rc = this.rivalChar;
-      this.ui.banner(`${CLASSES[rc.classId].icon} ${rc.name} — ${Math.ceil(w.frozen)}`);
-    } else if (this.duelGo < 1) {
-      this.duelGo += dt;
-      this.ui.banner(this.duelGo < 1 ? 'LUTE!' : null);
+  // ---------------- arena PvP (1×1, 2×2, 4×4) ----------------
+  // Classes distintas primeiro (composição de time), repetindo só quando acabam.
+  pickClasses(n, exclude = []) {
+    const pool = Object.keys(CLASSES).filter((c) => !exclude.includes(c));
+    const out = [];
+    while (out.length < n) {
+      if (!pool.length) pool.push(...Object.keys(CLASSES));
+      out.push(pool.splice(this.rng.int(0, pool.length - 1), 1)[0]);
     }
+    return out;
   }
 
-  endDuel(won) {
-    if (this.mode !== 'pvp') return;
+  startMatch(mode) {
+    if (!MODES[mode]) return;
+    if (!pvpUnlocked(this.char)) { this.ui.log(`O PvP libera no nível ${PVP_MIN_LEVEL}.`, '#ffb4a8'); return; }
+    this.ui.closePanels();
+    const M = newMatch(mode), size = M.size, c = this.char;
+    this.enterZone('arena_team', 900, 900, 'pvp');
+    const w = this.world, z = w.zone, myRating = getRating(c, mode);
+    const mine = spawnSlots(1, size, z.w / 2, z.spawns.south, z.spawns.north);
+    const theirs = spawnSlots(2, size, z.w / 2, z.spawns.south, z.spawns.north);
+    this.player.x = mine[0].x; this.player.y = mine[0].y; this.player.facing = -Math.PI / 2;
+    const team1 = [this.player], team2 = [];
+    const allyClasses = this.pickClasses(size - 1, [c.classId]);
+    const foeClasses = this.pickClasses(size);
+    const chars = { allies: [], enemies: [] };
+    allyClasses.forEach((classId, i) => {
+      const rc = generateRival(this.rng, c, { classId, rating: myRating });
+      const a = w.add(makeHeroActor(rc, mine[i + 1].x, mine[i + 1].y, 'rival', 1));
+      this.spawnSpirit(a, rc); team1.push(a); chars.allies.push(rc);
+    });
+    foeClasses.forEach((classId, i) => {
+      const rc = generateRival(this.rng, c, { classId, rating: myRating });
+      const a = w.add(makeHeroActor(rc, theirs[i].x, theirs[i].y, 'rival', 2));
+      a.facing = Math.PI / 2;
+      this.spawnSpirit(a, rc); team2.push(a); chars.enemies.push(rc);
+    });
+    w.objective = { ...z.objective, owner: 0, contested: false };
+    this.match = { ...M, team1, team2, chars, myRating };
+    this.rival = team2[0];
+    this.rivalChar = chars.enemies[0];
+    w.frozen = 3.2;
+    this.duelGo = 0;
+    const foePwr = Math.round(chars.enemies.reduce((s, r) => s + playerPower(r), 0) / size);
+    this.ui.log(`<b>${MODES[mode].label}</b> — seu poder ${playerPower(c)} · inimigos (média) ${foePwr} · rating ${myRating}`, '#ffb4a8');
+    this.ui.log('Segure o ponto central para pontuar; vence quem chegar a 100 ou eliminar o outro time.', '#ffe9a0');
+  }
+
+  updateMatch(dt) {
+    const w = this.world, M = this.match;
+    if (!M || this.mode !== 'pvp') return;
+    if (w.frozen > 0) { this.ui.banner(`${MODES[M.mode].label} — começa em ${Math.ceil(w.frozen)}`); return; }
+    const ob = w.objective;
+    const inside = (a) => !a.dead && Math.hypot(a.x - ob.x, a.y - ob.y) < ob.r + a.r;
+    const in1 = M.team1.filter(inside).length, in2 = M.team2.filter(inside).length;
+    controlTick(M, dt, in1, in2);
+    ob.owner = M.owner; ob.contested = in1 > 0 && in2 > 0;
+    const alive1 = M.team1.filter((a) => !a.dead), alive2 = M.team2.filter((a) => !a.dead);
+    this.rival = alive2[0] ?? M.team2[0];
+    const win = matchWinner(M, alive1.length, alive2.length, alive1.reduce((s, a) => s + a.hp, 0), alive2.reduce((s, a) => s + a.hp, 0));
+    const left = Math.max(0, Math.ceil(M.limit - M.time));
+    this.duelGo += dt;
+    this.ui.banner(this.duelGo < 1 ? 'LUTE!' : `${Math.floor(M.score[1])} × ${Math.floor(M.score[2])} · ${alive1.length} vs ${alive2.length} vivos · ${left}s`);
+    if (win) this.endMatch(win);
+  }
+
+  endMatch(winner) {
+    if (this.mode !== 'pvp' || !this.match) return;
     this.mode = 'ended';
-    const c = this.char, rc = this.rivalChar, a = c.arena;
-    const oldTier = tierFor(a.rating);
-    const delta = eloDelta(a.rating, rc.arena.rating, won);
-    a.rating = Math.max(0, a.rating + delta);
-    if (won) a.wins++; else a.losses++;
-    const gold = won ? 40 + c.level * 8 : 10 + c.level * 2;
+    const M = this.match, c = this.char, a = c.arena;
+    const won = winner === 1, draw = winner === 3;
+    const foes = M.chars.enemies;
+    const foeRating = Math.round(foes.reduce((s, r) => s + r.arena.rating, 0) / foes.length);
+    const oldTier = tierFor(M.myRating);
+    const delta = draw ? 0 : eloDelta(M.myRating, foeRating, won);
+    setRating(c, M.mode, Math.max(0, M.myRating + delta));
+    if (won) a.wins++; else if (!draw) a.losses++;
+    const mul = 1 + (M.size - 1) * 0.2; // times maiores pagam um pouco mais
+    const gold = Math.round((won ? 40 + c.level * 8 : draw ? 20 + c.level * 4 : 10 + c.level * 2) * mul);
     c.gold += gold;
-    const lines = [`Rating: ${a.rating} (${delta >= 0 ? '+' : ''}${delta})`, `+${gold} 🪙`];
-    const newTier = tierFor(a.rating);
+    const lines = [`Rating ${MODES[M.mode].label}: ${getRating(c, M.mode)} (${delta >= 0 ? '+' : ''}${delta})`, `Pontos: ${Math.floor(M.score[1])} × ${Math.floor(M.score[2])}`, `+${gold} 🪙`];
+    const newTier = tierFor(getRating(c, M.mode));
     if (newTier.name !== oldTier.name) lines.push(`Nova liga: <b style="color:${newTier.color}">${newTier.name}</b>`);
     if (won && this.rng.chance(0.35)) {
       const it = generateItem(this.rng, c.level, { classId: c.classId, luck: 1.2 });
@@ -565,11 +615,11 @@ class Game {
         lines.push(`Prêmio: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
       } else { c.gold += it.value; lines.push(`Prêmio convertido em ${it.value} 🪙 (inventário cheio)`); }
     }
-    this.grantXp(xpToNext(c.level) * (won ? 0.12 : 0.04));
+    this.grantXp(xpToNext(c.level) * (won ? 0.12 : 0.04) * mul);
     this.ui.banner(null);
     this.ui.showResult({
-      title: won ? 'Vitória!' : 'Derrota',
-      sub: `vs ${rc.name} · ${CLASSES[rc.classId].name} Nv ${rc.level}`,
+      title: won ? 'Vitória!' : draw ? 'Empate' : 'Derrota',
+      sub: `${MODES[M.mode].label} · ${foes.map((r) => CLASSES[r.classId].name).join(', ')}`,
       lines, tone: won ? 'win' : 'lose',
     });
     this.save();
@@ -621,7 +671,7 @@ class Game {
 
   onPlayerDeath() {
     const c = this.char;
-    if (this.mode === 'pvp') return this.endDuel(false);
+    if (this.mode === 'pvp') { this.ui.log('Você caiu — acompanhe o time!', '#ffb4a8'); return; }
     if (this.mode === 'waves') {
       const W = this.waves;
       const cleared = W.n - (W.state === 'fight' ? 1 : 0);

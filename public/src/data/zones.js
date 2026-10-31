@@ -115,5 +115,16 @@ export const ZONES = {
   },
 
   arena: { ...ARENA, name: 'Arena de Lúmen — Duelo' },
+  // Arena grande por times (1×1, 2×2, 4×4): ponto de controle no centro, pilares como cobertura contra projéteis.
+  arena_team: {
+    ...ARENA, name: 'Grande Arena dos Ecos', w: 1800, h: 1800, radius: 820,
+    objective: { x: 900, y: 900, r: 140 },
+    spawns: { south: 1480, north: 320 },
+    pillars: [
+      { x: 640, y: 640 }, { x: 1160, y: 640 }, { x: 640, y: 1160 }, { x: 1160, y: 1160 },
+      { x: 900, y: 520 }, { x: 900, y: 1280 }, { x: 520, y: 900 }, { x: 1280, y: 900 },
+    ],
+    palette: { ...ARENA.palette, ground: '#e3d3ad', ground2: '#d8c79d', ring: '#a98f63' },
+  },
   waves: { ...ARENA, name: 'Arena das Ondas', palette: { ...ARENA.palette, ground: '#d9cfe8', ground2: '#cdc1df', ring: '#9d8fbf' } },
 };

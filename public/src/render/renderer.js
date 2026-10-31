@@ -78,6 +78,7 @@ export class Renderer {
     if (z.scenery) drawGroundLife(g, world, t, vis);
 
     for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortal(g, p, t);
+    if (world.objective) drawObjective(g, world.objective, t);
     for (const ar of world.areas) drawArea(g, ar, t);
     for (const tg of world.telegraphs) drawTelegraph(g, tg);
 
@@ -168,11 +169,12 @@ export class Renderer {
       if (o.w) g.fillRect(ox + o.x * s, oy + o.y * s, o.w * s, o.h * s);
       else { circle(g, ox + o.x * s, oy + o.y * s, Math.max(1, o.r * s)); g.fill(); }
     }
+    if (world.objective) { const ob = world.objective; g.strokeStyle = ob.owner === 1 ? '#6fb8ff' : ob.owner === 2 ? '#ff6b6b' : '#ffe296'; g.lineWidth = 2; circle(g, ox + ob.x * s, oy + ob.y * s, Math.max(3, ob.r * s)); g.stroke(); }
     for (const p of z.portals ?? []) { g.fillStyle = '#b48cff'; circle(g, ox + p.x * s, oy + p.y * s, 4); g.fill(); }
     for (const n of z.npcs ?? []) { g.fillStyle = '#ffd34d'; circle(g, ox + n.x * s, oy + n.y * s, 3); g.fill(); }
     for (const a of world.actors) {
       if (a.dead || a.kind === 'spirit' || a === player) continue;
-      g.fillStyle = a.boss ? '#ff3b3b' : a.kind === 'rival' ? '#ff6b6b' : '#e05555';
+      g.fillStyle = a.boss ? '#ff3b3b' : a.kind === 'rival' ? (a.team === 1 ? '#6fb8ff' : '#ff6b6b') : '#e05555';
       circle(g, ox + a.x * s, oy + a.y * s, a.boss ? 4 : 1.8); g.fill();
     }
     if (player) {
@@ -852,6 +854,18 @@ function drawPortal(g, p, t) {
 }
 
 // ---------------- barras / nomes ----------------
+// Ponto de controle da arena por times: anel que muda de cor com o dono (azul = seu time, vermelho = inimigo) e pulsa se disputado.
+function drawObjective(g, ob, t) {
+  const col = ob.owner === 1 ? '111,184,255' : ob.owner === 2 ? '255,107,107' : '255,226,150';
+  const pulse = ob.contested ? 0.5 + 0.5 * Math.sin(t * 8) : 0.5;
+  g.save();
+  g.fillStyle = 'rgba(' + col + ',' + (0.12 + pulse * 0.08) + ')';
+  circle(g, ob.x, ob.y, ob.r); g.fill();
+  g.strokeStyle = 'rgba(' + col + ',0.85)'; g.lineWidth = 4; g.setLineDash([14, 10]); g.lineDashOffset = -t * 16;
+  circle(g, ob.x, ob.y, ob.r); g.stroke();
+  g.restore();
+}
+
 function drawBars(g, a, isPlayer) {
   if (a.kind === 'spirit') return;
   const showMob = a.kind === 'mob' && (a.hp < a.maxHp || a.elite || a.boss);
@@ -861,7 +875,7 @@ function drawBars(g, a, isPlayer) {
   const x = a.x - w / 2;
   g.fillStyle = 'rgba(20,20,35,0.6)';
   g.beginPath(); g.roundRect(x - 1, top - 1, w + 2, 7, 3); g.fill();
-  g.fillStyle = isPlayer ? '#5fd38a' : a.kind === 'rival' ? '#ff6b6b' : '#ff7a6b';
+  g.fillStyle = isPlayer ? '#5fd38a' : a.kind === 'rival' ? (a.team === 1 ? '#6fb8ff' : '#ff6b6b') : '#ff7a6b';
   g.beginPath(); g.roundRect(x, top, Math.max(0, w * a.hp / a.maxHp), 5, 2.5); g.fill();
   if (a.shield > 0) {
     g.fillStyle = '#ffe9a0';
@@ -875,7 +889,7 @@ function drawBars(g, a, isPlayer) {
   else if (a.kind === 'mob') label = `Nv ${a.level}${a.boss || a.elite ? ' · ' + a.name : ''}`;
   if (label) {
     g.strokeText(label, a.x, top - 4);
-    g.fillStyle = a.boss ? '#ffb4a8' : a.elite ? '#ffd27a' : '#ffffff';
+    g.fillStyle = a.boss ? '#ffb4a8' : a.elite ? '#ffd27a' : a.kind === 'rival' && a.team === 1 ? '#bfe0ff' : '#ffffff';
     g.fillText(label, a.x, top - 4);
   }
 }

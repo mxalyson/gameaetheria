@@ -5,6 +5,8 @@ import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
 import { computeStats, canEquip, itemScore } from '../core/stats.js';
 import { xpToNext, spiritXpToNext, spiritPower, MAX_LEVEL } from '../core/progression.js';
 import { tierFor } from '../core/combat.js';
+import { MODES, getRating } from '../core/match.js';
+import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
 import { PRICES } from '../shop.js';
 import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
 
@@ -337,8 +339,9 @@ export class UI {
       <p class="npc-line">"A arena guarda os ecos de todos que lutaram aqui. Prove seu valor!"</p>
       <div class="arena-badge" style="--tc:${tier.color}"><div class="tier">${tier.name}</div><div class="rt">${char.arena.rating}</div>
         <div class="wl">${char.arena.wins}V · ${char.arena.losses}D · Melhor onda: ${char.arena.bestWave}</div></div>
-      <button class="btn primary wide" data-action="duel">⚔️ Duelo Ranqueado (PvP)</button>
-      <p class="hint">Enfrente o eco de um aventureiro do seu nível, com classe, itens e spirit próprios. Vitória: rating, ouro e chance de item. Poções desativadas.</p>
+      <div class="arena-badge"><div class="wl">⚡ Seu poder: <b>${playerPower(char)}</b></div></div>
+      ${pvpUnlocked(char) ? Object.entries(MODES).map(([id, md]) => `<button class="btn primary wide" data-action="match" data-arg="${id}">⚔️ Grande Arena ${md.label} · rating ${getRating(char, id)}</button>`).join('') : `<p class="hint">🔒 O PvP libera no <b>nível ${PVP_MIN_LEVEL}</b> (você está no ${char.level}).</p>`}
+      <p class="hint">Times de ecos (aliados e inimigos com classe, itens e spirit próprios) na Grande Arena. Segure o ponto central: 100 pontos vencem; eliminar o outro time também. Cada modo tem seu rating. Poções desativadas.</p>
       <button class="btn wide" data-action="waves">🌊 Desafio de Ondas (PvE)</button>
       <p class="hint">Sobreviva a ondas crescentes de monstros. Ouro a cada onda vencida, chefes a cada 10.</p>
       <p class="soon">🌐 Em breve: duelos contra jogadores reais.</p>`);

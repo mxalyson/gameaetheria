@@ -9,10 +9,10 @@ import { newCharacter, createSpirit, POINTS_PER_LEVEL } from './progression.js';
 const NAMES = ['Kael', 'Lyra', 'Thorne', 'Mira', 'Bastian', 'Selene', 'Orin', 'Vex', 'Nara', 'Darius', 'Ilya', 'Rook', 'Sora', 'Elara', 'Fenn', 'Isolde', 'Tarek', 'Yara'];
 const TITLES = ['o Errante', 'a Veloz', 'o Firme', 'a Sombria', 'o Radiante', 'a Astuta', 'o Bravo', 'a Serena'];
 
-export function generateRival(rng, player) {
-  const classId = rng.pick(Object.keys(CLASSES));
+export function generateRival(rng, player, { classId: forced, rating: forcedRating } = {}) {
+  const classId = forced ?? rng.pick(Object.keys(CLASSES));
   const level = Math.max(1, Math.min(30, player.level + rng.int(-1, 1)));
-  const rating = Math.max(800, player.arena.rating + rng.int(-90, 90));
+  const rating = Math.max(800, (forcedRating ?? player.arena.rating) + rng.int(-90, 90));
   const char = newCharacter(`${rng.pick(NAMES)} ${rng.pick(TITLES)}`, classId, rng);
   char.level = level;
 

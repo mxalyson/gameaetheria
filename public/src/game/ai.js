@@ -76,10 +76,17 @@ export function rivalIntent(r, w, dt) {
 
   const pref = melee ? 40 : 300;
   let mx = 0, my = 0;
+  // Partida por times: longe de qualquer inimigo, vai ao ponto de controle em vez de vagar.
+  const ob = w.objective;
+  if (ob && d > 420) {
+    const ox = ob.x - r.x, oy = ob.y - r.y, od = Math.hypot(ox, oy) || 1;
+    if (od > ob.r * 0.6) { const [sx, sy] = steerAround(r, w, ox / od, oy / od); return { mx: sx, my: sy, aimX: tgt.x, aimY: tgt.y, cast: null, attack: false }; }
+  }
   if (d > pref + 40) { mx = nx; my = ny; }
   else if (!melee && d < pref - 90) { mx = -nx; my = -ny; }
   if (!melee || d < 140) { mx += -ny * ai.strafe * 0.7; my += nx * ai.strafe * 0.7; }
 
+  [mx, my] = steerAround(r, w, mx, my);
   const it = {
     mx, my, aimX: tgt.x + ai.jx, aimY: tgt.y + ai.jy, cast: null,
     attack: d <= (melee ? cls.basic.range + tgt.r : cls.basic.range * 0.95),
@@ -90,6 +97,23 @@ export function rivalIntent(r, w, dt) {
     ai.cast = null;
   }
   return it;
+}
+
+// Contorna pilares de frente (sem isto o bot trava atrás de um pilar no caminho reto até o alvo).
+function steerAround(r, w, mx, my) {
+  const len = Math.hypot(mx, my);
+  if (len < 0.01) return [mx, my];
+  const ux = mx / len, uy = my / len;
+  for (const o of w.layout.obstacles) {
+    if (!o.r || !o.block) continue;
+    const dx = o.x - r.x, dy = o.y - r.y, d = Math.hypot(dx, dy), reach = o.r + r.r + 60;
+    if (d > reach || d < 0.001) continue;
+    if ((dx * ux + dy * uy) / d < 0.6) continue; // não está à frente
+    const side = ux * dy - uy * dx > 0 ? -1 : 1; // lado mais curto
+    mx += -uy * side * 1.6; my += ux * side * 1.6;
+    break;
+  }
+  return [mx, my];
 }
 
 function chooseSkill(r, tgt, d) {
