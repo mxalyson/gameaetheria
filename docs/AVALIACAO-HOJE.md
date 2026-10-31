@@ -1,6 +1,12 @@
 # Como avaliar o jogo hoje
 Atualizado em 2026-10-31. O jogo **real** não foi alterado pelo trabalho de arte desta semana (tudo o que é novo está no laboratório isométrico, que **não** faz parte do jogo). Duas coisas para olhar:
 
+## 0) Online, sem o PC (GitHub Pages — ativo desde 2026-10-31)
+- **Jogo:** https://mxalyson.github.io/gameaetheria/ · **Laboratório com os heróis:** https://mxalyson.github.io/gameaetheria/labs/iso-poc/index.html
+- Abra no celular em **paisagem**; "Adicionar à tela inicial" instala como app. O progresso fica salvo **só naquele aparelho**.
+- A versão online é a do último  (repositório https://github.com/mxalyson/gameaetheria, branch ); atualizar = commit + push (o Pages republica em ~1–2 min).
+- Verificado em navegador emulado de celular (844×390, toque): vila carrega, personagem criado, HUD visível, sem erros nem arquivos 404. **Não testado em celular de verdade.**
+
 ## 1) O jogo real (é isto que vale como "o jogo")
 1. No terminal, na pasta `H:\aetheria`: `npm start`
 2. Abra **http://localhost:5174/** no Chrome (PC). Para ver como celular: F12 → ícone de celular → 844×390 (paisagem).
