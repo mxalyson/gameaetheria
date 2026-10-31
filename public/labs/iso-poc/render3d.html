@@ -61,6 +61,7 @@ const h = sz.y;
 const KEY = {
   attack: { rx: [-0.12, -0.2, 0.02, 0.3, 0.18, 0.05], tz: [-0.02, -0.04, 0.04, 0.12, 0.08, 0.02], y: [0, 0, 0.02, 0.03, 0.01, 0], sy: [1, 0.95, 1.04, 0.97, 1, 1] },
   skill: { rx: [-0.1, -0.22, -0.1, 0.1, 0.3, 0.2, 0.1, 0], tz: [0, -0.03, 0.02, 0.06, 0.14, 0.09, 0.03, 0], y: [0, -0.02, 0.04, 0.07, 0.02, 0, 0, 0], sy: [1, 0.9, 1.06, 1.08, 0.9, 0.98, 1, 1], ry: [0, 0, 0.25, 0.5, 0.5, 0.25, 0, 0] },
+  dash: { rx: [0.3, 0.5, 0.5, 0.4], tz: [0, 0.08, 0.12, 0.1], y: [0, 0.02, 0.03, 0.02], sy: [0.95, 1.03, 1, 1] },
   hit: { rx: [-0.22, -0.3, -0.1], tz: [-0.05, -0.09, -0.03], y: [0, 0.01, 0], sy: [0.92, 0.9, 0.98], tint: [0.6, 0.35, 0] },
 };
 function pose(name, f, n) {
@@ -73,7 +74,7 @@ function pose(name, f, n) {
   return P;
 }
 // idle/walk usam menos quadros (src = quadros da animação original do Blender): mesma duração do ciclo, ~13% menos textura
-const CLIPS = { idle: { frames: 4, src: 6, fps: 5.33, loop: true }, walk: { frames: 6, src: 8, fps: 9, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false } };
+const CLIPS = { idle: { frames: 4, src: 6, fps: 5.33, loop: true }, walk: { frames: 6, src: 8, fps: 9, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false }, dash: { frames: 4, fps: 12, loop: false, release: 1 } };
 const yaws = [0, 45, 90, 135, 180, 225, 270, 315]; // 0 = de frente para a câmera; +90 = olhando para a direita da tela
 
 function shoot(P, deg, dst, dx, dy) {

@@ -176,7 +176,9 @@ function startAction(kind, idx = 0) {
   const st = anims.get(player.id);
   if (!st) return;
   if (kind === 'skill') { if (player.cds['s' + idx] > 0) return; } else if (player.cds.basic > 0) return;
-  const clip = kind === 'skill' ? 'skill' : 'attack';
+  // skills de movimento (Investida, Rolamento: kind 'dash' em data/skills.js) usam o clipe próprio 'dash', se o atlas tiver
+  const isDash = kind === 'skill' && SKILLS[cls.skills[idx]]?.kind === 'dash' && heroClips?.dash;
+  const clip = kind === 'skill' ? (isDash ? 'dash' : 'skill') : 'attack';
   st.anim.play(clip, true);
   const c = (heroClips ?? MAGE_CLIPS)[clip];
   pending = { kind, idx, at: performance.now() / 1000 + c.release / c.fps };
@@ -223,7 +225,7 @@ function stateFor(a) {
   let st = anims.get(a.id);
   if (!st) {
     st = a.kind === 'player'
-      ? { atlas: heroAtlas ?? mageAtlas, anim: new Animator(heroClips ?? MAGE_CLIPS), names: { move: 'walk', attack: 'attack', skill: 'skill', death: null }, view: 0, prevSwing: 0, prevFlash: 0, size: heroAtlas ? cfg.hsize : 1, a }
+      ? { atlas: heroAtlas ?? mageAtlas, anim: new Animator(heroClips ?? MAGE_CLIPS), names: { move: 'walk', attack: 'attack', skill: 'skill', dash: heroClips?.dash ? 'dash' : null, death: null }, view: 0, prevSwing: 0, prevFlash: 0, size: heroAtlas ? cfg.hsize : 1, a }
       : { atlas: slimeAtlas, anim: new Animator(SLIME_CLIPS), names: { move: 'move', attack: 'attack', skill: null, death: 'death' }, view: 0, prevSwing: 0, prevFlash: 0, size: 1, a };
     anims.set(a.id, st);
   }
@@ -243,8 +245,8 @@ function updateAnim(a, st, dt, seen) {
   }
   chooseClip(st.anim, sig, st.names);
   st.anim.update(dt);
-  if (isPlayer && st.anim.finished && (st.anim.name === 'attack' || st.anim.name === 'skill')) st.anim.play(a.moving ? 'walk' : 'idle', true);
-  const acting = st.anim.name === 'attack' || st.anim.name === 'skill';
+  if (isPlayer && st.anim.finished && (st.anim.name === 'attack' || st.anim.name === 'skill' || st.anim.name === 'dash')) st.anim.play(a.moving ? 'walk' : 'idle', true);
+  const acting = st.anim.name === 'attack' || st.anim.name === 'skill' || st.anim.name === 'dash';
   if (!isPlayer) st.view = facingSector(a.facing, cfg.tilt);
   else if (acting) st.view = facingSector(a.facing, cfg.tilt); // lançando: olha para a mira
   else if (a.moving) st.view = dirSector(lastMoveDir.x, lastMoveDir.y, cfg.tilt); // andando: olha para onde anda

@@ -27,7 +27,8 @@ for (const [kind, id] of ['atlas', 'atlas-rig', 'atlas-rig-m'].flatMap((k) => ['
   test(`${kind} ${id}: metadados batem com o tamanho dos PNGs`, { skip: !fs.existsSync(path.join(dir, `${id}.json`)) && 'atlas não gerado (art-local/ fora do Git)' }, () => {
     const meta = JSON.parse(fs.readFileSync(path.join(dir, `${id}.json`), 'utf8'));
     assert.equal(meta.views, 8);
-    assert.deepEqual(Object.keys(meta.clips).sort(), ['attack', 'hit', 'idle', 'skill', 'walk']);
+    // o atlas rígido (antigo) tem 5 clipes; os com esqueleto ganharam o clipe 'dash' (Investida/Rolamento)
+    assert.deepEqual(Object.keys(meta.clips).sort(), kind === 'atlas' ? ['attack', 'hit', 'idle', 'skill', 'walk'] : ['attack', 'dash', 'hit', 'idle', 'skill', 'walk']);
     // o quadro pode estar recortado (não quadrado): tolerância de 1 px por arredondamento do tamanho lógico
     const cw = meta.frame.w * meta.scale, ch = meta.frame.h * meta.scale;
     for (const [name, c] of Object.entries(meta.clips)) {

@@ -205,7 +205,7 @@ for (const id of ['paladino', 'aprendiz', 'franco', 'sacerdote']) {
     const info = await page.evaluate(() => { const a = window.poc.atlases.hero; return { has: !!a, clips: Object.keys(a?.meta.clips ?? {}), cfgHero: window.poc.cfg.hero, rel: a?.meta.clips.attack.release }; });
     expect(info.has).toBe(true);
     expect(info.cfgHero).toBe(id);
-    expect(info.clips.sort()).toEqual(['attack', 'hit', 'idle', 'skill', 'walk']);
+    expect(info.clips.sort()).toEqual(['attack', 'dash', 'hit', 'idle', 'skill', 'walk']);
     await page.keyboard.down('d');
     await page.waitForFunction(() => window.poc.anims.get(window.poc.player.id).anim.name === 'walk', null, { timeout: 8000 });
     await page.keyboard.up('d');
@@ -273,5 +273,43 @@ test('seletor de herói troca o herói (e a classe) recarregando a página', asy
   expect(await page.evaluate(() => window.poc.cfg.hero)).toBe('sacerdote');
   expect(await page.textContent('#hp-name')).toContain('Clérigo');
   expect(await page.inputValue('#hero-pick')).toBe('sacerdote');
+  expect(errors, errors.join('\n')).toEqual([]);
+});
+
+// Skills de movimento (kind 'dash': Investida do Guerreiro, Rolamento do Arqueiro) usam o clipe próprio 'dash'; as outras, 'skill'.
+for (const [id, idx, esperado] of [['paladino', 1, 'dash'], ['paladino', 0, 'skill'], ['franco', 2, 'dash'], ['franco', 1, 'skill']]) {
+  const meta = new URL(`../../public/labs/iso-poc/art-local/atlas-rig/${id}/${id}.json`, import.meta.url);
+  test(`${id}: skill ${idx + 1} toca o clipe ${esperado}`, async ({ page }) => {
+    test.skip(!fs.existsSync(meta), 'atlas não gerado (art-local/ fora do Git)');
+    const errors = await open(page, `?hero=${id}&mobs=0`);
+    await clearArea(page);
+    await page.evaluate((i) => window.poc.startAction('skill', i), idx);
+    expect(await page.evaluate(() => window.poc.anims.get(window.poc.player.id).anim.name)).toBe(esperado);
+    await page.waitForFunction((i) => window.poc.player.cds['s' + i] > 0, idx, { timeout: 8000 });
+    await page.waitForFunction(() => ['idle', 'walk'].includes(window.poc.anims.get(window.poc.player.id).anim.name), null, { timeout: 8000 }); // o clipe termina e volta ao normal
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+}
+
+// O Paladino é Guerreiro: o ataque básico é CORPO A CORPO (alcance curto, sem projétil) e fere de verdade quem está à frente.
+test('paladino: ataque básico é corpo a corpo e causa dano real a um monstro à frente', async ({ page }) => {
+  const meta = new URL('../../public/labs/iso-poc/art-local/atlas-rig/paladino/paladino.json', import.meta.url);
+  test.skip(!fs.existsSync(meta), 'atlas não gerado (art-local/ fora do Git)');
+  const errors = await open(page, '?hero=paladino&mobs=4');
+  await clearArea(page);
+  await page.evaluate(() => { // põe UM monstro colado ao herói (alcance 74; `home` junto, senão a IA o leva de volta à origem) e os outros longe
+    const { world, player } = window.poc; const mobs = world.actors.filter((a) => a.kind === 'mob');
+    mobs.forEach((m, i) => { if (i) { m.x = -800; m.y = -800; } });
+    const m = mobs[0]; m.x = player.x + 48; m.y = player.y; m.home = { x: m.x, y: m.y }; m.ai.target = null; m.hp = m.maxHp; window.__mob = m; window.__hp0 = m.hp; window.__proj0 = world.projectiles.length;
+  });
+  const pos = await worldToClient(page, await page.evaluate(() => window.__mob.x), await page.evaluate(() => window.__mob.y), 20);
+  await page.mouse.move(pos.x, pos.y);
+  await page.evaluate(() => window.poc.startAction('attack'));
+  try { await page.waitForFunction(() => window.__mob.hp < window.__hp0, null, { timeout: 8000 }); } catch (e) {
+    throw new Error('sem dano: ' + JSON.stringify(await page.evaluate(() => { const p = window.poc, m = window.__mob; return { mob: [m.x, m.y, m.hp, m.dead], pl: [p.player.x, p.player.y, p.player.facing, p.player.cds.basic], aim: p.aimPoint(), mouse: [p.mouse.x, p.mouse.y], pend: !!window.poc.anims.get(p.player.id), clip: p.anims.get(p.player.id).anim.name }; })));
+  }
+  const r = await page.evaluate(() => ({ hp: window.__mob.hp, hp0: window.__hp0, proj: window.poc.world.projectiles.filter((p) => p.owner === window.poc.player.id || p.ownerId === window.poc.player.id).length }));
+  expect(r.hp).toBeLessThan(r.hp0);
+  expect(r.proj).toBe(0); // corpo a corpo: nada de projétil do jogador
   expect(errors, errors.join('\n')).toEqual([]);
 });

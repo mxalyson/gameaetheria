@@ -65,6 +65,12 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
 - **Testado:** `tests/vfx.test.js` (4 unitários) e o e2e dos heróis confere que cada golpe cria o efeito do estilo certo. **Visto no navegador:** os 4 estilos + impacto, com a cena parada (`poc.holdVfx`, `poc.spawnVfx`). **Não validado:** o aspecto em movimento a 60 FPS (o navegador embutido rodou a ~10 FPS nesta medição) e o custo por frame.
 - Limites: os projéteis são os da simulação (bola brilhante na cor da skill); não há efeito de morte nem de dano recebido pelo herói; Investida/Rolamento/Teleporte têm o rasto/clarão visual mas a animação do herói é a mesma de qualquer skill (não há clipe próprio de dash).
 
+## Dash próprio e Paladino corpo a corpo (2026-10-31)
+- **Clipe `dash`** (4 quadros, 12 fps, disparo no quadro 1) criado no Blender (`rig_animate.py`): corpo baixo e inclinado, passada larga, braços pouco para trás (com os braços muito atrás a capa rasgava; reduzido e revisto na folha de sprites). Está nos atlas com esqueleto (`atlas-rig` e `atlas-rig-m`); o atlas rígido antigo (`atlas`) não tem.
+- No PoC, as skills `kind: 'dash'` da classe real (Investida do Guerreiro, Rolamento do Arqueiro) tocam `dash`; as outras tocam `skill`. Teleporte (Mago) continua `skill`. Custo: +4 quadros por herói (~+12% de textura).
+- **Paladino é Guerreiro: o ataque básico é corpo a corpo** (`data/classes.js`: alcance 74, arco 1,8; sem projétil). **Testado:** e2e posiciona um monstro colado ao herói, ataca e confere dano real e nenhum projétil do jogador.
+- Testes: 60 unitários e 22 e2e do PoC passam (incluindo 4 de dash e 1 de corpo a corpo).
+
 ## Morte e dano do herói (PoC, 2026-10-30)
 `src/death.js` (módulo puro) + `poc.js`. **Sem texturas novas** (os atlas não ganharam clipe de morte): o sprite real é transformado.
 - **Dano recebido:** clipe `hit` (já existente, com clarão branco), faíscas vermelhas no herói e vinheta vermelha na tela (pulso de ~0,45 s).

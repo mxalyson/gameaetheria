@@ -154,7 +154,7 @@ WS = spec.get('weapon_side', 'R')        # lado do braço da arma principal
 OS = 'L' if WS == 'R' else 'R'
 STYLE = spec.get('style', 'slash')
 LEG = spec.get('leg_swing', 1.0)         # 0.4 para personagens de manto/vestido (evita deformar a roupa)
-FPS = {'idle': 6, 'walk': 8, 'attack': 6, 'skill': 8, 'hit': 3}
+FPS = {'idle': 6, 'walk': 8, 'attack': 6, 'skill': 8, 'hit': 3, 'dash': 4}
 
 def idle(f, n):
     p = 2 * math.pi * f / n
@@ -213,7 +213,14 @@ def hit(f, n):
     rot = {'hips': [(AX, -0.3 * t)], 'head': [(AX, -0.25 * t)], 'upper_arm.R': [(AX, 0.4 * t)], 'upper_arm.L': [(AX, 0.4 * t)]}
     return dict(rot=rot, hipy=0.04 * t, hipz=-0.01 * t)
 
-CLIPS = {'idle': idle, 'walk': walk, 'attack': attack, 'skill': skill, 'hit': hit}
+def dash(f, n):  # investida / rolamento: corpo baixo e inclinado, passada larga, braços para trás
+    lean = [0.2, 0.4, 0.45, 0.35][f]; stride = [-0.4, -1.0, 0.7, -0.9][f]; knee = [0.6, 1.0, 0.4, 0.9][f]; arms = [0.25, 0.55, 0.6, 0.45][f]  # braços pouco para trás: a capa/poncho acompanha os braços e rasga se eles vão longe
+    rot = {'hips': [(AX, lean), (AZ, [0.0, -0.1, 0.1, -0.05][f])], 'spine': [(AX, 0.1)], 'head': [(AX, -0.25)],
+           'thigh.R': [(AX, stride * LEG)], 'thigh.L': [(AX, -stride * 0.9 * LEG)], 'shin.R': [(AX, knee * LEG)], 'shin.L': [(AX, (1.2 - knee) * LEG)],
+           'upper_arm.R': [(AX, arms)], 'upper_arm.L': [(AX, arms)], 'fore_arm.R': [(AX, -0.3)], 'fore_arm.L': [(AX, -0.3)]}
+    return dict(rot=rot, hipz=[-0.03, 0.0, 0.02, 0.0][f])
+
+CLIPS = {'idle': idle, 'walk': walk, 'attack': attack, 'skill': skill, 'hit': hit, 'dash': dash}
 arm.animation_data_create()
 for cname, fn in CLIPS.items():
     n = FPS[cname]

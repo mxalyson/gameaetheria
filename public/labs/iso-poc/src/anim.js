@@ -36,7 +36,7 @@ export function chooseClip(anim, { dead, moving, hurt, attackStart, skillStart }
   if (names.death && anim.name === names.death) return;
   if (dead && names.death) return anim.play(names.death);
   if (dead) return;
-  const acting = (anim.name === names.attack || anim.name === names.skill) && !anim.finished;
+  const acting = (anim.name === names.attack || anim.name === names.skill || (names.dash && anim.name === names.dash)) && !anim.finished;
   if (skillStart && names.skill) return anim.play(names.skill, true);
   if (attackStart) return anim.play(names.attack, true);
   if (hurt && anim.name !== 'hit' && !acting) return anim.play('hit', true);
