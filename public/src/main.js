@@ -8,7 +8,7 @@ import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore } from './core/stats.js';
 import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext } from './core/progression.js';
 import { generateItem, rollMobLoot, rollRarity } from './core/loot.js';
-import { generateRival } from './core/rival.js';
+import { generateRivalForPower } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
 import { MODES, newMatch, controlTick, matchWinner, getRating, setRating, spawnSlots } from './core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from './core/power.js';
@@ -543,7 +543,7 @@ class Game {
     this.ui.closePanels();
     const M = newMatch(mode), size = M.size, c = this.char;
     this.enterZone('arena_team', 900, 900, 'pvp');
-    const w = this.world, z = w.zone, myRating = getRating(c, mode);
+    const w = this.world, z = w.zone, myRating = getRating(c, mode), myPower = playerPower(c); // inimigos e aliados nascem com poder ~ o seu (±5%)
     const mine = spawnSlots(1, size, z.w / 2, z.spawns.south, z.spawns.north);
     const theirs = spawnSlots(2, size, z.w / 2, z.spawns.south, z.spawns.north);
     this.player.x = mine[0].x; this.player.y = mine[0].y; this.player.facing = -Math.PI / 2;
@@ -552,12 +552,12 @@ class Game {
     const foeClasses = this.pickClasses(size);
     const chars = { allies: [], enemies: [] };
     allyClasses.forEach((classId, i) => {
-      const rc = generateRival(this.rng, c, { classId, rating: myRating });
+      const rc = generateRivalForPower(this.rng, c, myPower * (0.95 + this.rng.next() * 0.1), { classId, rating: myRating });
       const a = w.add(makeHeroActor(rc, mine[i + 1].x, mine[i + 1].y, 'rival', 1));
       this.spawnSpirit(a, rc); team1.push(a); chars.allies.push(rc);
     });
     foeClasses.forEach((classId, i) => {
-      const rc = generateRival(this.rng, c, { classId, rating: myRating });
+      const rc = generateRivalForPower(this.rng, c, myPower * (0.95 + this.rng.next() * 0.1), { classId, rating: myRating });
       const a = w.add(makeHeroActor(rc, theirs[i].x, theirs[i].y, 'rival', 2));
       a.facing = Math.PI / 2;
       this.spawnSpirit(a, rc); team2.push(a); chars.enemies.push(rc);

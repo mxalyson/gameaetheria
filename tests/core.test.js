@@ -157,3 +157,21 @@ test('IA do rival vai ao ponto de controle quando o inimigo está longe, e luta 
   for (let i = 0; i < 30 * 40 && !a.dead && !b.dead; i++) w.update(1 / 30);
   assert.ok(a.hp < a.maxHp && b.hp < b.maxHp, 'ao se encontrarem, trocam golpes');
 });
+
+test('rival gerado por poder-alvo fica perto do alvo (±12%) para jogadores fracos e fortes', async () => {
+  const { generateRivalForPower } = await import('../public/src/core/rival.js');
+  const { playerPower } = await import('../public/src/core/power.js');
+  const rng = makeRng(77);
+  for (const lvl of [10, 15, 25]) {
+    const me = newCharacter('P', 'mage', makeRng(lvl));
+    me.level = lvl;
+    me.alloc.int += 4 * (lvl - 1); // nem todos os pontos distribuídos
+    const target = playerPower(me);
+    for (const classId of Object.keys(CLASSES)) {
+      const r = generateRivalForPower(rng, me, target, { classId });
+      assert.equal(r.classId, classId);
+      const p = playerPower(r);
+      assert.ok(Math.abs(p - target) <= target * 0.12, `nível ${lvl} ${classId}: alvo ${target}, rival ${p}`);
+    }
+  }
+});
