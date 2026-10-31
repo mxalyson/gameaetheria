@@ -4,7 +4,7 @@ Atualizado em 2026-10-31. O jogo **real** não foi alterado pelo trabalho de art
 ## 0) Online, sem o PC (GitHub Pages — ativo desde 2026-10-31)
 - **Jogo:** https://mxalyson.github.io/gameaetheria/ · **Laboratório com os heróis:** https://mxalyson.github.io/gameaetheria/labs/iso-poc/index.html
 - Abra no celular em **paisagem**; "Adicionar à tela inicial" instala como app. O progresso fica salvo **só naquele aparelho**.
-- A versão online é a do último  (repositório https://github.com/mxalyson/gameaetheria, branch ); atualizar = commit + push (o Pages republica em ~1–2 min).
+- A versão online é a do último `git push` (repositório https://github.com/mxalyson/gameaetheria, branch `main`); atualizar = commit + push (o Pages republica em ~1–2 min).
 - Verificado em navegador emulado de celular (844×390, toque): vila carrega, personagem criado, HUD visível, sem erros nem arquivos 404. **Não testado em celular de verdade.**
 
 ## 1) O jogo real (é isto que vale como "o jogo")
