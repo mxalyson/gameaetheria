@@ -13,6 +13,7 @@ import { drawMage, MAGE_FRAME, MAGE_PIVOT } from './src/sprites/rig-mage.js';
 import { drawSlime, SLIME_FRAME, SLIME_PIVOT } from './src/sprites/rig-slime.js';
 import { bakeOak, bakePine, bakeBush, bakeRock, bakeTuft, bakeFlower, drawSprite, glowSprite } from './src/props.js';
 import { bakeGround } from './src/ground.js';
+import { HERO_FX, KIND_BY_STYLE, spawnVfx, stepVfx, drawVfx, drawVfxGround } from './src/vfx.js';
 
 const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
@@ -49,11 +50,12 @@ let world, player, cam, iso, ground, mageAtlas, slimeAtlas, heroAtlas = null, he
 const art = { oaks: [], pines: [], bushes: [], rocks: [], tufts: [], flowers: new Map() };
 const decor = [];
 const anims = new Map(), ghosts = [];
+const vfx = []; // efeitos visuais dos heróis em miniatura (só desenho; a simulação não os conhece)
 const keys = new Set(), mouse = { x: 0, y: 0, down: false };
 let ox = 0, oy = 0, acc = 0, last = 0;
 let pending = null, lastMoveDir = { x: 1, y: 1 }, vel = { x: 0, y: 0 }, prevPos = { x: 0, y: 0 }, respawnT = 0, reviveT = 0;
 const stats = { fps: 0, simMs: 0, renderMs: 0, sprites: 0, particles: 0, projectiles: 0, actors: 0, atlasMiB: 0, propsMiB: 0, frames: 0 };
-const poc = { keys, mouse, ready: false, stats, cfg, debugOrder: false, lastOrder: [], get world() { return world; }, get atlases() { return { mage: mageAtlas, slime: slimeAtlas, hero: heroAtlas }; }, get decor() { return decor; }, aimPoint: () => aimPoint(), startAction: (k, i) => startAction(k, i), get player() { return player; }, get iso() { return iso; }, get cam() { return cam; }, anims };
+const poc = { keys, mouse, ready: false, stats, cfg, debugOrder: false, lastOrder: [], get world() { return world; }, get atlases() { return { mage: mageAtlas, slime: slimeAtlas, hero: heroAtlas }; }, get decor() { return decor; }, aimPoint: () => aimPoint(), startAction: (k, i) => startAction(k, i), get player() { return player; }, get iso() { return iso; }, get cam() { return cam; }, anims, vfx, holdVfx: false, spawnVfx: (k, o) => spawnVfx(vfx, k, o), HERO_FX };
 window.poc = poc;
 
 // ---------- montagem ----------
@@ -180,6 +182,7 @@ function simStep() {
   const intent = { mx: md.x, my: md.y, aimX: aim.x, aimY: aim.y, attack: false, cast: null };
   if (pending && performance.now() / 1000 >= pending.at) {
     if (pending.kind === 'skill') intent.cast = pending.idx; else intent.attack = true;
+    if (cfg.hero) { const f = HERO_FX[cfg.hero]; spawnVfx(vfx, KIND_BY_STYLE[f.style], { x: player.x, y: player.y, ang: Math.atan2(aim.y - player.y, aim.x - player.x), big: pending.kind === 'skill', color: f.color, core: f.core }); }
     pending = null;
   }
   const t0 = performance.now();
@@ -216,6 +219,7 @@ function updateAnim(a, st, dt, seen) {
   const isPlayer = a.kind === 'player';
   const sig = { dead: a.dead, moving: a.moving, hurt: flash, attackStart: !isPlayer && sw && !casts.has(a.id), skillStart: false };
   // jogador: a ação foi iniciada localmente (startAction); aqui só cuidamos de andar/parar/ferido/morte
+  if (cfg.hero && !isPlayer && flash) { const f = HERO_FX[cfg.hero]; spawnVfx(vfx, 'impact', { x: a.x, y: a.y, z: 26, color: f.color, core: f.core }); }
   chooseClip(st.anim, sig, st.names);
   st.anim.update(dt);
   if (isPlayer && st.anim.finished && (st.anim.name === 'attack' || st.anim.name === 'skill')) st.anim.play(a.moving ? 'walk' : 'idle', true);
@@ -292,19 +296,22 @@ function render(dt, now) {
       g.globalAlpha = (1 - k) * 0.55; g.beginPath(); g.moveTo(f.x, f.y); g.arc(f.x, f.y, f.r, f.ang - f.arc / 2, f.ang + f.arc / 2); g.closePath(); g.fillStyle = f.color; g.fill(); g.globalAlpha = 1;
     }
   }
+  if (cfg.hero) drawVfxGround(g, vfx);
   g.restore();
 
   // ---- sprites em pé, de trás para a frente ----
   if (!cfg.off.has('sprites')) for (const it of items) drawEntity(it);
   stats.sprites = items.length;
+  if (cfg.hero) { if (!poc.holdVfx) stepVfx(vfx, dt); drawVfx({ g, glow: glowSprite, sprite: drawSprite, iso, ox, oy, zoom: cfg.zoom }, vfx); }
 
   // ---- projéteis, partículas e textos (acima de tudo) ----
   g.globalCompositeOperation = 'lighter';
   for (const p of world.projectiles) {
     if (p.dead) continue;
     const s = iso.toScreen(p.x, p.y, 38), x = s.x + ox, y = s.y + oy, R = (p.radius + 6) * cfg.zoom;
-    drawSprite(g, glowSprite(p.color), x, y, R * 0.07 * 4, 0.9);
-    drawSprite(g, glowSprite(p.color), x, y, R * 0.07 * 2, 1);
+    const pc = cfg.hero ? HERO_FX[cfg.hero].color : p.color; // o projétil real (do Mago) ganha a cor do herói escolhido
+    drawSprite(g, glowSprite(pc), x, y, R * 0.07 * 4, 0.9);
+    drawSprite(g, glowSprite(pc), x, y, R * 0.07 * 2, 1);
     drawSprite(g, glowSprite('#fff4d8'), x, y, R * 0.07 * 0.9, 0.85);
   }
   for (const p of world.particles) {

@@ -214,6 +214,10 @@ for (const id of ['paladino', 'aprendiz', 'franco', 'sacerdote']) {
     const antes = await page.evaluate(() => ({ clip: window.poc.anims.get(window.poc.player.id).anim.name, cd: window.poc.player.cds.basic }));
     expect(antes.clip).toBe('attack');
     expect(antes.cd).toBeLessThanOrEqual(0.0001);
+    // efeito visual do herói (só desenho) nasce junto com o golpe: o estilo vem da tabela HERO_FX
+    await page.waitForFunction(() => window.poc.vfx.length > 0, null, { timeout: 8000, polling: 'raf' });
+    const kind = await page.evaluate(() => window.poc.vfx[0].kind);
+    expect(kind).toBe({ paladino: 'swing', aprendiz: 'cast', franco: 'muzzle', sacerdote: 'pray' }[id]);
     await page.waitForFunction(() => window.poc.player.cds.basic > 0, null, { timeout: 8000 });
     expect(errors, errors.join('\n')).toEqual([]);
   });

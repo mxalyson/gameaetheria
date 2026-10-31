@@ -27,6 +27,18 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
 - **Não medido:** `npm run perf:poc` com o herói novo (a medição de FPS oficial ainda é só do mago).
 - **Observação:** as skills 1-3 continuam as do Mago (Bola de Fogo, Nova de Gelo, Teleporte) com o rosto do herói escolhido; as skills de cada classe são propostas em `designs.js`, não implementadas.
 
+## Efeitos dos golpes (PoC, 2026-10-30)
+`public/labs/iso-poc/src/vfx.js` — só visual, procedural (os modelos não trazem efeitos), em camadas aditivas sobre o sprite; a simulação não os conhece.
+| Herói | Estilo | Efeito no quadro de disparo |
+|---|---|---|
+| Paladino | `slash` | meia-lua dourada que varre à frente, com cauda e brilho na ponta |
+| Aprendiz | `cast` | clarão ciano, anel de energia e fagulhas que se abrem e caem |
+| Franco-atirador | `shoot` | clarão no cano, faíscas em leque e rastro do tiro |
+| Sacerdote | `pray` | coluna de luz, anel no chão (no plano isométrico) e grãos de luz subindo |
+- Habilidade (teclas 1-3) usa o mesmo estilo em versão maior ("big"); o dano ao inimigo ganha faíscas de impacto na cor do herói; o projétil real do Mago é pintado com a cor do herói.
+- **Testado:** `tests/vfx.test.js` (4 unitários) e o e2e dos heróis confere que cada golpe cria o efeito do estilo certo. **Visto no navegador:** os 4 estilos + impacto, com a cena parada (`poc.holdVfx`, `poc.spawnVfx`). **Não validado:** o aspecto em movimento a 60 FPS (o navegador embutido rodou a ~10 FPS nesta medição) e o custo por frame.
+- Limites: o projétil continua sendo o do Mago (bola brilhante), as skills 1-3 continuam as do Mago, e não há efeito de morte nem de dano recebido pelo herói.
+
 ## Peso das texturas (medido, 2026-10-30)
 | Versão | Paladino | Aprendiz | Franco | Sacerdote | Como gerar |
 |---|---|---|---|---|---|
