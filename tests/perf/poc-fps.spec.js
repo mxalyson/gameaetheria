@@ -9,6 +9,8 @@ const OUT_DIR = fileURLToPath(new URL('../../test-results/', import.meta.url));
 // por SOFTWARE, o que dá números muito piores e enganosos. FPS sem limite de vsync: é capacidade, não o que o monitor mostra.
 // Uso: npm run perf:poc    (resultado em test-results/perf-poc.json)
 const GPU_ARGS = ['--use-gl=angle', '--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--disable-frame-rate-limit', '--disable-gpu-vsync'];
+// HERO=paladino|aprendiz|franco|sacerdote mede com o herói em miniatura (atlas de art-local/); sem HERO mede o mago desenhado (linha de base)
+const HERO = process.env.HERO ?? '';
 const CASOS = [
   ['720p 2:1', 1280, 720, 'dpr=1'], ['1080p 2:1', 1920, 1080, 'dpr=1'], ['1080p 40 monstros', 1920, 1080, 'dpr=1&mobs=40'],
   ['1080p 120 monstros', 1920, 1080, 'dpr=1&mobs=120'], ['canvas 4K (1080p CSS, DPR 2)', 1920, 1080, 'dpr=2'], ['720p 30 graus', 1280, 720, 'dpr=1&tilt=30'], ['720p zoom 1,5', 1280, 720, 'dpr=1&zoom=1.5'],
@@ -16,11 +18,11 @@ const CASOS = [
 
 test('FPS do PoC isométrico na GPU', async () => {
   const browser = await chromium.launch({ args: GPU_ARGS });
-  const out = { quando: new Date().toISOString(), gpu: null, casos: [] };
+  const out = { hero: HERO || 'mago (linha de base)', quando: new Date().toISOString(), gpu: null, casos: [] };
   for (const [nome, w, h, qs] of CASOS) {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
     const erros = []; page.on('pageerror', (e) => erros.push(e.message));
-    await page.goto('http://localhost:5174/labs/iso-poc/index.html?' + qs);
+    await page.goto('http://localhost:5174/labs/iso-poc/index.html?' + qs + (HERO ? '&hero=' + HERO : ''));
     await page.waitForFunction(() => window.poc?.ready, null, { timeout: 120000 });
     out.gpu ??= await page.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl'); return gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL); });
     await page.waitForTimeout(2500);
@@ -37,6 +39,6 @@ test('FPS do PoC isométrico na GPU', async () => {
   }
   await browser.close();
   mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(OUT_DIR + 'perf-poc.json', JSON.stringify(out, null, 2));
+  writeFileSync(OUT_DIR + (HERO ? 'perf-poc-' + HERO + '.json' : 'perf-poc.json'), JSON.stringify(out, null, 2));
   console.log('PERF ' + JSON.stringify(out));
 });

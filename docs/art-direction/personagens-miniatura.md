@@ -24,7 +24,17 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
 `http://localhost:5174/labs/iso-poc/index.html?hero=paladino|aprendiz|franco|sacerdote` troca só o **visual** do herói (a simulação segue sendo a do Mago: skills, dano e recarga reais). Opções: `hsize=1.3` (tamanho do sprite), `herodir=atlas` (animação rígida, sem esqueleto). Sem os arquivos de `art-local/`, volta ao mago desenhado.
 - **Testado:** 4 testes e2e novos (`tests/e2e/iso-poc.spec.js`, "herói em miniatura"): atlas carregado, clipes, andar, golpe no quadro de disparo, sem erro de console. Suíte completa: 48 unitários + 24 e2e passando.
 - **Visto no navegador:** Paladino, Franco e Sacerdote andando e o Paladino atacando (projétil sai), ~60 FPS no navegador embutido; texturas 56,8 MiB (herói 24,2 + slime 32,6).
-- **Não medido:** `npm run perf:poc` com o herói novo (a medição de FPS oficial ainda é só do mago).
+- **FPS na GPU (Intel UHD 0x9A78, Direct3D11, sem vsync), 2026-10-30:** `HERO=<id> npx playwright test --config=tests/perf/playwright.config.js` (sem `HERO` = linha de base do mago). "Em uso" = andando e atacando/lançando sem parar, com efeitos. Uma rodada por configuração; a variação entre rodadas é de ~10-15%, então diferenças menores que isso não são conclusivas.
+  | Cenário | Mago (base) | Paladino | Aprendiz | Franco | Sacerdote |
+  |---|---|---|---|---|---|
+  | 720p | 117 | 105 | 93 | 99 | 122 |
+  | 1080p | 71 | 61 | 65 | 58 | 73 |
+  | 1080p, 40 monstros | 57 | 64 | 68 | 64 | 72 |
+  | 1080p, 120 monstros | 51 | 51 | 60 | 50 | 61 |
+  | canvas 4K (DPR 2) | 33 | 32 | 36 | 30 | 29 |
+  | 720p, 30° | 117 | 116 | 125 | 135 | 110 |
+  | 720p, zoom 1,5 | 156 | 125 | 122 | 128 | 133 |
+  Leitura: os heróis em miniatura ficam no mesmo patamar do mago desenhado; 1080p em uso fica em ~58-73 FPS (meta: 60) e o pior caso (canvas 4K) em ~29-36 FPS (meta: ≥30; o Sacerdote ficou 1 FPS abaixo, dentro da variação). Sem erros de console em nenhuma das 35 medições. Não medido em celular.
 - **Observação:** as skills 1-3 continuam as do Mago (Bola de Fogo, Nova de Gelo, Teleporte) com o rosto do herói escolhido; as skills de cada classe são propostas em `designs.js`, não implementadas.
 
 ## Efeitos dos golpes (PoC, 2026-10-30)
