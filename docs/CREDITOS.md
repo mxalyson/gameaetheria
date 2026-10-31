@@ -1,0 +1,19 @@
+# Créditos — Aetheria: Arena dos Ecos
+Atualizado em 2026-10-31. A licença CC BY 4.0 exige atribuição: este texto deve aparecer nos créditos do jogo quando os personagens entrarem nele.
+
+## Texto para a tela de créditos
+> **Personagens em miniatura** — modelos 3D e imagens de conceito gerados com **Meshy** (meshy.ai), licença **CC BY 4.0** (https://creativecommons.org/licenses/by/4.0/). Direção de arte, pós-processamento, rig e animação: equipe Aetheria.
+
+## Ferramentas e bibliotecas (não aparecem para o jogador; registro de origem)
+| Item | Uso | Licença | Origem |
+|---|---|---|---|
+| Meshy (Free) | imagens de conceito, modelos 3D Lite dos 4 heróis | CC BY 4.0 (saídas, confirmado pelo proprietário) | meshy.ai |
+| three.js r170 | renderizar os modelos em sprites (só laboratório) | MIT | npm `three@0.170.0` |
+| meshoptimizer 0.22 | reduzir a malha antes do auto-rig (só laboratório) | MIT | npm `meshoptimizer@0.22.0` |
+| Blender 4.2.23 LTS | rig e animação procedural (só ferramenta) | GPL (o programa; a saída é do autor) | download.blender.org, SHA-256 conferido |
+| Mixamo | tentado e **não usado** (auto-rig falhou) | — | — |
+
+## Pendências de crédito
+- Conferir os termos do Meshy ao publicar (podem mudar); guardar captura da página de cada modelo.
+- Místico: classe futura, ainda sem arte.
+- A tela de créditos no jogo real ainda não existe (a integração do visual isométrico está adiada); por ora o crédito aparece no canto do PoC (`public/labs/iso-poc/index.html`) e aqui.

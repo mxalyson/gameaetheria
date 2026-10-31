@@ -261,3 +261,17 @@ test('herói em miniatura: dano recebido gera clarão e a morte tomba o sprite e
   expect(await page.evaluate(() => window.poc.player.hp)).toBeGreaterThan(0);
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+// Seletor de herói no topo da página: trocar o herói sem digitar a URL.
+test('seletor de herói troca o herói (e a classe) recarregando a página', async ({ page }) => {
+  const meta = new URL('../../public/labs/iso-poc/art-local/atlas-rig/sacerdote/sacerdote.json', import.meta.url);
+  test.skip(!fs.existsSync(meta), 'atlas não gerado (art-local/ fora do Git)');
+  const errors = await open(page, '?mobs=0');
+  expect(await page.$$eval('#hero-pick option', (o) => o.length)).toBe(5);
+  await Promise.all([page.waitForURL(/hero=sacerdote/), page.selectOption('#hero-pick', 'sacerdote')]);
+  await page.waitForFunction(() => window.poc?.ready, null, { timeout: 90000 });
+  expect(await page.evaluate(() => window.poc.cfg.hero)).toBe('sacerdote');
+  expect(await page.textContent('#hp-name')).toContain('Clérigo');
+  expect(await page.inputValue('#hero-pick')).toBe('sacerdote');
+  expect(errors, errors.join('\n')).toEqual([]);
+});
