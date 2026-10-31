@@ -330,3 +330,15 @@ test('paladino: Grito de Guerra mostra efeito próprio, tooltip com a descriçã
   await page.waitForFunction(() => window.poc.vfx.some((v) => v.kind === 'aura' && v.persist), null, { timeout: 8000 }); // aura contínua enquanto o buff dura
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+// Página de identidade visual (rascunho B1): carrega sem erros e mostra os 4 retratos dos heróis.
+test('página de identidade visual carrega com paleta, UI e os 4 retratos', async ({ page }) => {
+  const meta = new URL('../../public/labs/iso-poc/art-local/atlas-rig/paladino/paladino.json', import.meta.url);
+  test.skip(!fs.existsSync(meta), 'atlas não gerado (art-local/ fora do Git)');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message)); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.goto('/labs/iso-poc/identidade.html');
+  await page.waitForFunction(() => window.identidade?.ready, null, { timeout: 30000 });
+  expect(await page.evaluate(() => window.identidade.retratos)).toBe(4);
+  expect(await page.$$eval('#pal .sw', (e) => e.length)).toBeGreaterThanOrEqual(12);
+  expect(errors, errors.join('\n')).toEqual([]);
+});

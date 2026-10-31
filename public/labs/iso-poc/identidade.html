@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-br"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Identidade visual v0 — laboratório</title>
+<style>
+  :root { --night:#141a2e; --glass: rgba(20,26,46,.88); --gold:#ffcf4a; --gold-l:#fff0a6; --gold-d:#c98f12; --violet:#3b2090; --ivory:#f3e8c8; --hp:#5fd38a; --xp:#8fb4ff; --danger:#ff6a6a; --text:#eceaf6; --muted:#a9a6c2;
+    --c-warrior:#4478e0; --c-mage:#5b53dc; --c-archer:#5fa84e; --c-cleric:#6fd6bd; --c-mystic:#6e44d8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(1200px 700px at 20% -10%, #2a2f5a 0%, #141a2e 55%, #0d1122 100%); color: var(--text); font: 15px/1.5 Nunito, 'Trebuchet MS', system-ui, sans-serif; padding: 28px 20px 60px; }
+  h1, h2 { font-family: Cinzel, Georgia, serif; color: var(--ivory); letter-spacing: .04em; margin: 0 0 8px; }
+  h1 { font-size: 30px; } h2 { font-size: 19px; margin-top: 34px; border-bottom: 1px solid rgba(255,207,74,.35); padding-bottom: 6px; }
+  .wrap { max-width: 1040px; margin: 0 auto; } .note { color: var(--muted); font-size: 13px; }
+  .tag { display:inline-block; font-size: 11px; font-weight: 800; letter-spacing:.12em; color: var(--gold); border: 1px solid rgba(255,207,74,.5); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .sw { border-radius: 14px; overflow: hidden; background: var(--glass); border: 1px solid rgba(255,255,255,.1); }
+  .sw i { display: block; height: 58px; } .sw div { padding: 8px 10px; font-size: 12px; } .sw b { display:block; font-size: 13px; }
+  .panel { position: relative; background: var(--glass); border: 1px solid rgba(255,207,74,.28); border-radius: 18px; padding: 14px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), 0 8px 24px rgba(0,0,0,.35); backdrop-filter: blur(6px); }
+  .panel::before, .panel::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid var(--gold-d); opacity: .8; } /* canto "eco" */
+  .panel::before { left: 7px; top: 7px; border-right: 0; border-bottom: 0; border-top-left-radius: 9px; } .panel::after { right: 7px; bottom: 7px; border-left: 0; border-top: 0; border-bottom-right-radius: 9px; }
+  .heroes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .hero { text-align: center; padding-top: 6px; } .hero canvas { width: 150px; height: 150px; } .hero .cls { font-weight: 800; } .hero .name { color: var(--muted); font-size: 12px; }
+  .hero .bar { height: 5px; border-radius: 3px; margin: 8px auto 0; width: 70%; background: var(--cc); box-shadow: 0 0 12px var(--cc); }
+  .row { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+  /* barra de vida segmentada com ponta dourada */
+  .hp { width: 280px; } .hp .nm { display:flex; justify-content: space-between; font-weight: 800; } .hp .nm span:last-child { color: var(--gold); }
+  .bar { position: relative; height: 16px; border-radius: 9px; background: #0a0e1c; border: 1px solid rgba(255,255,255,.12); overflow: hidden; margin-top: 5px; }
+  .bar .f { height: 100%; width: 72%; background: linear-gradient(#8ff0b4, var(--hp) 55%, #2f9a5b); border-right: 3px solid var(--gold); }
+  .bar::after { content:''; position:absolute; inset:0; background: repeating-linear-gradient(90deg, transparent 0 23px, rgba(0,0,0,.35) 23px 25px); }
+  .bar .t { position:absolute; inset:0; z-index:2; text-align:center; font-size: 11px; font-weight: 800; line-height: 16px; text-shadow: 0 1px 2px #000; }
+  .xp { height: 6px; margin-top: 4px; } .xp .f { width: 40%; background: linear-gradient(var(--xp), #5a82d6); border: 0; }
+  .buff { display:inline-flex; gap:6px; align-items:center; background: rgba(20,28,45,.85); border: 1px solid rgba(255,207,74,.45); border-radius: 8px; padding: 3px 9px; font-weight: 800; font-size: 12px; margin: 8px 6px 0 0; }
+  .buff b { color: var(--gold); }
+  /* slots de habilidade com anel de recarga ("eco") */
+  .slots { display:flex; gap: 12px; }
+  .slot { position: relative; width: 62px; height: 62px; border-radius: 18px; background: radial-gradient(circle at 35% 25%, #2d3562, #171c36); border: 2px solid var(--cc, var(--gold-d)); display:grid; place-items:center; font-size: 26px; box-shadow: 0 0 14px color-mix(in srgb, var(--cc, var(--gold)) 45%, transparent), inset 0 -5px 0 rgba(0,0,0,.25); }
+  .slot .key { position:absolute; left: 5px; top: 2px; font: 800 11px/1 system-ui; color: var(--gold-l); }
+  .slot .ring { position:absolute; inset: -6px; border-radius: 22px; pointer-events:none; --p: 0; background: conic-gradient(from 0deg, rgba(255,207,74,.0) calc(var(--p) * 1turn), rgba(10,14,28,.62) 0); mask: radial-gradient(circle, transparent 54%, #000 55%); -webkit-mask: radial-gradient(circle, transparent 54%, #000 55%); }
+  .slot.cd .ring { animation: eco 3.2s linear infinite; }
+  .slot.cd::after { content:''; position:absolute; inset: 0; border-radius: 18px; border: 2px solid var(--gold); opacity: 0; animation: ping 3.2s ease-out infinite; }
+  @keyframes eco { from { --p: 0; } to { --p: 1; } } @property --p { syntax: '<number>'; inherits: false; initial-value: 0; }
+  @keyframes ping { 0%,92% { opacity: 0; transform: scale(1); } 94% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.35); } }
+  .btn { font: 800 14px Nunito, system-ui, sans-serif; border-radius: 14px; padding: 11px 22px; cursor: pointer; border: 1px solid rgba(255,255,255,.2); color: var(--text); background: rgba(40,48,86,.8); min-height: 44px; }
+  .btn.gold { color: #2a1d00; background: linear-gradient(var(--gold-l), var(--gold) 55%, var(--gold-d)); border-color: #ffe9a0; box-shadow: 0 4px 0 #8a5e08, 0 8px 18px rgba(255,207,74,.28); }
+  .rar { display:flex; gap: 8px; flex-wrap: wrap; } .rar span { border: 2px solid var(--c); color: var(--c); border-radius: 10px; padding: 6px 12px; font-weight: 800; background: rgba(0,0,0,.25); } .rar .leg { box-shadow: 0 0 16px var(--c), inset 0 0 10px rgba(255,207,74,.35); }
+  .dmg span { font: 800 22px Nunito, system-ui; margin-right: 18px; -webkit-text-stroke: 4px rgba(20,20,40,.9); paint-order: stroke fill; }
+  .ttl { font: 900 34px Cinzel, Georgia, serif; color: var(--ivory); text-shadow: 0 2px 0 #7a5410, 0 0 24px rgba(255,207,74,.45); letter-spacing: .06em; }
+  .ttl small { display:block; font-size: 13px; letter-spacing: .4em; color: var(--gold); text-shadow: none; }
+</style></head><body><div class="wrap">
+<span class="tag">RASCUNHO v0 · FASE B1 · NADA DISTO ESTÁ NO JOGO</span>
+<h1>Identidade visual — “Ecos de ouro”</h1>
+<p class="note">Proposta para você aprovar, vetar ou ajustar (ver <code>docs/art-direction/identidade-visual-v0.md</code>). Tudo feito só com HTML/CSS e os atlas dos heróis; sem arte nova.</p>
+
+<h2>Título (assinatura)</h2>
+<div class="panel"><div class="ttl">AETHERIA<small>ARENA DOS ECOS</small></div></div>
+
+<h2>Paleta</h2>
+<div class="grid" id="pal"></div>
+
+<h2>Os 4 heróis na paleta de classe</h2>
+<div class="heroes" id="heroes"></div>
+<p class="note" id="hnote"></p>
+
+<h2>HUD: vida, XP, buffs e habilidades</h2>
+<div class="row">
+  <div class="panel hp"><div class="nm"><span>Paladino · Guerreiro</span><span>Nv 8</span></div>
+    <div class="bar"><div class="f"></div><div class="t">231 / 320</div></div><div class="bar xp"><div class="f"></div></div>
+    <span class="buff">📯 Grito de Guerra <b>5s</b></span><span class="buff">🛡️ Escudo <b>3s</b></span></div>
+  <div class="panel"><div class="slots" style="--cc: var(--c-warrior)">
+    <div class="slot"><span class="key">LMB</span>⚔️</div>
+    <div class="slot"><span class="key">1</span>🌀</div>
+    <div class="slot cd"><span class="ring"></span><span class="key">2</span>⚡</div>
+    <div class="slot"><span class="key">3</span>📯</div></div>
+    <p class="note" style="margin:10px 0 0">A recarga é um <b>anel que se fecha</b> (o “eco”) e, ao terminar, um pulso dourado. A cor da moldura é a da classe.</p></div>
+</div>
+
+<h2>Botões, raridade e números de dano</h2>
+<div class="row" style="align-items:center"><button class="btn gold">Entrar na Arena</button><button class="btn">Inventário</button></div>
+<div class="rar" style="margin-top:14px"><span style="--c:#c9ccd3">Comum</span><span style="--c:#7bd88f">Incomum</span><span style="--c:#5fa8ff">Raro</span><span style="--c:#b77cff">Épico</span><span class="leg" style="--c:#ffa53d">Lendário</span></div>
+<div class="dmg" style="margin-top:14px"><span style="color:#fff">63</span><span style="color:#ffd34d">127!</span><span style="color:var(--hp)">+70</span><span style="color:var(--danger)">−18</span></div>
+
+<h2>Regras de uso (resumo)</h2>
+<div class="panel"><ul style="margin:0; padding-left: 18px">
+  <li><b>Ouro = importante.</b> Se tudo brilha, nada brilha: no máximo 3 destaques por tela.</li>
+  <li><b>Eco</b> (anéis concêntricos) para seleção, recarga, portais e transições.</li>
+  <li>Luz sempre de cima à esquerda; sombras em violeta-azulado, nunca preto.</li>
+  <li>Alvo de toque ≥ 44 px; ícones simples e grandes (legíveis a 40 px).</li>
+</ul></div>
+</div>
+<script type="module">
+const PAL = [['Ouro eco', '#FFCF4A', 'assinatura: acabamentos, títulos, botão principal'], ['Ouro claro', '#FFF0A6', 'brilho, realce'], ['Ouro escuro', '#C98F12', 'filetes e sombra do ouro'], ['Azul noite', '#141A2E', 'painéis e fundo de UI'], ['Violeta profundo', '#3B2090', 'sombras frias, tinta'], ['Marfim', '#F3E8C8', 'títulos, pergaminho'], ['Vida', '#5FD38A', 'barra de vida, cura'], ['Mana / XP', '#8FB4FF', 'XP, magia'], ['Perigo', '#FF6A6A', 'dano recebido'], ['Guerreiro', '#4478E0', 'classe'], ['Mago', '#5B53DC', 'classe'], ['Arqueiro', '#5FA84E', 'classe'], ['Clérigo', '#6FD6BD', 'classe'], ['Místico (futuro)', '#6E44D8', 'classe futura (+ carmesim #DA3F5C)']];
+document.getElementById('pal').innerHTML = PAL.map(([n, h, u]) => `<div class="sw"><i style="background:${h}"></i><div><b>${n}</b>${h}<br><span class="note">${u}</span></div></div>`).join('');
+const HEROES = [['paladino', 'Paladino', 'Guerreiro', '--c-warrior'], ['aprendiz', 'Aprendiz Arcano', 'Mago', '--c-mage'], ['franco', 'Franco-atirador', 'Arqueiro', '--c-archer'], ['sacerdote', 'Sacerdote', 'Clérigo', '--c-cleric']];
+const box = document.getElementById('heroes'); let ok = 0;
+for (const [id, nome, cls, cv] of HEROES) {
+  const el = document.createElement('div'); el.className = 'panel hero'; el.style.setProperty('--cc', `var(${cv})`);
+  el.innerHTML = `<canvas width="300" height="300"></canvas><div class="cls">${cls}</div><div class="name">${nome}</div><div class="bar"></div>`; box.appendChild(el);
+  try { // retrato = quadro "parado", direção sul, do atlas (art-local/ não vai para o Git)
+    const meta = await (await fetch(`./art-local/atlas-rig/${id}/${id}.json`)).json(); const img = new Image(); img.src = `./art-local/atlas-rig/${id}/idle.png`; await img.decode();
+    const cw = img.width / meta.clips.idle.frames, ch = img.height / (meta.rows ?? 8), g = el.querySelector('canvas').getContext('2d'), s = Math.min(300 / cw, 300 / ch) * 0.98; g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 0, 0, cw, ch, (300 - cw * s) / 2, 300 - ch * s - 4, cw * s, ch * s); ok++;
+  } catch { /* sem arte local: fica só a moldura */ }
+}
+document.getElementById('hnote').textContent = ok ? '' : 'Retratos indisponíveis: a pasta art-local/ (arte gerada, fora do Git) não foi encontrada.';
+window.identidade = { ready: true, retratos: ok };
+</script></body></html>

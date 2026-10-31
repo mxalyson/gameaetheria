@@ -29,6 +29,8 @@ Montagem real em `H:aetheria-extrasmedicoes-e-capturasmock-visual` (herói em mi
 | **B. Visual inteiro, com isométrico** (o que o PoC mostra) | Personagens, monstros, NPCs, cenário, chão, UI e câmera no mesmo estilo | **Alto**: nova câmera/projeção, cenário e props com arte própria, monstros e NPCs na mesma linha de arte (Meshy → sprites), UI nova | Maior prazo; a simulação **não muda** (ela é só o plano x,y) |
 | **C. Visual inteiro, sem isométrico** | Mesma linguagem de arte aplicada ao top-down atual | Médio-alto: tudo de B menos a câmera | Perde a profundidade do isométrico; fica mais barato e mais seguro no celular |
 
+> **Decidido em 2026-10-31: opção B** (ADR 0007). Fases B1–B5 em `docs/decisions/0007-visual-inteiro-isometrico.md`; a fase B1 começou com o rascunho `docs/art-direction/identidade-visual-v0.md` e a página `/labs/iso-poc/identidade.html`.
+
 **Recomendação:** o destino é B (ou C), nunca A em produção. Ordem: (1) guia de identidade + UI própria; (2) monstros e NPCs no mesmo pipeline dos heróis; (3) cenário e chão; (4) só então a câmera (isométrico ou não). Os 4 heróis já estão prontos e servem de padrão de qualidade. Nada disso começa antes da sua aprovação (Fase 2 segue adiada).
 
 ## 2. Mapa e mundo
