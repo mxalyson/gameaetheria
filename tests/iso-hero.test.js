@@ -4,6 +4,7 @@ import { IsoHero, PX_PER_TILE } from '../public/src/game/iso-hero.js';
 import { newCharacter } from '../public/src/core/progression.js';
 import { makeRng } from '../public/src/core/rng.js';
 import { SKILLS } from '../public/src/data/skills.js';
+import { CLASSES } from '../public/src/data/classes.js';
 
 // Terreno de teste: chão plano de 10x10 com uma parede (água) em x >= 5.
 const terrain = {
@@ -57,7 +58,8 @@ test('ataque básico acerta só dentro do alcance e do arco, e respeita o cooldo
   assert.ok(ev[0].amount >= 1);
   assert.ok(h.cds.basic > 0, 'cooldown ativo');
   const again = run(h, { ...idle, aimX: 9, aimY: 5, attack: true }, 1.2, [front]).filter((e) => e.type === 'hit');
-  assert.ok(again.length >= 1 && again.length <= 2, `golpes em 1.2s: ${again.length}`);
+  const max = Math.ceil(1.2 / CLASSES.warrior.basic.cd) + 1; // o limite acompanha o cooldown dos dados
+  assert.ok(again.length >= 1 && again.length <= max, `golpes em 1.2s: ${again.length}`);
 });
 
 test('Golpe Giratório acerta em todas as direções, no raio da skill real, e tem o cooldown dos dados', () => {
