@@ -133,3 +133,7 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 - **Testes:** 89 unitários (8 novos em `tests/specs.test.js`) e 51 e2e (3 novos em `tests/e2e/especializacao.spec.js`) passam.
 - **Equilíbrio medido (taxa média de vitória; Guerreiro/Mago/Arqueiro/Clérigo; passo fixo 60 Hz):** nível 5: 58/60/48/44% · nível 10: 50/46/56/51% · **nível 20 (as duas especializações alternadas): 50/46/49/46%**. Por especialização no nível 20: índice 0 (Bastião/Piromante/Atirador/Guardião) 50/48/52/47%; índice 1 (Carrasco/Criomante/Caçador/Inquisidor) 43/48/53/52%. **Nível 20 na meta; nível 10 quase (Arqueiro 56%); nível 5 fora (Guerreiro 58, Mago 60, Clérigo 44).** Duelos 14–37 s; o do Guerreiro continua < 20 s. Limite de 3 rodadas na especialização + 1 correção de regressão; nível 5 fica como pendência.
 - **Correção encontrada pela captura de tela:** o crescimento fracionário mostrava "Vitalidade 48.1999999…" no painel; atributos agora têm 1 casa decimal (com teste).
+
+### 10.6 P3 — salvamento versionado (2026-10-31)
+- Documento do personagem na **versão 2** (ratings por modo e especialização), migração a partir de saves v1 e saves sem versão, validação com lista branca, backup e recuperação, exportar/importar. Detalhes e limites (validação local não é anti-trapaça) em `docs/roadmap/auditoria-p0-e-plano-multiplayer.md` (atualização P3).
+- **Testes:** 101 unitários e 56 e2e passam (última execução completa).

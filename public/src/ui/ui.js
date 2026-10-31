@@ -12,7 +12,7 @@ import { PRICES } from '../shop.js';
 import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export const itemIcon = (it) => (it.slot === 'weapon' ? WEAPON_TYPES[it.weaponType].icon : SLOT_ICONS[it.slot]);
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
@@ -59,11 +59,12 @@ export class UI {
       ? `<button class="btn primary big" data-action="continue">Continuar — ${esc(save.name)} · ${CLASSES[save.classId].name} Nv ${save.level}</button>
          <button class="btn ghost" data-action="new-char">Novo personagem</button>`
       : `<button class="btn primary big" data-action="new-char">Criar personagem</button>`;
+    const importBtn = '<button class="btn ghost" data-action="save-import">Importar save</button>';
     this.screen.innerHTML = `
       <div class="title-wrap">
         <div class="logo"><span>AETHERIA</span><small>Arena dos Ecos</small></div>
         <p class="tagline">Suba de nível, colete itens, desperte spirits e conquiste a arena.</p>
-        <div class="title-actions">${cont}</div>
+        <div class="title-actions">${cont}${importBtn}</div>
         <p class="foot">Protótipo v0.1 · PvE + Arena PvP contra ecos (multiplayer em breve)</p>
       </div>`;
     this.screen.className = 'visible';
@@ -388,7 +389,9 @@ export class UI {
       <p class="hint">Baixa e média reduzem névoa, partículas e resolução: ajudam em celulares fracos e economizam bateria.</p>
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Auto'], ['touch', 'Toque'], ['keyboard', 'Teclado e mouse']])}</div>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
-      <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>`);
+      <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
+      <div class="opt-row"><b>Save do personagem</b><div class="seg"><button class="btn small" data-action="save-export">Exportar</button><button class="btn small" data-action="save-import">Importar</button></div></div>
+      <p class="hint">Exportar baixa um arquivo com seu personagem (guarde como backup ou leve para outro aparelho). Importar substitui o personagem atual.</p>`);
   }
 
   // ---------------- tooltips ----------------

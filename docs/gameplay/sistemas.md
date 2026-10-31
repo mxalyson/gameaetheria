@@ -25,3 +25,6 @@ Controles: WASD (eixos isométricos: W sobe na tela), mouse mira, clique ataca, 
 | Inimigo com IA, vida, dano recebido, esquiva | pendente (Fase 5) |
 | Câmera que segue o herói | pendente (hoje o diorama inteiro cabe na tela e o herói fica pequeno) |
 | Integração ao jogo principal | pendente, exige decisão à parte |
+
+## Salvamento
+Documento do personagem versionado (v2), validado e com backup; exportar/importar em Opções e na tela de título. Ver `core/savedoc.js`, `save.js`.

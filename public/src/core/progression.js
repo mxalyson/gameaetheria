@@ -4,6 +4,8 @@ import { generateItem, rollRarity, uid } from './loot.js';
 
 export const MAX_LEVEL = 30;
 export const POINTS_PER_LEVEL = 5;
+// Versão do documento do personagem (migrações em core/savedoc.js). v2: ratings por modo de arena e especialização.
+export const SAVE_VERSION = 2;
 
 export const xpToNext = (level) => Math.round(60 * level ** 1.55);
 
@@ -31,11 +33,11 @@ export function mobXp(mobLevel, playerLevel, mul = 1) {
 
 export function newCharacter(name, classId, rng) {
   const char = {
-    version: 1, name, classId, level: 1, xp: 0, statPoints: 0,
+    version: SAVE_VERSION, name, classId, level: 1, xp: 0, statPoints: 0,
     alloc: { str: 0, agi: 0, int: 0, vit: 0 },
     gold: 60, potions: 3, equipment: {}, inventory: [],
     spirits: [], activeSpirit: null,
-    arena: { rating: 1000, wins: 0, losses: 0, bestWave: 0 },
+    arena: { rating: 1000, wins: 0, losses: 0, bestWave: 0, ratings: {} },
     created: Date.now(),
   };
   char.equipment.weapon = generateItem(rng, 1, { slot: 'weapon', rarityId: 'common', weaponType: CLASSES[classId].weapon });

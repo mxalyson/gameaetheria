@@ -249,3 +249,10 @@ P0 Auditoria ──▶ P1 Classes+combate estável ──┬──▶ P3 Save ve
 4. Conta: **obrigatória ou opcional**, e método de login (e-mail ou Google).
 5. Arte fina (UI sem emojis, monstros, cenário): **como produzir** (gerador pago, artista, licenciada) — isso bloqueia B2–B5.
 6. Arena **3×3**: incluir já nos modos (é só dado + teste), ou manter 1×1/2×2/4×4?
+
+---
+## Atualização — P3 concluída (2026-10-31): salvamento versionado e validado
+- **Implementado e testado:** `core/savedoc.js` (versão do documento = **2**, migração v1→v2 por passos, validação/normalização com lista branca, contabilidade de pontos de atributo, limites de ouro/nível/itens, itens inválidos/duplicados/fora de slot removidos, nome sem HTML); `save.js` (backup automático a cada 5 min e antes de migrar, original corrompido guardado em `aetheria_save_v1_corrupt`, recuperação pelo backup, aviso ao jogador); **Exportar/Importar** (Opções e tela de título); `main.js:135` agora escapa o nome (o ponto de XSS da seção 2.3 item 7 foi fechado).
+- **Testes:** 12 unitários (`tests/save.test.js`) e 5 e2e (`tests/e2e/save.spec.js`: save antigo migra, corrompido não derruba, recuperação por backup, trapaça limitada e sem XSS, exportar/importar).
+- **O que isto NÃO é:** validação no cliente **não impede trapaça** (o jogador controla o navegador). Ela protege contra corrupção/versões e é o **molde do validador do servidor** (P5), que será a autoridade. Exportar/importar sem assinatura permite que o jogador edite o arquivo: dentro dos limites acima, o servidor terá de revalidar na importação para a conta.
+- **Importação para a conta (P5):** o servidor receberá este mesmo documento, reaplicará `migrate`+`validate` e atribuirá IDs novos a itens.

@@ -2,7 +2,7 @@ import './no-zoom.js';
 import { heroSpritesEnabled, preloadHero, showHeroLoading } from './render/hero-sprites.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
-import { UI } from './ui/ui.js';
+import { UI, esc } from './ui/ui.js';
 import { World, makeHeroActor, makeMobActor, makeSpiritActor } from './game/sim.js';
 import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore } from './core/stats.js';
@@ -13,7 +13,8 @@ import { eloDelta, tierFor } from './core/combat.js';
 import { MODES, newMatch, controlTick, matchWinner, getRating, setRating, spawnSlots } from './core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from './core/power.js';
 import { chooseSpec, specInfo, activeSpec } from './core/specs.js';
-import { loadChar, saveChar } from './save.js';
+import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.js';
+import { cleanName } from './core/savedoc.js';
 import { PRICES } from './shop.js';
 import { TouchControls } from './touch.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
@@ -54,6 +55,7 @@ class Game {
     this.shopLevel = 0;
     this.titleWorld = new World('town');
     this.ui.showTitle(loadChar());
+    this.reportLoad();
     addEventListener('beforeunload', () => this.save());
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
@@ -88,8 +90,10 @@ class Game {
       case 'new-char': this.ui.showCreate(!!loadChar()); break;
       case 'back-title': this.ui.showTitle(loadChar()); break;
       case 'pick-class': this.ui.createClass = arg; this.ui.showCreate(!!loadChar()); break;
+      case 'save-export': this.exportSave(); break;
+      case 'save-import': this.importSave(); break;
       case 'create': {
-        const name = (document.getElementById('char-name')?.value ?? '').trim() || CLASSES[this.ui.createClass].name;
+        const name = cleanName((document.getElementById('char-name')?.value ?? '').trim() || CLASSES[this.ui.createClass].name);
         this.newGame(name, this.ui.createClass);
         break;
       }
@@ -139,7 +143,7 @@ class Game {
     if (heroSpritesEnabled()) showHeroLoading(preloadHero(char.classId)); // visual novo: espera o herói carregar
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
-      this.ui.toast(`Bem-vindo, ${char.name}!`, 'Siga o portal a leste para o Bosque Verdejante', 'gold');
+      this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Siga o portal a leste para o Bosque Verdejante', 'gold');
       this.ui.log('WASD move · mouse mira · <b>clique</b> ataca · <b>1 2 3</b> habilidades', '#cfe8ff');
       this.ui.log('<b>E</b> conversa · <b>I</b> inventário · <b>C</b> personagem · <b>P</b> spirits · <b>Q</b> poção · <b>H</b> volta à vila', '#cfe8ff');
       const sp = SPIRITS[char.spirits[0].type];
@@ -169,6 +173,48 @@ class Game {
   }
 
   save() { if (this.char) saveChar(this.char); }
+
+  // Avisa o jogador quando o save foi migrado, corrigido ou recuperado do backup.
+  reportLoad() {
+    const i = takeLoadInfo();
+    if (!i) return;
+    if (i.recovered) this.ui.toast('Save recuperado', 'O save principal estava corrompido; usei o backup.', 'gold');
+    else if (i.error) this.ui.toast('Save ilegível', 'O arquivo original foi guardado; você pode criar outro personagem.', '');
+    else if (i.migratedFrom) this.ui.toast('Save atualizado', 'Versão ' + i.migratedFrom + ' → nova (cópia guardada).', 'gold');
+    else if (i.warnings?.length) this.ui.toast('Save corrigido', i.warnings.length + ' ajuste(s) de segurança aplicados.', '');
+  }
+
+  exportSave() {
+    if (!this.char) return;
+    const blob = new Blob([exportSave(this.char)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'aetheria-' + cleanName(this.char.name).replace(/\s+/g, '-').toLowerCase() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    this.ui.toast('Save exportado', a.download, 'gold');
+  }
+
+  importSave() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json,application/json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      this.applyImport(await file.text());
+    };
+    input.click();
+  }
+
+  // Separado do seletor de arquivo para poder ser testado sem diálogo do sistema.
+  applyImport(text) {
+    const r = parseSave(text);
+    if (!r.ok) return this.ui.toast('Importação falhou', r.reason, '');
+    if (loadChar() && !confirm('Importar "' + r.char.name + '" substitui o personagem atual deste aparelho. Continuar?')) return;
+    saveChar(r.char);
+    this.ui.toast('Save importado', r.char.name + (r.warnings.length ? ' · ' + r.warnings.length + ' ajuste(s)' : ''), 'gold');
+    if (this.mode === 'title') this.ui.showTitle(r.char); else this.loadGame(r.char);
+  }
 
   spawnSpirit(owner, char) {
     const w = this.world;
