@@ -63,7 +63,7 @@ for s in ('R', 'L'):
     ]
 for wp in spec.get('weapons', []):  # armas/adereços presos a uma mão (ou a outro osso)
     dy = wp.get('dy', 0.0)  # profundidade própria do adereço (a vista frontal não separa frente/trás)
-    bones.append((wp['name'], wp['parent'], w(wp['a'], yb + dy), w(wp['b'], yb + dy), wp['r']))
+    bones.append((wp['name'], wp['parent'], w(wp['a'], yb + wp.get('ay', dy)), w(wp['b'], yb + wp.get('by', dy)), wp['r']))  # ay/by: profundidade de cada ponta (ex.: espada que aponta para a frente)
 
 arm_data = bpy.data.armatures.new('Rig'); arm = bpy.data.objects.new('Rig', arm_data)
 sc.collection.objects.link(arm); bpy.context.view_layer.objects.active = arm
@@ -104,12 +104,17 @@ for _ in range(spec.get('smooth', 3)):
     Wu = 0.5 * Wu + 0.5 * Sn / deg
 Wt = Wu[inv]
 # adereços rígidos (espada, escudo, cajado...): vértices dentro da cápsula e mais perto dela que de qualquer osso do corpo ficam 100% no adereço
+yb_ = spec.get('depth', 0.0)
 wnames = {wp['name'] for wp in spec.get('weapons', [])}
 body_idx = [i for i, b in enumerate(bones) if b[0] not in wnames]
 body_raw = RAW[:, body_idx].min(1)
 for i, (name, parent, hd, tl, r) in enumerate(bones):
     if name in wnames:
-        inside = (RAW[:, i] < r / S) & (RAW[:, i] < body_raw * 0.8)
+        wp = next(w_ for w_ in spec['weapons'] if w_['name'] == name)
+        inside = RAW[:, i] < r / S
+        if not wp.get('rigid'): inside &= RAW[:, i] < body_raw * 0.8   # rigid: tudo dentro da cápsula é 100% do adereço (sem 'mole')
+        if 'ymax' in wp: inside &= co[:, 1] <= yb_ + wp['ymax']          # corte por profundidade (ex.: escudo só a parte à frente do peito)
+        if 'ymin' in wp: inside &= co[:, 1] >= yb_ + wp['ymin']
         Wt[inside] = 0; Wt[inside, i] = 1.0
 keep = np.argsort(-Wt, axis=1)[:, :4]
 mask = np.zeros_like(Wt, dtype=bool); np.put_along_axis(mask, keep, True, axis=1)
@@ -153,6 +158,7 @@ def pose(rot=None, hipz=0.0, hipy=0.0):
 WS = spec.get('weapon_side', 'R')        # lado do braço da arma principal
 OS = 'L' if WS == 'R' else 'R'
 STYLE = spec.get('style', 'slash')
+AMP = spec.get('arm_amp', 1.0)           # < 1 em personagens de manga larga/vestido: o pano acompanha o braço e 'balança' estranho
 LEG = spec.get('leg_swing', 1.0)         # 0.4 para personagens de manto/vestido (evita deformar a roupa)
 FPS = {'idle': 6, 'walk': 8, 'attack': 6, 'skill': 8, 'hit': 3, 'dash': 4}
 
@@ -166,7 +172,7 @@ def walk(f, n):
     rot = {'hips': [(AX, 0.08), (AZ, 0.08 * s)], 'spine': [(AZ, -0.08 * s)],
            'thigh.R': [(AX, -0.7 * LEG * s)], 'thigh.L': [(AX, 0.7 * LEG * s)],
            'shin.R': [(AX, 0.8 * LEG * max(0, c))], 'shin.L': [(AX, 0.8 * LEG * max(0, -c))],
-           'upper_arm.R': [(AX, 0.5 * s)], 'upper_arm.L': [(AX, -0.5 * s)], 'head': [(AX, -0.05)]}
+           'upper_arm.R': [(AX, 0.5 * AMP * s)], 'upper_arm.L': [(AX, -0.5 * AMP * s)], 'head': [(AX, -0.05)]}
     return dict(rot=rot, hipz=0.035 * abs(s))
 
 def swing(arr, f): return arr[f]
@@ -194,7 +200,7 @@ def attack(f, n, big=False):
         fa = [-0.2, -0.5, -0.7, -0.4, -0.3, -0.2]
         lean = [0, -0.08, -0.12, 0.12, 0.05, 0]; twist = [0, 0, 0, 0, 0, 0]
         o = [-0.2, -0.9, -1.3, -1.1, -0.6, -0.2]
-    rot = {W: [(AX, a[f] * k)], 'fore_arm.' + WS: [(AX, fa[f])], O: [(AX, o[f])],
+    rot = {W: [(AX, a[f] * k)], 'fore_arm.' + WS: [(AX, fa[f])], O: [(AX, o[f] * AMP)],
            'hips': [(AX, lean[f] * k), (AZ, twist[f] * k)], 'spine': [(AZ, twist[f] * 0.5)]}
     return dict(rot=rot, hipz=0.01 * f / n if f < 4 else 0.0)
 

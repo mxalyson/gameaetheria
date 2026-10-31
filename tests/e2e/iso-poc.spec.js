@@ -313,3 +313,20 @@ test('paladino: ataque básico é corpo a corpo e causa dano real a um monstro �
   expect(r.proj).toBe(0); // corpo a corpo: nada de projétil do jogador
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+// Skill 3 do Paladino (Grito de Guerra, buff real: +35% dano e -25% dano recebido por 6 s): efeito claro, nome no ar, tooltip e indicador de buff.
+test('paladino: Grito de Guerra mostra efeito próprio, tooltip com a descrição real e o buff ativo no HUD', async ({ page }) => {
+  const meta = new URL('../../public/labs/iso-poc/art-local/atlas-rig/paladino/paladino.json', import.meta.url);
+  test.skip(!fs.existsSync(meta), 'atlas não gerado (art-local/ fora do Git)');
+  const errors = await open(page, '?hero=paladino&mobs=0');
+  await clearArea(page);
+  const tip = await page.getAttribute('#sl-s2', 'title');
+  expect(tip).toContain('Grito de Guerra');
+  expect(tip).toContain('+35% de dano');
+  await page.evaluate(() => window.poc.startAction('skill', 2));
+  await page.waitForFunction(() => window.poc.vfx.some((v) => v.kind === 'shout' && v.label === 'Grito de Guerra'), null, { timeout: 8000, polling: 'raf' });
+  await page.waitForFunction(() => window.poc.player.buffs.some((b) => b.id === 'warcry'), null, { timeout: 8000 });
+  await page.waitForFunction(() => document.getElementById('hud-buffs').textContent.includes('Grito de Guerra'), null, { timeout: 8000 });
+  await page.waitForFunction(() => window.poc.vfx.some((v) => v.kind === 'aura' && v.persist), null, { timeout: 8000 }); // aura contínua enquanto o buff dura
+  expect(errors, errors.join('\n')).toEqual([]);
+});

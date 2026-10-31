@@ -29,6 +29,8 @@
     #hud-hero { position: fixed; left: 50%; top: 34px; transform: translateX(-50%); padding: 6px 10px; font: 700 12px/1.2 system-ui; display: flex; gap: 8px; align-items: center; }
     #hud-hero select { font: inherit; background: #1b2636; color: var(--text); border: 1px solid #3a4a63; border-radius: 6px; padding: 3px 6px; }
     #credits { position: fixed; right: 10px; bottom: 6px; font: 600 11px/1.3 system-ui; color: #c9d3e6; opacity: .75; text-align: right; pointer-events: none; }
+    #hud-buffs { position: fixed; left: 16px; top: 78px; display: flex; flex-direction: column; gap: 4px; font: 700 12px/1.2 system-ui; color: #fff; }
+    #hud-buffs span { background: rgba(20,28,45,.8); border: 1px solid #5a6a8c; border-radius: 6px; padding: 3px 8px; }
     #tag { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); font: 800 12px/1 system-ui; letter-spacing: .12em; color: #ffd98a; opacity: .8; pointer-events: none; }
   </style>
 </head>
@@ -37,6 +39,7 @@
   <canvas id="view"></canvas>
   <div id="tag">LABORATÓRIO · PoC ISOMÉTRICO · NÃO FAZ PARTE DO JOGO</div>
   <div id="hud-hp" class="panel"><div class="name"><span id="hp-name">Aren · Mago Nv 8</span><span>simulação real</span></div><div class="bar"><i id="hp-fill"></i><span id="hp-text"></span></div></div>
+  <div id="hud-buffs"></div>
   <div id="hud-skills" class="panel"></div>
   <div id="hud-stats" class="panel"></div>
   <div id="hud-help" class="panel"><b>WASD</b> mover (relativo à tela) · <b>mouse</b> mira · <b>clique</b> ataque · <b>1 2 3</b> <span id="help-skills">Bola de Fogo / Nova de Gelo / Teleporte</span> · <b>roda</b> ou <b>+ −</b> zoom · <b>T</b> alterna 2:1 / 30°</div>

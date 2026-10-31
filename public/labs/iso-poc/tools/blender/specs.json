@@ -9,8 +9,8 @@
       "hipj_R": [370, 610], "hipj_L": [450, 610], "kn_R": [350, 675], "kn_L": [470, 675], "an_R": [340, 715], "an_L": [465, 715]
     },
     "weapons": [
-      {"name": "sword", "parent": "hand.R", "a": [240, 580], "b": [410, 655], "r": 48},
-      {"name": "shield", "parent": "hand.L", "a": [525, 560], "b": [525, 572], "r": 125}
+      {"name": "sword", "parent": "hand.R", "a": [240, 580], "b": [405, 650], "ay": -0.06, "by": -0.55, "r": 40, "rigid": true},
+      {"name": "shield", "parent": "hand.L", "a": [525, 560], "b": [525, 572], "dy": -0.07, "r": 125, "ymax": -0.02, "rigid": true}
     ]
   },
   "aprendiz": {
@@ -41,8 +41,8 @@
     ]
   },
   "sacerdote": {
-    "style": "pray", "weapon_side": "L", "leg_swing": 0.4, "cut": 0.04,
-    "r": {"hips": 100, "spine": 105, "head": 165, "arm": 42, "hand": 38, "leg": 40, "foot": 45},
+    "style": "pray", "weapon_side": "L", "leg_swing": 0.4, "arm_amp": 0.45, "smooth": 6, "cut": 0.04,
+    "r": {"hips": 100, "spine": 120, "head": 165, "arm": 34, "hand": 38, "leg": 40, "foot": 45},
     "points": {
       "hip": [395, 590], "neck": [395, 435], "chin": [395, 405], "top": [400, 70],
       "sh_R": [345, 470], "el_R": [300, 540], "wr_R": [265, 575],
@@ -50,11 +50,11 @@
       "hipj_R": [375, 600], "hipj_L": [420, 600], "kn_R": [370, 665], "kn_L": [425, 665], "an_R": [378, 702], "an_L": [420, 702]
     },
     "weapons": [
-      {"name": "staff", "parent": "hand.L", "a": [492, 700], "b": [585, 300], "r": 55, "dy": -0.22},
-      {"name": "braid.R", "parent": "head", "a": [330, 430], "b": [250, 610], "r": 45, "dy": -0.05},
-      {"name": "braid.L", "parent": "head", "a": [470, 430], "b": [550, 610], "r": 45, "dy": -0.05},
-      {"name": "ribbon.R", "parent": "head", "a": [290, 340], "b": [235, 395], "r": 55, "dy": -0.08},
-      {"name": "ribbon.L", "parent": "head", "a": [515, 380], "b": [620, 505], "r": 65, "dy": -0.08}
+      {"name": "staff", "parent": "hand.L", "a": [492, 700], "b": [585, 300], "r": 60, "dy": -0.26, "rigid": true},
+      {"name": "braid.R", "parent": "head", "a": [330, 430], "b": [250, 610], "r": 45, "dy": 0.12, "rigid": true},
+      {"name": "braid.L", "parent": "head", "a": [470, 430], "b": [550, 610], "r": 45, "dy": 0.12, "rigid": true},
+      {"name": "ribbon.R", "parent": "head", "a": [290, 340], "b": [235, 395], "r": 60, "dy": 0.3, "rigid": true},
+      {"name": "ribbon.L", "parent": "head", "a": [515, 380], "b": [620, 505], "r": 70, "dy": 0.3, "rigid": true}
     ]
   }
 }

@@ -13,20 +13,20 @@ export const KIND_BY_STYLE = { slash: 'swing', shoot: 'muzzle', cast: 'cast', pr
 // Efeito de cada ação do herói: [ataque básico, skill 1, skill 2, skill 3]. As skills são as REAIS da classe do jogo (data/classes.js):
 // Paladino = Guerreiro, Aprendiz = Mago, Franco-atirador = Arqueiro, Sacerdote = Clérigo.
 export const HERO_ACTIONS = {
-  paladino: ['swing', 'nova', 'dash', 'aura'],      // Golpe Giratório, Investida, Grito de Guerra
+  paladino: ['swing', 'nova', 'dash', 'shout'],     // Golpe Giratório, Investida, Grito de Guerra (buff: +35% dano, -25% dano recebido, 6 s)
   aprendiz: ['cast', 'cast', 'nova', 'blink'],      // Bola de Fogo, Nova de Gelo, Teleporte
   franco: ['muzzle', 'rain', 'muzzle', 'dash'],     // Chuva de Flechas, Tiro Perfurante, Rolamento
   sacerdote: ['swing', 'pray', 'aura', 'cast'],     // Luz Sagrada, Escudo Divino, Julgamento
 };
-const LIFE = { swing: 0.3, muzzle: 0.18, cast: 0.5, pray: 0.8, impact: 0.34, nova: 0.6, dash: 0.38, aura: 0.95, blink: 0.55, rain: 2.2 };
+const LIFE = { swing: 0.3, muzzle: 0.18, cast: 0.5, pray: 0.8, impact: 0.34, nova: 0.6, shout: 0.75, dash: 0.38, aura: 0.95, blink: 0.55, rain: 2.2 };
 const MAX = 48;
 
 // `o`: { x, y, z?, ang (rad, mundo), big?, color, core, r? (raio em unid. do mundo: nova/chuva), len? (dash/blink), life? }. `rnd` injetável para teste.
 export function spawnVfx(list, kind, o, rnd = Math.random) {
   if (list.length >= MAX) list.shift();
   const big = o.big ? 1.35 : 1;
-  const v = { kind, t: 0, life: o.life ?? (LIFE[kind] ?? 0.3) * (kind === 'pray' || kind === 'swing' ? big : 1), x: o.x, y: o.y, z: o.z ?? 34, ang: o.ang ?? 0, big, color: o.color, core: o.core, r: o.r ?? 100, len: o.len ?? 200, parts: [] };
-  const n = { cast: 11, pray: 12, impact: 9, muzzle: 7, swing: 0, nova: 14, aura: 8, blink: 10, rain: 18, dash: 0 }[kind] ?? 0;
+  const v = { kind, t: 0, life: o.life ?? (LIFE[kind] ?? 0.3) * (kind === 'pray' || kind === 'swing' ? big : 1), x: o.x, y: o.y, z: o.z ?? 34, ang: o.ang ?? 0, big, color: o.color, core: o.core, r: o.r ?? 100, len: o.len ?? 200, label: o.label, parts: [] };
+  const n = { cast: 11, pray: 12, impact: 9, muzzle: 7, swing: 0, nova: 14, shout: 8, aura: 8, blink: 10, rain: 18, dash: 0 }[kind] ?? 0;
   for (let i = 0; i < n; i++) v.parts.push({ a: kind === 'muzzle' ? (rnd() - 0.5) * 1.6 : rnd() * TAU, s: 0.4 + rnd() * 0.9, d: rnd() });
   list.push(v);
   return v;
@@ -127,6 +127,14 @@ export function drawVfx(c, list) {
         g.beginPath(); g.moveTo(bx + dx * s0 * z * 0.9, by + dy * s0 * z * 0.9 - 8 * z); g.lineTo(bx + dx * s1 * z * 0.9, by + dy * s1 * z * 0.9 - 8 * z); g.stroke();
       }
       g.globalAlpha = 1;
+    } else if (v.kind === 'shout') {
+      // grito: ondas sonoras que se abrem a partir da cabeça + clarão e raios; o buff fica no indicador do HUD e na aura contínua
+      const f = 1 - k, hx = ax, hy = ay - 26 * z;
+      glow(v.color, hx, hy, (60 + 80 * ease(k)) * z, 0.8 * f);
+      g.lineCap = 'round';
+      for (let w = 0; w < 3; w++) { const kk = Math.max(0, k - w * 0.14); if (kk <= 0) continue; const r = (16 + 80 * ease(kk)) * z; g.globalAlpha = (1 - kk) * 0.85; g.lineWidth = (4 - w) * z; g.strokeStyle = w ? v.color : v.core; g.beginPath(); g.ellipse(hx, hy, r, r * 0.62, 0, 0, TAU); g.stroke(); }
+      for (const p of v.parts) { const q = ease(k), a = p.a, r0 = 26 * z, r1 = (40 + 60 * p.s) * z * q + r0; g.globalAlpha = f; g.strokeStyle = p.d > 0.5 ? v.core : v.color; g.lineWidth = 2.4 * z; g.beginPath(); g.moveTo(hx + Math.cos(a) * r0, hy + Math.sin(a) * r0 * 0.7); g.lineTo(hx + Math.cos(a) * r1, hy + Math.sin(a) * r1 * 0.7); g.stroke(); }
+      g.globalAlpha = 1;
     } else if (v.kind === 'dash') {
       const f = 1 - k, e = iso.toScreen(v.x + Math.cos(v.ang) * v.len * ease(Math.min(1, k * 2.2)), v.y + Math.sin(v.ang) * v.len * ease(Math.min(1, k * 2.2)), v.z), ex = e.x + ox, ey = e.y + oy;
       const gr = g.createLinearGradient(ax, ay, ex, ey); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, v.color);
@@ -168,4 +176,9 @@ export function drawVfx(c, list) {
     }
   }
   g.globalCompositeOperation = 'source-over';
+  for (const v of list) { // rótulo (nome da skill) acima da cabeça: sobe e esmaece
+    if (!v.label) continue;
+    const k = v.t / v.life, s = iso.toScreen(v.x, v.y, 96), x = s.x + ox, y = s.y + oy - 22 * z * ease(Math.min(1, k * 2));
+    g.save(); g.globalAlpha = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3; g.font = `800 ${Math.round(15 * z)}px Nunito, system-ui, sans-serif`; g.textAlign = 'center'; g.lineWidth = 4 * z; g.strokeStyle = 'rgba(20,20,40,0.9)'; g.strokeText(v.label, x, y); g.fillStyle = v.core; g.fillText(v.label, x, y); g.restore();
+  }
 }

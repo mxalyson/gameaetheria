@@ -20,6 +20,17 @@
 - Sugestão de caminho, em ordem: (a) **guia de identidade** de 1 página (paleta de 6–8 cores, silhueta/proporção dos personagens, forma dos ícones, tipografia local, tom dos textos, "regra do brilho dourado" que já aparece nos efeitos); (b) **UI própria** (molduras, ícones, fonte local) — não depende do isométrico; (c) personagens e monstros no mesmo estilo dos 4 heróis; (d) cenário (árvores, casas, chão) com a mesma linguagem; (e) só então decidir isométrico.
 - **Decisões suas:** nome/tema do mundo ("Ecos"?), referência de tom (fofo × sombrio), o que faz o jogo ser reconhecível em 1 screenshot.
 
+### 1.1 O novo visual entra no jogo só nos personagens, ou inteiro? (pergunta de 2026-10-31)
+Montagem real em `H:aetheria-extrasmedicoes-e-capturasmock-visual` (herói em miniatura por cima do bosque ATUAL): os personagens têm sombreado 3D, contorno e brilho; o mapa atual é vetorial chapado, pastel, sem sombra projetada nem textura. **Juntos, destoam** (parece um boneco colado num cenário de outro jogo).
+
+| Opção | Como fica | Custo | Risco |
+|---|---|---|---|
+| **A. Só os personagens** (no mapa atual) | Heróis bonitos, mapa, monstros, NPCs e UI antigos | Baixo: um carregador de atlas no `renderer.js` (já existe a lógica no laboratório) | Estilo misturado; só serve como **teste interno** |
+| **B. Visual inteiro, com isométrico** (o que o PoC mostra) | Personagens, monstros, NPCs, cenário, chão, UI e câmera no mesmo estilo | **Alto**: nova câmera/projeção, cenário e props com arte própria, monstros e NPCs na mesma linha de arte (Meshy → sprites), UI nova | Maior prazo; a simulação **não muda** (ela é só o plano x,y) |
+| **C. Visual inteiro, sem isométrico** | Mesma linguagem de arte aplicada ao top-down atual | Médio-alto: tudo de B menos a câmera | Perde a profundidade do isométrico; fica mais barato e mais seguro no celular |
+
+**Recomendação:** o destino é B (ou C), nunca A em produção. Ordem: (1) guia de identidade + UI própria; (2) monstros e NPCs no mesmo pipeline dos heróis; (3) cenário e chão; (4) só então a câmera (isométrico ou não). Os 4 heróis já estão prontos e servem de padrão de qualidade. Nada disso começa antes da sua aprovação (Fase 2 segue adiada).
+
 ## 2. Mapa e mundo
 1. Mapa-múndi ligando as zonas (portais com destino e nível recomendado) e **mais 2–3 zonas** com mecânica própria (ex.: costa/porto, caverna com luz limitada).
 2. **Pontos de interesse** (baús, altares, eventos) usando o gerador determinístico já existente (`layout.js`).

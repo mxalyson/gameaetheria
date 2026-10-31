@@ -65,3 +65,10 @@ test('vfx: cada herói tem efeito para o básico e as 3 skills da classe REAL do
   assert.equal(HERO_ACTIONS.franco[1], 'rain');     // Chuva de Flechas (ground_aoe)
   assert.equal(HERO_ACTIONS.franco[3], 'dash');     // Rolamento
 });
+
+test('vfx: o grito tem efeito próprio e o rótulo da skill acompanha o efeito', () => {
+  assert.equal(HERO_ACTIONS.paladino[3], 'shout');   // Grito de Guerra (buff) deixou de ser uma "aura" genérica
+  const v = spawnVfx([], 'shout', { x: 0, y: 0, color: '#f80', core: '#fff', label: 'Grito de Guerra' });
+  assert.equal(v.label, 'Grito de Guerra');
+  assert.equal(v.parts.length, 8);
+});

@@ -18,6 +18,8 @@ Atualizado em 2026-10-31. O jogo **real** não foi alterado pelo trabalho de art
   - Os heróis em miniatura só aparecem se a pasta `public/labs/iso-poc/art-local/` existir (ela não vai para o Git); nesta máquina ela existe.
 - Controles do laboratório: WASD, clique, 1-3, roda do mouse (zoom), **T** alterna 2:1 / 30°.
 - **Testar o Sacerdote:** escolha "Sacerdote — Clérigo" no seletor. Ele ataca com a maça (corpo a corpo); **1** Luz Sagrada (cura 22% e fere em volta — coluna de luz), **2** Escudo Divino (bolha), **3** Julgamento (raio que atordoa). Para ver a cura, deixe os slimes baterem nele antes (o dano aparece na barra de vida).
+- **Passe o mouse sobre cada habilidade** (barra de baixo): aparece o nome, o que ela faz de verdade e a recarga. Ao usar uma skill, o nome dela sobe sobre a cabeça do herói; buffs ativos (Grito de Guerra, Escudo Divino) aparecem como etiqueta com o tempo restante, abaixo da barra de vida.
+- Paladino (Guerreiro): **1** Golpe Giratório (onda ao redor), **2** Investida (avança até o cursor e atordoa), **3** Grito de Guerra (**buff**: +35% de dano e −25% de dano recebido por 6 s; não é um ataque — por isso não machuca ninguém).
 - Para ver a **morte** do herói: deixe-se matar por vários slimes (`?mobs=40` na URL acelera). Ele tomba, esmaece e renasce.
 
 ## O que está decidido e o que não está

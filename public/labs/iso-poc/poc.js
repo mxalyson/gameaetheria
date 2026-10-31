@@ -209,7 +209,7 @@ function spawnActionVfx(pk, aim) {
   const ang = Math.atan2(aim.y - player.y, aim.x - player.x);
   let x = player.x, y = player.y, len = sk?.dist ?? 200;
   if (kind === 'rain') { const d = Math.min(Math.hypot(aim.x - player.x, aim.y - player.y), sk.range); x = player.x + Math.cos(ang) * d; y = player.y + Math.sin(ang) * d; }
-  spawnVfx(vfx, kind, { x, y, ang, big: isSkill, color: sk?.color ?? f.color, core: f.core, r: sk?.radius ?? 100, len, life: kind === 'rain' ? sk.ticks * sk.interval + 0.5 : undefined });
+  spawnVfx(vfx, kind, { x, y, ang, big: isSkill, label: sk?.name, color: sk?.color ?? f.color, core: f.core, r: sk?.radius ?? 100, len, life: kind === 'rain' ? sk.ticks * sk.interval + 0.5 : undefined });
 }
 
 function gameLogic(dt) {
@@ -334,6 +334,9 @@ function render(dt, now) {
   // ---- sprites em pé, de trás para a frente ----
   if (!cfg.off.has('sprites')) for (const it of items) drawEntity(it);
   stats.sprites = items.length;
+  if (cfg.hero && !player.dead && player.buffs.length && !vfx.some((v) => v.persist)) { // buff ativo: aura contínua na cor da skill
+    const sk = SKILLS[player.buffs[0].id]; spawnVfx(vfx, 'aura', { x: player.x, y: player.y, color: sk?.color ?? '#ffffff', core: '#ffffff' }).persist = true;
+  }
   if (cfg.hero) { if (!poc.holdVfx) stepVfx(vfx, dt); drawVfx({ g, glow: glowSprite, sprite: drawSprite, iso, ox, oy, zoom: cfg.zoom }, vfx); }
 
   // ---- projéteis, partículas e textos (acima de tudo) ----
@@ -383,12 +386,14 @@ function render(dt, now) {
 
 // ---------- HUD (DOM) ----------
 function buildHud() {
-  SK = [{ id: 'basic', key: 'Clique', icon: cls.icon, name: 'Ataque' }, ...cls.skills.map((s, i) => ({ id: 's' + i, key: String(i + 1), icon: SKILLS[s].icon, name: SKILLS[s].name, cd: SKILLS[s].cd }))];
-  $('hud-skills').innerHTML = SK.map((s) => `<div class="slot" id="sl-${s.id}"><span class="ic">${s.icon}</span><span class="key">${s.key}</span><i class="cd"></i><b class="cdt"></b></div>`).join('');
+  SK = [{ id: 'basic', key: 'Clique', icon: cls.icon, name: 'Ataque' }, ...cls.skills.map((s, i) => ({ id: 's' + i, key: String(i + 1), icon: SKILLS[s].icon, name: SKILLS[s].name, cd: SKILLS[s].cd, desc: SKILLS[s].desc }))];
+  $('hud-skills').innerHTML = SK.map((s) => `<div class="slot" id="sl-${s.id}" title="${s.name}${s.desc ? ' — ' + s.desc : ''}${s.cd ? ' (recarga ' + s.cd + ' s)' : ''}"><span class="ic">${s.icon}</span><span class="key">${s.key}</span><i class="cd"></i><b class="cdt"></b></div>`).join('');
 }
 function updateHud() {
   const p = player;
   $('hp-fill').style.width = `${(100 * Math.max(0, p.hp)) / p.maxHp}%`;
+  // buffs ativos (Grito de Guerra, Escudo Divino...): nome, descrição real da skill e tempo restante
+  $('hud-buffs').innerHTML = p.buffs.map((b) => { const sk = SKILLS[b.id]; return sk ? `<span title="${sk.desc}">${sk.icon} ${sk.name} <b>${Math.ceil(b.t)}s</b></span>` : ''; }).join('');
   $('hp-text').textContent = `${Math.ceil(Math.max(0, p.hp))} / ${p.maxHp}`;
   const max = { basic: cls.basic.cd / p.stats.atkSpeed };
   cls.skills.forEach((s, i) => { max['s' + i] = SKILLS[s].cd; });
