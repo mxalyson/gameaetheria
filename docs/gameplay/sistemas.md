@@ -4,6 +4,7 @@ Controles: WASD move, mouse mira, clique ataca, 1/2/3 habilidades; I/C/P abrem i
 | Sistema | Onde | Estado |
 |---|---|---|
 | Classes e habilidades (3×3) | data/classes.js, data/skills.js | implementado e testado (cada skill/status em tests/combat.test.js); equilíbrio medido com npm run balance |
+| Especializações (nível 15, 2 por classe) | data/specs.js, core/specs.js | implementado e testado; ajustam habilidades existentes; 1ª escolha grátis |
 | Combate (melee, projétil, AoE, dash, buff, stun, slow, escudo) | game/sim.js | implementado e testado; passo fixo 60 Hz; eventos hit/heal/swing/status/cast/death; Clérigo cura/protege aliados próximos |
 | Mobs, chefes e IA | data/mobs.js, game/ai.js | implementado; não validado em jogo |
 | Loot, raridades, equipamento | core/loot.js, data/items.js | implementado e testado (unitário) |

@@ -14,7 +14,7 @@ export const CLASSES = {
   mage: {
     id: 'mage', name: 'Mago', icon: '🔮', color: '#6a7cf0', accent: '#d5dbff',
     desc: 'Magia arcana à distância. Frágil, mas devastador em área.',
-    primary: 'int', base: { str: 2, agi: 4, int: 10, vit: 6 }, growth: { str: 0, agi: 1, int: 2.6, vit: 1.9 },
+    primary: 'int', base: { str: 2, agi: 4, int: 10, vit: 6 }, growth: { str: 0, agi: 1, int: 2.65, vit: 1.9 },
     hpBase: 110, weapon: 'staff',
     basic: { kind: 'projectile', speed: 480, range: 520, cd: 0.7, mult: 1.0, color: '#a9b8ff', radius: 7 },
     skills: ['fireball', 'frostnova', 'blink'],

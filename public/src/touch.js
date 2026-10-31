@@ -2,6 +2,7 @@
 // Mira automática no inimigo mais próximo; arrastar um botão de skill mira na mão. Usa Pointer Events (multi-toque).
 import { CLASSES } from './data/classes.js';
 import { SKILLS } from './data/skills.js';
+import { skillOf } from './core/specs.js';
 import { stickVector, pickAim, aimModeFor, dragAim } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
@@ -146,7 +147,7 @@ export class TouchControls {
     const q = this.castQueue.shift();
     let cast = null, aim;
     if (q) {
-      const skill = SKILLS[CLASSES[player.classId].skills[q.i]];
+      const skill = skillOf(player.classId, player.spec, CLASSES[player.classId].skills[q.i]);
       cast = q.i;
       aim = pickAim({ player, enemies, move: this.move, override: q.aim, mode: aimModeFor(skill), reach: skill.dist ?? 260 });
     } else aim = pickAim({ player, enemies, move: this.move });
@@ -165,7 +166,7 @@ export class TouchControls {
       const t = el.querySelector('.cdt');
       if (t) t.textContent = text && cd > 0 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
     };
-    cls.skills.forEach((s, i) => setCd(this.root.querySelector(`.sk${i}`), cdOf[i], SKILLS[s].cd, true));
+    cls.skills.forEach((s, i) => setCd(this.root.querySelector(`.sk${i}`), cdOf[i], skillOf(p.classId, p.spec, s).cd, true));
     setCd(this.root.querySelector('.atk'), p.cds.basic, cls.basic.cd / p.stats.atkSpeed, false);
     const pot = this.root.querySelector('.pot');
     setCd(pot, game.potionCd, 8, false);

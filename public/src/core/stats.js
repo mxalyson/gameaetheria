@@ -15,7 +15,8 @@ export function primaryStats(char) {
   const cls = CLASSES[char.classId];
   const g = gearTotals(char.equipment);
   const out = {};
-  for (const k of STAT_KEYS) out[k] = cls.base[k] + cls.growth[k] * (char.level - 1) + (char.alloc?.[k] ?? 0) + (g[k] ?? 0);
+  // 1 casa decimal: o crescimento por nível é fracionário e a soma em ponto flutuante aparecia como 48.1999999 na tela
+  for (const k of STAT_KEYS) out[k] = Math.round((cls.base[k] + cls.growth[k] * (char.level - 1) + (char.alloc?.[k] ?? 0) + (g[k] ?? 0)) * 10) / 10;
   return out;
 }
 

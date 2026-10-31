@@ -6,12 +6,13 @@ import { SLOTS } from '../data/items.js';
 import { generateItem, rollRarity } from './loot.js';
 import { newCharacter, createSpirit, POINTS_PER_LEVEL } from './progression.js';
 import { makeRng } from './rng.js';
+import { specsOf, SPEC_LEVEL } from './specs.js';
 import { playerPower } from './power.js';
 
 const NAMES = ['Kael', 'Lyra', 'Thorne', 'Mira', 'Bastian', 'Selene', 'Orin', 'Vex', 'Nara', 'Darius', 'Ilya', 'Rook', 'Sora', 'Elara', 'Fenn', 'Isolde', 'Tarek', 'Yara'];
 const TITLES = ['o Errante', 'a Veloz', 'o Firme', 'a Sombria', 'o Radiante', 'a Astuta', 'o Bravo', 'a Serena'];
 
-export function generateRival(rng, player, { classId: forced, rating: forcedRating, strength = 1 } = {}) {
+export function generateRival(rng, player, { classId: forced, rating: forcedRating, strength = 1, spec: forcedSpec } = {}) {
   const classId = forced ?? rng.pick(Object.keys(CLASSES));
   const level = Math.max(1, Math.min(30, player.level + rng.int(-1, 1)));
   const rating = Math.max(800, (forcedRating ?? player.arena.rating) + rng.int(-90, 90));
@@ -33,6 +34,7 @@ export function generateRival(rng, player, { classId: forced, rating: forcedRati
   }
   char.spirits = [createSpirit(rng, { level: Math.max(1, gearLevel - rng.int(0, 3)), luck })];
   char.activeSpirit = char.spirits[0].id;
+  if (level >= SPEC_LEVEL) { const ids = Object.keys(specsOf(classId)); char.spec = forcedSpec ?? ids[rng.int(0, ids.length - 1)]; }
   char.arena.rating = rating;
   return char;
 }

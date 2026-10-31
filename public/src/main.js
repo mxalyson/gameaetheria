@@ -12,6 +12,7 @@ import { generateRivalForPower } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
 import { MODES, newMatch, controlTick, matchWinner, getRating, setRating, spawnSlots } from './core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from './core/power.js';
+import { chooseSpec, specInfo, activeSpec } from './core/specs.js';
 import { loadChar, saveChar } from './save.js';
 import { PRICES } from './shop.js';
 import { TouchControls } from './touch.js';
@@ -97,6 +98,7 @@ class Game {
       case 'item': this.ui.isOpen('shop') ? this.sell(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
       case 'alloc': this.alloc(arg); break;
+      case 'spec': this.pickSpec(arg); break;
       case 'sort-inv': this.sortInventory(); break;
       case 'pref': this.setPref(arg); break;
       case 'fullscreen': this.toggleFullscreen(); break;
@@ -463,6 +465,16 @@ class Game {
   sortInventory() {
     this.char.inventory.sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || itemScore(b) - itemScore(a));
     this.ui.render();
+  }
+
+  pickSpec(id) {
+    if (this.mode === 'pvp') return this.ui.log('Não dá para trocar de especialização durante uma partida.', '#ffb4a8');
+    const r = chooseSpec(this.char, id);
+    if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
+    this.player.spec = activeSpec(this.char);
+    this.ui.toast('Especialização', specInfo(this.char.classId, id).name + (r.cost ? ` · -${r.cost} 🪙` : ''), 'gold');
+    this.ui.render();
+    this.save();
   }
 
   alloc(stat) {

@@ -1,5 +1,6 @@
 import { CLASSES, STAT_KEYS, STAT_NAMES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
+import { skillOf, specsOf, specInfo, activeSpec, respecCost, SPEC_LEVEL } from '../core/specs.js';
 import { SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
 import { computeStats, canEquip, itemScore } from '../core/stats.js';
@@ -157,7 +158,7 @@ export class UI {
 
     const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, potion: game.potionCd, hearth: 0 };
     const maxOf = { basic: CLASSES[char.classId].basic.cd / player.stats.atkSpeed, potion: 8, hearth: 1 };
-    CLASSES[char.classId].skills.forEach((s, i) => { maxOf['s' + i] = SKILLS[s].cd; });
+    CLASSES[char.classId].skills.forEach((s, i) => { maxOf['s' + i] = skillOf(char.classId, activeSpec(char), s).cd; });
     for (const id of Object.keys(cdOf)) {
       const cd = cdOf[id];
       const pct = cd > 0 ? Math.min(1, cd / maxOf[id]) : 0;
@@ -286,7 +287,20 @@ export class UI {
       <div class="equip-grid">${equip}</div>
       <h3>Atributos ${char.statPoints ? `<span class="pts">${char.statPoints} pontos livres</span>` : ''}</h3>
       ${stats}
+      ${this.specBlock(char)}
       <h3>Combate</h3><div class="kv-grid">${d}</div>`);
+  }
+
+  // Especialização (nível 15): duas por classe; a primeira escolha é grátis, trocar custa ouro.
+  specBlock(char) {
+    const list = specsOf(char.classId);
+    if (char.level < SPEC_LEVEL) return `<h3>Especialização</h3><p class="hint">🔒 Libera no nível ${SPEC_LEVEL} (você está no ${char.level}): duas escolhas que ajustam suas habilidades.</p>`;
+    const cost = respecCost(char);
+    const cards = Object.entries(list).map(([id, sp]) => `
+      <div class="shop-item ${char.spec === id ? 'sel' : ''}"><div class="cell r-epic"><span class="ic">${sp.icon}</span></div>
+        <div><div class="nm">${sp.name}${char.spec === id ? ' ✔' : ''}</div><div class="sub">${sp.desc}</div></div>
+        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}">${cost ? '🪙 ' + cost : 'Escolher'}</button>`}</div>`).join('');
+    return `<h3>Especialização ${char.spec ? `<span class="pts">${specInfo(char.classId, char.spec).name}</span>` : '<span class="pts">escolha uma</span>'}</h3>${cards}`;
   }
 
   panel_spirits() {
@@ -408,7 +422,7 @@ export class UI {
         return `<div class="tt-name">Ataque básico</div><div class="tt-sub">Botão esquerdo · segure para atacar</div>
           <div>${b.kind === 'melee' ? 'Golpe corpo a corpo em arco' : 'Projétil à distância'} · ${Math.round(b.mult * 100)}% do poder</div>`;
       }
-      const s = SKILLS[arg];
+      const s = skillOf(char.classId, activeSpec(char), arg);
       return `<div class="tt-name">${s.icon} ${s.name}</div><div class="tt-sub">Recarga ${s.cd}s</div><div>${s.desc}</div>
         ${s.mult ? `<div class="tt-stat">${Math.round(s.mult * 100)}% do poder${s.ticks ? ` × ${s.ticks}` : ''}</div>` : ''}`;
     }

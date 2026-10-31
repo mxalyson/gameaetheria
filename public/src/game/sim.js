@@ -7,6 +7,7 @@ import { computeStats } from '../core/stats.js';
 import { spiritPower } from '../core/progression.js';
 import { CLASSES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
+import { skillOf, activeSpec } from '../core/specs.js';
 import { MOBS } from '../data/mobs.js';
 import { ZONES } from '../data/zones.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -35,7 +36,7 @@ function baseActor(extra) {
 export function makeHeroActor(char, x, y, kind = 'player', team = 1) {
   const st = computeStats(char);
   return baseActor({
-    kind, team, name: char.name, classId: char.classId, level: char.level, x, y, r: 15,
+    kind, team, name: char.name, classId: char.classId, level: char.level, spec: activeSpec(char), x, y, r: 15,
     stats: st, hp: st.maxHp, maxHp: st.maxHp, cds: { basic: 0, s0: 0, s1: 0, s2: 0 },
   });
 }
@@ -285,7 +286,7 @@ export class World {
     const key = 's' + idx;
     if (a.cds[key] > 0 || a.dash) return false;
     const id = CLASSES[a.classId].skills[idx];
-    const s = SKILLS[id];
+    const s = skillOf(a.classId, a.spec, id); // com os ajustes da especialização
     a.cds[key] = s.cd;
     a.swing = 0.3;
     a.lastCombat = this.time;

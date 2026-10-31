@@ -1,6 +1,7 @@
 // IA produz as mesmas "intenções" que o input do jogador.
 import { CLASSES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
+import { skillOf } from '../core/specs.js';
 import { MOBS } from '../data/mobs.js';
 
 const toward = (a, x, y, spd = 1) => ({ mx: x - a.x, my: y - a.y, aimX: x, aimY: y, spd });
@@ -120,7 +121,7 @@ function chooseSkill(r, tgt, d, w) {
   const ids = CLASSES[r.classId].skills;
   for (let i = 0; i < ids.length; i++) {
     if (r.cds['s' + i] > 0) continue;
-    const s = SKILLS[ids[i]];
+    const s = skillOf(r.classId, r.spec, ids[i]);
     switch (s.kind) {
       case 'aoe_self':
         if (s.heal ? r.hp < r.maxHp * 0.6 || d < s.radius * 0.8 || w.alliesOf(r, s.radius).some((al) => al.hp < al.maxHp * 0.5) : d < s.radius * 0.9) return { idx: i };
