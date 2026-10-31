@@ -3,13 +3,28 @@
 // Usa os atlas prontos (PNG + JSON, 8 direções, esqueleto): public/labs/iso-poc/art-local/atlas-rig/<herói>/ — mesmo formato do laboratório.
 // Só desenho: lê o estado do ator (parado/andando/golpe/skill/dano/morte/dash) e não altera a simulação.
 import { deathPose } from './hero-death.js';
+import { loadPrefs, resolveQuality } from '../prefs.js';
 
 const KEY = 'aetheria_visual';
 const CLASS_TO_HERO = { warrior: 'paladino', mage: 'aprendiz', archer: 'franco', cleric: 'sacerdote' };
 const BASE = new URL('../../labs/iso-poc/art-local/atlas-rig/', import.meta.url).href;
 export const SIZE = 0.9;             // escala do quadro (128 lógico): ≈ 80 px de altura no jogo (o herói antigo tinha ~48)
 const FEET_Y = 12;                    // os pés do herói antigo ficam em a.y + 12
-export const stats = { drawn: 0, loaded: 0 };
+export const stats = { drawn: 0, loaded: 0, texBytes: 0, texScale: 1 };
+
+// Escala das texturas (memória de GPU): cada herói tem ≈ 20–24 MiB decodificados em resolução cheia (4 classes ≈ 87 MiB).
+// Qualidade alta = 1; média (padrão em celular) = 0,75; baixa = 0,5. Aparelhos com pouca memória (deviceMemory ≤ 4 GB) nunca passam de 0,75 (≤ 2 GB: 0,5).
+// O desenho usa proporções da própria folha (largura ÷ quadros), então folhas reduzidas funcionam sem mudar o resto. ?texscale=0.5 força um valor.
+export function textureScale() {
+  let q = 'high';
+  try { q = resolveQuality(loadPrefs(), matchMedia('(pointer: coarse)').matches); } catch { /* sem prefs: alta */ }
+  let k = q === 'low' ? 0.5 : q === 'medium' ? 0.75 : 1;
+  const mem = typeof navigator !== 'undefined' ? navigator.deviceMemory : undefined;
+  if (mem && mem <= 2) k = Math.min(k, 0.5); else if (mem && mem <= 4) k = Math.min(k, 0.75);
+  const force = Number(new URLSearchParams(location.search).get('texscale'));
+  if (force >= 0.25 && force <= 1) k = force;
+  return k;
+}
 
 let enabled = null;
 export function heroSpritesEnabled() {
@@ -32,7 +47,11 @@ function load(id) {
       const meta = await (await fetch(`${BASE}${id}/${id}.json`)).json();
       for (const name of Object.keys(meta.clips)) {
         const img = new Image(); img.src = `${BASE}${id}/${name}.png`; await img.decode();
-        at.sheets[name] = img;
+        const k = (stats.texScale = textureScale());
+        // reduz ao carregar: a imagem cheia é liberada e só a reduzida fica na memória de GPU
+        const sheet = k < 1 ? await createImageBitmap(img, { resizeWidth: Math.round(img.naturalWidth * k), resizeHeight: Math.round(img.naturalHeight * k), resizeQuality: 'medium' }) : img;
+        stats.texBytes += sheet.width * sheet.height * 4;
+        at.sheets[name] = sheet;
       }
       at.meta = meta; at.state = 'ready'; stats.loaded++;
     } catch (e) { at.state = 'error'; console.warn('herói em miniatura indisponível:', id, e.message); }

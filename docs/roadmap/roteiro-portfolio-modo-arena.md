@@ -155,3 +155,6 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 
 ### 10.12 P9 — otimização, segurança e carga (2026-10-31)
 - Snapshots por delta (−82% de banda), alocações reduzidas, teste de carga com clientes reais, limites de conexão, auditoria de abuso, fuzz e varredura de segredos. **196 unitários e 72 e2e.** Medições e limites: decisão 0013.
+
+### 10.13 P10 — Android (PWA) e infraestrutura (2026-10-31)
+- PWA instalável e offline, texturas adaptativas, rotas de saúde/métricas, logs JSON, desligamento limpo e restauração de backup. **200 unitários e 77 e2e.** Sem validação em aparelho real nem Docker: ver decisão 0014.

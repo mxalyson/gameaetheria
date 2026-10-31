@@ -1,0 +1,16 @@
+# Exemplo (NÃO TESTADO: Docker ausente nesta máquina). Coloque um proxy com TLS (Caddy/nginx) na frente: ele publica https:// e wss:// e repassa
+# /api/* para a porta 5176 e o WebSocket para a 5175. Defina as variáveis num arquivo .env que NÃO vai ao Git.
+services:
+  aetheria:
+    build: .
+    restart: unless-stopped
+    ports: ["127.0.0.1:5175:5175", "127.0.0.1:5176:5176"]
+    environment:
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?defina a origem do site, ex.: https://jogo.exemplo.com}
+      GAME_URL: ${GAME_URL:?defina a URL pública wss://…}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      TRUST_PROXY: "1"
+    volumes: ["aetheria-data:/data"]
+volumes:
+  aetheria-data:

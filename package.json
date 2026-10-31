@@ -13,10 +13,13 @@
     "server:poc": "node server/start-poc.js",
     "server": "node server/start.js",
     "db:backup": "node tools/db-backup.mjs",
+    "db:restore": "node tools/db-restore.mjs",
     "bench:net": "node tools/net-bench.mjs",
     "economy": "node tools/economy.mjs",
     "load": "node tools/load-test.mjs",
-    "security:scan": "node tools/security-scan.mjs"
+    "security:scan": "node tools/security-scan.mjs",
+    "texture:budget": "node tools/texture-budget.mjs",
+    "icons": "node tools/make-icons.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"

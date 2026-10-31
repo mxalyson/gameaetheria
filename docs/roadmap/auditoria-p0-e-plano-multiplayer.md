@@ -303,3 +303,10 @@ P0 Auditoria ──▶ P1 Classes+combate estável ──┬──▶ P3 Save ve
 - **Testes executados:** 196 unitários (17 novos: snapshots e segurança) e 72 e2e (71 passaram e 1 oscilante de laboratório que passa sozinho).
 - **Defeitos encontrados na própria fase:** (1) conexão derrubada por abuso continuava sendo processada e gerava **uma linha de auditoria por mensagem** (spam de log) — corrigido; (2) no teste, o limite de listagem da auditoria escondia registros — consequência do item anterior.
 - **Não feito:** Canvas 2D × PixiJS (decisão 0001 mantida), medição em celular real, perfil de CPU em carga longa, TLS/WSS, teste de rede com perda/latência.
+
+---
+## Atualização — P10 concluída (2026-10-31): Android (PWA) e infraestrutura
+- **Feito e testado (navegador desktop/Node):** ícones PNG + manifesto, service worker com jogo offline, memória de textura adaptativa (4 heróis: 86,8 → 48,8 → 21,7 MiB; média por padrão em celular), custo de desenho medido (≈ 9–11 ms a 844×390 em CPU), `/healthz` `/readyz` `/metrics`, logs JSON, validação de ambiente, desligamento limpo com aviso aos clientes, restauração de backup com salvaguardas.
+- **Testes executados:** 200 unitários (4 novos) e 77 e2e (76 passaram; 1 oscilante de laboratório que passa sozinho).
+- **Não validado:** empacotamento Android (sem SDK/Java/adb), **qualquer medição em celular real**, Docker (ausente), TLS/WSS, publicação do servidor. O orçamento de 64 MiB de textura é suposição. Detalhes: `docs/roadmap/android.md`, `docs/architecture/infra.md`, decisão 0014.
+- **Ainda pendente do plano geral:** prova de conceito Canvas × PixiJS, fases de arte B2–B5, escoamento (sinks) de fim de jogo na economia, perfil de GC em carga longa.

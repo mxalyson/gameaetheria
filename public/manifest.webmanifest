@@ -2,14 +2,20 @@
   "name": "Aetheria — Arena dos Ecos",
   "short_name": "Aetheria",
   "description": "RPG de arena com classes, itens, spirits, PvE e PvP.",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "landscape",
   "background_color": "#1b1d2e",
   "theme_color": "#1b1d2e",
   "lang": "pt-BR",
+  "categories": ["games"],
   "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }
