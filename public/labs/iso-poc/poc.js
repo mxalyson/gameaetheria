@@ -8,7 +8,7 @@ import { SKILLS } from '../../src/data/skills.js';
 import { makeIso, TILT_2_1, TILT_30, screenDirToWorld, facingSector, dirSector, sortByDepth } from './src/iso.js';
 import { followStep, clampFocus, clampZoom } from './src/camera.js';
 import { Animator, chooseClip, MAGE_CLIPS, SLIME_CLIPS } from './src/anim.js';
-import { bakeAtlas, drawFrame, atlasMiB } from './src/atlas.js';
+import { bakeAtlas, loadAtlas, drawFrame, atlasMiB } from './src/atlas.js';
 import { drawMage, MAGE_FRAME, MAGE_PIVOT } from './src/sprites/rig-mage.js';
 import { drawSlime, SLIME_FRAME, SLIME_PIVOT } from './src/sprites/rig-slime.js';
 import { bakeOak, bakePine, bakeBush, bakeRock, bakeTuft, bakeFlower, drawSprite, glowSprite } from './src/props.js';
@@ -27,6 +27,11 @@ const cfg = {
   // 'low' (bilinear) é o único viável; a nitidez vem de assar os sprites em resolução maior (bake), não do filtro.
   smooth: params.get('smooth') ?? 'low',
   off: new Set((params.get('off') ?? '').split(',').filter(Boolean)), // desliga partes do desenho para medir o custo de cada uma
+  // ?hero=paladino|aprendiz|franco|sacerdote troca SÓ o visual do herói pelo atlas de miniatura (art-local/atlas-rig/, fora do Git).
+  // A simulação continua sendo a do Mago (classe do jogo); `hsize` ajusta o tamanho do sprite (o quadro dos atlas é 128 lógico).
+  hero: ['paladino', 'aprendiz', 'franco', 'sacerdote'].includes(params.get('hero')) ? params.get('hero') : null,
+  hsize: Number(params.get('hsize') ?? 1.3),
+  heroDir: params.get('herodir') ?? 'atlas-rig', // 'atlas' = versão com animação rígida (sem esqueleto)
 };
 const FIXED = 1 / 60;
 
@@ -40,7 +45,7 @@ function resize() {
 addEventListener('resize', resize);
 
 // ---------- estado ----------
-let world, player, cam, iso, ground, mageAtlas, slimeAtlas;
+let world, player, cam, iso, ground, mageAtlas, slimeAtlas, heroAtlas = null, heroClips = null;
 const art = { oaks: [], pines: [], bushes: [], rocks: [], tufts: [], flowers: new Map() };
 const decor = [];
 const anims = new Map(), ghosts = [];
@@ -48,7 +53,7 @@ const keys = new Set(), mouse = { x: 0, y: 0, down: false };
 let ox = 0, oy = 0, acc = 0, last = 0;
 let pending = null, lastMoveDir = { x: 1, y: 1 }, vel = { x: 0, y: 0 }, prevPos = { x: 0, y: 0 }, respawnT = 0, reviveT = 0;
 const stats = { fps: 0, simMs: 0, renderMs: 0, sprites: 0, particles: 0, projectiles: 0, actors: 0, atlasMiB: 0, propsMiB: 0, frames: 0 };
-const poc = { keys, mouse, ready: false, stats, cfg, debugOrder: false, lastOrder: [], get world() { return world; }, get atlases() { return { mage: mageAtlas, slime: slimeAtlas }; }, get decor() { return decor; }, aimPoint: () => aimPoint(), startAction: (k, i) => startAction(k, i), get player() { return player; }, get iso() { return iso; }, get cam() { return cam; }, anims };
+const poc = { keys, mouse, ready: false, stats, cfg, debugOrder: false, lastOrder: [], get world() { return world; }, get atlases() { return { mage: mageAtlas, slime: slimeAtlas, hero: heroAtlas }; }, get decor() { return decor; }, aimPoint: () => aimPoint(), startAction: (k, i) => startAction(k, i), get player() { return player; }, get iso() { return iso; }, get cam() { return cam; }, anims };
 window.poc = poc;
 
 // ---------- montagem ----------
@@ -56,6 +61,14 @@ async function boot() {
   resize();
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
   const t0 = performance.now();
+  if (cfg.hero) {
+    try {
+      const base = `./art-local/${cfg.heroDir}/${cfg.hero}/`;
+      const meta = await (await fetch(`${base}${cfg.hero}.json`)).json();
+      heroAtlas = await loadAtlas(meta, Object.fromEntries(Object.keys(meta.clips).map((c) => [c, `${base}${c}.png`])));
+      heroClips = meta.clips;
+    } catch (e) { console.warn('atlas do herói indisponível, usando o mago:', e.message); cfg.hero = null; }
+  }
   mageAtlas = bakeAtlas({ name: 'mage', frame: MAGE_FRAME, pivot: MAGE_PIVOT, clips: MAGE_CLIPS, draw: drawMage, scale: cfg.bake });
   slimeAtlas = bakeAtlas({ name: 'slime', frame: SLIME_FRAME, pivot: SLIME_PIVOT, clips: SLIME_CLIPS, draw: drawSlime, scale: cfg.bake });
   for (let v = 0; v < 4; v++) art.oaks.push(bakeOak(v, 3 + v));
@@ -71,7 +84,7 @@ async function boot() {
   buildDecor();
   ground = bakeGround(world);
   const props = [...art.oaks, ...art.pines, ...art.bushes, ...art.rocks, ...art.tufts, ...art.flowers.values()];
-  stats.atlasMiB = +((mageAtlas.bytes + slimeAtlas.bytes) / 1048576).toFixed(1);
+  stats.atlasMiB = +(((heroAtlas ?? mageAtlas).bytes + slimeAtlas.bytes) / 1048576).toFixed(1);
   stats.propsMiB = +(props.reduce((s, p) => s + p.bytes, 0) / 1048576 + (ground.width * ground.height * 4) / 1048576).toFixed(1);
   stats.bakeMs = Math.round(performance.now() - t0);
   poc.ready = true;
@@ -154,7 +167,7 @@ function startAction(kind, idx = 0) {
   if (kind === 'skill') { if (player.cds['s' + idx] > 0) return; } else if (player.cds.basic > 0) return;
   const clip = kind === 'skill' ? 'skill' : 'attack';
   st.anim.play(clip, true);
-  const c = MAGE_CLIPS[clip];
+  const c = (heroClips ?? MAGE_CLIPS)[clip];
   pending = { kind, idx, at: performance.now() / 1000 + c.release / c.fps };
 }
 
@@ -189,7 +202,7 @@ function stateFor(a) {
   let st = anims.get(a.id);
   if (!st) {
     st = a.kind === 'player'
-      ? { atlas: mageAtlas, anim: new Animator(MAGE_CLIPS), names: { move: 'walk', attack: 'attack', skill: 'skill', death: null }, view: 0, prevSwing: 0, prevFlash: 0, size: 1, a }
+      ? { atlas: heroAtlas ?? mageAtlas, anim: new Animator(heroClips ?? MAGE_CLIPS), names: { move: 'walk', attack: 'attack', skill: 'skill', death: null }, view: 0, prevSwing: 0, prevFlash: 0, size: heroAtlas ? cfg.hsize : 1, a }
       : { atlas: slimeAtlas, anim: new Animator(SLIME_CLIPS), names: { move: 'move', attack: 'attack', skill: null, death: 'death' }, view: 0, prevSwing: 0, prevFlash: 0, size: 1, a };
     anims.set(a.id, st);
   }

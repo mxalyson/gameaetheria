@@ -193,3 +193,28 @@ test('câmera: segue o jogador com suavização, respeita o zoom mínimo/máximo
   expect(t2).not.toBe(t1);
   await page.screenshot({ path: 'test-results/poc-tilt30.png' });
 });
+
+// Heróis em miniatura (atlas de art-local/, fora do Git): só roda onde a arte foi gerada.
+import fs from 'node:fs';
+for (const id of ['paladino', 'aprendiz', 'franco', 'sacerdote']) {
+  const meta = new URL(`../../public/labs/iso-poc/art-local/atlas-rig/${id}/${id}.json`, import.meta.url);
+  test(`herói em miniatura ${id}: atlas carregado, anda e o golpe sai no quadro de disparo do clipe`, async ({ page }) => {
+    test.skip(!fs.existsSync(meta), 'atlas não gerado (art-local/ fora do Git)');
+    const errors = await open(page, `?hero=${id}`);
+    await clearArea(page);
+    const info = await page.evaluate(() => { const a = window.poc.atlases.hero; return { has: !!a, clips: Object.keys(a?.meta.clips ?? {}), cfgHero: window.poc.cfg.hero, rel: a?.meta.clips.attack.release }; });
+    expect(info.has).toBe(true);
+    expect(info.cfgHero).toBe(id);
+    expect(info.clips.sort()).toEqual(['attack', 'hit', 'idle', 'skill', 'walk']);
+    await page.keyboard.down('d');
+    await page.waitForFunction(() => window.poc.anims.get(window.poc.player.id).anim.name === 'walk', null, { timeout: 8000 });
+    await page.keyboard.up('d');
+    // golpe: a animação 'attack' começa na hora e o comando só chega à simulação no quadro `release` (recarga começa nesse momento)
+    await page.evaluate(() => window.poc.startAction('attack'));
+    const antes = await page.evaluate(() => ({ clip: window.poc.anims.get(window.poc.player.id).anim.name, cd: window.poc.player.cds.basic }));
+    expect(antes.clip).toBe('attack');
+    expect(antes.cd).toBeLessThanOrEqual(0.0001);
+    await page.waitForFunction(() => window.poc.player.cds.basic > 0, null, { timeout: 8000 });
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+}

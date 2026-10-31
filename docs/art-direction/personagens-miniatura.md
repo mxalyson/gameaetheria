@@ -20,6 +20,13 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
 - `render3d.mjs <id> <tamanho> [corte]` gera só as 8 vistas estáticas.
 - Clipes: idle 6, walk 8, attack 6 (release 3), skill 8 (release 4), hit 3 — mesmos nomes de `anim.js`.
 
+## No PoC isométrico (2026-10-30)
+`http://localhost:5174/labs/iso-poc/index.html?hero=paladino|aprendiz|franco|sacerdote` troca só o **visual** do herói (a simulação segue sendo a do Mago: skills, dano e recarga reais). Opções: `hsize=1.3` (tamanho do sprite), `herodir=atlas` (animação rígida, sem esqueleto). Sem os arquivos de `art-local/`, volta ao mago desenhado.
+- **Testado:** 4 testes e2e novos (`tests/e2e/iso-poc.spec.js`, "herói em miniatura"): atlas carregado, clipes, andar, golpe no quadro de disparo, sem erro de console. Suíte completa: 48 unitários + 24 e2e passando.
+- **Visto no navegador:** Paladino, Franco e Sacerdote andando e o Paladino atacando (projétil sai), ~60 FPS no navegador embutido; texturas 56,8 MiB (herói 24,2 + slime 32,6).
+- **Não medido:** `npm run perf:poc` com o herói novo (a medição de FPS oficial ainda é só do mago).
+- **Observação:** as skills 1-3 continuam as do Mago (Bola de Fogo, Nova de Gelo, Teleporte) com o rosto do herói escolhido; as skills de cada classe são propostas em `designs.js`, não implementadas.
+
 ## Limites conhecidos
 - Sem esqueleto: animação rígida, sem braços/pernas; efeitos (brilho, projétil) devem ser procedurais no jogo.
 - Enquadramento por personagem: todos ocupam a mesma altura no quadro; o tamanho relativo no jogo terá de ser ajustado por `size`.
