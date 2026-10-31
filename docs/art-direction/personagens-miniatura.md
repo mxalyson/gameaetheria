@@ -65,6 +65,13 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
 - **Testado:** `tests/vfx.test.js` (4 unitários) e o e2e dos heróis confere que cada golpe cria o efeito do estilo certo. **Visto no navegador:** os 4 estilos + impacto, com a cena parada (`poc.holdVfx`, `poc.spawnVfx`). **Não validado:** o aspecto em movimento a 60 FPS (o navegador embutido rodou a ~10 FPS nesta medição) e o custo por frame.
 - Limites: os projéteis são os da simulação (bola brilhante na cor da skill); não há efeito de morte nem de dano recebido pelo herói; Investida/Rolamento/Teleporte têm o rasto/clarão visual mas a animação do herói é a mesma de qualquer skill (não há clipe próprio de dash).
 
+## Morte e dano do herói (PoC, 2026-10-30)
+`src/death.js` (módulo puro) + `poc.js`. **Sem texturas novas** (os atlas não ganharam clipe de morte): o sprite real é transformado.
+- **Dano recebido:** clipe `hit` (já existente, com clarão branco), faíscas vermelhas no herói e vinheta vermelha na tela (pulso de ~0,45 s).
+- **Morte (2,5 s):** sobressalto, o herói tomba 90° em torno dos pés para trás (lado conforme a direção em que olha), amassa ao encostar, levanta poeira (onda cinza), fica deitado, esmaece e solta uma coluna de luz (a "alma"). A vinheta vermelha acompanha. Renasce com uma aura (o ciclo de renascimento é do PoC, `DEATH.total + 0,15 s`; o jogo real tem as próprias regras).
+- **Testado:** `tests/death.test.js` (3 unitários) e um e2e (dano → clarão; morte → clipe `hit`, tempo de queda, renascimento sem erro). **Visto:** sequência de 6 instantes do Paladino e do Sacerdote capturada num navegador headless (inclinado aos 0,5 s, deitado aos 1,3 s, esmaecendo com a coluna de luz aos 2,2 s).
+- **Limite:** é um tombo 2D de um sprite rígido, não uma animação de queda com esqueleto; de lado (leste/oeste) lê melhor que de frente/costas.
+
 ## Peso das texturas (medido, 2026-10-30)
 | Versão | Paladino | Aprendiz | Franco | Sacerdote | Como gerar |
 |---|---|---|---|---|---|

@@ -13,6 +13,7 @@ import { drawMage, MAGE_FRAME, MAGE_PIVOT } from './src/sprites/rig-mage.js';
 import { drawSlime, SLIME_FRAME, SLIME_PIVOT } from './src/sprites/rig-slime.js';
 import { bakeOak, bakePine, bakeBush, bakeRock, bakeTuft, bakeFlower, drawSprite, glowSprite } from './src/props.js';
 import { bakeGround } from './src/ground.js';
+import { deathPose, hurtPulse, DEATH } from './src/death.js';
 import { HERO_FX, HERO_ACTIONS, spawnVfx, stepVfx, drawVfx, drawVfxGround } from './src/vfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -210,7 +211,7 @@ function spawnActionVfx(pk, aim) {
 }
 
 function gameLogic(dt) {
-  if (player.dead) { reviveT += dt; if (reviveT > 2.2) { player.dead = false; player.deadT = 0; player.hp = player.maxHp; reviveT = 0; anims.get(player.id)?.anim.play('idle', true); } }
+  if (player.dead) { reviveT += dt; if (reviveT > (cfg.hero ? DEATH.total + 0.15 : 2.2)) { if (cfg.hero) spawnVfx(vfx, 'aura', { x: player.x, y: player.y, color: '#9dffd8', core: '#ffffff' }); player.dead = false; player.deadT = 0; player.hp = player.maxHp; reviveT = 0; anims.get(player.id)?.anim.play('idle', true); } }
   if (!pending && !player.dead && (mouse.down)) startAction('attack');
   const alive = world.actors.filter((a) => a.kind === 'mob' && !a.dead).length;
   respawnT += dt;
@@ -236,6 +237,10 @@ function updateAnim(a, st, dt, seen) {
   const sig = { dead: a.dead, moving: a.moving, hurt: flash, attackStart: !isPlayer && sw && !casts.has(a.id), skillStart: false };
   // jogador: a ação foi iniciada localmente (startAction); aqui só cuidamos de andar/parar/ferido/morte
   if (cfg.hero && !isPlayer && flash) { const f = HERO_FX[cfg.hero]; spawnVfx(vfx, 'impact', { x: a.x, y: a.y, z: 26, color: f.color, core: f.core }); }
+  if (cfg.hero && isPlayer) { // morte e dano do herói: sem texturas novas (ver src/death.js)
+    if (a.dead) { if (!st.deadT) { st.anim.play('hit', true); st.dust = false; st.soul = false; } st.deadT = (st.deadT ?? 0) + dt; } else st.deadT = 0;
+    if (flash && !a.dead) { st.hurtT = 0; const f = HERO_FX[cfg.hero]; spawnVfx(vfx, 'impact', { x: a.x, y: a.y, z: 30, color: '#ff6a6a', core: '#ffffff' }); } else if (st.hurtT !== undefined) st.hurtT += dt;
+  }
   chooseClip(st.anim, sig, st.names);
   st.anim.update(dt);
   if (isPlayer && st.anim.finished && (st.anim.name === 'attack' || st.anim.name === 'skill')) st.anim.play(a.moving ? 'walk' : 'idle', true);
@@ -250,6 +255,15 @@ function drawEntity(it) {
   const s = iso.toScreen(it.x, it.y), x = s.x + ox, y = s.y + oy;
   if (it.sprite) { drawSprite(g, it.sprite, x, y, it.size * cfg.zoom); return; }
   const st = it.st;
+  if (cfg.hero && st.deadT > 0 && it.kind === 'player') { // morto: o sprite tomba em torno dos pés, amassa e esmaece
+    const side = st.view >= 1 && st.view <= 3 ? -1 : 1, P = deathPose(st.deadT, side), z = cfg.zoom * st.size;
+    if (P.impact && !st.dust) { st.dust = true; spawnVfx(vfx, 'nova', { x: it.x, y: it.y, color: '#d9d2c0', core: '#ffffff', r: 46, life: 0.4 }); spawnVfx(vfx, 'impact', { x: it.x, y: it.y, z: 8, color: '#d9d2c0', core: '#ffffff' }); }
+    if (st.deadT > DEATH.recoil + DEATH.fall + DEATH.lie && !st.soul) { st.soul = true; spawnVfx(vfx, 'pray', { x: it.x, y: it.y, color: HERO_FX[cfg.hero].color, core: HERO_FX[cfg.hero].core }); }
+    g.save(); g.translate(x, y); g.rotate(P.rot); g.scale(1, P.squash); g.globalAlpha = P.alpha;
+    drawFrame(g, st.atlas, st.anim.name, st.view, st.anim.frame, 0, 0, z, 1);
+    g.restore();
+    return;
+  }
   drawFrame(g, st.atlas, st.anim.name, st.view, st.anim.frame, x, y, st.size * cfg.zoom, it.alpha ?? 1);
 }
 
@@ -357,6 +371,10 @@ function render(dt, now) {
   g.fillStyle = warm; g.fillRect(0, 0, W, H);
   const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.4, W / 2, H / 2, Math.max(W, H) * 0.78); vg.addColorStop(0, 'rgba(6,14,20,0)'); vg.addColorStop(1, 'rgba(6,14,20,0.5)');
   g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  }
+  if (cfg.hero) { // dano recebido e morte: vinheta vermelha
+    const ps = anims.get(player.id), k = Math.max(ps?.hurtT !== undefined ? hurtPulse(ps.hurtT) : 0, ps?.deadT > 0 ? Math.min(0.6, ps.deadT * 1.2) : 0);
+    if (k > 0.01) { const rg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.72); rg.addColorStop(0, 'rgba(200,20,30,0)'); rg.addColorStop(1, `rgba(200,20,30,${(0.55 * k).toFixed(3)})`); g.fillStyle = rg; g.fillRect(0, 0, W, H); }
   }
   stats.renderMs += (performance.now() - t0 - stats.renderMs) * 0.05;
 }

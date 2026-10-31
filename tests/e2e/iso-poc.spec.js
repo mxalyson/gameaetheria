@@ -241,3 +241,23 @@ for (const id of Object.keys(CLASSE)) {
     expect(errors, errors.join('\n')).toEqual([]);
   });
 }
+
+// Morte e dano do herói em miniatura (sem texturas novas: o sprite tomba, amassa e esmaece; ver src/death.js).
+test('herói em miniatura: dano recebido gera clarão e a morte tomba o sprite e renasce', async ({ page }) => {
+  const meta = new URL('../../public/labs/iso-poc/art-local/atlas-rig/paladino/paladino.json', import.meta.url);
+  test.skip(!fs.existsSync(meta), 'atlas não gerado (art-local/ fora do Git)');
+  const errors = await open(page, '?hero=paladino&mobs=0');
+  await clearArea(page);
+  // dano: o pulso começa no golpe e o clarão de impacto nasce no herói
+  await page.evaluate(() => { window.poc.player.hitFlash = 0.3; });
+  await page.waitForFunction(() => window.poc.anims.get(window.poc.player.id).hurtT !== undefined, null, { timeout: 8000, polling: 'raf' });
+  expect(await page.evaluate(() => window.poc.vfx.some((v) => v.kind === 'impact'))).toBe(true);
+  // morte: toca 'hit', conta o tempo de queda e, depois do tempo total, renasce inteiro
+  await page.evaluate(() => { window.poc.player.dead = true; window.poc.player.hp = 0; });
+  await page.waitForFunction(() => window.poc.anims.get(window.poc.player.id).deadT > 0.6, null, { timeout: 10000, polling: 'raf' });
+  const morto = await page.evaluate(() => { const st = window.poc.anims.get(window.poc.player.id); return { clip: st.anim.name, deadT: st.deadT }; });
+  expect(morto.clip).toBe('hit');
+  await page.waitForFunction(() => !window.poc.player.dead && window.poc.anims.get(window.poc.player.id).deadT === 0, null, { timeout: 15000 });
+  expect(await page.evaluate(() => window.poc.player.hp)).toBeGreaterThan(0);
+  expect(errors, errors.join('\n')).toEqual([]);
+});
