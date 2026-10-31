@@ -38,7 +38,7 @@ Vila de Lúmen (segura) → Bosque Verdejante (Nv 1-6, chefe Carvalho Ancestral)
 - Sem dependências de runtime novas sem justificativa. Preservar funcionalidades existentes; não apagar sem autorização.
 
 ## Arte e desempenho
-- Toda arte é desenhada no renderer; validar o padrão visual em UM caso antes de produzir em massa. Sem placeholders permanentes, UI não genérica. **Personagens jogáveis: miniatura/caricato (Summoners War + anime) e arte real, nunca formas geométricas desenhadas por código** (decisão 0006; pipeline em `docs/art-direction/personagens-miniatura.md`). Arte gerada/licenciada fica em `public/labs/iso-poc/art-local/` (fora do Git) até a licença ser confirmada.
+- Toda arte é desenhada no renderer; validar o padrão visual em UM caso antes de produzir em massa. Sem placeholders permanentes, UI não genérica. **Personagens jogáveis: miniatura/caricato (Summoners War + anime) e arte real, nunca formas geométricas desenhadas por código** (decisão 0006; pipeline em `docs/art-direction/personagens-miniatura.md`). Licença do Meshy confirmada (CC BY 4.0, créditos em `docs/CREDITOS.md`): o atlas final dos heróis (`art-local/atlas-rig/`) vai ao Git; GLBs, esqueletos e atlas antigos ficam fora (pesados).
 - Medir o custo por frame antes/depois de mudanças visuais; evitar alocações dentro de `draw()`; usar cache offscreen (ex.: `buildGround`) para o que é estático.
 - A fonte vem do Google Fonts (recurso externo): preferir arquivo local ao evoluir.
 

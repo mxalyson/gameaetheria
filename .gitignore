@@ -4,5 +4,7 @@ playwright-report/
 .env
 *.log
 art-tests/
-public/labs/iso-poc/art-local/
+# arte gerada pesada fica fora (GLBs, esqueletos, atlas antigos); só o atlas dos 4 heróis (CC BY 4.0, ver docs/CREDITOS.md) vai ao Git para o laboratório funcionar online
+public/labs/iso-poc/art-local/*
+!public/labs/iso-poc/art-local/atlas-rig/
 /*.glb

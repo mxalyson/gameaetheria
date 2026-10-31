@@ -1,0 +1,53 @@
+{
+  "name": "aprendiz",
+  "frame": {
+    "w": 116.8,
+    "h": 114.4
+  },
+  "pivot": {
+    "x": 58.4,
+    "y": 104.39
+  },
+  "scale": 1.25,
+  "views": 8,
+  "rows": 8,
+  "mirror": false,
+  "clips": {
+    "idle": {
+      "frames": 4,
+      "fps": 5.33,
+      "loop": true,
+      "release": null
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 9,
+      "loop": true,
+      "release": null
+    },
+    "attack": {
+      "frames": 6,
+      "fps": 16,
+      "loop": false,
+      "release": 3
+    },
+    "skill": {
+      "frames": 8,
+      "fps": 14,
+      "loop": false,
+      "release": 4
+    },
+    "hit": {
+      "frames": 3,
+      "fps": 12,
+      "loop": false,
+      "release": null
+    },
+    "dash": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false,
+      "release": 1
+    }
+  }
+}
