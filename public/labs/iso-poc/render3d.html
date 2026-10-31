@@ -65,14 +65,15 @@ const KEY = {
 };
 function pose(name, f, n) {
   const P = { y: 0, tz: 0, rx: 0, ry: 0, rz: 0, sy: 1, tint: 0 }, p = (Math.PI * 2 * f) / n;
-  if (rig) { P.tint = name === 'hit' ? [0.6, 0.35, 0][f] : 0; setAnim(name, f); return P; } // com esqueleto, o movimento vem do mixer
+  if (rig) { P.tint = name === 'hit' ? [0.6, 0.35, 0][f] : 0; setAnim(name, f * ((CLIPS[name].src ?? n) / n)); return P; } // com esqueleto, o movimento vem do mixer
   if (name === 'idle') Object.assign(P, { y: Math.sin(p) * 0.012, sy: 1 + Math.sin(p + 0.6) * 0.02, rz: Math.sin(p) * 0.02 });
   else if (name === 'walk') Object.assign(P, { y: Math.abs(Math.sin(p)) * 0.05, sy: 1 - 0.04 * (1 - Math.abs(Math.sin(p))), rx: 0.1, rz: Math.sin(p) * 0.07, ry: Math.sin(p) * 0.08 });
   else { const k = KEY[name]; for (const [a, arr] of Object.entries(k)) P[a] = arr[f]; }
   P.y *= h; P.tz *= h;
   return P;
 }
-const CLIPS = { idle: { frames: 6, fps: 8, loop: true }, walk: { frames: 8, fps: 12, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false } };
+// idle/walk usam menos quadros (src = quadros da animação original do Blender): mesma duração do ciclo, ~13% menos textura
+const CLIPS = { idle: { frames: 4, src: 6, fps: 5.33, loop: true }, walk: { frames: 6, src: 8, fps: 9, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false } };
 const yaws = [0, 45, 90, 135, 180, 225, 270, 315]; // 0 = de frente para a câmera; +90 = olhando para a direita da tela
 
 function shoot(P, deg, dst, dx, dy) {
@@ -93,13 +94,31 @@ function shoot(P, deg, dst, dx, dy) {
 if (q.get('clips')) {
   const px = size * (0.5 + 0.5 * Math.cos(EL) * (sz.y / H)); // y dos pés no quadro (px físicos)
   const scale = size / 128;
-  out.meta = { name: model, frame: { w: 128, h: 128 }, pivot: { x: 64, y: +(px / scale).toFixed(1) }, scale, views: 8, clips: {} };
+  // 1) renderiza todos os quadros; 2) recorta TODOS os clipes do personagem pela mesma caixa (união das áreas opacas):
+  // quadro justo = menos textura na GPU, sem mexer no pivô (o desenho continua alinhado pelos pés)
+  const mirror = !!q.get('mirror'); const vy = mirror ? yaws.slice(0, 5) : yaws; // mirror=1: só S,SE,E,NE,N; O/SO/NO saem espelhando L/SE/NE em tempo de desenho (-37,5% de textura)
+  const frames = {}; let x0 = size, y0 = size, x1 = 0, y1 = 0;
   for (const [name, cd] of Object.entries(CLIPS)) {
-    const sh = document.createElement('canvas'); sh.width = size * cd.frames; sh.height = size * 8; const sg = sh.getContext('2d');
-    yaws.forEach((deg, v) => { for (let f = 0; f < cd.frames; f++) shoot(pose(name, f, cd.frames), deg, sg, f * size, v * size); });
+    frames[name] = [];
+    vy.forEach((deg, v) => { frames[name][v] = []; for (let f = 0; f < cd.frames; f++) {
+      const c = document.createElement('canvas'); c.width = c.height = size; const cg = c.getContext('2d', { willReadFrequently: true });
+      shoot(pose(name, f, cd.frames), deg, cg, 0, 0);
+      const d = cg.getImageData(0, 0, size, size).data;
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (d[(y * size + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      frames[name][v][f] = c;
+    } });
+  }
+  const pad = 2; x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(size - 1, x1 + pad); y1 = Math.min(size - 1, y1 + pad);
+  if (mirror) { const hw = Math.min(size / 2, Math.max(size / 2 - x0, x1 - size / 2)); x0 = Math.round(size / 2 - hw); x1 = Math.round(size / 2 + hw - 1); } // caixa simétrica em torno do pivô, para o espelho coincidir
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  out.meta = { name: model, frame: { w: +(bw / scale).toFixed(2), h: +(bh / scale).toFixed(2) }, pivot: { x: +((size / 2 - x0) / scale).toFixed(2), y: +((px - y0) / scale).toFixed(2) }, scale, views: 8, rows: vy.length, mirror, clips: {} };
+  for (const [name, cd] of Object.entries(CLIPS)) {
+    const sh = document.createElement('canvas'); sh.width = bw * cd.frames; sh.height = bh * vy.length; const sg = sh.getContext('2d');
+    for (let v = 0; v < vy.length; v++) for (let f = 0; f < cd.frames; f++) sg.drawImage(frames[name][v][f], x0, y0, bw, bh, f * bw, v * bh, bw, bh);
     out.sheets[name] = sh.toDataURL('image/png');
     out.meta.clips[name] = { frames: cd.frames, fps: cd.fps, loop: !!cd.loop, release: cd.release ?? null };
   }
+  out.info.crop = { x0, y0, bw, bh };
 } else {
   const sheet = document.getElementById('sheet'); sheet.width = size * 8; sheet.height = size; const sg = sheet.getContext('2d');
   yaws.forEach((deg, i) => { shoot(pose('idle', 0, 6), deg, sg, i * size, 0); out.views.push(sheet.toDataURL('image/png')); });

@@ -27,6 +27,16 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
 - **Não medido:** `npm run perf:poc` com o herói novo (a medição de FPS oficial ainda é só do mago).
 - **Observação:** as skills 1-3 continuam as do Mago (Bola de Fogo, Nova de Gelo, Teleporte) com o rosto do herói escolhido; as skills de cada classe são propostas em `designs.js`, não implementadas.
 
+## Peso das texturas (medido, 2026-10-30)
+| Versão | Paladino | Aprendiz | Franco | Sacerdote | Como gerar |
+|---|---|---|---|---|---|
+| Antes (quadro 160×160, 31 quadros, 8 direções) | 24,2 MiB | ≈24 | ≈24 | ≈24 | — |
+| **atlas-rig** (quadro recortado, idle 4 + walk 6 quadros) | 20,3 | 17,2 | 20,3 | 16,0 | `RIG=1 node tools/bake-atlas.mjs <id> 160 0` |
+| **atlas-rig-m** (+ só 5 direções; O/SO/NO são o espelho de L/SE/NE) | 12,7 | 10,8 | 12,7 | 10,0 | `RIG=1 MIRROR=1 node tools/bake-atlas.mjs <id> 160 0` e `?herodir=atlas-rig-m` |
+- O espelho troca a mão da arma nas direções de oeste (a espada do Paladino vai para a outra mão). É decisão de arte/jogo, por isso `atlas-rig` continua o padrão.
+- Ainda falta medir FPS oficial com GPU (`perf:poc`) e em celular.
+- Corrigido de passagem: `poc.js` criava `iso` só no 1º desenho; um 1º quadro lento quebrava a mira com `iso` indefinido. Agora `iso` nasce no boot.
+
 ## Limites conhecidos
 - Sem esqueleto: animação rígida, sem braços/pernas; efeitos (brilho, projétil) devem ser procedurais no jogo.
 - Enquadramento por personagem: todos ocupam a mesma altura no quadro; o tamanho relativo no jogo terá de ser ajustado por `size`.

@@ -83,6 +83,7 @@ async function boot() {
   for (let i = 0; i < cfg.mobs; i++) spawnSlime();
   buildDecor();
   ground = bakeGround(world);
+  iso = makeIso({ tilt: cfg.tilt, scale: cfg.zoom }); // o 1º passo da simulação já usa a projeção (mira); sem isto, um 1º quadro lento quebrava com iso indefinido
   const props = [...art.oaks, ...art.pines, ...art.bushes, ...art.rocks, ...art.tufts, ...art.flowers.values()];
   stats.atlasMiB = +(((heroAtlas ?? mageAtlas).bytes + slimeAtlas.bytes) / 1048576).toFixed(1);
   stats.propsMiB = +(props.reduce((s, p) => s + p.bytes, 0) / 1048576 + (ground.width * ground.height * 4) / 1048576).toFixed(1);

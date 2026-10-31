@@ -22,17 +22,19 @@ test('fichas: 5 personagens com os campos de design completos', () => {
 
 const pngSize = (f) => { const b = fs.readFileSync(f); return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) }; };
 
-for (const [kind, id] of ['atlas', 'atlas-rig'].flatMap((k) => ['paladino', 'aprendiz', 'franco', 'sacerdote'].map((i) => [k, i]))) {
+for (const [kind, id] of ['atlas', 'atlas-rig', 'atlas-rig-m'].flatMap((k) => ['paladino', 'aprendiz', 'franco', 'sacerdote'].map((i) => [k, i]))) {
   const dir = path.join(lab, 'art-local', kind, id);
   test(`${kind} ${id}: metadados batem com o tamanho dos PNGs`, { skip: !fs.existsSync(path.join(dir, `${id}.json`)) && 'atlas não gerado (art-local/ fora do Git)' }, () => {
     const meta = JSON.parse(fs.readFileSync(path.join(dir, `${id}.json`), 'utf8'));
     assert.equal(meta.views, 8);
     assert.deepEqual(Object.keys(meta.clips).sort(), ['attack', 'hit', 'idle', 'skill', 'walk']);
-    const cell = meta.frame.w * meta.scale;
+    // o quadro pode estar recortado (não quadrado): tolerância de 1 px por arredondamento do tamanho lógico
+    const cw = meta.frame.w * meta.scale, ch = meta.frame.h * meta.scale;
     for (const [name, c] of Object.entries(meta.clips)) {
       const { w, h } = pngSize(path.join(dir, `${name}.png`));
-      assert.equal(w, cell * c.frames, `${id}/${name} largura`);
-      assert.equal(h, cell * 8, `${id}/${name} altura`);
+      assert.ok(Math.abs(w - cw * c.frames) <= c.frames, `${id}/${name} largura ${w} vs ${cw * c.frames}`);
+      const rows = meta.rows ?? 8;
+      assert.ok(Math.abs(h - ch * rows) <= rows, `${id}/${name} altura ${h} vs ${ch * rows}`);
       if (c.release != null) assert.ok(c.release > 0 && c.release < c.frames, `${id}/${name} release`);
     }
     assert.ok(meta.pivot.y > 0 && meta.pivot.y < meta.frame.h);

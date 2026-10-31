@@ -53,10 +53,16 @@ export function drawFrame(g, atlas, clip, view, frame, x, y, size = 1, alpha = 1
   const { meta, sheets } = atlas, c = meta.clips[clip];
   if (!c) return;
   const sheet = sheets[clip];
-  const cw = sheet.width / c.frames, ch = sheet.height / meta.views;
+  const rows = meta.rows ?? meta.views; // `mirror`: a folha guarda só 5 direções (S,SE,L,NE,N); O/SO/NO são o espelho de L/SE/NE
+  const cw = sheet.width / c.frames, ch = sheet.height / rows;
   const f = Math.max(0, Math.min(c.frames - 1, frame));
+  const flip = meta.mirror && view > 4, row = flip ? meta.views - view : view;
   if (alpha !== 1) g.globalAlpha = alpha;
-  g.drawImage(sheet, f * cw, view * ch, cw, ch, x - meta.pivot.x * size, y - meta.pivot.y * size, meta.frame.w * size, meta.frame.h * size);
+  if (flip) {
+    g.save(); g.translate(x, y); g.scale(-1, 1);
+    g.drawImage(sheet, f * cw, row * ch, cw, ch, -meta.pivot.x * size, -meta.pivot.y * size, meta.frame.w * size, meta.frame.h * size);
+    g.restore();
+  } else g.drawImage(sheet, f * cw, row * ch, cw, ch, x - meta.pivot.x * size, y - meta.pivot.y * size, meta.frame.w * size, meta.frame.h * size);
   if (alpha !== 1) g.globalAlpha = 1;
 }
 
