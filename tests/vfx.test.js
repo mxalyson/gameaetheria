@@ -42,3 +42,26 @@ test('vfx: faíscas do tiro abrem em leque estreito; do impacto, em círculo', (
   const im = spawnVfx([], 'impact', { x: 0, y: 0, color: '#fff', core: '#fff' }, seq([0.99]));
   assert.ok(im.parts.every((p) => p.a > 6));
 });
+
+import { HERO_ACTIONS } from '../public/labs/iso-poc/src/vfx.js';
+import { CLASSES } from '../public/src/data/classes.js';
+import { SKILLS } from '../public/src/data/skills.js';
+
+test('vfx: cada herói tem efeito para o básico e as 3 skills da classe REAL do jogo', () => {
+  const classeDe = { paladino: 'warrior', aprendiz: 'mage', franco: 'archer', sacerdote: 'cleric' };
+  for (const [hero, kinds] of Object.entries(HERO_ACTIONS)) {
+    const cls = CLASSES[classeDe[hero]];
+    assert.equal(kinds.length, 1 + cls.skills.length, hero);
+    for (const k of kinds) {
+      const v = spawnVfx([], k, { x: 0, y: 0, color: '#fff', core: '#fff' });
+      assert.ok(v.life > 0, `${hero} ${k}`);
+    }
+    for (const s of cls.skills) assert.ok(SKILLS[s], `${hero} skill ${s}`);
+  }
+  // skills de movimento/área ganham o efeito certo
+  assert.equal(HERO_ACTIONS.paladino[1], 'nova');   // Golpe Giratório (aoe_self)
+  assert.equal(HERO_ACTIONS.paladino[2], 'dash');   // Investida
+  assert.equal(HERO_ACTIONS.aprendiz[3], 'blink');  // Teleporte
+  assert.equal(HERO_ACTIONS.franco[1], 'rain');     // Chuva de Flechas (ground_aoe)
+  assert.equal(HERO_ACTIONS.franco[3], 'dash');     // Rolamento
+});

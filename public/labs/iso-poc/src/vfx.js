@@ -10,15 +10,23 @@ export const HERO_FX = {
   sacerdote: { style: 'pray', color: '#7dffc8', core: '#f6fff2' },
 };
 export const KIND_BY_STYLE = { slash: 'swing', shoot: 'muzzle', cast: 'cast', pray: 'pray' };
-const LIFE = { swing: 0.3, muzzle: 0.18, cast: 0.5, pray: 0.8, impact: 0.34 };
+// Efeito de cada ação do herói: [ataque básico, skill 1, skill 2, skill 3]. As skills são as REAIS da classe do jogo (data/classes.js):
+// Paladino = Guerreiro, Aprendiz = Mago, Franco-atirador = Arqueiro, Sacerdote = Clérigo.
+export const HERO_ACTIONS = {
+  paladino: ['swing', 'nova', 'dash', 'aura'],      // Golpe Giratório, Investida, Grito de Guerra
+  aprendiz: ['cast', 'cast', 'nova', 'blink'],      // Bola de Fogo, Nova de Gelo, Teleporte
+  franco: ['muzzle', 'rain', 'muzzle', 'dash'],     // Chuva de Flechas, Tiro Perfurante, Rolamento
+  sacerdote: ['swing', 'pray', 'aura', 'cast'],     // Luz Sagrada, Escudo Divino, Julgamento
+};
+const LIFE = { swing: 0.3, muzzle: 0.18, cast: 0.5, pray: 0.8, impact: 0.34, nova: 0.6, dash: 0.38, aura: 0.95, blink: 0.55, rain: 2.2 };
 const MAX = 48;
 
-// `o`: { x, y, z?, ang (rad, mundo), big?, color, core }. `rnd` injetável para teste determinístico.
+// `o`: { x, y, z?, ang (rad, mundo), big?, color, core, r? (raio em unid. do mundo: nova/chuva), len? (dash/blink), life? }. `rnd` injetável para teste.
 export function spawnVfx(list, kind, o, rnd = Math.random) {
   if (list.length >= MAX) list.shift();
   const big = o.big ? 1.35 : 1;
-  const v = { kind, t: 0, life: (LIFE[kind] ?? 0.3) * (kind === 'pray' || kind === 'swing' ? big : 1), x: o.x, y: o.y, z: o.z ?? 34, ang: o.ang ?? 0, big, color: o.color, core: o.core, parts: [] };
-  const n = { cast: 11, pray: 12, impact: 9, muzzle: 7, swing: 0 }[kind] ?? 0;
+  const v = { kind, t: 0, life: o.life ?? (LIFE[kind] ?? 0.3) * (kind === 'pray' || kind === 'swing' ? big : 1), x: o.x, y: o.y, z: o.z ?? 34, ang: o.ang ?? 0, big, color: o.color, core: o.core, r: o.r ?? 100, len: o.len ?? 200, parts: [] };
+  const n = { cast: 11, pray: 12, impact: 9, muzzle: 7, swing: 0, nova: 14, aura: 8, blink: 10, rain: 18, dash: 0 }[kind] ?? 0;
   for (let i = 0; i < n; i++) v.parts.push({ a: kind === 'muzzle' ? (rnd() - 0.5) * 1.6 : rnd() * TAU, s: 0.4 + rnd() * 0.9, d: rnd() });
   list.push(v);
   return v;
@@ -32,12 +40,18 @@ const ease = (k) => 1 - (1 - k) * (1 - k);
 // Efeitos no plano do chão (coordenadas do mundo; o chamador aplica a matriz isométrica).
 export function drawVfxGround(g, list) {
   for (const v of list) {
-    if (v.kind !== 'pray') continue;
-    const k = v.t / v.life, r = (14 + 62 * ease(k)) * v.big;
-    g.globalAlpha = (1 - k) * 0.8;
-    const gr = g.createRadialGradient(v.x, v.y, r * 0.5, v.x, v.y, r); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, v.color);
-    g.beginPath(); g.arc(v.x, v.y, r, 0, TAU); g.fillStyle = gr; g.fill();
-    g.lineWidth = 3 * (1 - k) + 0.6; g.strokeStyle = v.core; g.stroke();
+    const k = v.t / v.life;
+    let x = v.x, y = v.y, r, a, lw = 3;
+    if (v.kind === 'pray') { r = (14 + 62 * ease(k)) * v.big; a = (1 - k) * 0.8; }
+    else if (v.kind === 'nova') { r = (10 + (v.r - 10) * ease(k)); a = (1 - k) * 0.9; lw = 5; } // onda de choque até o raio real da skill
+    else if (v.kind === 'aura') { r = 30 + 8 * Math.sin(k * 12); a = Math.min(1, (1 - k) * 2) * 0.7; lw = 2.5; }
+    else if (v.kind === 'blink') { x = v.x + Math.cos(v.ang) * v.len; y = v.y + Math.sin(v.ang) * v.len; r = (8 + 40 * ease(k)); a = (1 - k) * 0.8; }
+    else if (v.kind === 'rain') { r = v.r; a = (v.t < 0.2 ? v.t / 0.2 : Math.max(0, 1 - (v.t - 1.6) / 0.6)) * 0.45; lw = 2; } // marca da área bombardeada
+    else continue;
+    g.globalAlpha = Math.max(0, a);
+    const gr = g.createRadialGradient(x, y, r * 0.5, x, y, r); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, v.color);
+    g.beginPath(); g.arc(x, y, r, 0, TAU); g.fillStyle = gr; g.fill();
+    g.lineWidth = lw * (v.kind === 'rain' ? 1 : (1 - k) + 0.2); g.strokeStyle = v.core; g.stroke();
     g.globalAlpha = 1;
   }
 }
@@ -103,6 +117,44 @@ export function drawVfx(c, list) {
         const X = bx + Math.cos(p.a) * 38 * z * p.s * v.big, Y = by - (14 + 120 * p.d * k + 30 * k) * z * v.big;
         glow(p.d > 0.5 ? v.core : v.color, X, Y, (8 + 9 * p.s) * z * f, f);
       }
+    } else if (v.kind === 'nova') {
+      const f = 1 - k, gx = iso.toScreen(v.x, v.y, 0), bx = gx.x + ox, by = gx.y + oy;
+      glow(v.color, bx, by - 20 * z, (80 + 120 * ease(k)) * z * f + 20, 0.9 * f); glow(v.core, bx, by - 20 * z, 50 * z * f, f);
+      g.lineCap = 'round'; g.strokeStyle = v.core;
+      for (const p of v.parts) { // raios que saem do centro até a borda da onda
+        const rr = ease(k) * v.r, dx = Math.cos(p.a), dy = Math.sin(p.a) * 0.55, s0 = rr * 0.55, s1 = rr * (0.8 + 0.2 * p.s);
+        g.globalAlpha = f * 0.8; g.lineWidth = (1.5 + 2 * p.s) * z;
+        g.beginPath(); g.moveTo(bx + dx * s0 * z * 0.9, by + dy * s0 * z * 0.9 - 8 * z); g.lineTo(bx + dx * s1 * z * 0.9, by + dy * s1 * z * 0.9 - 8 * z); g.stroke();
+      }
+      g.globalAlpha = 1;
+    } else if (v.kind === 'dash') {
+      const f = 1 - k, e = iso.toScreen(v.x + Math.cos(v.ang) * v.len * ease(Math.min(1, k * 2.2)), v.y + Math.sin(v.ang) * v.len * ease(Math.min(1, k * 2.2)), v.z), ex = e.x + ox, ey = e.y + oy;
+      const gr = g.createLinearGradient(ax, ay, ex, ey); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, v.color);
+      g.lineCap = 'round'; g.globalAlpha = f; g.strokeStyle = gr; g.lineWidth = 16 * z * f + 2; g.beginPath(); g.moveTo(ax, ay); g.lineTo(ex, ey); g.stroke();
+      g.strokeStyle = v.core; g.lineWidth = 4 * z * f + 1; g.beginPath(); g.moveTo(ax + (ex - ax) * 0.3, ay + (ey - ay) * 0.3); g.lineTo(ex, ey); g.stroke(); g.globalAlpha = 1;
+      for (let i = 0; i < 5; i++) glow(v.color, ax + (ex - ax) * (i / 5), ay + (ey - ay) * (i / 5), 40 * z * f * (i / 5 + 0.3), 0.55 * f); // imagens residuais
+      glow(v.core, ex, ey, 46 * z * f, 0.9 * f);
+    } else if (v.kind === 'aura') {
+      const f = Math.min(1, (1 - k) * 2.2), gx = iso.toScreen(v.x, v.y, 0), bx = gx.x + ox, by = gx.y + oy, cy = by - 38 * z;
+      g.globalAlpha = f * 0.22; g.fillStyle = v.color; g.beginPath(); g.ellipse(bx, cy, (40 + 3 * Math.sin(k * 14)) * z, 54 * z, 0, 0, TAU); g.fill(); // bolha/escudo em torno do corpo
+      g.globalAlpha = f * 0.85; g.lineWidth = 2.5 * z; g.strokeStyle = v.core; g.beginPath(); g.ellipse(bx, cy, (40 + 3 * Math.sin(k * 14)) * z, 54 * z, 0, 0, TAU); g.stroke();
+      g.globalAlpha = 1;
+      glow(v.color, bx, cy, 120 * z * f, 0.45 * f);
+      for (const p of v.parts) { const X = bx + Math.cos(p.a) * 34 * z, Y = by - (6 + 100 * ((k * (0.7 + p.s * 0.6) + p.d) % 1)) * z; glow(p.d > 0.5 ? v.core : v.color, X, Y, 11 * z * f, f); }
+    } else if (v.kind === 'blink') {
+      const f = 1 - k, ex = v.x + Math.cos(v.ang) * v.len, ey2 = v.y + Math.sin(v.ang) * v.len, e = iso.toScreen(ex, ey2, v.z), dx = e.x + ox, dy = e.y + oy;
+      glow(v.color, ax, ay, 90 * z * f * f, 0.9 * f); glow(v.core, ax, ay, 30 * z * f, f); // sai: o clarão encolhe
+      glow(v.color, dx, dy, (30 + 110 * ease(k)) * z, 0.85 * f); glow(v.core, dx, dy, 40 * z * f, f); // chega: o clarão abre
+      for (const p of v.parts) { const q = ease(k); glow(p.d > 0.5 ? v.core : v.color, dx + Math.cos(p.a) * 60 * z * p.s * q, dy + Math.sin(p.a) * 40 * z * p.s * q - 20 * z * k, 11 * z * f, f); }
+    } else if (v.kind === 'rain') {
+      const gx = iso.toScreen(v.x, v.y, 0), bx = gx.x + ox, by = gx.y + oy;
+      g.lineCap = 'round';
+      for (const p of v.parts) {
+        const tt = v.t - p.d * v.life * 0.72, X = bx + Math.cos(p.a) * p.s * v.r * z * 0.9, Y = by + Math.sin(p.a) * p.s * v.r * z * 0.5;
+        if (tt > 0 && tt < 0.22) { const h = 230 * z * (1 - tt / 0.22); g.globalAlpha = 0.95; g.strokeStyle = v.core; g.lineWidth = 2 * z; g.beginPath(); g.moveTo(X - h * 0.12, Y - h - 30 * z); g.lineTo(X - h * 0.12 + 3 * z, Y - h + 6 * z); g.stroke(); }
+        else if (tt >= 0.22 && tt < 0.5) { const q = (tt - 0.22) / 0.28; glow(v.color, X, Y, (16 + 26 * q) * z, 0.8 * (1 - q)); }
+      }
+      g.globalAlpha = 1;
     } else if (v.kind === 'impact') {
       const f = 1 - k;
       glow(v.color, ax, ay, (40 + 50 * ease(k)) * z, 0.8 * f); glow(v.core, ax, ay, 26 * z * f, f);

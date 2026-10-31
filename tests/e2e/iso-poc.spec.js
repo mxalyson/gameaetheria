@@ -217,8 +217,27 @@ for (const id of ['paladino', 'aprendiz', 'franco', 'sacerdote']) {
     // efeito visual do herói (só desenho) nasce junto com o golpe: o estilo vem da tabela HERO_FX
     await page.waitForFunction(() => window.poc.vfx.length > 0, null, { timeout: 8000, polling: 'raf' });
     const kind = await page.evaluate(() => window.poc.vfx[0].kind);
-    expect(kind).toBe({ paladino: 'swing', aprendiz: 'cast', franco: 'muzzle', sacerdote: 'pray' }[id]);
+    expect(kind).toBe({ paladino: 'swing', aprendiz: 'cast', franco: 'muzzle', sacerdote: 'swing' }[id]); // Clérigo = golpe corpo a corpo (maça); a prece é a skill 1
     await page.waitForFunction(() => window.poc.player.cds.basic > 0, null, { timeout: 8000 });
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+}
+
+// Cada herói usa a classe REAL do jogo (data/classes.js): HUD, skills e efeito da skill 1.
+const CLASSE = { paladino: ['Guerreiro', 'nova'], aprendiz: ['Mago', 'cast'], franco: ['Arqueiro', 'rain'], sacerdote: ['Clérigo', 'pray'] };
+for (const id of Object.keys(CLASSE)) {
+  const meta = new URL(`../../public/labs/iso-poc/art-local/atlas-rig/${id}/${id}.json`, import.meta.url);
+  test(`herói ${id}: classe ${CLASSE[id][0]} e a skill 1 real gera o efeito ${CLASSE[id][1]}`, async ({ page }) => {
+    test.skip(!fs.existsSync(meta), 'atlas não gerado (art-local/ fora do Git)');
+    const errors = await open(page, `?hero=${id}`);
+    await clearArea(page);
+    expect(await page.textContent('#hp-name')).toContain(CLASSE[id][0]);
+    const n = await page.$$eval('#hud-skills .slot', (e) => e.length);
+    expect(n).toBe(4); // ataque + 3 skills
+    await page.evaluate(() => window.poc.startAction('skill', 0));
+    await page.waitForFunction(() => window.poc.vfx.length > 0, null, { timeout: 8000, polling: 'raf' });
+    expect(await page.evaluate(() => window.poc.vfx[0].kind)).toBe(CLASSE[id][1]);
+    await page.waitForFunction(() => window.poc.player.cds.s0 > 0, null, { timeout: 8000 });
     expect(errors, errors.join('\n')).toEqual([]);
   });
 }

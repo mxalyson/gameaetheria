@@ -1,6 +1,6 @@
 # Aetheria — Arena dos Ecos
 
-RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro), itens por raridade, spirits, PvE (bosques, chefes, ondas) e PvP contra rival com Elo. JavaScript puro (módulos ES), **Canvas 2D**, zero dependências de runtime. (O briefing o chamava de "Projeto Arcana"; o nome no código e na UI é Aetheria.)
+RPG de arena para navegador: classes (Guerreiro, Mago, Arqueiro, Clérigo), itens por raridade, spirits, PvE (bosques, chefes, ondas) e PvP contra rival com Elo. JavaScript puro (módulos ES), **Canvas 2D**, zero dependências de runtime. (O briefing o chamava de "Projeto Arcana"; o nome no código e na UI é Aetheria.)
 
 ## Decisões fixas
 - **Motor: Canvas 2D próprio.** Babylon.js/3D/GLB/Blender foram recusados (ver `docs/decisions/0001-manter-canvas-2d.md`). Não reintroduzir sem autorização do usuário.

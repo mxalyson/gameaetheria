@@ -13,7 +13,7 @@ import { drawMage, MAGE_FRAME, MAGE_PIVOT } from './src/sprites/rig-mage.js';
 import { drawSlime, SLIME_FRAME, SLIME_PIVOT } from './src/sprites/rig-slime.js';
 import { bakeOak, bakePine, bakeBush, bakeRock, bakeTuft, bakeFlower, drawSprite, glowSprite } from './src/props.js';
 import { bakeGround } from './src/ground.js';
-import { HERO_FX, KIND_BY_STYLE, spawnVfx, stepVfx, drawVfx, drawVfxGround } from './src/vfx.js';
+import { HERO_FX, HERO_ACTIONS, spawnVfx, stepVfx, drawVfx, drawVfxGround } from './src/vfx.js';
 
 const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
@@ -46,6 +46,9 @@ function resize() {
 addEventListener('resize', resize);
 
 // ---------- estado ----------
+// Classe REAL do jogo (data/classes.js) de cada herói: as skills 1-3, o ataque básico e a simulação são as dela. Só o visual muda.
+const CLASS_BY_HERO = { paladino: 'warrior', aprendiz: 'mage', franco: 'archer', sacerdote: 'cleric' };
+let cls = CLASSES.mage, SK = [];
 let world, player, cam, iso, ground, mageAtlas, slimeAtlas, heroAtlas = null, heroClips = null;
 const art = { oaks: [], pines: [], bushes: [], rocks: [], tufts: [], flowers: new Map() };
 const decor = [];
@@ -71,6 +74,10 @@ async function boot() {
       heroClips = meta.clips;
     } catch (e) { console.warn('atlas do herói indisponível, usando o mago:', e.message); cfg.hero = null; }
   }
+  cls = CLASSES[cfg.hero ? CLASS_BY_HERO[cfg.hero] : 'mage'];
+  buildHud();
+  $('hp-name').textContent = `Aren · ${cls.name} Nv 8`;
+  $('help-skills').textContent = cls.skills.map((k) => SKILLS[k].name).join(' / ');
   mageAtlas = bakeAtlas({ name: 'mage', frame: MAGE_FRAME, pivot: MAGE_PIVOT, clips: MAGE_CLIPS, draw: drawMage, scale: cfg.bake });
   slimeAtlas = bakeAtlas({ name: 'slime', frame: SLIME_FRAME, pivot: SLIME_PIVOT, clips: SLIME_CLIPS, draw: drawSlime, scale: cfg.bake });
   for (let v = 0; v < 4; v++) art.oaks.push(bakeOak(v, 3 + v));
@@ -79,7 +86,7 @@ async function boot() {
 
   world = new World('forest', { seed: 11 });
   const rng = makeRng(7);
-  const char = newCharacter('Aren', 'mage', rng); char.level = 8;
+  const char = newCharacter('Aren', cls.id, rng); char.level = 8;
   player = world.add(makeHeroActor(char, 700, 950));
   cam = { x: player.x, y: player.y }; prevPos = { x: player.x, y: player.y };
   for (let i = 0; i < cfg.mobs; i++) spawnSlime();
@@ -182,7 +189,7 @@ function simStep() {
   const intent = { mx: md.x, my: md.y, aimX: aim.x, aimY: aim.y, attack: false, cast: null };
   if (pending && performance.now() / 1000 >= pending.at) {
     if (pending.kind === 'skill') intent.cast = pending.idx; else intent.attack = true;
-    if (cfg.hero) { const f = HERO_FX[cfg.hero]; spawnVfx(vfx, KIND_BY_STYLE[f.style], { x: player.x, y: player.y, ang: Math.atan2(aim.y - player.y, aim.x - player.x), big: pending.kind === 'skill', color: f.color, core: f.core }); }
+    if (cfg.hero) spawnActionVfx(pending, aim);
     pending = null;
   }
   const t0 = performance.now();
@@ -192,6 +199,15 @@ function simStep() {
   world.events.length = 0;
 }
 const casts = new Set();
+// Efeito visual da ação (golpe ou skill) na cor da skill real; só desenho, nasce no quadro de disparo.
+function spawnActionVfx(pk, aim) {
+  const f = HERO_FX[cfg.hero], isSkill = pk.kind === 'skill', sk = isSkill ? SKILLS[cls.skills[pk.idx]] : null;
+  const kind = HERO_ACTIONS[cfg.hero][isSkill ? pk.idx + 1 : 0];
+  const ang = Math.atan2(aim.y - player.y, aim.x - player.x);
+  let x = player.x, y = player.y, len = sk?.dist ?? 200;
+  if (kind === 'rain') { const d = Math.min(Math.hypot(aim.x - player.x, aim.y - player.y), sk.range); x = player.x + Math.cos(ang) * d; y = player.y + Math.sin(ang) * d; }
+  spawnVfx(vfx, kind, { x, y, ang, big: isSkill, color: sk?.color ?? f.color, core: f.core, r: sk?.radius ?? 100, len, life: kind === 'rain' ? sk.ticks * sk.interval + 0.5 : undefined });
+}
 
 function gameLogic(dt) {
   if (player.dead) { reviveT += dt; if (reviveT > 2.2) { player.dead = false; player.deadT = 0; player.hp = player.maxHp; reviveT = 0; anims.get(player.id)?.anim.play('idle', true); } }
@@ -309,7 +325,7 @@ function render(dt, now) {
   for (const p of world.projectiles) {
     if (p.dead) continue;
     const s = iso.toScreen(p.x, p.y, 38), x = s.x + ox, y = s.y + oy, R = (p.radius + 6) * cfg.zoom;
-    const pc = cfg.hero ? HERO_FX[cfg.hero].color : p.color; // o projétil real (do Mago) ganha a cor do herói escolhido
+    const pc = p.color;
     drawSprite(g, glowSprite(pc), x, y, R * 0.07 * 4, 0.9);
     drawSprite(g, glowSprite(pc), x, y, R * 0.07 * 2, 1);
     drawSprite(g, glowSprite('#fff4d8'), x, y, R * 0.07 * 0.9, 0.85);
@@ -346,16 +362,16 @@ function render(dt, now) {
 }
 
 // ---------- HUD (DOM) ----------
-const SK = [{ id: 'basic', key: 'Clique', icon: '🔮', name: 'Ataque' }, ...CLASSES.mage.skills.map((s, i) => ({ id: 's' + i, key: String(i + 1), icon: SKILLS[s].icon, name: SKILLS[s].name, cd: SKILLS[s].cd }))];
 function buildHud() {
+  SK = [{ id: 'basic', key: 'Clique', icon: cls.icon, name: 'Ataque' }, ...cls.skills.map((s, i) => ({ id: 's' + i, key: String(i + 1), icon: SKILLS[s].icon, name: SKILLS[s].name, cd: SKILLS[s].cd }))];
   $('hud-skills').innerHTML = SK.map((s) => `<div class="slot" id="sl-${s.id}"><span class="ic">${s.icon}</span><span class="key">${s.key}</span><i class="cd"></i><b class="cdt"></b></div>`).join('');
 }
 function updateHud() {
   const p = player;
   $('hp-fill').style.width = `${(100 * Math.max(0, p.hp)) / p.maxHp}%`;
   $('hp-text').textContent = `${Math.ceil(Math.max(0, p.hp))} / ${p.maxHp}`;
-  const max = { basic: CLASSES.mage.basic.cd / p.stats.atkSpeed };
-  CLASSES.mage.skills.forEach((s, i) => { max['s' + i] = SKILLS[s].cd; });
+  const max = { basic: cls.basic.cd / p.stats.atkSpeed };
+  cls.skills.forEach((s, i) => { max['s' + i] = SKILLS[s].cd; });
   for (const s of SK) {
     const cd = p.cds[s.id] ?? 0, el = $('sl-' + s.id);
     el.style.setProperty('--p', cd > 0 ? Math.min(1, cd / max[s.id]).toFixed(3) : '0');
@@ -387,5 +403,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-buildHud();
 boot();

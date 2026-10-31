@@ -35,7 +35,14 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
   | 720p, 30° | 117 | 116 | 125 | 135 | 110 |
   | 720p, zoom 1,5 | 156 | 125 | 122 | 128 | 133 |
   Leitura: os heróis em miniatura ficam no mesmo patamar do mago desenhado; 1080p em uso fica em ~58-73 FPS (meta: 60) e o pior caso (canvas 4K) em ~29-36 FPS (meta: ≥30; o Sacerdote ficou 1 FPS abaixo, dentro da variação). Sem erros de console em nenhuma das 35 medições. Não medido em celular.
-- **Observação:** as skills 1-3 continuam as do Mago (Bola de Fogo, Nova de Gelo, Teleporte) com o rosto do herói escolhido; as skills de cada classe são propostas em `designs.js`, não implementadas.
+- **Classe real por herói (2026-10-30):** o jogo já tem 4 classes em `data/classes.js` (Guerreiro, Mago, Arqueiro, **Clérigo**). No PoC, `?hero=` escolhe a classe: Paladino = Guerreiro, Aprendiz = Mago, Franco-atirador = Arqueiro, Sacerdote = Clérigo. Ataque básico, skills 1-3, recargas, dano e HUD são os REAIS dessa classe (sem alterar `public/src/`). O Místico não tem classe no jogo (nova, a desenhar).
+  | Herói | Básico | Skill 1 | Skill 2 | Skill 3 |
+  |---|---|---|---|---|
+  | Paladino (Guerreiro) | golpe de espada (corpo a corpo) | Golpe Giratório (onda) | Investida (rasto) | Grito de Guerra (aura) |
+  | Aprendiz (Mago) | projétil | Bola de Fogo (magia) | Nova de Gelo (onda) | Teleporte (clarão) |
+  | Franco (Arqueiro) | tiro | Chuva de Flechas (chuva na área) | Tiro Perfurante (tiro) | Rolamento (rasto) |
+  | Sacerdote (Clérigo) | golpe de maça (corpo a corpo) | Luz Sagrada (coluna de luz) | Escudo Divino (aura/bolha) | Julgamento (raio) |
+  As skills de `designs.js` ("Rajada de Runas", "Armadilha de Cristal"...) eram propostas anteriores e **não** foram usadas; vale a classe real do jogo.
 
 ## Efeitos dos golpes (PoC, 2026-10-30)
 `public/labs/iso-poc/src/vfx.js` — só visual, procedural (os modelos não trazem efeitos), em camadas aditivas sobre o sprite; a simulação não os conhece.
@@ -47,7 +54,7 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
 | Sacerdote | `pray` | coluna de luz, anel no chão (no plano isométrico) e grãos de luz subindo |
 - Habilidade (teclas 1-3) usa o mesmo estilo em versão maior ("big"); o dano ao inimigo ganha faíscas de impacto na cor do herói; o projétil real do Mago é pintado com a cor do herói.
 - **Testado:** `tests/vfx.test.js` (4 unitários) e o e2e dos heróis confere que cada golpe cria o efeito do estilo certo. **Visto no navegador:** os 4 estilos + impacto, com a cena parada (`poc.holdVfx`, `poc.spawnVfx`). **Não validado:** o aspecto em movimento a 60 FPS (o navegador embutido rodou a ~10 FPS nesta medição) e o custo por frame.
-- Limites: o projétil continua sendo o do Mago (bola brilhante), as skills 1-3 continuam as do Mago, e não há efeito de morte nem de dano recebido pelo herói.
+- Limites: os projéteis são os da simulação (bola brilhante na cor da skill); não há efeito de morte nem de dano recebido pelo herói; Investida/Rolamento/Teleporte têm o rasto/clarão visual mas a animação do herói é a mesma de qualquer skill (não há clipe próprio de dash).
 
 ## Peso das texturas (medido, 2026-10-30)
 | Versão | Paladino | Aprendiz | Franco | Sacerdote | Como gerar |
