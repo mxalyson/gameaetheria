@@ -5,6 +5,7 @@ import { World, makeHeroActor } from '../public/src/game/sim.js';
 import { MODES, newMatch, controlTick, matchWinner, spawnSlots } from '../public/src/core/match.js';
 import { applyMatchResult } from '../public/src/core/rewards.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
+import { wire } from './wire.js';
 
 export const COUNTDOWN = 3;   // s
 export const RESULT_SHOW = 5; // s com o resultado na tela antes de fechar a sala
@@ -141,18 +142,5 @@ export class MatchRoom {
     const head = this.snapshotJson().slice(0, -1);
     this.bytes = head.length;
     for (const p of this.humans()) if (p.session.ws && p.session.player === p) this.send.raw(p.session, head + `,"ack":${p.lastSeq}}`);
-  }
-}
-
-function wire(ev) {
-  const id = (a) => a?.id ?? null;
-  switch (ev.type) {
-    case 'hit': return { e: 'hit', src: id(ev.src), target: id(ev.target), amount: ev.amount, crit: !!ev.crit, absorbed: !!ev.absorbed };
-    case 'heal': return { e: 'heal', actor: id(ev.actor), amount: ev.amount };
-    case 'swing': return { e: 'swing', actor: id(ev.actor) };
-    case 'cast': return { e: 'cast', actor: id(ev.actor), skill: ev.skill };
-    case 'status': return { e: 'status', actor: id(ev.actor), kind: ev.kind, dur: r1(ev.dur) };
-    case 'death': return { e: 'death', actor: id(ev.actor), killer: id(ev.killer) };
-    default: return null;
   }
 }

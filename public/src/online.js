@@ -61,10 +61,10 @@ export class CloudSave {
   constructor(online, { every = 8000, onSync, onReject } = {}) {
     Object.assign(this, { online, every, onSync, onReject, charId: null, rev: 0, dirty: false, busy: false, last: 0, getDoc: null });
   }
-  attach(charId, rev, getDoc) { Object.assign(this, { charId, rev, getDoc, dirty: false, busy: false, last: Date.now() }); }
-  detach() { this.charId = null; this.getDoc = null; this.dirty = false; }
+  attach(charId, rev, getDoc) { Object.assign(this, { charId, rev, getDoc, dirty: false, busy: false, last: Date.now(), paused: false }); }
+  detach() { this.charId = null; this.getDoc = null; this.dirty = false; this.paused = false; }
   markDirty() { this.dirty = true; }
-  tick(now = Date.now()) { if (this.dirty && !this.busy && this.charId != null && now - this.last >= this.every) return this.flush(); }
+  tick(now = Date.now()) { if (this.paused) return; if (this.dirty && !this.busy && this.charId != null && now - this.last >= this.every) return this.flush(); }
   async flush({ keepalive = false } = {}) {
     if (this.charId == null || this.busy) return false;
     this.busy = true; this.dirty = false; this.last = Date.now();

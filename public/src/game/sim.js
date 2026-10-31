@@ -293,6 +293,7 @@ export class World {
     const ang = Math.atan2(ay - a.y, ax - a.x);
     const cos = Math.cos(ang), sin = Math.sin(ang);
     a.facing = ang;
+    let castTarget = null; // ground_aoe: onde a área cai (o cliente desenha o efeito no mesmo ponto)
     switch (s.kind) {
       case 'aoe_self':
         this.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius, color: s.color, t: 0, life: 0.45 });
@@ -329,6 +330,7 @@ export class World {
         break;
       case 'ground_aoe': {
         const d = Math.min(s.range, Math.hypot(ax - a.x, ay - a.y));
+        castTarget = { x: a.x + cos * d, y: a.y + sin * d };
         this.areas.push({ x: a.x + cos * d, y: a.y + sin * d, r: s.radius, ticks: s.ticks, interval: s.interval, next: 0.2, src: a, mult: s.mult, color: s.color, t: 0 });
         break;
       }
@@ -341,7 +343,7 @@ export class World {
         break;
       }
     }
-    this.events.push({ type: 'cast', actor: a, skill: id, t: this.time });
+    this.events.push({ type: 'cast', actor: a, skill: id, t: this.time, ang, ...(castTarget ? { tx: castTarget.x, ty: castTarget.y } : {}) });
     return true;
   }
 

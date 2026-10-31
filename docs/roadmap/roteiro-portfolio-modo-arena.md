@@ -146,3 +146,6 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 
 ### 10.9 P6 — salas, grupos e sincronização (2026-10-31)
 - Lobby com grupos/convites, fila 1×1/2×2/4×4 por rating e poder, bots que completam vagas, abandono tratado, recompensas por modo. **160 unitários e 64 e2e.** Detalhes e medições: decisão 0010. O jogo real ainda não usa o servidor de salas (P7).
+
+### 10.10 P7 — arena PvP e cooperativo no jogo real (2026-10-31)
+- Partidas com jogadores reais e cooperativo (ondas + chefe) no cliente principal, grupos e fila no jogo, servidor autoritativo com loot e XP. **169 unitários e 68 e2e.** Detalhes e limites: decisão 0011.

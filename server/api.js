@@ -39,7 +39,7 @@ function reId(doc) {
   return doc;
 }
 
-export function createApi(db, { googleClientId = null, origins = [], trustProxy = false, fetchJwks, now = () => Date.now() } = {}) {
+export function createApi(db, { googleClientId = null, origins = [], trustProxy = false, fetchJwks, gameUrl = null, now = () => Date.now() } = {}) {
   const auth = createAuth(db, { googleClientId, fetchJwks, now });
   const ipLimit = new Map(), authLimit = new Map();
   const limited = (map, key, max) => { let l = map.get(key); if (!l) map.set(key, (l = new RateLimiter(max))); return !l.allow(now()); };
@@ -68,7 +68,7 @@ export function createApi(db, { googleClientId = null, origins = [], trustProxy 
     const route = `${req.method} ${url.pathname}`;
     try {
       // ---- públicas ----
-      if (route === 'GET /api/config') return json(res, 200, { googleClientId, maxCharacters: MAX_CHARACTERS, requireAccount: true }, cors), true;
+      if (route === 'GET /api/config') return json(res, 200, { googleClientId, maxCharacters: MAX_CHARACTERS, requireAccount: true, gameUrl }, cors), true;
       if (['POST /api/register', 'POST /api/login', 'POST /api/google', 'POST /api/recover'].includes(route)) {
         if (limited(authLimit, ip, 10)) { err(res, 429, 'rate_limit', 'Muitas tentativas de login. Aguarde um minuto.', cors); return true; }
         const b = await readJson(req, SMALL);

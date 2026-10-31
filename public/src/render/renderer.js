@@ -881,6 +881,14 @@ function drawBars(g, a, isPlayer) {
     g.fillStyle = '#ffe9a0';
     g.fillRect(x, top - 3, Math.min(w, w * a.shield / a.maxHp), 2);
   }
+  // Marcador de time que NÃO depende só da cor (partidas online): losango = aliado, quadrado = adversário
+  if (a.mark) {
+    const mx = x - 9, my = top + 2.5;
+    g.fillStyle = a.mark === 'ally' ? '#6fb8ff' : '#ff6b6b'; g.strokeStyle = 'rgba(20,20,35,0.8)'; g.lineWidth = 1.5;
+    g.beginPath();
+    if (a.mark === 'ally') { g.moveTo(mx, my - 5); g.lineTo(mx + 5, my); g.lineTo(mx, my + 5); g.lineTo(mx - 5, my); g.closePath(); } else g.rect(mx - 4, my - 4, 8, 8);
+    g.fill(); g.stroke();
+  }
   g.font = '800 11px Nunito, system-ui, sans-serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';

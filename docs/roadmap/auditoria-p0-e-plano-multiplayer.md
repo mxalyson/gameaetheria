@@ -280,3 +280,10 @@ P0 Auditoria ──▶ P1 Classes+combate estável ──┬──▶ P3 Save ve
 - **Medido (esta máquina):** snapshot 4×4 ≈ 2,3 KB (≈ 45 KB/s por jogador a 20 Hz — **acima do alvo**); CPU de 40 salas 4×4 (320 atores de IA) ≈ 1,6 ms por tick, com picos de 25–36 ms (GC/JIT) acima do tick de 16,7 ms. **Nada disso foi medido com rede ou jogadores reais.**
 - **Defeitos/lacunas encontrados e tratados:** (1) abandono na contagem punia o time inteiro → agora cancela a partida sem punir; (2) o desertor poderia ser premiado se seu time vencesse com um bot no lugar → agora conta derrota; (3) o rating do adversário usava ratings já atualizados → ratings "de antes".
 - **Não feito:** ligar o **jogo real** (renderer) ao servidor de salas — é a **P7** (arena PvP e conteúdo cooperativo no cliente principal); chat; amigos; guildas; otimização de banda; investigação dos picos de CPU.
+
+---
+## Atualização — P7 concluída (2026-10-31): arena PvP e conteúdo cooperativo no jogo real
+- **Implementado e testado (local):** o jogo real (modo online) joga partidas 1×1/2×2/4×4 contra jogadores reais e **cooperativo** (5 ondas + chefe, PvE **autoritativo** no servidor, com XP, ouro e loot decididos e gravados lá); painel de grupo (tecla G), fila pelo painel da Arena, marcador de time por forma (losango/quadrado), nome e nível, aviso de perigo do chefe por evento. Decisão **0011**.
+- **Testes executados:** 169 unitários (9 novos de cooperativo) e 68 e2e (4 novos no **jogo real**: 1×1 em dois navegadores, grupo + 2×2 em quatro, cooperativo até o chefe, servidor indisponível). Última execução completa: 67 passaram e 1 oscilou (laboratório; passou sozinho). Capturas de tela da arena e do cooperativo conferidas.
+- **Defeitos encontrados e corrigidos na P7:** (1) a recompensa chegava antes do snapshot "over" e era sobrescrita por "Calculando…" (corrida); (2) o teste de perseguição travava nos pilares (a IA já os contornava; o cliente de teste não).
+- **Limites:** projéteis do cliente são só visuais; **cooperativo ainda sem balanceamento** (recompensa provavelmente generosa); zonas de exploração continuam sem servidor; sem chat, amigos, guildas; nada medido em rede real ou com carga.

@@ -16,6 +16,9 @@ import { chooseSpec, specInfo, activeSpec } from './core/specs.js';
 import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.js';
 import { cleanName } from './core/savedoc.js';
 import { apiUrl, Online, CloudSave } from './online.js';
+import { NetClient } from './net/client.js';
+import { noticeText } from './ui/ui.js';
+import { skillOf } from './core/specs.js';
 import { PRICES } from './shop.js';
 import { TouchControls } from './touch.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
@@ -90,6 +93,9 @@ class Game {
       this.touch.update(this);
     }
     this.cloud?.tick();
+    if (this.net?.connected && (this.netPingT = (this.netPingT ?? 0) - dt) <= 0) { this.net.ping(); this.netPingT = 2; }
+    if (this.net?.queue && this.mode === 'explore') { this.ui.banner(`🔎 Procurando ${this.net.queue.mode === 'coop' ? 'cooperativo' : this.net.queue.mode}… ${this.net.queue.waited}s`); this.netBanner = true; }
+    else if (this.netBanner && this.mode === 'explore') { this.ui.banner(null); this.netBanner = false; }
     this.input.endFrame();
     requestAnimationFrame((t) => this.frame(t));
   }
@@ -98,6 +104,14 @@ class Game {
   act(action, arg) {
     switch (action) {
       case 'continue': this.loadGame(loadChar()); break;
+      case 'net-queue': this.netQueue(arg); break;
+      case 'net-cancel': this.net?.cancelQueue(); break;
+      case 'net-leave': this.leaveNetMatch(); break;
+      case 'party-invite': { const n = document.getElementById('party-name')?.value?.trim(); if (n) this.net?.invite(n); break; }
+      case 'party-accept': this.net?.accept(Number(arg)); this.ui.render(); break;
+      case 'party-decline': this.net?.decline(Number(arg)); this.ui.render(); break;
+      case 'party-leave': this.net?.leaveParty(); break;
+      case 'party-kick': this.net?.kick(arg); break;
       case 'auth-mode': this.showAuth(arg); break;
       case 'auth-login': case 'auth-register': case 'auth-recover': this.submitAuth(action); break;
       case 'auth-google': this.authGoogle(arg); break;
@@ -270,6 +284,7 @@ class Game {
     this.charId = id;
     this.cloud.attach(id, rev, () => this.char);
     this.loadGame(doc);
+    this.connectNet();
   }
 
   async deleteCharacter(id) {
@@ -288,6 +303,7 @@ class Game {
   // Grava o que falta e solta o personagem (trocar de personagem ou sair da conta).
   async leaveCharacter() {
     if (this.cloud?.charId != null) { this.cloud.markDirty(); await this.cloud.flush(); this.cloud.detach(); }
+    this.disconnectNet();
     this.char = null; this.charId = null; this.mode = 'title'; this.ui.banner(null);
   }
 
@@ -304,6 +320,247 @@ class Game {
   }
 
   flushCloud() { return this.cloud?.flush(); }
+
+  // ---------------- multiplayer no jogo real (servidor autoritativo) ----------------
+  async connectNet() {
+    this.disconnectNet();
+    const url = this.online?.config?.gameUrl;
+    if (!url || !this.online.token || this.charId == null) return;
+    const refresh = () => { if (this.ui.isOpen('party') || this.ui.isOpen('arena')) this.ui.render(); };
+    const net = this.net = new NetClient({
+      url, session: this.online.token, characterId: this.charId,
+      handlers: {
+        party: refresh,
+        queue: () => { refresh(); },
+        invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (tecla G)`, 'gold'); refresh(); },
+        notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
+        reject: (m) => { if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast('Servidor de partidas', noticeText({ ...m, t: 'reject' }), ''); },
+        matchFound: (m) => this.enterNetMatch(m),
+        snap: (s) => this.onNetSnap(s),
+        reward: (m) => this.onNetReward(m),
+        matchEnd: () => { this.netEnded = true; },
+        close: () => { if (this.mode === 'net') this.ui.toast('Conexão', 'Reconectando ao servidor de partidas…', ''); },
+      },
+    });
+    try { await net.connect(); refresh(); }
+    catch (e) { this.ui.log(e.message === 'already_online' ? 'Este personagem já está conectado em outro lugar.' : 'Servidor de partidas indisponível: o PvP online e o cooperativo ficam desligados.', '#ffb4a8'); this.net = null; }
+  }
+  disconnectNet() { this.net?.close(); this.net = null; this.netBanner = false; }
+
+  async netQueue(mode) {
+    if (!this.net?.joined) return this.ui.toast('Servidor de partidas', 'Ainda conectando…', '');
+    if (this.mode !== 'explore') return;
+    await this.cloud?.flush(); // grava o progresso ANTES: as recompensas da partida são gravadas pelo servidor em cima dessa versão
+    this.net.queueFor(mode);
+  }
+
+  enterNetMatch(m) {
+    if (this.mode === 'net' && this.netInfo?.room === m.room) { this.netInfo = m; return; } // reconexão na mesma sala
+    this.ui.closePanels(); this.ui.hideScreen();
+    if (this.cloud) this.cloud.paused = true; // durante a partida o servidor é quem altera o personagem
+    const w = new World(m.mode === 'coop' ? 'waves' : 'arena_team', { visuals: true });
+    this.world = w; this.mode = 'net'; this.netInfo = m; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
+    this.netActors = new Map(); this.netMobs = new Map(); this.netSnaps = []; this.netPred = null; this.netT = 0; this.netCastPending = null; this.netVProj = [];
+    for (const p of m.players) {
+      const doc = newCharacter(p.name, p.classId, makeRng(p.id)); doc.level = p.level ?? 10;
+      const mine = p.id === m.you, ally = p.team === m.team;
+      const a = makeHeroActor(doc, 550, 550, mine ? 'player' : 'rival', ally ? 1 : 2);
+      a.name = p.bot ? p.name + ' (bot)' : p.name; a.netId = p.id; a.mark = mine ? null : ally ? 'ally' : 'foe';
+      w.add(a); this.netActors.set(p.id, a);
+    }
+    this.player = this.netActors.get(m.you);
+    const st = computeStats(this.char);
+    Object.assign(this.player, { stats: st, maxHp: st.maxHp, hp: st.maxHp, classId: this.char.classId, spec: activeSpec(this.char), level: this.char.level });
+    if (m.objective) w.objective = { ...m.objective, owner: 0, contested: false };
+    this.cam = this.renderer.camera(w, this.player);
+    this.ui.toast(m.mode === 'coop' ? 'Cooperativo' : `Partida ${m.mode}`, m.mode === 'coop' ? 'Cinco ondas e um chefe: sobrevivam juntos!' : 'Segure o ponto central e vença o time rival.', 'gold');
+  }
+
+  // snapshot do servidor: guarda para interpolar e dispara os efeitos dos EVENTOS confirmados (a apresentação nunca decide dano)
+  onNetSnap(s) {
+    if (this.mode !== 'net' || s.room !== this.netInfo?.room) return;
+    s.at = performance.now();
+    this.netSnaps.push(s); if (this.netSnaps.length > 24) this.netSnaps.shift();
+    this.netLast = s;
+    const w = this.world, my = this.netInfo.team;
+    if (w.objective && s.match) { w.objective.owner = s.match.owner ? (s.match.owner === my ? 1 : 2) : 0; }
+    for (const e of s.events) this.netEvent(e);
+    if (s.state === 'over' && !this.netOver) { this.netOver = true; this.showNetResult(s); }
+  }
+
+  netEntity(id) { return this.netActors.get(id) ?? this.netMobs.get(id) ?? null; }
+
+  netEvent(e) {
+    const w = this.world, a = e.actor != null ? this.netEntity(e.actor) : null;
+    switch (e.e) {
+      case 'hit': {
+        const t = this.netEntity(e.target); if (!t) break;
+        t.hitFlash = 0.12;
+        const mine = t === this.player;
+        w.addText({ x: t.x + (Math.random() - 0.5) * 16, y: t.y - t.r - 12, t: 0, life: 0.9, text: e.absorbed ? 'absorvido' : String(e.amount), size: e.crit ? 21 : 15, color: e.absorbed ? '#ffe9a0' : mine ? '#ff6b6b' : e.crit ? '#ffd166' : '#ffffff' });
+        w.burst(t.x, t.y, mine ? '#ff8080' : '#ffffff', e.crit ? 10 : 5, 140);
+        break;
+      }
+      case 'heal': if (a) w.addText({ x: a.x, y: a.y - a.r - 14, t: 0, life: 0.9, text: '+' + e.amount, size: 15, color: '#7dff9b' }); break;
+      case 'swing': {
+        if (!a) break;
+        a.swing = 0.25;
+        const b = a.kind === 'mob' ? null : CLASSES[a.classId]?.basic;
+        if (!b) break;
+        if (b.kind === 'melee') w.addFx({ type: 'slash', x: a.x, y: a.y, ang: e.ang ?? a.facing, arc: b.arc, r: b.range, t: 0, life: 0.2, color: b.color });
+        else this.netShoot(a, e.ang ?? a.facing, b);
+        break;
+      }
+      case 'cast': {
+        if (!a) break;
+        a.swing = 0.3;
+        const s = skillOf(a.classId, a.spec ?? null, e.skill);
+        if (s.kind === 'aoe_self' || s.kind === 'buff') { w.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius ?? 60, color: s.color, t: 0, life: 0.45, follow: s.kind === 'buff' ? a : undefined }); w.burst(a.x, a.y, s.color, 18, 180); }
+        else if (s.kind === 'projectile') this.netShoot(a, e.ang ?? a.facing, s);
+        else if (s.kind === 'ground_aoe' && e.tx != null) { w.addFx({ type: 'ring', x: e.tx, y: e.ty, r: s.radius, color: s.color, t: 0, life: 0.6 }); w.burst(e.tx, e.ty, s.color, 20, 160); }
+        else { w.burst(a.x, a.y, s.color ?? '#fff', 14, 150); }
+        break;
+      }
+      case 'death': { const t = this.netEntity(e.actor); if (t) w.burst(t.x, t.y, t.kind === 'mob' ? MOBS[t.mobId]?.color ?? '#fff' : '#ffffff', 26, 220); break; }
+      case 'telegraph': w.telegraphs.push({ x: e.x, y: e.y, r: e.r, t: 0, delay: e.delay, color: e.color, done: false, src: { dead: false } }); break;
+      case 'wave': this.ui.toast(e.boss ? 'Onda final: o chefe!' : `Onda ${e.n}`, '', 'gold'); break;
+      case 'wave_clear': this.ui.toast(`Onda ${e.n} vencida!`, 'Recuperem o fôlego…', 'gold'); break;
+      case 'revive': if (a) w.burst(a.x, a.y, '#ffe9a0', 20, 160); break;
+      case 'left': this.ui.log('Um jogador saiu da partida.', '#ffb4a8'); break;
+    }
+  }
+
+  // projétil só VISUAL (o dano vem do servidor): voa em linha reta até o alcance
+  netShoot(a, ang, spec) {
+    this.world.projectiles.push({ x: a.x + Math.cos(ang) * (a.r + 4), y: a.y + Math.sin(ang) * (a.r + 4), vx: Math.cos(ang) * spec.speed, vy: Math.sin(ang) * spec.speed, ang,
+      team: a.team, src: a, mult: 0, radius: spec.radius ?? 6, color: spec.color ?? '#fff', range: spec.range ?? 500, traveled: 0, pierce: false, explode: 0, stun: 0, hit: new Set(), dead: false, cosmetic: true });
+  }
+
+  netStep(dt) {
+    const w = this.world, p = this.player, inp = this.input, net = this.net;
+    // ---- entrada: só INTENÇÕES, a ~30 Hz ----
+    let intent = { mx: 0, my: 0, aimX: p.x, aimY: p.y, attack: false, cast: null };
+    if (this.touch.active) intent = { ...this.touch.read(p, w) };
+    else {
+      let cast = null;
+      ['1', '2', '3'].forEach((k, i) => { if (inp.hit(k)) cast = i; });
+      intent = {
+        mx: (inp.held('d', 'arrowright') ? 1 : 0) - (inp.held('a', 'arrowleft') ? 1 : 0), my: (inp.held('s', 'arrowdown') ? 1 : 0) - (inp.held('w', 'arrowup') ? 1 : 0),
+        aimX: inp.mouse.x / this.renderer.zoom + this.cam.x, aimY: inp.mouse.y / this.renderer.zoom + this.cam.y, attack: inp.mouse.down, cast,
+      };
+    }
+    if (intent.cast != null) this.netCastPending = intent.cast;
+    this.netIntent = intent;
+    if (this.netInfo && this.netLast?.state !== 'over' && ((this.netT += dt) >= 1 / 30 || this.netCastPending != null)) {
+      this.netT = 0;
+      net?.sendInput({ ...intent, cast: this.netCastPending });
+      this.netCastPending = null;
+    }
+    this.updateNet(dt);
+    const focus = p.dead ? ([...this.netActors.values()].find((a) => !a.dead && a.mark !== 'foe') ?? p) : p;
+    const target = this.renderer.camera(w, focus), k = Math.min(1, dt * 8);
+    this.cam = { x: this.cam.x + (target.x - this.cam.x) * k, y: this.cam.y + (target.y - this.cam.y) * k };
+    this.nearNpc = null;
+  }
+
+  updateNet(dt) {
+    const w = this.world, snaps = this.netSnaps, last = this.netLast;
+    if (!last) { w.updateVisuals(dt); return; }
+    const now = performance.now() - 100; // interpolação: desenha 100 ms no passado
+    let a = snaps[0], b = snaps[snaps.length - 1];
+    for (let i = 0; i < snaps.length - 1; i++) { if (snaps[i].at <= now && now <= snaps[i + 1].at) { a = snaps[i]; b = snaps[i + 1]; break; } }
+    const k = b === a ? 1 : Math.max(0, Math.min(1, (now - a.at) / (b.at - a.at || 1)));
+    const lerp = (list, id, key) => { const x = list.find((e) => e.id === id), y = b[list === a.actors ? 'actors' : 'mobs']?.find((e) => e.id === id) ?? x; return x && y ? x[key] + (y[key] - x[key]) * k : null; };
+    const apply = (ent, se, isMob) => {
+      const ax = lerp(isMob ? a.mobs : a.actors, se.id, 'x'), ay = lerp(isMob ? a.mobs : a.actors, se.id, 'y');
+      ent.x = ax ?? se.x; ent.y = ay ?? se.y;
+      ent.hp = se.hp; ent.maxHp = se.maxHp; ent.facing = se.facing; ent.moving = se.moving;
+      if (se.dead && !ent.dead) ent.deadT = 0;
+      ent.dead = se.dead; ent.deadT = se.dead ? ent.deadT + dt : 0;
+      ent.swing = se.swing ? Math.max(ent.swing, 0.1) : Math.max(0, ent.swing - dt);
+      ent.stunT = se.stun ? 1 : 0; ent.shield = se.shield ?? 0;
+      ent.hitFlash = Math.max(0, (ent.hitFlash ?? 0) - dt);
+      if (se.moving) ent.walk += dt * (se.spd ?? 200) / 28;
+    };
+    for (const se of last.actors) {
+      const ent = this.netActors.get(se.id); if (!ent) continue;
+      apply(ent, se, false);
+      if (ent === this.player) {
+        // predição só do movimento do PRÓPRIO jogador, corrigida pelo servidor
+        const i = this.netIntent ?? {}, len = Math.hypot(i.mx ?? 0, i.my ?? 0);
+        const pr = (this.netPred ??= { x: se.x, y: se.y });
+        if (se.dead || Math.hypot(pr.x - se.x, pr.y - se.y) > 120 || last.state !== 'fight') { pr.x = se.x; pr.y = se.y; }
+        else { if (len > 0.01) { pr.x += (i.mx / len) * se.spd * dt; pr.y += (i.my / len) * se.spd * dt; } pr.x += (se.x - pr.x) * 0.12; pr.y += (se.y - pr.y) * 0.12; }
+        ent.x = pr.x; ent.y = pr.y;
+        ent.cds = { ...se.cds };
+        if (se.maxHp) { ent.hp = se.hp; ent.maxHp = se.maxHp; }
+      }
+    }
+    // monstros do cooperativo: cria/atualiza/remove conforme o snapshot
+    if (last.mobs) {
+      const present = new Set();
+      for (const sm of last.mobs) {
+        present.add(sm.id);
+        let m = this.netMobs.get(sm.id);
+        if (!m) { m = makeMobActor(sm.mob, sm.level, sm.x, sm.y, { elite: sm.elite }); m.netId = sm.id; w.add(m); this.netMobs.set(sm.id, m); }
+        apply(m, sm, true);
+      }
+      for (const [id, m] of this.netMobs) if (!present.has(id)) { w.actors = w.actors.filter((x) => x !== m); this.netMobs.delete(id); }
+    }
+    // projéteis visuais e avisos de perigo
+    for (const pr of w.projectiles) { pr.x += pr.vx * dt; pr.y += pr.vy * dt; pr.traveled += Math.hypot(pr.vx, pr.vy) * dt; if (pr.traveled >= pr.range) pr.dead = true; }
+    w.projectiles = w.projectiles.filter((pr) => !pr.dead);
+    for (const tg of w.telegraphs) { tg.t += dt; if (tg.t >= tg.delay) tg.done = true; }
+    w.telegraphs = w.telegraphs.filter((tg) => !tg.done);
+    w.time += dt;
+    w.updateVisuals(dt);
+    // faixa de informação da partida
+    if (!this.netOver) {
+      const my = this.netInfo.team;
+      if (last.mode === 'coop') this.ui.banner(last.state === 'countdown' ? `Começa em ${Math.ceil(last.countdown)}` : last.coop.rest > 0 ? `Onda ${last.coop.wave + 1}/${last.coop.total} em ${Math.ceil(last.coop.rest)}s` : `Onda ${last.coop.wave}/${last.coop.total} · ${last.coop.mobs} monstros`);
+      else if (last.state === 'countdown') this.ui.banner(`${this.netInfo.mode} — começa em ${Math.ceil(last.countdown)}`);
+      else if (last.match) this.ui.banner(`${last.match.score[my]} × ${last.match.score[my === 1 ? 2 : 1]} · ${last.match.left}s`);
+    }
+  }
+
+  showNetResult(s) {
+    const m = this.netInfo, coop = m.mode === 'coop';
+    const won = coop ? s.winner === 1 : s.winner === m.team, draw = !coop && s.winner === 3;
+    this.netResult = { won, draw, coop };
+    this.ui.banner(null);
+    if (this.netRewardMsg) return this.renderNetReward();
+    this.ui.showResult({
+      title: draw ? 'Empate' : won ? (coop ? 'Vitória cooperativa!' : 'Vitória!') : (coop ? 'Derrota' : 'Derrota'),
+      sub: coop ? `Ondas vencidas: ${s.coop?.wave ?? 0}/${s.coop?.total ?? 5}` : `Partida ${m.mode}`,
+      lines: ['Calculando recompensas no servidor…'], button: 'Voltar à vila', action: 'net-leave', tone: won ? 'win' : 'lose',
+    });
+  }
+
+  onNetReward(r) {
+    if (this.mode !== 'net') return;
+    this.netRewardMsg = r; // a recompensa pode chegar ANTES do snapshot 'over': guarda e mostra quando a tela de resultado existir
+    if (this.netOver) this.renderNetReward();
+  }
+
+  renderNetReward() {
+    const r = this.netRewardMsg;
+    const lines = [];
+    if (r.mode !== 'coop') lines.push(`Rating ${r.mode}: ${r.rating} (${r.ratingDelta >= 0 ? '+' : ''}${r.ratingDelta})`);
+    lines.push(`+${r.gold} 🪙`, `+${r.xp} XP${r.levels ? ` · subiu ${r.levels} nível(is)!` : ''}`);
+    if (r.items) lines.push(`${r.items} item(ns) de recompensa no inventário`);
+    if (r.converted) lines.push(`${r.converted} item(ns) viraram ouro (inventário cheio)`);
+    const nr = this.netResult ?? {};
+    this.ui.showResult({ title: nr.draw ? 'Empate' : r.won ? (r.mode === 'coop' ? 'Vitória cooperativa!' : 'Vitória!') : 'Derrota', sub: r.mode === 'coop' ? `Ondas vencidas: ${r.waves}/5` : `Partida ${r.mode}`, lines, button: 'Voltar à vila', action: 'net-leave', tone: r.won ? 'win' : 'lose' });
+  }
+
+  // volta ao jogo normal: adota o personagem OFICIAL do servidor (com as recompensas) e retoma a sincronização
+  async leaveNetMatch() {
+    this.ui.hideScreen(); this.ui.banner(null);
+    this.netInfo = null; this.netLast = null; this.netActors = null; this.netMobs = null;
+    try { const r = await this.online.getCharacter(this.charId); this.char = r.character; this.cloud.attach(this.charId, r.rev, () => this.char); } catch { /* mantém o local */ }
+    if (this.cloud) this.cloud.paused = false;
+    this.enterZone('town', TOWN.x, TOWN.y);
+  }
 
   // Avisa o jogador quando o save foi migrado, corrigido ou recuperado do backup.
   reportLoad() {
@@ -403,8 +660,10 @@ class Game {
     if (inp.hit('p')) this.ui.toggle('spirits');
     if (inp.hit('q')) this.usePotion();
     if (inp.hit('h')) this.hearth();
+    if (inp.hit('g') && this.online) this.ui.toggle('party');
     if (inp.hit('e') && this.nearNpc) this.talk(this.nearNpc);
 
+    if (this.mode === 'net') { this.netStep(dt); return; }
     if (this.mode === 'ended') {
       w.updateVisuals(dt);
     } else {
@@ -485,7 +744,7 @@ class Game {
 
   usePotion() {
     const p = this.player, c = this.char;
-    if (this.mode === 'pvp') return this.ui.log('Poções são proibidas no duelo.', '#ffb4a8');
+    if (this.mode === 'pvp' || this.mode === 'net') return this.ui.log('Poções são proibidas nas partidas.', '#ffb4a8');
     if (p.dead || this.potionCd > 0) return;
     if (!c.potions) return this.ui.log('Sem poções! Compre com a Mercadora Lia.', '#ffb4a8');
     if (p.hp >= p.maxHp) return;

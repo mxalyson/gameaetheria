@@ -14,6 +14,20 @@ import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// Textos dos avisos e recusas do servidor de partidas (o servidor manda só códigos).
+const REJECT_TEXT = {
+  pvp_locked: 'O PvP online libera no nível 10.', no_such_player: 'Jogador não encontrado (ele precisa estar online).', already_in_party: 'Esse jogador já está em um grupo.',
+  party_full: 'O grupo está cheio (4).', not_leader: 'Só o líder do grupo pode fazer isso.', party_too_big: 'O grupo é grande demais para esse modo.',
+  no_invite: 'Esse convite não vale mais.', in_match: 'Você ou alguém do grupo já está em fila ou partida.', self: 'Você não pode se convidar.',
+  member_offline: 'Alguém do grupo está desconectado.', already_queued: 'Você já está na fila.',
+};
+export const noticeText = (n) => {
+  if (n.t === 'reject') return REJECT_TEXT[n.code] ?? 'Recusado: ' + n.code;
+  if (n.code === 'invite_sent') return 'Convite enviado a ' + n.name + '.';
+  if (n.code === 'invite_declined') return n.name + ' recusou o convite.';
+  return n.code;
+};
+
 export const itemIcon = (it) => (it.slot === 'weapon' ? WEAPON_TYPES[it.weaponType].icon : SLOT_ICONS[it.slot]);
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
 
@@ -235,7 +249,7 @@ export class UI {
       const cd = cdOf[id];
       const pct = cd > 0 ? Math.min(1, cd / maxOf[id]) : 0;
       this.set(`slot-${id}`, '--p', pct.toFixed(3));
-      this.set(`slot-${id}`, 'class', 'slot' + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp') ? ' empty' : ''));
+      this.set(`slot-${id}`, 'class', 'slot' + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
     }
     for (const id of ['s0', 's1', 's2']) {
       const cd = player.cds[id];
@@ -289,7 +303,7 @@ export class UI {
   anyOpen() { return this.open.size > 0; }
   toggle(id) { this.isOpen(id) ? this.close(id) : this.openPanel(id); }
   openPanel(id) {
-    if (['shop', 'arena', 'sage'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'spirits', 'character', 'options']) this.open.delete(p);
+    if (['shop', 'arena', 'sage', 'party'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'party', 'spirits', 'character', 'options']) this.open.delete(p);
     if (id === 'options') this.open.clear();
     this.open.add(id);
     if (id === 'shop') this.open.add('inventory');
@@ -304,7 +318,7 @@ export class UI {
 
   render() {
     this.hideTooltip();
-    const order = ['character', 'arena', 'sage', 'shop', 'spirits', 'inventory', 'options'];
+    const order = ['character', 'arena', 'party', 'sage', 'shop', 'spirits', 'inventory', 'options'];
     this.layer.innerHTML = order.filter((p) => this.open.has(p)).map((p) => this['panel_' + p]()).join('');
   }
 
@@ -428,9 +442,41 @@ export class UI {
       <div class="arena-badge"><div class="wl">⚡ Seu poder: <b>${playerPower(char)}</b></div></div>
       ${pvpUnlocked(char) ? Object.entries(MODES).map(([id, md]) => `<button class="btn primary wide" data-action="match" data-arg="${id}">⚔️ Grande Arena ${md.label} · rating ${getRating(char, id)}</button>`).join('') : `<p class="hint">🔒 O PvP libera no <b>nível ${PVP_MIN_LEVEL}</b> (você está no ${char.level}).</p>`}
       <p class="hint">Times de ecos (aliados e inimigos com classe, itens e spirit próprios) na Grande Arena. Segure o ponto central: 100 pontos vencem; eliminar o outro time também. Cada modo tem seu rating. Poções desativadas.</p>
+      ${this.game.online ? this.onlineArenaBlock(char) : ''}
       <button class="btn wide" data-action="waves">🌊 Desafio de Ondas (PvE)</button>
       <p class="hint">Sobreviva a ondas crescentes de monstros. Ouro a cada onda vencida, chefes a cada 10.</p>
       <p class="soon">🌐 Em breve: duelos contra jogadores reais.</p>`);
+  }
+
+  // Arena online: partidas com jogadores reais (servidor autoritativo) e cooperativo. Só aparece com conta.
+  onlineArenaBlock(char) {
+    const net = this.game.net, q = net?.queue;
+    if (!net?.joined) return '<p class="hint">🌐 Conectando ao servidor de partidas…</p>';
+    if (q) return `<p class="hint">🔎 Procurando <b>${q.mode === 'coop' ? 'cooperativo' : q.mode}</b>… ${q.waited}s</p><button class="btn wide" data-action="net-cancel">Cancelar busca</button>`;
+    const pvp = pvpUnlocked(char);
+    const modes = Object.entries(MODES).map(([id, md]) => `<button class="btn ${pvp ? 'primary' : ''} wide" data-action="net-queue" data-arg="${id}" ${pvp ? '' : 'disabled'}>🌐 ${md.label} com jogadores reais · rating ${getRating(char, id)}</button>`).join('');
+    return `<h3>Jogadores reais</h3>${pvp ? '' : `<p class="hint">🔒 PvP online libera no nível ${PVP_MIN_LEVEL}.</p>`}${modes}
+      <button class="btn wide" data-action="net-queue" data-arg="coop">🤝 Cooperativo: ondas e chefe (1–4 jogadores)</button>
+      <p class="hint">Aliados e adversários são pareados por rating e poder; vagas vazias são preenchidas por bots. Grupo: tecla <b>G</b>.</p>
+      <button class="btn small" data-action="toggle" data-arg="party">👥 Grupo</button>`;
+  }
+
+  panel_party() {
+    const net = this.game.net;
+    if (!net?.joined) return this.frame('party', 'Grupo', '<p class="hint">Entre com sua conta e espere a conexão com o servidor de partidas.</p>');
+    const p = net.party, me = net.name;
+    const members = p ? p.members.map((m) => `<div class="shop-item"><div class="cell"><span class="ic">${CLASSES[m.classId]?.icon ?? '?'}</span></div>
+      <div><div class="nm">${esc(m.name)} ${p.leader === m.name ? '👑' : ''}</div><div class="sub">Nv ${m.level} · ${m.online ? 'online' : 'desconectado'}</div></div>
+      ${p.leader === me && m.name !== me ? `<button class="btn small" data-action="party-kick" data-arg="${esc(m.name)}">Expulsar</button>` : ''}</div>`).join('') : '<p class="hint">Você não está em um grupo. Convide alguém pelo nome.</p>';
+    const invites = net.invites.map((i) => `<div class="shop-item"><div><div class="nm">${esc(i.from)} convidou você</div></div>
+      <button class="btn small primary" data-action="party-accept" data-arg="${i.partyId}">Aceitar</button><button class="btn small" data-action="party-decline" data-arg="${i.partyId}">Recusar</button></div>`).join('');
+    const notes = net.notes.slice(-3).map((n) => `<p class="hint">${esc(noticeText(n))}</p>`).join('');
+    return this.frame('party', 'Grupo', `
+      ${invites}${members}
+      <div class="row-btns"><input id="party-name" maxlength="14" placeholder="Nome do jogador" autocomplete="off" /><button class="btn small primary" data-action="party-invite">Convidar</button></div>
+      ${p ? '<button class="btn small" data-action="party-leave">Sair do grupo</button>' : ''}
+      ${notes}
+      <p class="hint">O líder do grupo (👑) escolhe a fila; o grupo joga junto no mesmo time.</p>`);
   }
 
   panel_sage() {

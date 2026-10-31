@@ -41,6 +41,7 @@ export function mobIntent(m, w, dt) {
   // Chefes: golpe em área telegrafado sob o alvo.
   if (m.boss && m.cds.slam <= 0 && d < 450) {
     w.telegraphs.push({ x: tgt.x, y: tgt.y, r: 115, t: 0, delay: 1.1, src: m, mult: 1.8, color: M.color });
+    w.events.push({ type: 'telegraph', x: tgt.x, y: tgt.y, r: 115, delay: 1.1, color: M.color }); // o cliente desenha o aviso de perigo
     m.cds.slam = 5.5;
   }
   const it = { aimX: tgt.x, aimY: tgt.y, mx: 0, my: 0, attack: false };

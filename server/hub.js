@@ -3,6 +3,7 @@
 // é testável sem rede e o relógio é o do servidor (`step()` avança em passos fixos), nunca Date.now().
 import { randomBytes } from 'node:crypto';
 import { MatchRoom } from './room.js';
+import { CoopRoom } from './coop.js';
 import { MODES } from '../public/src/core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../public/src/core/power.js';
 import { getRating } from '../public/src/core/match.js';
@@ -13,6 +14,8 @@ import { TICK_DT, MAX_PARTY, REJECT } from '../public/src/core/protocol.js';
 
 export const INVITE_TTL = 60;        // s
 export const BOT_FILL_AFTER = 20;    // s na fila até completar com bots
+export const COOP_WAIT = 6;          // s esperando mais jogadores antes de começar o cooperativo
+const COOP_LEVEL_GAP = 8;
 const RATING_WIN = [50, 400], POWER_WIN = [0.15, 0.5], WIDEN_SEC = 40; // a janela abre linearmente com a espera
 
 export class Hub {
@@ -156,14 +159,15 @@ export class Hub {
     const p = this.partyOf(s);
     if (p && p.leader !== s) return no(REJECT.NOT_LEADER);
     const members = p ? p.members : [s];
-    const size = MODES[mode].size;
+    const coop = mode === 'coop';
+    const size = coop ? 4 : MODES[mode].size;
     if (members.length > size) return no(REJECT.PARTY_TOO_BIG);
     for (const m of members) {
       if (!m.ws) return no(REJECT.MEMBER_OFFLINE);
       if (m.room || m.queued) return no(REJECT.IN_MATCH);
-      if (!pvpUnlocked(m.char)) return no(REJECT.PVP_LOCKED, { minLevel: PVP_MIN_LEVEL, name: m.name });
+      if (!coop && !pvpUnlocked(m.char)) return no(REJECT.PVP_LOCKED, { minLevel: PVP_MIN_LEVEL, name: m.name });
     }
-    const e = { mode, members, since: this.clock, rating: avg(members.map((m) => this.rating(m, mode))), power: avg(members.map((m) => this.power(m))) };
+    const e = { mode, members, since: this.clock, rating: coop ? 0 : avg(members.map((m) => this.rating(m, mode))), power: avg(members.map((m) => this.power(m))), level: avg(members.map((m) => m.char.level)) };
     for (const m of members) m.queued = e;
     this.queue.push(e);
     for (const m of members) this.out.send(m, { t: 'queue', mode, state: 'searching' });
@@ -181,7 +185,30 @@ export class Hub {
   }
 
   // Tenta montar partidas: a entrada mais antiga é a semente; completa os dois times com grupos compatíveis e, passado BOT_FILL_AFTER, com bots.
+  // Cooperativo: junta quem espera (nível parecido) até 4 jogadores; começa com 4 ou depois de COOP_WAIT s de espera.
+  matchmakeCoop() {
+    const list = this.queue.filter((e) => e.mode === 'coop').sort((a, b) => a.since - b.since);
+    const used = new Set();
+    for (const seed of list) {
+      if (used.has(seed)) continue;
+      const groups = [seed]; let n = seed.members.length;
+      for (const e of list) if (e !== seed && !used.has(e) && n + e.members.length <= 4 && Math.abs(e.level - seed.level) <= COOP_LEVEL_GAP) { groups.push(e); n += e.members.length; }
+      if (n < 4 && this.clock - seed.since < COOP_WAIT) continue;
+      for (const g of groups) used.add(g);
+      this.startCoop(groups);
+    }
+  }
+  startCoop(groups) {
+    for (const g of groups) { this.queue = this.queue.filter((x) => x !== g); for (const m of g.members) m.queued = null; }
+    const entries = groups.flatMap((g) => g.members.map((s) => ({ session: s, doc: s.char, charId: s.charId, accountId: s.accountId })));
+    const id = this.nextRoom++;
+    const room = new CoopRoom({ id, entries, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession });
+    this.rooms.set(id, room); this.stats.matches++;
+    for (const p of room.humans()) this.sendMatchFound(p.session, room, p);
+  }
+
   matchmake() {
+    this.matchmakeCoop();
     for (const mode of Object.keys(MODES)) {
       const size = MODES[mode].size;
       const list = this.queue.filter((e) => e.mode === mode).sort((a, b) => a.since - b.since);
@@ -238,7 +265,7 @@ export class Hub {
   sendMatchFound(s, room, p) {
     this.out.send(s, { t: 'match_found', room: room.id, mode: room.mode, you: p.actor.id, team: p.team, slot: p.team, arena: { w: room.world.zone.w, h: room.world.zone.h, radius: room.world.zone.radius },
       objective: room.world.objective ? { x: room.world.objective.x, y: room.world.objective.y, r: room.world.objective.r } : null,
-      players: [...room.players.values()].map((q) => ({ id: q.actor.id, team: q.team, name: q.name, classId: q.classId, bot: q.bot })) });
+      players: [...room.players.values()].filter((q) => !q.left).map((q) => ({ id: q.actor.id, team: q.team, name: q.name, classId: q.classId, level: q.actor.level, bot: q.bot })) });
   }
 
   // ---------- relógio ----------
