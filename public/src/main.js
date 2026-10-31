@@ -1,3 +1,4 @@
+import './no-zoom.js';
 import { heroSpritesEnabled, preloadHero, showHeroLoading } from './render/hero-sprites.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';

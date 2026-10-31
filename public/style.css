@@ -232,7 +232,7 @@ button { font-family: inherit; }
 .opt-val { min-width: 54px; text-align: center; font-weight: 900; }
 
 /* ---------- celular e tablet ---------- */
-html, body { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; overscroll-behavior: none; touch-action: manipulation; }
+html, body { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; overscroll-behavior: none; touch-action: none; } /* none (não só manipulation): dois dedos em qualquer ponto não dão zoom/pinça no navegador */
 canvas#game { touch-action: none; }
 .touch-only { display: none; }
 body.touch .menu-btns .touch-only { display: inline-block; }
@@ -282,10 +282,10 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
   #stick { transform: scale(calc(var(--ui) * .85)); }
   #boss-bar { width: min(260px, calc(34vw / var(--ui))); }
 }
-/* Muito baixa (≤ 360 px): o minimapa sai (fica só o nome da zona e os botões de menu) e os botões de toque encolhem um pouco,
+/* Muito baixa (≤ 360 px): o minimapa continua visível, só menor (pedido do proprietário: "o minimapa não mostra?"); os botões de toque encolhem um pouco,
    mas nunca abaixo de 44 px (alvo mínimo de toque): os pequenos crescem antes de encolher. */
 @media (max-height: 360px) {
-  #minimap { display: none; }
+  #minimap { width: 84px; height: 56px; }
   #tbtns { transform: scale(calc(var(--ui) * .85)); }
   .tbtn.pot, .tbtn.home { width: 54px; height: 54px; }
   .portrait { width: 34px; height: 34px; font-size: 17px; }
