@@ -12,9 +12,10 @@ import { playerPower } from './power.js';
 const NAMES = ['Kael', 'Lyra', 'Thorne', 'Mira', 'Bastian', 'Selene', 'Orin', 'Vex', 'Nara', 'Darius', 'Ilya', 'Rook', 'Sora', 'Elara', 'Fenn', 'Isolde', 'Tarek', 'Yara'];
 const TITLES = ['o Errante', 'a Veloz', 'o Firme', 'a Sombria', 'o Radiante', 'a Astuta', 'o Bravo', 'a Serena'];
 
-export function generateRival(rng, player, { classId: forced, rating: forcedRating, strength = 1, spec: forcedSpec } = {}) {
+export function generateRival(rng, player, { classId: forced, rating: forcedRating, strength = 1, spec: forcedSpec, exactLevel = false } = {}) {
   const classId = forced ?? rng.pick(Object.keys(CLASSES));
-  const level = Math.max(1, Math.min(30, player.level + rng.int(-1, 1)));
+  const jitter = rng.int(-1, 1); // sempre sorteado: mantém a sequência do rng igual com ou sem exactLevel
+  const level = Math.max(1, Math.min(30, player.level + (exactLevel ? 0 : jitter)));
   const rating = Math.max(800, (forcedRating ?? player.arena.rating) + rng.int(-90, 90));
   const char = newCharacter(`${rng.pick(NAMES)} ${rng.pick(TITLES)}`, classId, rng);
   char.level = level;
@@ -32,8 +33,8 @@ export function generateRival(rng, player, { classId: forced, rating: forcedRati
     if (slot !== 'weapon' && slot !== 'armor' && (strength < 0.3 || !rng.chance(0.6))) { delete char.equipment[slot]; continue; }
     char.equipment[slot] = generateItem(rng, gearLevel, { classId, slot, weaponType: slot === 'weapon' ? cls.weapon : undefined, rarityId: rollRarity(rng, luck) });
   }
-  char.spirits = [createSpirit(rng, { level: Math.max(1, gearLevel - rng.int(0, 3)), luck })];
-  char.activeSpirit = char.spirits[0].id;
+  const spirit = createSpirit(rng, { level: Math.max(1, gearLevel - rng.int(0, 3)), luck });
+  if (strength >= 0.15) { char.spirits = [spirit]; char.activeSpirit = spirit.id; } // rival muito fraco vai sem spirit (piso de poder mais baixo)
   if (level >= SPEC_LEVEL) { const ids = Object.keys(specsOf(classId)); char.spec = forcedSpec ?? ids[rng.int(0, ids.length - 1)]; }
   char.arena.rating = rating;
   return char;
@@ -43,7 +44,7 @@ export function generateRival(rng, player, { classId: forced, rating: forcedRati
 // com a mesma semente em cada tentativa, então o resultado é determinístico para um mesmo estado do rng).
 export function generateRivalForPower(rng, player, target, opts = {}) {
   const seed = rng.int(1, 0x3fffffff);
-  const build = (strength) => generateRival(makeRng(seed), player, { ...opts, strength });
+  const build = (strength) => generateRival(makeRng(seed), player, { ...opts, strength, exactLevel: true });
   let lo = 0, hi = 1.2, best = build(hi), bestD = Math.abs(playerPower(best) - target);
   for (let i = 0; i < 9; i++) {
     const mid = (lo + hi) / 2, c = build(mid), p = playerPower(c), d = Math.abs(p - target);

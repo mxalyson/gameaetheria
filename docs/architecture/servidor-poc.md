@@ -37,3 +37,6 @@ Validação de esquema e versão · tamanho máximo · limite de taxa por conex�
 - Um processo, uma sala, tick por `setInterval` (jitter do Node); sem teste de carga nem de rede com perda/latência.
 - `ws://` sem TLS (o servidor escuta só em `127.0.0.1`); em produção, WSS atrás de proxy.
 - O `token` de reconexão viaja no `welcome`; em produção virá da autenticação da conta.
+
+## Com contas (P5)
+`npm run server` (`server/start.js`) liga o mesmo servidor com banco: o `hello` passa a ser `{session, characterId}` (protocolo **v2**); o servidor carrega o personagem **do banco** (o cliente não envia atributos), recusa convidados e grava as recompensas do duelo (ouro, XP, rating, vitória/derrota) numa transação idempotente por `matchId`+personagem. Mensagem nova: `reward`. Contas, API e limites: decisão 0009 e `docs/roadmap/auditoria-p0-e-plano-multiplayer.md`.

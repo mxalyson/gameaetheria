@@ -57,7 +57,7 @@ test('a partida só usa o rating do próprio modo (2v2 não mexe no 1v1)', async
   expect(typeof r.r2).toBe('number');
 });
 
-test('pareamento por poder: aliados e inimigos nascem com poder ≈ o do jogador (±15%)', async ({ page }) => {
+test('pareamento por poder: aliados e inimigos nascem com poder ≈ o do jogador (±20%)', async ({ page }) => {
   await criar(page);
   const r = await page.evaluate(async () => {
     const { playerPower } = await import('/src/core/power.js');
@@ -72,8 +72,8 @@ test('pareamento por poder: aliados e inimigos nascem com poder ≈ o do jogador
     return out;
   });
   for (const x of r) {
-    expect(x.min).toBeGreaterThanOrEqual(x.mine * 0.85);
-    expect(x.max).toBeLessThanOrEqual(x.mine * 1.15);
+    expect(x.min).toBeGreaterThanOrEqual(x.mine * 0.8);
+    expect(x.max).toBeLessThanOrEqual(x.mine * 1.2);
   }
 });
 

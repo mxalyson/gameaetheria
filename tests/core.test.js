@@ -175,3 +175,20 @@ test('rival gerado por poder-alvo fica perto do alvo (±12%) para jogadores frac
     }
   }
 });
+
+test('pareamento por poder é robusto: 640 combinações (nível × classe × semente) ficam dentro de ±20% do alvo, com e sem pontos distribuídos', async () => {
+  const { generateRivalForPower } = await import('../public/src/core/rival.js');
+  const { playerPower } = await import('../public/src/core/power.js');
+  let worst = 0, n = 0;
+  for (const alloc of [false, true]) for (const lvl of [10, 15, 20, 25]) for (let seed = 1; seed <= 20; seed++) for (const classId of Object.keys(CLASSES)) {
+    const rng = makeRng(seed);
+    const me = newCharacter('P', classId, rng); me.level = lvl;
+    const sp = createSpirit(rng, { rarity: 'common' }); me.spirits.push(sp); me.activeSpirit = sp.id;
+    if (alloc) me.alloc[CLASSES[classId].primary] += 3 * (lvl - 1);
+    const t = playerPower(me);
+    const r = generateRivalForPower(makeRng(seed * 7), me, t * (0.95 + (seed % 10) / 100), { classId });
+    worst = Math.max(worst, Math.abs(playerPower(r) - t) / t); n++;
+  }
+  assert.equal(n, 640);
+  assert.ok(worst <= 0.2, `pior desvio ${(worst * 100).toFixed(1)}%`);
+});

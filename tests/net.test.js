@@ -45,9 +45,9 @@ const closeAll = async (srv, ...cs) => { for (const c of cs) c.ws.terminate(); a
 
 // ---------- protocolo (sem rede) ----------
 test('protocolo: mensagens válidas passam e são normalizadas com lista branca', () => {
-  const h = decodeClient(JSON.stringify({ v: 1, t: 'hello', name: '<b>Zé</b>', classId: 'mage', token: null, extra: 'x' }));
+  const h = decodeClient(JSON.stringify({ v: PROTOCOL_VERSION, t: 'hello', name: '<b>Zé</b>', classId: 'mage', token: null, extra: 'x' }));
   assert.equal(h.ok, true); assert.equal(h.msg.name, 'bZéb'); // sem < > /, com acento assert.equal(h.msg.token, null); assert.ok(!('extra' in h.msg));
-  const i = parseClientMessage({ v: 1, t: 'input', seq: 3, mx: 999, my: -999, aimX: 1e9, aimY: 5, attack: 'yes', cast: 1, damage: 1e6 });
+  const i = parseClientMessage({ v: PROTOCOL_VERSION, t: 'input', seq: 3, mx: 999, my: -999, aimX: 1e9, aimY: 5, attack: 'yes', cast: 1, damage: 1e6 });
   assert.equal(i.ok, true);
   assert.equal(i.msg.mx, 1); assert.equal(i.msg.my, -1); assert.equal(i.msg.aimX, 10000); assert.equal(i.msg.attack, false);
   assert.ok(!('damage' in i.msg));
@@ -55,8 +55,8 @@ test('protocolo: mensagens válidas passam e são normalizadas com lista branca'
 });
 
 test('protocolo: versão errada, tipos proibidos (damage/loot/pos), NaN, skill inválida e token ruim são recusados', () => {
-  const bad = (o) => parseClientMessage({ v: 1, ...o }).code;
-  assert.equal(parseClientMessage({ v: 2, t: 'ping', ts: 1 }).code, REJECT.BAD_VERSION);
+  const bad = (o) => parseClientMessage({ v: PROTOCOL_VERSION, ...o }).code;
+  assert.equal(parseClientMessage({ v: PROTOCOL_VERSION + 1, t: 'ping', ts: 1 }).code, REJECT.BAD_VERSION);
   assert.equal(parseClientMessage({ t: 'ping', ts: 1 }).code, REJECT.BAD_VERSION);
   for (const t of ['damage', 'loot', 'pos', 'gold', 'setHp', 'admin', '']) assert.equal(bad({ t, amount: 9999 }), REJECT.BAD_MESSAGE, t);
   assert.equal(bad({ t: 'input', seq: 1, mx: NaN, my: 0, aimX: 0, aimY: 0 }), REJECT.BAD_MESSAGE);

@@ -10,7 +10,9 @@
     "test:e2e": "playwright test",
     "perf:poc": "playwright test --config=tests/perf/playwright.config.js",
     "balance": "node tools/balance.mjs",
-    "server:poc": "node server/start-poc.js"
+    "server:poc": "node server/start-poc.js",
+    "server": "node server/start.js",
+    "db:backup": "node tools/db-backup.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"

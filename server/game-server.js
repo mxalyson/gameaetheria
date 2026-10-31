@@ -11,6 +11,7 @@ import { newCharacter, POINTS_PER_LEVEL } from '../public/src/core/progression.j
 import { generateItem } from '../public/src/core/loot.js';
 import { CLASSES } from '../public/src/data/classes.js';
 import { SLOTS } from '../public/src/data/items.js';
+import { applyDuelResult } from '../public/src/core/rewards.js';
 import { decodeClient, encode, REJECT, RateLimiter, TICK_DT, SNAPSHOT_EVERY, TICK_HZ, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 
 const SPAWNS = { 1: { x: 550, y: 840, facing: -Math.PI / 2 }, 2: { x: 550, y: 260, facing: Math.PI / 2 } };
@@ -34,12 +35,14 @@ const r1 = (n) => Math.round(n * 10) / 10;
 export function createGameServer({
   port = 5175, host = '127.0.0.1', autoTick = true, seed = 12345, allowedOrigins = null,
   maxMsgPerSec = 120, maxErrors = 5, reconnectSec = 30, heartbeatMs = 10000,
+  db = null,                 // com banco: jogadores entram com conta + personagem do servidor e as recompensas são gravadas
+  allowGuests = !db,         // sem banco (PoC/testes) aceita convidados com personagem padrão; com banco, conta é obrigatória
 } = {}) {
   const rng = makeRng(seed);
   const world = new World('arena', { seed, visuals: false });
   const players = new Map();       // actorId -> player
   const stats = { connections: 0, messages: 0, rejected: 0, staleInputs: 0, kicked: 0 };
-  const room = { state: 'waiting', clock: 0, countdown: 0, resultT: 0, tick: 0, winner: 0, lastEvents: [] };
+  const room = { state: 'waiting', clock: 0, countdown: 0, resultT: 0, tick: 0, winner: 0, lastEvents: [], matchId: null };
 
   const send = (ws, msg) => { if (ws.readyState === 1) ws.send(encode(msg)); };
   const reject = (ws, code, close = false) => {
@@ -66,11 +69,42 @@ export function createGameServer({
 
   function startCountdown() {
     for (const p of players.values()) resetActor(p);
-    room.state = 'countdown'; room.countdown = COUNTDOWN; room.winner = 0;
+    room.state = 'countdown'; room.countdown = COUNTDOWN; room.winner = 0; room.matchId = randomBytes(9).toString('base64url');
   }
-  function endMatch(winnerSlot, reason) {
+  // Fim de partida: grava as recompensas no banco (uma transação por personagem, idempotente por matchId+personagem).
+  function endMatch(winnerSlot, reason, leavers = []) {
+    if (room.state === 'over') return; // já encerrada: nunca paga duas vezes
     room.state = 'over'; room.resultT = RESULT_SHOW; room.winner = winnerSlot;
     room.lastEvents.push({ e: 'result', winner: winnerSlot, reason });
+    if (!db) return;
+    const all = [...players.values(), ...leavers].filter((p) => p.charId);
+    const before = new Map(all.map((p) => [p, p.rating])); // ratings de ANTES: o resultado não pode depender da ordem de pagamento
+    for (const p of all) {
+      const foe = all.find((q) => q !== p);
+      const foeRating = before.get(foe) ?? 1000;
+      try {
+        const out = db.applyOperation(`match:${room.matchId}:${p.charId}`, p.charId, 'duel', (doc) => applyDuelResult(doc, { won: p.slot === winnerSlot, foeRating }));
+        if (!out.duplicate) {
+          p.rating = out.summary.rating;
+          db.audit('match_reward', { accountId: p.accountId, detail: JSON.stringify({ match: room.matchId, char: p.charId, ...out.summary }) });
+          if (p.conn) send(p.conn, { t: 'reward', ...out.summary });
+        }
+      } catch (e) { db.audit('match_reward_error', { accountId: p.accountId, detail: e.message }); }
+    }
+  }
+
+  // Entrada na sala. Com banco: sessão válida + personagem DA CONTA, carregado do servidor (o cliente não envia atributos nem itens).
+  function resolveIdentity(msg) {
+    if (msg.session) {
+      if (!db) return { error: REJECT.AUTH_REQUIRED };
+      const acc = db.sessionAccount(msg.session);
+      if (!acc) return { error: REJECT.BAD_SESSION };
+      const ch = db.ownedCharacter(acc.id, msg.characterId);
+      if (!ch) return { error: REJECT.BAD_CHARACTER };
+      return { char: ch.doc, charId: ch.id, accountId: acc.id };
+    }
+    if (!allowGuests) return { error: REJECT.AUTH_REQUIRED };
+    return { char: buildServerChar(msg.name, msg.classId, rng.int(1, 0x3fffffff)), charId: null, accountId: null };
   }
 
   function join(ws, msg) {
@@ -80,20 +114,24 @@ export function createGameServer({
     if (msg.token) {
       p = [...players.values()].find((q) => q.token === msg.token);
       if (!p || p.conn) return reject(ws, REJECT.BAD_TOKEN, true);
+      if (p.accountId && (!msg.session || db.sessionAccount(msg.session)?.id !== p.accountId)) return reject(ws, REJECT.BAD_SESSION, true); // reconectar exige a mesma conta
       p.conn = ws; p.dropT = null; // reconexão: volta ao mesmo ator
     } else {
+      const id = resolveIdentity(msg);
+      if (id.error) return reject(ws, id.error, true);
+      if (id.charId && [...players.values()].some((q) => q.charId === id.charId)) return reject(ws, REJECT.ALREADY_ONLINE, true); // um personagem, uma conexão
       if (players.size >= 2) return reject(ws, REJECT.ROOM_FULL, true);
       const slot = [...players.values()].some((q) => q.slot === 1) ? 2 : 1;
-      const char = buildServerChar(msg.name, msg.classId, rng.int(1, 0x3fffffff));
       const sp = SPAWNS[slot];
-      const actor = world.add(makeHeroActor(char, sp.x, sp.y, 'player', slot));
+      const actor = world.add(makeHeroActor(id.char, sp.x, sp.y, 'player', slot));
       actor.facing = sp.facing;
-      p = { slot, token: randomBytes(18).toString('base64url'), name: char.name, classId: msg.classId, actor, conn: ws, input: idleInput(), lastSeq: -1, dropT: null };
+      p = { slot, token: randomBytes(18).toString('base64url'), name: id.char.name, classId: id.char.classId, actor, conn: ws, input: idleInput(), lastSeq: -1, dropT: null,
+        charId: id.charId, accountId: id.accountId, rating: id.char.arena?.rating ?? 1000 };
       players.set(actor.id, p);
     }
     c.player = p;
     send(ws, { t: 'welcome', you: p.actor.id, slot: p.slot, token: p.token, name: p.name, tickHz: TICK_HZ, snapEvery: SNAPSHOT_EVERY, protocol: PROTOCOL_VERSION,
-      arena: { w: world.zone.w, h: world.zone.h, radius: world.zone.radius }, state: room.state });
+      arena: { w: world.zone.w, h: world.zone.h, radius: world.zone.radius }, state: room.state, account: !!p.accountId });
     if (room.state === 'waiting' && present().length === 2) startCountdown();
   }
 
@@ -153,7 +191,8 @@ export function createGameServer({
         players.delete(id); world.actors = world.actors.filter((a) => a !== p.actor);
         if (room.state === 'fight' || room.state === 'countdown') {
           const left = [...players.values()][0];
-          if (left) endMatch(left.slot, 'forfeit'); else { room.state = 'waiting'; }
+          if (left && room.state === 'fight') endMatch(left.slot, 'forfeit', [p]); // abandono em luta = derrota registrada; na contagem, ninguém perde nada
+          else if (left) { room.state = 'waiting'; } else { room.state = 'waiting'; }
         } else if (room.state === 'over' && players.size < 2) room.state = 'waiting';
       }
     }

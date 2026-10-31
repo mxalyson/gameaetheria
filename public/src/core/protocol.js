@@ -2,7 +2,7 @@
 // Regras: toda mensagem é JSON { v, t, ... }; `v` é a versão do protocolo; o cliente só envia INTENÇÕES (nunca dano, posição final, loot).
 import { CLASSES } from '../data/classes.js';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2; // v2: hello autenticado (session + characterId) e mensagem reward
 export const TICK_HZ = 60;                    // simulação (igual ao FIXED_DT do cliente)
 export const TICK_DT = 1 / TICK_HZ;
 export const SNAPSHOT_EVERY = 3;              // snapshot a cada 3 ticks = 20 Hz
@@ -14,6 +14,7 @@ export const REJECT = {
   BAD_JSON: 'bad_json', BAD_VERSION: 'bad_version', BAD_MESSAGE: 'bad_message', NOT_JOINED: 'not_joined',
   ALREADY_JOINED: 'already_joined', ROOM_FULL: 'room_full', RATE_LIMIT: 'rate_limit', TOO_MANY_ERRORS: 'too_many_errors',
   BAD_TOKEN: 'bad_token', BAD_ORIGIN: 'bad_origin', SERVER_BUSY: 'server_busy',
+  AUTH_REQUIRED: 'auth_required', BAD_SESSION: 'bad_session', BAD_CHARACTER: 'bad_character', ALREADY_ONLINE: 'already_online',
 };
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -32,10 +33,17 @@ export function parseClientMessage(data) {
   if (data.v !== PROTOCOL_VERSION) return { ok: false, code: REJECT.BAD_VERSION };
   switch (data.t) {
     case 'hello': {
+      const token0 = data.token;
+      if (data.session !== undefined) { // jogador com conta: sessão da API + personagem escolhido (o servidor carrega o personagem do banco)
+        if (typeof data.session !== 'string' || !/^[A-Za-z0-9_-]{32,64}$/.test(data.session) || !Number.isInteger(data.characterId) || data.characterId < 1) return { ok: false, code: REJECT.BAD_MESSAGE };
+        const tk = token0 == null ? null : (typeof token0 === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(token0) ? token0 : undefined);
+        if (tk === undefined) return { ok: false, code: REJECT.BAD_TOKEN };
+        return { ok: true, msg: { t: 'hello', session: data.session, characterId: data.characterId, token: tk } };
+      }
       if (!CLASSES[data.classId]) return { ok: false, code: REJECT.BAD_MESSAGE };
       const token = data.token == null ? null : (typeof data.token === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(data.token) ? data.token : undefined);
       if (token === undefined) return { ok: false, code: REJECT.BAD_TOKEN };
-      return { ok: true, msg: { t: 'hello', name: safeName(data.name), classId: data.classId, token } };
+      return { ok: true, msg: { t: 'hello', session: null, name: safeName(data.name), classId: data.classId, token } };
     }
     case 'input': {
       if (!Number.isInteger(data.seq) || data.seq < 0 || data.seq > 2 ** 31) return { ok: false, code: REJECT.BAD_MESSAGE };

@@ -15,6 +15,7 @@ import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from './core/power.js';
 import { chooseSpec, specInfo, activeSpec } from './core/specs.js';
 import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.js';
 import { cleanName } from './core/savedoc.js';
+import { apiUrl, Online, CloudSave } from './online.js';
 import { PRICES } from './shop.js';
 import { TouchControls } from './touch.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
@@ -54,9 +55,18 @@ class Game {
     this.shopStock = [];
     this.shopLevel = 0;
     this.titleWorld = new World('town');
-    this.ui.showTitle(loadChar());
-    this.reportLoad();
-    addEventListener('beforeunload', () => this.save());
+    // Com API configurada o jogo exige conta (login → personagens na nuvem). Sem API, segue offline como antes.
+    const base = apiUrl();
+    this.online = null; this.cloud = null; this.charId = null;
+    if (base) {
+      this.online = new Online(base);
+      this.cloud = new CloudSave(this.online, { onSync: (doc) => this.mergeServerFields(doc), onReject: (doc, e) => this.resync(doc, e) });
+      this.bootOnline();
+    } else {
+      this.ui.showTitle(loadChar());
+      this.reportLoad();
+    }
+    addEventListener('beforeunload', () => { if (this.online) { this.cloud?.flush({ keepalive: true }); } else this.save(); });
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
   }
@@ -79,6 +89,7 @@ class Game {
       this.ui.updateHud(this);
       this.touch.update(this);
     }
+    this.cloud?.tick();
     this.input.endFrame();
     requestAnimationFrame((t) => this.frame(t));
   }
@@ -87,14 +98,24 @@ class Game {
   act(action, arg) {
     switch (action) {
       case 'continue': this.loadGame(loadChar()); break;
-      case 'new-char': this.ui.showCreate(!!loadChar()); break;
-      case 'back-title': this.ui.showTitle(loadChar()); break;
-      case 'pick-class': this.ui.createClass = arg; this.ui.showCreate(!!loadChar()); break;
+      case 'auth-mode': this.showAuth(arg); break;
+      case 'auth-login': case 'auth-register': case 'auth-recover': this.submitAuth(action); break;
+      case 'auth-google': this.authGoogle(arg); break;
+      case 'char-select': this.selectCharacter(Number(arg)); break;
+      case 'char-delete': this.deleteCharacter(Number(arg)); break;
+      case 'char-import-local': this.importLocalSave(); break;
+      case 'chars-refresh': this.showChars(); break;
+      case 'auth-back-login': this.showAuth('login'); break;
+      case 'switch-char': this.leaveCharacter().then(() => this.showChars()); break;
+      case 'logout': this.leaveCharacter().then(async () => { await this.online.logout(); this.showAuth('login'); }); break;
+      case 'new-char': this.ui.showCreate(this.online ? false : !!loadChar()); break;
+      case 'back-title': this.online ? this.showChars() : this.ui.showTitle(loadChar()); break;
+      case 'pick-class': this.ui.createClass = arg; this.ui.showCreate(this.online ? false : !!loadChar()); break;
       case 'save-export': this.exportSave(); break;
       case 'save-import': this.importSave(); break;
       case 'create': {
         const name = cleanName((document.getElementById('char-name')?.value ?? '').trim() || CLASSES[this.ui.createClass].name);
-        this.newGame(name, this.ui.createClass);
+        if (this.online) this.createOnline(name, this.ui.createClass); else this.newGame(name, this.ui.createClass);
         break;
       }
       case 'close': this.ui.close(arg); break;
@@ -172,7 +193,117 @@ class Game {
     this.save();
   }
 
-  save() { if (this.char) saveChar(this.char); }
+  save() {
+    if (this.online) { this.cloud?.markDirty(); return; } // online: o servidor é a fonte oficial; o localStorage não guarda o personagem
+    if (this.char) saveChar(this.char);
+  }
+
+  // ---------------- modo online ----------------
+  async bootOnline() {
+    try {
+      const cfg = await this.online.loadConfig();
+      this.googleClientId = cfg.googleClientId ?? null;
+      this.maxCharacters = cfg.maxCharacters ?? 4;
+      if (this.online.hasSession) { await this.showChars(); return; }
+      this.showAuth('login');
+    } catch (e) {
+      this.showAuth('login', e.status === 0 ? 'Sem conexão com o servidor. Verifique a internet e tente de novo.' : e.message);
+    }
+  }
+
+  showAuth(mode = 'login', msg = '') {
+    this.ui.showLogin(mode, msg, !!this.googleClientId);
+    if (this.googleClientId && mode !== 'recover') this.loadGoogleButton();
+  }
+
+  // Botão "Entrar com Google" (Google Identity Services). O ID token vai ao NOSSO servidor, que o verifica; só carrega se o servidor tiver Google configurado.
+  loadGoogleButton() {
+    const init = () => {
+      const el = document.getElementById('google-btn');
+      if (!el || !window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({ client_id: this.googleClientId, callback: (r) => this.act('auth-google', r.credential) });
+      window.google.accounts.id.renderButton(el, { theme: 'filled_black', size: 'large', text: 'signin_with', locale: 'pt-BR' });
+    };
+    if (window.google?.accounts?.id) return init();
+    if (document.getElementById('gsi-script')) return;
+    const s = document.createElement('script');
+    s.id = 'gsi-script'; s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = init;
+    document.head.appendChild(s);
+  }
+
+  async submitAuth(action) {
+    const email = document.getElementById('acc-email')?.value ?? '', pass = document.getElementById('acc-pass')?.value ?? '';
+    try {
+      if (action === 'auth-login') { await this.online.login(email, pass); await this.showChars(); }
+      else if (action === 'auth-register') { const r = await this.online.register(email, pass); this.ui.showRecoveryCodes(r.recoveryCodes); }
+      else {
+        const r = await this.online.recover(email, document.getElementById('acc-code')?.value ?? '', pass);
+        this.ui.showRecoveryCodes(r.recoveryCodes, 'auth-back-login');
+      }
+    } catch (e) { this.showAuth(action === 'auth-login' ? 'login' : action === 'auth-register' ? 'register' : 'recover', e.message); }
+  }
+
+  async authGoogle(idToken) {
+    try { await this.online.google(idToken); await this.showChars(); }
+    catch (e) { this.showAuth('login', e.message); }
+  }
+
+  async showChars(msg = '') {
+    try {
+      const me = await this.online.me();
+      this.account = me.account;
+      this.ui.showCharacters(me.characters, { email: me.account.email ?? 'conta Google', maxCharacters: this.maxCharacters ?? 4, hasLocalSave: !!loadChar(), msg });
+    } catch (e) { this.showAuth('login', e.status === 401 ? '' : e.message); }
+  }
+
+  async createOnline(name, classId) {
+    try { const r = await this.online.createCharacter(name, classId); this.startOnline(r.id, r.character, r.rev); }
+    catch (e) { this.ui.showCreate(false); this.ui.toast('Não foi possível criar', e.message, ''); }
+  }
+
+  async selectCharacter(id) {
+    try { const r = await this.online.getCharacter(id); this.startOnline(id, r.character, r.rev); }
+    catch (e) { this.showChars(e.message); }
+  }
+
+  startOnline(id, doc, rev) {
+    this.charId = id;
+    this.cloud.attach(id, rev, () => this.char);
+    this.loadGame(doc);
+  }
+
+  async deleteCharacter(id) {
+    if (!confirm('Apagar este personagem? Essa ação não pode ser desfeita pelo jogo.')) return;
+    try { await this.online.deleteCharacter(id); } catch (e) { return this.showChars(e.message); }
+    this.showChars();
+  }
+
+  async importLocalSave() {
+    const local = loadChar();
+    if (!local) return;
+    try { const r = await this.online.importCharacter(JSON.stringify(local)); this.ui.toast('Save importado', r.character.name, 'gold'); await this.showChars(); }
+    catch (e) { this.showChars(e.message); }
+  }
+
+  // Grava o que falta e solta o personagem (trocar de personagem ou sair da conta).
+  async leaveCharacter() {
+    if (this.cloud?.charId != null) { this.cloud.markDirty(); await this.cloud.flush(); this.cloud.detach(); }
+    this.char = null; this.charId = null; this.mode = 'title'; this.ui.banner(null);
+  }
+
+  // O servidor é dono de rating/vitórias/derrotas: depois de cada gravação adotamos o valor oficial.
+  mergeServerFields(doc) {
+    if (!this.char) return;
+    Object.assign(this.char.arena, { rating: doc.arena.rating, wins: doc.arena.wins, losses: doc.arena.losses, ratings: doc.arena.ratings ?? {} });
+  }
+
+  // Gravação recusada (revisão velha ou valor implausível): volta ao estado oficial do servidor.
+  resync(doc, err) {
+    this.ui.toast('Sincronização', err.status === 409 ? 'O personagem foi alterado em outro lugar; recarreguei.' : 'O servidor recusou o salvamento; voltei ao último estado salvo.', '');
+    this.loadGame(doc);
+  }
+
+  flushCloud() { return this.cloud?.flush(); }
 
   // Avisa o jogador quando o save foi migrado, corrigido ou recuperado do backup.
   reportLoad() {
@@ -210,6 +341,10 @@ class Game {
   applyImport(text) {
     const r = parseSave(text);
     if (!r.ok) return this.ui.toast('Importação falhou', r.reason, '');
+    if (this.online) { // online: o arquivo vira um NOVO personagem da conta (o servidor revalida e reemite os ids)
+      this.online.importCharacter(text).then((x) => { this.ui.toast('Save importado', x.character.name, 'gold'); this.leaveCharacter().then(() => this.showChars()); }).catch((e) => this.ui.toast('Importação falhou', e.message, ''));
+      return;
+    }
     if (loadChar() && !confirm('Importar "' + r.char.name + '" substitui o personagem atual deste aparelho. Continuar?')) return;
     saveChar(r.char);
     this.ui.toast('Save importado', r.char.name + (r.warnings.length ? ' · ' + r.warnings.length + ' ajuste(s)' : ''), 'gold');

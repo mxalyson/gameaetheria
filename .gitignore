@@ -8,3 +8,6 @@ art-tests/
 public/labs/iso-poc/art-local/*
 !public/labs/iso-poc/art-local/atlas-rig/
 /*.glb
+
+# banco local e backups (dados de jogadores nunca vao ao Git)
+data/

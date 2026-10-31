@@ -70,6 +70,77 @@ export class UI {
     this.screen.className = 'visible';
   }
 
+  // ---- modo online: login, cadastro, recuperação, códigos e lista de personagens ----
+  showLogin(mode = 'login', msg = '', googleOn = false) {
+    $('hud').classList.add('hidden');
+    this.closePanels();
+    const titles = { login: 'Entrar', register: 'Criar conta', recover: 'Recuperar acesso' };
+    const pass = mode === 'recover'
+      ? '<input id="acc-code" placeholder="Código de recuperação (xxxxx-xxxxx)" autocomplete="off" /><input id="acc-pass" type="password" placeholder="Nova senha (mín. 8 caracteres)" autocomplete="new-password" />'
+      : `<input id="acc-pass" type="password" placeholder="Senha${mode === 'register' ? ' (mín. 8 caracteres)' : ''}" autocomplete="${mode === 'register' ? 'new-password' : 'current-password'}" />`;
+    const go = { login: 'auth-login', register: 'auth-register', recover: 'auth-recover' }[mode];
+    const links = mode === 'login'
+      ? '<button class="btn ghost" data-action="auth-mode" data-arg="register">Criar conta</button><button class="btn ghost" data-action="auth-mode" data-arg="recover">Esqueci a senha</button>'
+      : '<button class="btn ghost" data-action="auth-mode" data-arg="login">Voltar ao login</button>';
+    this.screen.innerHTML = `
+      <div class="title-wrap">
+        <div class="logo"><span>AETHERIA</span><small>Arena dos Ecos</small></div>
+        <p class="tagline">${titles[mode]} para jogar: seu herói fica salvo na sua conta.</p>
+        <form class="auth-form" onsubmit="return false">
+          <input id="acc-email" type="email" placeholder="E-mail" autocomplete="email" />
+          ${pass}
+          <button class="btn primary big" type="button" data-action="${go}">${titles[mode]}</button>
+          <div id="google-btn" class="google-btn ${googleOn && mode !== 'recover' ? '' : 'hidden'}"></div>
+          ${msg ? `<p class="auth-err" role="alert">${esc(msg)}</p>` : ''}
+        </form>
+        <div class="title-actions">${links}</div>
+        <p class="foot">Conta obrigatória · seus dados ficam no servidor do jogo</p>
+      </div>`;
+    this.screen.className = 'visible';
+    const email = $('acc-email'), pw = $('acc-pass');
+    const enter = (e) => { if (e.key === 'Enter') this.game.act(go); };
+    email.addEventListener('keydown', enter); pw.addEventListener('keydown', enter);
+    email.focus();
+  }
+
+  showRecoveryCodes(codes, next = 'chars-refresh') {
+    this.screen.innerHTML = `
+      <div class="title-wrap">
+        <div class="logo"><span>AETHERIA</span><small>Arena dos Ecos</small></div>
+        <p class="tagline">Guarde estes <b>códigos de recuperação</b>: cada um redefine sua senha uma única vez. Eles <b>não aparecem de novo</b>.</p>
+        <div class="recovery-codes" id="recovery-codes">${codes.map((c) => `<code>${esc(c)}</code>`).join('')}</div>
+        <div class="title-actions"><button class="btn primary big" data-action="${next}">Anotei, continuar</button></div>
+      </div>`;
+    this.screen.className = 'visible';
+  }
+
+  showCharacters(list, { email = '', maxCharacters = 4, hasLocalSave = false, msg = '' } = {}) {
+    $('hud').classList.add('hidden');
+    this.closePanels();
+    const cards = list.map((c) => `
+      <div class="char-card" style="--cc:${CLASSES[c.classId]?.color ?? '#999'}">
+        <button class="char-pick" data-action="char-select" data-arg="${c.id}">
+          <span class="cc-icon">${CLASSES[c.classId]?.icon ?? '?'}</span>
+          <span class="cc-name">${esc(c.name)}</span>
+          <span class="cc-desc">${CLASSES[c.classId]?.name ?? ''} · Nv ${c.level} · ${tierFor(c.rating).name} (${c.rating})</span>
+        </button>
+        <button class="btn small ghost" data-action="char-delete" data-arg="${c.id}" aria-label="Apagar ${esc(c.name)}">Apagar</button>
+      </div>`).join('');
+    this.screen.innerHTML = `
+      <div class="create-wrap">
+        <h1>Seus personagens</h1>
+        <p class="tagline" style="font-size:13px">Conta: ${esc(email)}</p>
+        <div class="char-list">${cards || '<p class="hint">Você ainda não tem personagens.</p>'}</div>
+        <div class="title-actions">
+          ${list.length < maxCharacters ? '<button class="btn primary big" data-action="new-char">Novo personagem</button>' : `<p class="hint">Limite de ${maxCharacters} personagens.</p>`}
+          ${hasLocalSave && list.length < maxCharacters ? '<button class="btn" data-action="char-import-local">Importar o save deste aparelho</button>' : ''}
+          <button class="btn ghost" data-action="logout">Sair da conta</button>
+        </div>
+        ${msg ? `<p class="auth-err" role="alert">${esc(msg)}</p>` : ''}
+      </div>`;
+    this.screen.className = 'visible';
+  }
+
   showCreate(hasSave) {
     this.createClass = this.createClass ?? 'warrior';
     const cards = Object.values(CLASSES).map((c) => `
@@ -88,7 +159,7 @@ export class UI {
           <input id="char-name" maxlength="14" placeholder="Nome do herói" value="${esc(this.lastName ?? '')}" autocomplete="off" />
           <button class="btn primary big" data-action="create">Começar aventura</button>
         </div>
-        ${hasSave ? '<p class="warn">Criar um novo personagem substitui o salvo atual.</p>' : ''}
+        ${hasSave && !this.game.online ? '<p class="warn">Criar um novo personagem substitui o salvo atual.</p>' : ''}
         <button class="btn ghost" data-action="back-title">Voltar</button>
       </div>`;
     this.screen.className = 'visible';
@@ -390,6 +461,7 @@ export class UI {
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Auto'], ['touch', 'Toque'], ['keyboard', 'Teclado e mouse']])}</div>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
+      ${this.game.online ? '<div class="opt-row"><b>Conta</b><div class="seg"><button class="btn small" data-action="switch-char">Trocar personagem</button><button class="btn small" data-action="logout">Sair</button></div></div>' : ''}
       <div class="opt-row"><b>Save do personagem</b><div class="seg"><button class="btn small" data-action="save-export">Exportar</button><button class="btn small" data-action="save-import">Importar</button></div></div>
       <p class="hint">Exportar baixa um arquivo com seu personagem (guarde como backup ou leve para outro aparelho). Importar substitui o personagem atual.</p>`);
   }

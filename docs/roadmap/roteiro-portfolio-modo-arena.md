@@ -140,3 +140,6 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 
 ### 10.7 P4 — servidor autoritativo (PoC), 2026-10-31
 - `ws` + protocolo JSON v1 + sala de duelo para 2 jogadores reais com a simulação do jogo; detalhes, limites e como rodar em `docs/architecture/servidor-poc.md` e decisão 0008. **118 unitários e 57 e2e passam.** Sem contas/persistência (P5); sem teste de carga ou rede real.
+
+### 10.8 P5 — contas e persistência (2026-10-31)
+- Conta obrigatória (login por e-mail/senha e Google), até 4 personagens por conta, nuvem com revisão e plausibilidade, recompensas de duelo gravadas pelo servidor. **142 unitários e 63 e2e** (ver relatório). Detalhes e limites: decisão 0009.

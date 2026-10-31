@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createGameServer } from '../../server/game-server.js';
+import { PROTOCOL_VERSION } from '../../public/src/core/protocol.js';
 
 // Prova de conceito do multiplayer: DOIS navegadores reais no mesmo servidor autoritativo (laboratório net-poc).
 let srv;
@@ -48,7 +49,7 @@ test('dois navegadores: entram na mesma sala, se veem, movimento sincronizado, a
 
   // 3. tentativa de trapaça pelo navegador: dano falso é recusado e a vida do alvo não muda
   const hp0 = await B.page.evaluate(() => window.net.srv.hp);
-  await A.page.evaluate((target) => window.net.sendRaw(JSON.stringify({ v: 1, t: 'damage', target, amount: 99999 })), idB);
+  await A.page.evaluate(([target, v]) => window.net.sendRaw(JSON.stringify({ v, t: 'damage', target, amount: 99999 })), [idB, PROTOCOL_VERSION]);
   await A.page.waitForFunction(() => window.net.rejects.includes('bad_message'), null, { timeout: 5000 });
   await B.page.waitForTimeout(400);
   expect(await B.page.evaluate(() => window.net.srv.hp)).toBe(hp0);
