@@ -143,3 +143,6 @@ Prioridade: **equipamento (aprimorar + conjuntos) → especialização → árvo
 
 ### 10.8 P5 — contas e persistência (2026-10-31)
 - Conta obrigatória (login por e-mail/senha e Google), até 4 personagens por conta, nuvem com revisão e plausibilidade, recompensas de duelo gravadas pelo servidor. **142 unitários e 63 e2e** (ver relatório). Detalhes e limites: decisão 0009.
+
+### 10.9 P6 — salas, grupos e sincronização (2026-10-31)
+- Lobby com grupos/convites, fila 1×1/2×2/4×4 por rating e poder, bots que completam vagas, abandono tratado, recompensas por modo. **160 unitários e 64 e2e.** Detalhes e medições: decisão 0010. O jogo real ainda não usa o servidor de salas (P7).

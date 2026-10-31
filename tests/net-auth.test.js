@@ -1,54 +1,30 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import WebSocket from 'ws';
 import { openDb } from '../server/db.js';
 import { createGameServer } from '../server/game-server.js';
 import { newOfficialCharacter } from '../server/api.js';
-import { PROTOCOL_VERSION, REJECT } from '../public/src/core/protocol.js';
+import { REJECT } from '../public/src/core/protocol.js';
+import { connect, chase, closeAll } from './helpers/net.js';
 
-// Multiplayer com contas: o servidor carrega o personagem DO BANCO e grava as recompensas da partida (idempotentes).
+// Multiplayer com contas: o servidor carrega o personagem DO BANCO, exige nível para PvP e grava as recompensas da partida (idempotentes).
 function world() {
   const db = openDb(':memory:');
-  const mkAcc = (email, name, classId, patch = {}) => {
+  const mkAcc = (email, name, classId, patch = { level: 10 }) => {
     const acc = db.createAccount({ email, pwHash: 'x' });
     const doc = { ...newOfficialCharacter(name, classId), ...patch };
     return { acc, session: db.createSession(acc), charId: db.createCharacter(acc, doc.name, doc.classId, doc), doc };
   };
   return { db, A: mkAcc('a@x.com', 'Alfa', 'warrior'), B: mkAcc('b@x.com', 'Beta', 'warrior'), mkAcc };
 }
-async function start(db, opts = {}) { const srv = createGameServer({ port: 0, autoTick: false, db, ...opts }); await srv.ready; return srv; }
-function connect(srv) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${srv.port}`);
-    const c = { ws, msgs: [], closed: null, waiters: [] };
-    ws.on('message', (d) => { const m = JSON.parse(d.toString()); c.msgs.push(m); c.waiters = c.waiters.filter((w) => !w(m)); });
-    ws.on('close', (code) => { c.closed = code; c.waiters = c.waiters.filter((w) => !w(null)); });
-    ws.on('open', () => resolve(c)); ws.on('error', reject);
-    c.send = (o) => ws.send(JSON.stringify({ v: PROTOCOL_VERSION, ...o }));
-    c.waitFor = (pred, ms = 3000) => new Promise((res, rej) => { const f = c.msgs.find(pred); if (f) return res(f); const to = setTimeout(() => rej(new Error('timeout')), ms); c.waiters.push((m) => { if (m && pred(m)) { clearTimeout(to); res(m); return true; } return false; }); });
-    c.waitClose = (ms = 3000) => new Promise((res, rej) => { if (c.closed != null) return res(c.closed); const to = setTimeout(() => rej(new Error('timeout fechar')), ms); c.waiters.push((m) => { if (m === null) { clearTimeout(to); res(c.closed); return true; } return false; }); });
-    c.sync = async () => { const ts = Math.random(); c.send({ t: 'ping', ts }); await c.waitFor((m) => m.t === 'pong' && m.ts === ts); };
-  });
-}
+async function start(db, opts = {}) { const srv = createGameServer({ port: 0, autoTick: false, db, maxMsgPerSec: 100000, ...opts }); await srv.ready; return srv; }
 const hello = (who, extra = {}) => ({ t: 'hello', session: who.session, characterId: who.charId, ...extra });
-const input = (seq, my, extra = {}) => ({ t: 'input', seq, mx: 0, my, aimX: 550, aimY: -5000, attack: false, cast: null, ...extra });
-const closeAll = async (srv, ...cs) => { for (const c of cs) c.ws.terminate(); await srv.close(); };
-
-// A persegue o B (parado) e ataca até a partida acabar.
-async function playUntilOver(srv, a, A, B) {
-  srv.step(60 * 4); await a.sync();
-  const byChar = (id) => [...srv.players.values()].find((p) => p.charId === id).actor;
-  const actA = byChar(A.charId), actB = byChar(B.charId);
-  let seq = 1, moving = true;
-  a.send(input(seq++, -1, { attack: true })); await a.sync();
-  let g = 0;
-  while (srv.room.state === 'fight' && g++ < 60 * 120) {
-    srv.step(1);
-    const d = actA.y - actB.y;
-    if (moving && d <= 55) { moving = false; a.send(input(seq++, 0, { attack: true })); await a.sync(); }
-    else if (!moving && d > 70) { moving = true; a.send(input(seq++, -1, { attack: true })); await a.sync(); }
-  }
-  srv.step(6);
+async function enter(srv, who) { const c = await connect(srv); c.send(hello(who)); const w = await c.waitFor((m) => m.t === 'welcome'); return { c, w }; }
+async function duel(srv, A, B) {
+  const a = await enter(srv, A), b = await enter(srv, B);
+  a.c.send({ t: 'queue', mode: '1v1' }); b.c.send({ t: 'queue', mode: '1v1' }); await a.c.sync(); await b.c.sync();
+  srv.step(31);
+  const ma = await a.c.waitFor((m) => m.t === 'match_found'), mb = await b.c.waitFor((m) => m.t === 'match_found');
+  return { a: a.c, b: b.c, wa: { ...a.w, ...ma }, wb: { ...b.w, ...mb } };
 }
 
 test('com banco, convidado é recusado: conta é obrigatória', async () => {
@@ -73,25 +49,40 @@ test('sessão falsa e personagem de outra conta são recusados', async () => {
   const c3 = await connect(srv);
   c3.send({ t: 'hello', session: A.session, characterId: 99999 });
   assert.equal((await c3.waitFor((m) => m.t === 'reject')).code, REJECT.BAD_CHARACTER);
-  assert.equal(srv.players.size, 0);
+  assert.equal(srv.hub.sessions.size, 0);
   await closeAll(srv, c1, c2, c3);
 });
 
 test('o personagem vem do banco: o cliente não consegue impor nível, vida nem classe', async () => {
   const { db, A, mkAcc } = world();
-  const forte = mkAcc('f@x.com', 'Forte', 'mage', { level: 10 });
+  const forte = mkAcc('f@x.com', 'Forte', 'mage', { level: 12 }); // poder parecido com o do nível 10: o matchmaking os junta
   const srv = await start(db);
   const a = await connect(srv), f = await connect(srv);
   a.send(hello(A, { level: 99, hp: 1e9, classId: 'mage', name: 'Hacker', stats: { power: 1e6 } }));
   const wa = await a.waitFor((m) => m.t === 'welcome');
   f.send(hello(forte));
   const wf = await f.waitFor((m) => m.t === 'welcome');
-  assert.equal(wa.name, 'Alfa'); assert.equal(wa.account, true);
-  const actA = srv.players.get(wa.you).actor, actF = srv.players.get(wf.you).actor;
-  assert.equal(actA.level, 1); assert.equal(actA.classId, 'warrior');
-  assert.equal(actF.level, 10); assert.equal(actF.classId, 'mage');
-  assert.ok(actF.maxHp > actA.maxHp);
+  assert.equal(wa.name, 'Alfa'); assert.equal(wa.account, true); assert.equal(wa.level, 10); assert.equal(wa.classId, 'warrior');
+  assert.equal(wf.level, 12); assert.equal(wf.classId, 'mage');
+  a.send({ t: 'queue', mode: '1v1' }); f.send({ t: 'queue', mode: '1v1' }); await a.sync(); await f.sync();
+  srv.step(31 * 2);
+  const ma = await a.waitFor((m) => m.t === 'match_found'), mf = await f.waitFor((m) => m.t === 'match_found');
+  const actA = srv.actor(ma.you), actF = srv.actor(mf.you);
+  assert.equal(actA.level, 10); assert.equal(actA.classId, 'warrior');
+  assert.equal(actF.level, 12); assert.equal(actF.classId, 'mage');
   await closeAll(srv, a, f);
+});
+
+test('PvP só a partir do nível 10: personagem de nível menor não entra na fila', async () => {
+  const { db, mkAcc } = world();
+  const novo = mkAcc('n@x.com', 'Novato', 'mage', { level: 9 });
+  const srv = await start(db);
+  const { c } = await enter(srv, novo);
+  c.send({ t: 'queue', mode: '2v2' });
+  const r = await c.waitFor((m) => m.t === 'reject');
+  assert.equal(r.code, REJECT.PVP_LOCKED); assert.equal(r.minLevel, 10);
+  assert.equal(srv.hub.queue.length, 0);
+  await closeAll(srv, c);
 });
 
 test('um personagem não entra duas vezes; reconexão exige a mesma conta', async () => {
@@ -106,65 +97,79 @@ test('um personagem não entra duas vezes; reconexão exige a mesma conta', asyn
   const semSessao = await connect(srv); semSessao.send({ t: 'hello', session: 'y'.repeat(43), characterId: 1, token: wa.token });
   assert.equal((await semSessao.waitFor((m) => m.t === 'reject')).code, REJECT.BAD_SESSION);
   const volta = await connect(srv); volta.send({ t: 'hello', session: A.session, characterId: A.charId, token: wa.token });
-  assert.equal((await volta.waitFor((m) => m.t === 'welcome')).you, wa.you);
+  const w2 = await volta.waitFor((m) => m.t === 'welcome');
+  assert.equal(w2.resumed, true); assert.equal(w2.token, wa.token);
   await closeAll(srv, a, dup, ladrao, semSessao, volta);
 });
 
 test('fim de partida: ouro, XP e rating são gravados no banco pelo servidor, uma vez só, e cada jogador recebe o resumo', async () => {
   const { db, A, B } = world();
   const srv = await start(db);
-  const a = await connect(srv), b = await connect(srv);
-  a.send(hello(A)); await a.waitFor((m) => m.t === 'welcome');
-  b.send(hello(B)); await b.waitFor((m) => m.t === 'welcome');
-  srv.step(1);
-  const matchId = srv.room.matchId;
+  const { a, b, wa, wb } = await duel(srv, A, B);
+  const room = srv.room, matchId = room.matchId;
   assert.ok(matchId);
-  await playUntilOver(srv, a, A, B);
-  assert.equal(srv.room.state, 'over'); assert.equal(srv.room.winner, 1);
-  await a.sync(); await b.sync();
+  srv.step(60 * 4); await a.sync();
+  await chase(srv, a, srv.actor(wa.you), srv.actor(wb.you), () => room.state !== 'fight');
+  assert.equal(room.state, 'over'); assert.equal(room.winner, 1);
+  srv.step(6); await a.sync(); await b.sync();
   const dA = db.character(A.charId).doc, dB = db.character(B.charId).doc;
-  assert.equal(dA.gold, A.doc.gold + 40 + 8, 'vencedor: ouro = 40 + nível × 8');
-  assert.equal(dB.gold, B.doc.gold + 10 + 2, 'perdedor: ouro = 10 + nível × 2');
+  assert.equal(dA.gold, A.doc.gold + 40 + 80, 'vencedor: ouro = 40 + nível × 8 (nível 10)');
+  assert.equal(dB.gold, B.doc.gold + 10 + 20, 'perdedor: ouro = 10 + nível × 2');
   assert.equal(dA.arena.wins, 1); assert.equal(dA.arena.losses, 0); assert.equal(dB.arena.losses, 1);
-  assert.equal(dA.arena.rating, 1016); assert.equal(dB.arena.rating, 984);
-  assert.ok(dA.xp > A.doc.xp || dA.level > 1);
+  assert.equal(dA.arena.rating, 1016); assert.equal(dB.arena.rating, 984, 'o rating do perdedor não depende da ordem de pagamento');
+  assert.ok(dA.xp > A.doc.xp || dA.level > 10);
   const ra = await a.waitFor((m) => m.t === 'reward'), rb = await b.waitFor((m) => m.t === 'reward');
-  assert.equal(ra.won, true); assert.equal(ra.ratingDelta, 16); assert.equal(rb.won, false); assert.equal(rb.ratingDelta, -16);
-  assert.equal(db.raw.prepare("select count(*) n from operations where kind = 'duel'").get().n, 2);
+  assert.equal(ra.won, true); assert.equal(ra.ratingDelta, 16); assert.equal(rb.won, false); assert.equal(rb.ratingDelta, -16); assert.equal(ra.mode, '1v1');
+  assert.equal(db.raw.prepare("select count(*) n from operations where kind = '1v1'").get().n, 2);
   assert.equal(db.audits('match_reward').length, 2);
   // pagamento duplicado do mesmo fim de partida (ex.: evento repetido) não paga de novo
-  srv.step(1);
-  const again = db.applyOperation(`match:${matchId}:${A.charId}`, A.charId, 'duel', () => { throw new Error('não deveria executar'); });
+  room.end(1, 'elimination');
+  const again = db.applyOperation(`match:${matchId}:${A.charId}`, A.charId, '1v1', () => { throw new Error('não deveria executar'); });
   assert.equal(again.duplicate, true);
   assert.equal(db.character(A.charId).doc.gold, dA.gold);
   await closeAll(srv, a, b);
 });
 
-test('abandono em luta: quem sai perde (registrado) e o outro ganha', async () => {
+test('quem abandona uma luta é substituído por um bot e leva a derrota (registrada); o outro lado ganha', async () => {
   const { db, A, B } = world();
   const srv = await start(db, { reconnectSec: 2 });
-  const a = await connect(srv), b = await connect(srv);
-  a.send(hello(A)); await a.waitFor((m) => m.t === 'welcome');
-  b.send(hello(B)); await b.waitFor((m) => m.t === 'welcome');
+  const { a, b, wb } = await duel(srv, A, B);
   srv.step(60 * 4); await a.sync();
   b.ws.terminate(); await new Promise((r) => setTimeout(r, 50));
   srv.step(60 * 3); await a.sync();
-  assert.equal(srv.room.state, 'over');
+  const room = srv.room;
+  assert.equal(room.players.get(wb.you).left, true);
+  room.end(1, 'elimination'); // o time 1 vence (o time do bot perde)
   assert.equal(db.character(A.charId).doc.arena.wins, 1);
   assert.equal(db.character(B.charId).doc.arena.losses, 1, 'quem abandonou leva a derrota');
+  assert.equal(db.character(B.charId).doc.arena.wins, 0);
   await closeAll(srv, a, b);
 });
 
-test('abandono na contagem regressiva não pune ninguém', async () => {
+test('mesmo que o time de quem abandonou vença, o desertor não ganha nada', async () => {
+  const { db, A, B } = world();
+  const srv = await start(db, { reconnectSec: 2 });
+  const { a, b } = await duel(srv, A, B);
+  srv.step(60 * 4); await a.sync();
+  a.ws.terminate(); await new Promise((r) => setTimeout(r, 50));
+  srv.step(60 * 3);
+  srv.room.end(1, 'elimination'); // o time 1 (do desertor A) "vence"
+  assert.equal(db.character(A.charId).doc.arena.wins, 0, 'desertor não é premiado');
+  assert.equal(db.character(A.charId).doc.arena.losses, 1);
+  assert.equal(db.character(B.charId).doc.arena.losses, 1);
+  await closeAll(srv, a, b);
+});
+
+test('abandono na contagem regressiva cancela a partida sem punir ninguém', async () => {
   const { db, A, B } = world();
   const srv = await start(db, { reconnectSec: 1 });
-  const a = await connect(srv), b = await connect(srv);
-  a.send(hello(A)); await a.waitFor((m) => m.t === 'welcome');
-  b.send(hello(B)); await b.waitFor((m) => m.t === 'welcome');
+  const { a, b } = await duel(srv, A, B);
   srv.step(30);
   b.ws.terminate(); await new Promise((r) => setTimeout(r, 50));
   srv.step(60 * 2);
+  assert.equal(srv.hub.rooms.size, 0);
   assert.equal(db.character(B.charId).doc.arena.losses, 0); assert.equal(db.character(A.charId).doc.arena.wins, 0);
-  assert.equal(srv.room.state, 'waiting');
+  assert.equal((await a.waitFor((m) => m.t === 'match_end')).reason, 'aborted');
+  assert.equal(db.raw.prepare('select count(*) n from operations').get().n, 0);
   await closeAll(srv, a, b);
 });

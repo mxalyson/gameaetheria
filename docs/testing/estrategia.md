@@ -1,6 +1,6 @@
 # Testes
-- Unitários: `npm test` — 142 testes (RNG, stats, loot, progressão, dano, Elo, rival, arena por times, poder, **combate: determinismo, eventos, skills, status, Clérigo em grupo** em `tests/combat.test.js`). Última execução (2026-10-31, após P1): 142 passam.
-- E2E: `npm run test:e2e` — 63 testes. Última execução completa (após P5): 62 passaram e 1 oscilou sob carga (`iso-poc.spec.js` do Franco-atirador, laboratório; passou sozinho). Antes dessa execução, dois testes tinham falhado por motivos reais já corrigidos (versão de protocolo antiga num teste e tolerância/piso do pareamento por poder).
+- Unitários: `npm test` — 160 testes (RNG, stats, loot, progressão, dano, Elo, rival, arena por times, poder, **combate: determinismo, eventos, skills, status, Clérigo em grupo** em `tests/combat.test.js`). Última execução (2026-10-31, após P1): 160 passam.
+- E2E: `npm run test:e2e` — 64 testes. Última execução completa (após P6): 63 passaram e 1 oscilou sob carga (`mobile.spec.js` botões do celular emulado; passou sozinho 2 de 2).
 - Equilíbrio: `npm run balance -- --level N --n 30` (duelos reais classe×classe; meta 45–55% de vitórias e 20–40 s).
 
 - E2E do Vale (`tests/e2e/vale.spec.js`): carrega `/vale.html`, espera 60 quadros, confere que o canvas não está em branco e que não há erros de console. Desempenho medido no Chromium headless sem GPU: cerca de 11 ms de desenho por quadro (22 ms antes de cachear os tiles). Não medido em GPU real nem em celular.
@@ -13,6 +13,7 @@
 
 Rede/segurança (P4): `tests/net.test.js` (17: protocolo, sala, movimento, anti-trapaça, cooldown, replay, limites, reconexão, determinismo) e `tests/e2e/net-poc.spec.js` (2 navegadores reais).
 Contas/API (P5): `tests/accounts.test.js` (16: senha, cadastro, login, bloqueio, sessão, recuperação, Google com chave de teste, personagens, importar, nuvem, CORS, limites, operação idempotente), `tests/net-auth.test.js` (7: WebSocket autenticado, personagem do banco, recompensas gravadas uma vez, abandono) e `tests/e2e/online.spec.js` (6: conta obrigatória, cadastro→nuvem→recarregar, salvamento falso recusado, importar save local, Google, modo offline).
+Lobby/salas (P6): `tests/lobby.test.js` (16: grupos e convites, fila 2×2/4×4, grupo no mesmo time, bots, rating e poder, isolamento, ponto de controle, tempo, reconexão, nomes) e `tests/e2e/net-poc.spec.js` (1×1 em 2 navegadores e 2×2 com grupo em 4 navegadores). Ajudantes: `tests/helpers/net.js`.
 Salvamento: `tests/save.test.js` (migração, validação, trapaça, XSS) e `tests/e2e/save.spec.js` (save antigo, corrompido, backup, importar).
 
 Lacunas (após P1): telégrafo de chefe, colisões em detalhe, ondas, loja, UI e desempenho multiplayer ainda não têm teste automatizado; não há testes de rede, segurança nem carga.

@@ -272,3 +272,11 @@ P0 Auditoria ──▶ P1 Classes+combate estável ──┬──▶ P3 Save ve
 - **Testes executados:** 142 unitários (16 de contas/API, 7 de WebSocket autenticado, 1 novo de robustez do pareamento) e 63 e2e (6 de modo online). Resultado da última execução completa: ver relatório da P5.
 - **Não validado:** servidor publicado, HTTPS/WSS, Google real (precisa de um *client id* do proprietário), carga, recuperação de desastre, PvE autoritativo (o progresso de PvE segue sendo calculado no cliente, com limites de plausibilidade).
 - **Defeito real encontrado e corrigido durante a P5:** a ordem de pagamento das recompensas alterava o rating do perdedor (985 em vez de 984); agora os ratings "de antes" são congelados. Também melhorei o pareamento por poder (piso de poder do rival mais baixo; antes, 5/1280 combinações fugiam de ±15%).
+
+---
+## Atualização — P6 concluída (2026-10-31): salas, grupos e sincronização multiplayer
+- **Implementado e testado (local):** `Hub` (sessões, grupos com convites, fila, matchmaking por rating **e** poder, relógio fixo), `MatchRoom` (1×1, 2×2 e 4×4 com ponto de controle, bots que completam vagas ou assumem quem abandona, recompensas por modo idempotentes), protocolo **v3**, laboratório com lobby/grupo/fila e visual de times (forma + cor). Decisão **0010**.
+- **Testes executados:** 160 unitários (16 novos de lobby, 17 de rede, 9 de contas autenticadas) e 64 e2e (2 em navegadores reais: 1×1 e grupo + 2×2 com 4 navegadores). Última execução completa: 63 passaram e 1 oscilou sob carga (teste do celular emulado; passou sozinho).
+- **Medido (esta máquina):** snapshot 4×4 ≈ 2,3 KB (≈ 45 KB/s por jogador a 20 Hz — **acima do alvo**); CPU de 40 salas 4×4 (320 atores de IA) ≈ 1,6 ms por tick, com picos de 25–36 ms (GC/JIT) acima do tick de 16,7 ms. **Nada disso foi medido com rede ou jogadores reais.**
+- **Defeitos/lacunas encontrados e tratados:** (1) abandono na contagem punia o time inteiro → agora cancela a partida sem punir; (2) o desertor poderia ser premiado se seu time vencesse com um bot no lugar → agora conta derrota; (3) o rating do adversário usava ratings já atualizados → ratings "de antes".
+- **Não feito:** ligar o **jogo real** (renderer) ao servidor de salas — é a **P7** (arena PvP e conteúdo cooperativo no cliente principal); chat; amigos; guildas; otimização de banda; investigação dos picos de CPU.

@@ -5,17 +5,21 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aetheria — Laboratório de Rede</title>
 <style>
-  :root { color-scheme: dark; --bg:#12151f; --fg:#f3e8c8; --muted:#9aa3b8; --a:#6fb8ff; --b:#ff6b6b; }
-  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:14px system-ui, sans-serif; touch-action:none; }
-  #bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:8px 12px; background:#1b2030; }
-  #bar select, #bar input, #bar button { background:#262d44; color:var(--fg); border:1px solid #3a4468; border-radius:8px; padding:6px 10px; font:inherit; }
+  :root { color-scheme: dark; --bg:#12151f; --fg:#f3e8c8; --muted:#9aa3b8; }
+  html, body { margin:0; min-height:100%; background:var(--bg); color:var(--fg); font:14px system-ui, sans-serif; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:8px 12px; background:#1b2030; border-bottom:1px solid #2a3350; }
+  .bar select, .bar input, .bar button { background:#262d44; color:var(--fg); border:1px solid #3a4468; border-radius:8px; padding:6px 10px; font:inherit; }
+  .bar button { cursor:pointer; } .bar button:hover { filter:brightness(1.2); }
+  .bar b { margin-right:4px; }
   #status { margin-left:auto; color:var(--muted); }
+  #party, #invites, #notes { padding:4px 12px; color:var(--muted); min-height:18px; }
+  #invites button { margin-left:6px; background:#2c6a4a; color:#fff; border:0; border-radius:6px; padding:3px 8px; cursor:pointer; }
   canvas { display:block; margin:0 auto; max-width:100%; }
   #help { padding:6px 12px; color:var(--muted); }
 </style>
 </head>
 <body>
-<div id="bar">
+<div class="bar">
   <b>Rede (PoC)</b>
   <input id="name" value="Jogador" maxlength="14" aria-label="Nome">
   <select id="cls" aria-label="Classe"><option value="warrior">Guerreiro</option><option value="mage">Mago</option><option value="archer">Arqueiro</option><option value="cleric">Clérigo</option></select>
@@ -23,7 +27,17 @@
   <button id="go">Entrar</button>
   <span id="status">desconectado</span>
 </div>
-<div id="help">Prova de conceito técnica (NÃO é arte do jogo): WASD move · mouse mira · clique ataca · 1/2/3 habilidades. O servidor decide posição, dano e morte.</div>
+<div class="bar" id="lobby">
+  <b>Fila</b>
+  <button data-q="1v1">1×1</button><button data-q="2v2">2×2</button><button data-q="4v4">4×4</button><button id="qcancel">Cancelar</button>
+  <b style="margin-left:14px">Grupo</b>
+  <input id="inv" placeholder="nome do jogador" maxlength="14" aria-label="Convidar">
+  <button id="invite">Convidar</button><button id="pleave">Sair do grupo</button>
+</div>
+<div id="party">Sem grupo.</div>
+<div id="invites"></div>
+<div id="notes"></div>
+<div id="help">Prova de conceito técnica (NÃO é arte do jogo): WASD move · mouse mira · clique ataca · 1/2/3 habilidades. O servidor decide posição, dano e morte; segure o círculo central para pontuar.</div>
 <canvas id="c" width="900" height="720"></canvas>
 <script type="module" src="./net-client.js"></script>
 </body>

@@ -40,3 +40,6 @@ Validação de esquema e versão · tamanho máximo · limite de taxa por conex�
 
 ## Com contas (P5)
 `npm run server` (`server/start.js`) liga o mesmo servidor com banco: o `hello` passa a ser `{session, characterId}` (protocolo **v2**); o servidor carrega o personagem **do banco** (o cliente não envia atributos), recusa convidados e grava as recompensas do duelo (ouro, XP, rating, vitória/derrota) numa transação idempotente por `matchId`+personagem. Mensagem nova: `reward`. Contas, API e limites: decisão 0009 e `docs/roadmap/auditoria-p0-e-plano-multiplayer.md`.
+
+## Lobby, grupos e salas (P6)
+Protocolo **v3**: `hello` → `welcome` (lobby) → `queue{mode}` / `party_*` → `match_found` (sala, time, jogadores, objetivo) → `snap` por sala → `reward` e `match_end` (volta ao lobby). Detalhes, regras e medições: decisão 0010. Para testar à mão: `npm run server:poc` e **uma aba por jogador** em `/labs/net-poc/index.html` (convide pelo nome, aceite, enfileire 2×2 com o líder).

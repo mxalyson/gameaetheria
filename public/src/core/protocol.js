@@ -2,7 +2,9 @@
 // Regras: toda mensagem é JSON { v, t, ... }; `v` é a versão do protocolo; o cliente só envia INTENÇÕES (nunca dano, posição final, loot).
 import { CLASSES } from '../data/classes.js';
 
-export const PROTOCOL_VERSION = 2; // v2: hello autenticado (session + characterId) e mensagem reward
+export const PROTOCOL_VERSION = 3; // v2: hello autenticado e reward · v3: lobby, fila, grupos e salas por modo (1v1/2v2/4v4)
+export const MAX_PARTY = 4;
+export const QUEUE_MODES = ['1v1', '2v2', '4v4'];
 export const TICK_HZ = 60;                    // simulação (igual ao FIXED_DT do cliente)
 export const TICK_DT = 1 / TICK_HZ;
 export const SNAPSHOT_EVERY = 3;              // snapshot a cada 3 ticks = 20 Hz
@@ -14,6 +16,8 @@ export const REJECT = {
   BAD_JSON: 'bad_json', BAD_VERSION: 'bad_version', BAD_MESSAGE: 'bad_message', NOT_JOINED: 'not_joined',
   ALREADY_JOINED: 'already_joined', ROOM_FULL: 'room_full', RATE_LIMIT: 'rate_limit', TOO_MANY_ERRORS: 'too_many_errors',
   BAD_TOKEN: 'bad_token', BAD_ORIGIN: 'bad_origin', SERVER_BUSY: 'server_busy',
+  PVP_LOCKED: 'pvp_locked', BAD_MODE: 'bad_mode', ALREADY_QUEUED: 'already_queued', IN_MATCH: 'in_match', NOT_IN_PARTY: 'not_in_party', NOT_LEADER: 'not_leader',
+  PARTY_FULL: 'party_full', PARTY_TOO_BIG: 'party_too_big', NO_SUCH_PLAYER: 'no_such_player', NO_INVITE: 'no_invite', ALREADY_IN_PARTY: 'already_in_party', SELF: 'self', MEMBER_OFFLINE: 'member_offline',
   AUTH_REQUIRED: 'auth_required', BAD_SESSION: 'bad_session', BAD_CHARACTER: 'bad_character', ALREADY_ONLINE: 'already_online',
 };
 
@@ -57,6 +61,15 @@ export function parseClientMessage(data) {
         attack: data.attack === true, cast: data.cast ?? null,
       } };
     }
+    case 'queue':
+      return QUEUE_MODES.includes(data.mode) ? { ok: true, msg: { t: 'queue', mode: data.mode } } : { ok: false, code: REJECT.BAD_MODE };
+    case 'queue_cancel': case 'party_create': case 'party_leave':
+      return { ok: true, msg: { t: data.t } };
+    case 'party_invite': case 'party_kick':
+      if (typeof data.name !== 'string' || data.name.length < 1 || data.name.length > 40) return { ok: false, code: REJECT.BAD_MESSAGE };
+      return { ok: true, msg: { t: data.t, name: safeName(data.name) } };
+    case 'party_accept': case 'party_decline':
+      return Number.isInteger(data.partyId) && data.partyId > 0 ? { ok: true, msg: { t: data.t, partyId: data.partyId } } : { ok: false, code: REJECT.BAD_MESSAGE };
     case 'ping':
       return finite(data.ts) ? { ok: true, msg: { t: 'ping', ts: data.ts } } : { ok: false, code: REJECT.BAD_MESSAGE };
     default:

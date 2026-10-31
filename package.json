@@ -12,7 +12,8 @@
     "balance": "node tools/balance.mjs",
     "server:poc": "node server/start-poc.js",
     "server": "node server/start.js",
-    "db:backup": "node tools/db-backup.mjs"
+    "db:backup": "node tools/db-backup.mjs",
+    "bench:net": "node tools/net-bench.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"
