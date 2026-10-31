@@ -7,8 +7,14 @@ O jogo se chama *Arena dos Ecos*. O que une os 4 heróis já criados é o **ouro
 - **O eco** como motivo gráfico: **anéis concêntricos** que se espalham (já aparecem nas ondas de choque, na prece e no teleporte). Usar em: seleção de alvo, cooldown das skills, transição de zona, ícone/logo, portais.
 - **Luz de topo-esquerda, quente, com contraluz frio** (é a luz usada nos renders dos heróis): vale para tudo, inclusive cenário.
 
-## 2. Tom (decisão sua) 
-Proponho **"conto de fadas luminoso com um fundo de mistério"**: personagens fofos e legíveis (miniatura), mas mundo com profundidade e um tom épico leve (Summoners War + anime, como pedido). Alternativas: (a) **mais fofo** (cores mais claras, sem sombra pesada); (b) **mais sombrio** (noite permanente, contraste alto). Escolha antes de B2.
+## 2. Tom — **DECIDIDO (2026-10-31): luminoso com mistério**
+O mundo é claro, colorido e acolhedor (miniaturas fofas, ouro, vida), mas **esconde coisas**: o mistério vem da atmosfera e do que se revela, não do medo.
+- **Luz**: dia limpo e quente (topo-esquerda), com **feixes de luz** atravessando a copa das árvores; sombras em **violeta**, nunca pretas.
+- **Névoa baixa** passando devagar, mais densa perto do chão e em zonas antigas; **vaga-lumes/grãos de ouro** no ar (o "eco" do mundo).
+- **O que se revela**: runas e anéis de eco que acendem quando você se aproxima, portais que brilham, ruínas com glifos dourados, estátuas e NPCs com segredos. Sempre **ouro** para o que é importante/misterioso.
+- **Por zona** (atmosfera como camada de cor, sem mudar regras): Vila = dourado quente, quase sem névoa · Bosque Verdejante = luminoso, feixes fortes, névoa leve · Planície de Cristal = frio cristalino, brilhos azulados, névoa fina · Ruínas Sombrias = o mais misterioso: crepúsculo violeta, névoa densa, runas acesas (continua colorido, nunca preto).
+- **Evitar**: preto chapado, vermelho-sangue, monstros assustadores; o perigo aparece pela cor de alerta (`#FF6A6A`) e pelo ritmo, não pelo horror.
+- **Já no laboratório**: a atmosfera (feixes, névoa, sombras violeta, vinheta violeta) está ligada por padrão no PoC; **tecla M** liga/desliga, `?mood=0` desliga. Só desenho (procedural), sem tocar na simulação.
 
 ## 3. Paleta (proposta)
 | Papel | Cor | Hex | Uso |
@@ -51,7 +57,7 @@ Regra: **no máximo 3 cores de destaque por tela**; ouro sempre significa "impor
 Trocar `style.css` e `ui.js` pelos componentes acima, manter as ações (`data-action`) e a lógica. A tela de créditos entra aqui (`docs/CREDITOS.md`).
 
 ## 8. Perguntas abertas
-1. **Tom** (§2): luminoso com mistério / mais fofo / mais sombrio?
+1. ~~Tom~~ **decidido: luminoso com mistério** (§2).
 2. O **ouro** como assinatura e o **eco** (anéis) como motivo: aprova?
 3. **Fonte** de título: manter Cinzel (local) ou avaliar uma face nova?
 4. **Ícones** próprios: por IA (mesmo pipeline) ou artista?

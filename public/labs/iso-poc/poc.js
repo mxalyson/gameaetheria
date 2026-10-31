@@ -33,6 +33,7 @@ const cfg = {
   // A simulação continua sendo a do Mago (classe do jogo); `hsize` ajusta o tamanho do sprite (o quadro dos atlas é 128 lógico).
   hero: ['paladino', 'aprendiz', 'franco', 'sacerdote'].includes(params.get('hero')) ? params.get('hero') : null,
   hsize: Number(params.get('hsize') ?? 1.3),
+  mood: params.get('mood') !== '0', // atmosfera "luminoso com mistério" (névoa baixa, feixes de luz, sombras violeta); tecla M liga/desliga
   heroDir: params.get('herodir') ?? 'atlas-rig', // 'atlas' = versão com animação rígida (sem esqueleto)
 };
 const FIXED = 1 / 60;
@@ -137,6 +138,7 @@ function buildDecor() {
 addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (!keys.has(k)) {
+    if (k === 'm') cfg.mood = !cfg.mood;
     if (k === 't') cfg.tilt = cfg.tilt === TILT_2_1 ? TILT_30 : TILT_2_1;
     if (k === '+' || k === '=') cfg.zoom = clampZoom(cfg.zoom * 1.1);
     if (k === '-') cfg.zoom = clampZoom(cfg.zoom / 1.1);
@@ -315,7 +317,7 @@ function render(dt, now) {
   for (const it of items) {
     const R = it.sh ?? (it.r ? it.r * 1.15 : 0);
     if (!R) continue;
-    g.beginPath(); g.ellipse(it.x + R * 0.35, it.y + R * 0.1, R, R * 0.85, 0, 0, TAU); g.fillStyle = it.kind === 'tree' || it.kind === 'pine' ? 'rgba(10,30,30,0.28)' : 'rgba(10,30,30,0.32)'; g.fill();
+    g.beginPath(); g.ellipse(it.x + R * 0.35, it.y + R * 0.1, R, R * 0.85, 0, 0, TAU); g.fillStyle = cfg.mood ? 'rgba(48,28,104,0.30)' : it.kind === 'tree' || it.kind === 'pine' ? 'rgba(10,30,30,0.28)' : 'rgba(10,30,30,0.32)'; g.fill();
   }
   for (const f of world.fx) {
     const k = f.t / f.life;
@@ -334,6 +336,7 @@ function render(dt, now) {
   // ---- sprites em pé, de trás para a frente ----
   if (!cfg.off.has('sprites')) for (const it of items) drawEntity(it);
   stats.sprites = items.length;
+  if (cfg.mood) drawMood(now);
   if (cfg.hero && !player.dead && player.buffs.length && !vfx.some((v) => v.persist)) { // buff ativo: aura contínua na cor da skill
     const sk = SKILLS[player.buffs[0].id]; spawnVfx(vfx, 'aura', { x: player.x, y: player.y, color: sk?.color ?? '#ffffff', core: '#ffffff' }).persist = true;
   }
@@ -374,7 +377,7 @@ function render(dt, now) {
   if (!cfg.off.has('grade')) {
   const warm = g.createLinearGradient(0, 0, W, H); warm.addColorStop(0, 'rgba(255,214,150,0.10)'); warm.addColorStop(0.55, 'rgba(255,200,150,0)'); warm.addColorStop(1, 'rgba(20,40,110,0.20)');
   g.fillStyle = warm; g.fillRect(0, 0, W, H);
-  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.4, W / 2, H / 2, Math.max(W, H) * 0.78); vg.addColorStop(0, 'rgba(6,14,20,0)'); vg.addColorStop(1, 'rgba(6,14,20,0.5)');
+  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.4, W / 2, H / 2, Math.max(W, H) * 0.78); vg.addColorStop(0, 'rgba(6,14,20,0)'); vg.addColorStop(1, cfg.mood ? 'rgba(22,10,56,0.52)' : 'rgba(6,14,20,0.5)');
   g.fillStyle = vg; g.fillRect(0, 0, W, H);
   }
   if (cfg.hero) { // dano recebido e morte: vinheta vermelha
@@ -382,6 +385,35 @@ function render(dt, now) {
     if (k > 0.01) { const rg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.72); rg.addColorStop(0, 'rgba(200,20,30,0)'); rg.addColorStop(1, `rgba(200,20,30,${(0.55 * k).toFixed(3)})`); g.fillStyle = rg; g.fillRect(0, 0, W, H); }
   }
   stats.renderMs += (performance.now() - t0 - stats.renderMs) * 0.05;
+}
+
+// ---------- atmosfera: "luminoso com mistério" (identidade v0) ----------
+// Névoa baixa que passa devagar (sprite radial em cache), feixes de luz quentes vindos do alto-esquerda e um véu frio nos cantos.
+// Só desenho: não toca a simulação. Custo: ~10 drawImage + 4 polígonos por quadro.
+let mistSprite = null;
+function drawMood(now) {
+  if (!mistSprite) {
+    mistSprite = document.createElement('canvas'); mistSprite.width = mistSprite.height = 256;
+    const m = mistSprite.getContext('2d'), gr = m.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gr.addColorStop(0, 'rgba(214,226,255,0.85)'); gr.addColorStop(0.55, 'rgba(214,226,255,0.32)'); gr.addColorStop(1, 'rgba(214,226,255,0)');
+    m.fillStyle = gr; m.fillRect(0, 0, 256, 256);
+  }
+  const z = cfg.zoom;
+  // feixes de luz (aditivos), levemente oscilantes
+  g.save(); g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 4; i++) {
+    const x0 = W * (0.02 + i * 0.27) + Math.sin(now / 5200 + i * 1.7) * 36, w = (70 + 30 * (i % 2)) * z, drop = H * 0.95, slant = H * 0.55;
+    const gr = g.createLinearGradient(x0, 0, x0 + slant, drop); gr.addColorStop(0, 'rgba(255,238,190,0.13)'); gr.addColorStop(0.6, 'rgba(255,226,160,0.05)'); gr.addColorStop(1, 'rgba(255,226,160,0)');
+    g.fillStyle = gr; g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + w, 0); g.lineTo(x0 + w + slant, drop); g.lineTo(x0 + slant, drop); g.closePath(); g.fill();
+  }
+  g.restore();
+  // névoa baixa: manchas grandes que derivam da esquerda para a direita, mais densas perto do chão
+  g.save(); g.globalAlpha = 0.5;
+  for (let i = 0; i < 7; i++) {
+    const span = W * 1.7, bx = ((i * span * 0.381 + now * (0.010 + (i % 3) * 0.004)) % span) - W * 0.35, by = H * (0.52 + 0.4 * ((i * 0.37) % 1)) + Math.sin(now / 3600 + i) * 10, d = (460 + 130 * (i % 3)) * z;
+    g.drawImage(mistSprite, bx - d / 2, by - d * 0.26, d, d * 0.52);
+  }
+  g.restore();
 }
 
 // ---------- HUD (DOM) ----------
@@ -405,7 +437,7 @@ function updateHud() {
   $('hud-stats').innerHTML = `FPS <b>${stats.fps.toFixed(0)}</b> · simulação <b>${stats.simMs.toFixed(2)} ms</b> · desenho <b>${stats.renderMs.toFixed(2)} ms</b><br>`
     + `sprites <b>${stats.sprites}</b> · atores <b>${stats.actors}</b> · partículas <b>${stats.particles}</b> · projéteis <b>${stats.projectiles}</b><br>`
     + `texturas <b>${stats.atlasMiB} MiB</b> (heróis/monstros) + <b>${stats.propsMiB} MiB</b> (cenário) · assado em <b>${stats.bakeMs} ms</b><br>`
-    + `projeção <b>${cfg.tilt === TILT_2_1 ? '2:1' : '30°'}</b> · zoom <b>${cfg.zoom.toFixed(2)}×</b> · DPR <b>${cfg.dpr}</b> · bake <b>${cfg.bake}×</b>`;
+    + `atmosfera <b>${cfg.mood ? 'ligada (M)' : 'desligada (M)'}</b> · projeção <b>${cfg.tilt === TILT_2_1 ? '2:1' : '30°'}</b> · zoom <b>${cfg.zoom.toFixed(2)}×</b> · DPR <b>${cfg.dpr}</b> · bake <b>${cfg.bake}×</b>`;
 }
 
 // ---------- laço ----------

@@ -342,3 +342,19 @@ test('página de identidade visual carrega com paleta, UI e os 4 retratos', asyn
   expect(await page.$$eval('#pal .sw', (e) => e.length)).toBeGreaterThanOrEqual(12);
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+// Atmosfera "luminoso com mistério" (identidade v0): ligada por padrão, M alterna, ?mood=0 desliga; sem erros.
+test('atmosfera: ligada por padrão, tecla M alterna e ?mood=0 desliga', async ({ page }) => {
+  const errors = await open(page, '?mobs=0');
+  expect(await page.evaluate(() => window.poc.cfg.mood)).toBe(true);
+  await page.keyboard.press('m');
+  expect(await page.evaluate(() => window.poc.cfg.mood)).toBe(false);
+  await page.keyboard.press('m');
+  expect(await page.evaluate(() => window.poc.cfg.mood)).toBe(true);
+  await page.waitForTimeout(500); // desenha alguns quadros com a atmosfera
+  expect(await page.evaluate(() => window.poc.stats.frames)).toBeGreaterThan(5);
+  const off = await page.context().newPage(); const e2 = []; off.on('pageerror', (e) => e2.push(e.message));
+  await off.goto('/labs/iso-poc/index.html?mobs=0&mood=0'); await off.waitForFunction(() => window.poc?.ready, null, { timeout: 90000 });
+  expect(await off.evaluate(() => window.poc.cfg.mood)).toBe(false);
+  expect([...errors, ...e2], [...errors, ...e2].join('\n')).toEqual([]);
+});
