@@ -16,12 +16,22 @@
     .bar { position: relative; height: 16px; border-radius: 8px; background: rgba(0,0,0,.45); overflow: hidden; }
     .bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(180deg, #7ff0a6, #3fb46a); transition: width .12s; }
     .bar span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 800; text-shadow: 0 1px 2px #000; }
-    #hud-skills { left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; border-radius: 18px; }
-    .slot { --p: 0; position: relative; width: 58px; height: 58px; border-radius: 14px; background: linear-gradient(180deg, #3a3d63, #2a2c4a); border: 1px solid rgba(255,255,255,.14); display: grid; place-items: center; overflow: hidden; }
-    .slot .ic { font-size: 26px; }
-    .slot .key { position: absolute; left: 5px; top: 3px; font-size: 10px; font-weight: 900; color: var(--muted); }
-    .slot .cd { position: absolute; inset: 0; background: conic-gradient(rgba(10,10,25,.74) calc(var(--p) * 360deg), transparent 0); }
-    .slot .cdt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; font-weight: 900; text-shadow: 0 1px 4px #000; }
+    /* barra de habilidades v1 (identidade "Ecos de ouro"): medalhões metálicos, joia com a tecla, recarga em anel, brilho quando pronta */
+    #hud-skills { --cc: #9b8cff; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 20px; align-items: flex-end; padding: 14px 34px 16px; background: none; border: 0; backdrop-filter: none; border-radius: 0; }
+    #hud-skills::before { content: ''; position: absolute; inset: 14px 0 6px; z-index: -1; border-radius: 40px 40px 18px 18px; background: linear-gradient(180deg, rgba(34,30,70,.88), rgba(14,16,34,.94)); border: 1px solid rgba(255,207,74,.45); box-shadow: 0 10px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,240,166,.35), inset 0 0 22px rgba(0,0,0,.45); }
+    #hud-skills::after { content: ''; position: absolute; left: 10%; right: 10%; bottom: 3px; height: 2px; z-index: -1; background: linear-gradient(90deg, transparent, #c98f12, #fff0a6, #c98f12, transparent); opacity: .85; border-radius: 2px; }
+    .slot { --p: 0; position: relative; width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; cursor: help;
+      background: radial-gradient(circle at 50% 30%, #4a54a0 0%, #262c63 48%, #131735 100%);
+      box-shadow: 0 0 0 3px #d9a21b, 0 0 0 5px #4a3208, 0 0 0 6px rgba(255,240,166,.55), 0 8px 16px rgba(0,0,0,.55), inset 0 -10px 16px rgba(0,0,0,.5), inset 0 7px 10px rgba(255,255,255,.14); }
+    .slot:first-child { width: 74px; height: 74px; }
+    .slot .ic { font-size: 28px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.65)); z-index: 1; }
+    .slot:first-child .ic { font-size: 33px; }
+    .slot .key { position: absolute; left: 50%; bottom: -13px; transform: translateX(-50%); z-index: 3; min-width: 22px; padding: 1px 7px; text-align: center; font: 900 11px/16px system-ui; color: #fff; text-shadow: 0 1px 2px #000; border-radius: 9px; border: 1.5px solid #ffe9a0; background: linear-gradient(180deg, color-mix(in srgb, var(--cc) 75%, #fff), var(--cc) 60%, color-mix(in srgb, var(--cc) 60%, #000)); box-shadow: 0 2px 4px rgba(0,0,0,.6); }
+    .slot .cd { position: absolute; inset: 0; border-radius: 50%; z-index: 2; background: conic-gradient(rgba(8,10,26,.8) calc(var(--p) * 360deg), transparent 0); }
+    .slot .cdt { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; font-size: 19px; font-weight: 900; text-shadow: 0 1px 4px #000; }
+    .slot.rdy { box-shadow: 0 0 0 3px #ffd34d, 0 0 0 5px #4a3208, 0 0 0 6px rgba(255,240,166,.75), 0 0 20px color-mix(in srgb, var(--cc) 80%, transparent), 0 8px 16px rgba(0,0,0,.55), inset 0 -10px 16px rgba(0,0,0,.45), inset 0 7px 10px rgba(255,255,255,.2); }
+    .slot.rdy.pulse::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid #ffe9a0; animation: eco .7s ease-out 1; pointer-events: none; z-index: 4; }
+    @keyframes eco { from { opacity: .95; transform: scale(1); } to { opacity: 0; transform: scale(1.5); } }
     #hud-stats { right: 16px; top: 16px; padding: 10px 14px; font-size: 12px; line-height: 1.6; color: var(--muted); max-width: 440px; }
     #hud-stats b { color: var(--text); }
     #hud-help { left: 16px; bottom: 18px; padding: 8px 12px; font-size: 12px; color: var(--muted); max-width: 340px; line-height: 1.5; }

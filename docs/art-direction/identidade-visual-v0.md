@@ -1,4 +1,6 @@
 # Identidade visual — rascunho v0 (para aprovar)
+> **Em revisão (2026-10-31):** o proprietário quer uma identidade própria, "de jogo de verdade"; ouro+eco é só ponto de partida. A luz "de sol" (feixes) foi removida. Método e decisões pendentes: `como-criar-a-identidade.md`.
+
 2026-10-31. Fase **B1** (ADR 0007). Tudo aqui é **proposta**, derivada do que já existe (os 4 heróis, os efeitos, a UI atual); nada foi aplicado ao jogo real. Pode ser aprovado, vetado ou ajustado item a item. A página `http://localhost:5174/labs/iso-poc/identidade.html` mostra a paleta, a UI e os heróis lado a lado.
 
 ## 1. Ideia central: "Ecos de ouro"

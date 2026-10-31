@@ -78,6 +78,7 @@ async function boot() {
   }
   cls = CLASSES[cfg.hero ? CLASS_BY_HERO[cfg.hero] : 'mage'];
   buildHud();
+  $('hud-skills').style.setProperty('--cc', { paladino: '#4478e0', aprendiz: '#5b53dc', franco: '#5fa84e', sacerdote: '#6fd6bd' }[cfg.hero] ?? '#9b8cff'); // cor da classe (identidade v0)
   $('hp-name').textContent = `Aren · ${cls.name} Nv 8`;
   $('help-skills').textContent = cls.skills.map((k) => SKILLS[k].name).join(' / ');
   mageAtlas = bakeAtlas({ name: 'mage', frame: MAGE_FRAME, pivot: MAGE_PIVOT, clips: MAGE_CLIPS, draw: drawMage, scale: cfg.bake });
@@ -388,8 +389,8 @@ function render(dt, now) {
 }
 
 // ---------- atmosfera: "luminoso com mistério" (identidade v0) ----------
-// Névoa baixa que passa devagar (sprite radial em cache), feixes de luz quentes vindos do alto-esquerda e um véu frio nos cantos.
-// Só desenho: não toca a simulação. Custo: ~10 drawImage + 4 polígonos por quadro.
+// Névoa baixa que passa devagar (sprite radial em cache) e um véu violeta nos cantos. (Os feixes de luz "de sol" foram removidos a pedido.)
+// Só desenho: não toca a simulação. Custo: ~7 drawImage por quadro.
 let mistSprite = null;
 function drawMood(now) {
   if (!mistSprite) {
@@ -399,14 +400,6 @@ function drawMood(now) {
     m.fillStyle = gr; m.fillRect(0, 0, 256, 256);
   }
   const z = cfg.zoom;
-  // feixes de luz (aditivos), levemente oscilantes
-  g.save(); g.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 4; i++) {
-    const x0 = W * (0.02 + i * 0.27) + Math.sin(now / 5200 + i * 1.7) * 36, w = (70 + 30 * (i % 2)) * z, drop = H * 0.95, slant = H * 0.55;
-    const gr = g.createLinearGradient(x0, 0, x0 + slant, drop); gr.addColorStop(0, 'rgba(255,238,190,0.13)'); gr.addColorStop(0.6, 'rgba(255,226,160,0.05)'); gr.addColorStop(1, 'rgba(255,226,160,0)');
-    g.fillStyle = gr; g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + w, 0); g.lineTo(x0 + w + slant, drop); g.lineTo(x0 + slant, drop); g.closePath(); g.fill();
-  }
-  g.restore();
   // névoa baixa: manchas grandes que derivam da esquerda para a direita, mais densas perto do chão
   g.save(); g.globalAlpha = 0.5;
   for (let i = 0; i < 7; i++) {
@@ -432,6 +425,8 @@ function updateHud() {
   for (const s of SK) {
     const cd = p.cds[s.id] ?? 0, el = $('sl-' + s.id);
     el.style.setProperty('--p', cd > 0 ? Math.min(1, cd / max[s.id]).toFixed(3) : '0');
+    const was = el.classList.contains('rdy'); el.classList.toggle('rdy', cd <= 0); // pronta: brilho; ao ficar pronta, um pulso ("eco")
+    if (cd <= 0 && !was && s.id !== 'basic') { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
     el.querySelector('.cdt').textContent = cd > 0.05 && s.id !== 'basic' ? cd.toFixed(cd < 1 ? 1 : 0) : '';
   }
   $('hud-stats').innerHTML = `FPS <b>${stats.fps.toFixed(0)}</b> · simulação <b>${stats.simMs.toFixed(2)} ms</b> · desenho <b>${stats.renderMs.toFixed(2)} ms</b><br>`
