@@ -10,4 +10,4 @@ public/labs/iso-poc/art-local/*
 /*.glb
 
 # banco local e backups (dados de jogadores nunca vao ao Git)
-data/
+/data/
