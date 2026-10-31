@@ -17,12 +17,15 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 
 ## Técnico pendente
 - [ ] Prova de conceito **Canvas 2D × PixiJS** (decisão 0001 segue valendo).
-- [ ] Exploração PvE ainda é calculada no cliente (servidor só aplica limites de plausibilidade).
+- [ ] Exploração PvE ainda é calculada no cliente (servidor só aplica limites de plausibilidade). **Proposta de desenho em `docs/roadmap/pve-autoritativo.md`: precisa da sua decisão (escopo e custo).**
+- [ ] Rodar `docs/roadmap/teste-android.md` no seu aparelho e me trazer FPS/RAM.
+- [ ] Decidir se `?visual=miniatura` (heróis novos) vira o padrão do jogo e do app instalado.
 - [ ] Picos de coleta de lixo no servidor (perfil `--cpu-prof` em carga longa; reuso de objetos).
 - [ ] Snapshots ainda em JSON (sem binário/compressão).
 - [ ] Escala além de um processo: SQLite é de um processo (→ PostgreSQL), sem balanceamento entre servidores.
 - [ ] Alertas, agregação de logs, agendamento de backup e teste de restauração em máquina limpa.
 - [ ] Sem CAPTCHA/anti-abuso de contas em massa; sem teste de invasão por terceiros.
-- [ ] Economia: sumidouros (sinks) de fim de jogo e co-op end-game.
+- [x] Sumidouro de ouro de fim de jogo: Ferreiro (aprimoramento +1…+8) — **falta calibrar com jogadores** (≈ 600 abates por peça).
+- [ ] Economia: co-op end-game (recompensas além do nível 20) e eventuais outros ralos (taxas, cosméticos).
 - [ ] Teste oscilante sob carga: `iso-poc.spec.js` (laboratório; Bola de Fogo, Aprendiz/Franco) e `mobile` "botões" — passam sozinhos.
-- [ ] Fonte do Google Fonts (recurso externo) → arquivo local.
+- [x] Fonte local (Cinzel/Nunito em `public/fonts`, OFL).

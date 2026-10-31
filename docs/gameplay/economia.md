@@ -23,6 +23,7 @@ Atualizado em 2026-10-31. Os números abaixo saem de `npm run economy` (`tools/e
 | Essência de spirit (selvagem / prismática) | `250 + nível×20` / `1 500 + nível×60` |
 | Itens da loja | valor × 4 (`itemMarkup`) |
 | Trocar de especialização (a 1ª é grátis) | `150 + nível×25` |
+| **Aprimoramento no Ferreiro** (loja): +1 a +8, +6% dos atributos base por nível, sem risco de perder o item | `60 + nível×15 × (1 + 0,25×raridade) × n^1,6` (n = próximo nível); a venda **não** devolve o ouro gasto |
 | Morte no PvE | −10% do ouro |
 | Itens extras com a mochila cheia | viram ouro (nada some, mas a mochila é o limite: 30) |
 
@@ -52,8 +53,16 @@ DESTINOS (ralos de ouro)
 Nível máximo 30. Itens: só entram por abates, chefes, baús, missões, cooperativo e prêmios de arena; saem por venda (50% do valor), conversão (inventário cheio).
 ```
 
+```
+APRIMORAMENTO (ferreiro): ouro por item vestido, +0 → +8, e quantos abates isso equivale
+  forest (item raro nv 4): 1º nível 150 · tudo até +8 9488 ouro ≈ 560 abates · 6 peças ≈ 3361 abates
+  plains (item raro nv 9): 1º nível 263 · tudo até +8 20748 ouro ≈ 593 abates · 6 peças ≈ 3555 abates
+  ruins (item raro nv 16): 1º nível 420 · tudo até +8 36513 ouro ≈ 614 abates · 6 peças ≈ 3684 abates
+```
+
 ## Leitura (honesta)
-- **Ritmo de exploração:** 14 abates por nível no Bosque, 22 na Planície, 31 nas Ruínas. Uma essência selvagem custa ≈ 19 / 12 / 10 abates (Bosque / Planície / Ruínas): barato demais para ser um ralo forte no fim do jogo. **Pendência:** ralos de fim de jogo (aprimoramento de equipamento, P8+) ainda não existem.
+- **Ralo de fim de jogo (novo):** o Ferreiro custa ≈ 600 abates por peça até +8 em qualquer zona (≈ 3 500 para 6 peças). É um ralo **grande de propósito** (jogo de longo prazo) e **não foi testado com jogadores**: os números são ajustáveis em `core/enhance.js`. O servidor recusa item novo já aprimorado e saltos de mais de 10 níveis entre gravações (`plausible.js`); o ouro gasto **não** é conferido pelo servidor (PvE de exploração ainda é do cliente).
+- **Ritmo de exploração:** 14 abates por nível no Bosque, 22 na Planície, 31 nas Ruínas. Uma essência selvagem custa ≈ 19 / 12 / 10 abates (Bosque / Planície / Ruínas): barato demais para ser um ralo forte no fim do jogo. Ralo de fim de jogo: o aprimoramento (abaixo).
 - **Cooperativo (corrigido nesta fase):** antes uma vitória dava ≈ 75% de um nível de XP e ouro generoso; agora ≈ **30% de um nível** (teto), e ouro moderado (≈ 8 abates da Planície em ouro; XP menor que um nível de farm).
 - **Arena:** o ouro por vitória (≈ 120 em nv 10) equivale a ≈ 4 abates da Planície; o rating é o prêmio principal.
 - **Não existe ainda:** mercado entre jogadores, leilão, comércio direto (decidido: **não** implementar antes de existir telemetria — é onde duplicação e inflação nascem).

@@ -5,6 +5,7 @@ import { mobXp, xpToNext, MAX_LEVEL } from '../public/src/core/progression.js';
 import { rollMobLoot, generateItem } from '../public/src/core/loot.js';
 import { MOBS } from '../public/src/data/mobs.js';
 import { ZONES } from '../public/src/data/zones.js';
+import { totalEnhanceCost, enhanceCost, MAX_PLUS } from '../public/src/core/enhance.js';
 import { PRICES } from '../public/src/shop.js';
 import { COOP_WAVES } from '../server/coop.js';
 import { coopRewardPlan } from '../public/src/core/economy.js';
@@ -43,4 +44,10 @@ for (const lvl of [10, 20]) console.log(`  PvP 1×1 nv ${lvl}: vitória ${40 + l
 console.log('\nDESTINOS (ralos de ouro)');
 for (const lvl of [5, 15, 25]) console.log(`  nv ${String(lvl).padStart(2)}: poção ${PRICES.potion(lvl)} · essência ${PRICES.essence(lvl)} · prismática ${PRICES.prism(lvl)} · item na loja ≈ ${(generateItem(rng, lvl, { rarityId: 'rare' }).value * PRICES.itemMarkup)} (raro) · trocar de especialização ${150 + lvl * 25} · morte no PvE: -10% do ouro`);
 console.log('  Ouro necessário para 1 essência ≈ abates:', rows.map((r) => `${r.zona}: ${(PRICES.essence(r.nivel) / (r.ouroPorAbate + r.valorVendaPorAbate * 0.5)).toFixed(0)}`).join(' · '));
+console.log('\nAPRIMORAMENTO (ferreiro): ouro por item vestido, +0 → +' + MAX_PLUS + ', e quantos abates isso equivale');
+for (const r of rows) {
+  const it = generateItem(rng, r.nivel, { rarityId: 'rare', slot: 'armor' });
+  const total = totalEnhanceCost(it), perKill = r.ouroPorAbate + r.valorVendaPorAbate * 0.5;
+  console.log(`  ${r.zona} (item raro nv ${r.nivel}): 1º nível ${enhanceCost(it)} · tudo até +${MAX_PLUS} ${total} ouro ≈ ${Math.round(total / perKill)} abates · 6 peças ≈ ${Math.round((total * 6) / perKill)} abates`);
+}
 console.log(`\nNível máximo ${MAX_LEVEL}. Itens: só entram por abates, chefes, baús, missões, cooperativo e prêmios de arena; saem por venda (50% do valor), conversão (inventário cheio).`);

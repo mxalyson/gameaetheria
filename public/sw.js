@@ -3,7 +3,7 @@
 // nada de WebSocket, API ou outras origens (login/salvamento na nuvem passam direto). Subir VERSION invalida o cache antigo.
 const VERSION = 'aetheria-v1';
 
-self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(VERSION).then((c) => c.addAll(['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icon.svg']))); });
+self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(VERSION).then((c) => c.addAll(['./', 'index.html', 'style.css', 'fonts/fonts.css', 'manifest.webmanifest', 'icon.svg']))); });
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     for (const k of await caches.keys()) if (k !== VERSION) await caches.delete(k);

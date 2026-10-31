@@ -1,12 +1,14 @@
 import { CLASSES, STAT_KEYS } from '../data/classes.js';
 import { SLOTS, WEAPON_TYPES, RARITY } from '../data/items.js';
+import { plusMul } from './enhance.js';
 
 export function gearTotals(equipment) {
   const t = {};
   for (const slot of SLOTS) {
     const it = equipment?.[slot];
     if (!it) continue;
-    for (const [k, v] of Object.entries(it.stats)) t[k] = (t[k] ?? 0) + v;
+    const m = plusMul(it); // aprimoramento (+N) multiplica os atributos base do item
+    for (const [k, v] of Object.entries(it.stats)) t[k] = (t[k] ?? 0) + (m === 1 ? v : Math.round(v * m * 100) / 100);
   }
   return t;
 }

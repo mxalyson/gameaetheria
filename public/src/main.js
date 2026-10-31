@@ -1,3 +1,4 @@
+import { enhance, findGear } from './core/enhance.js';
 import './no-zoom.js';
 import { heroSpritesEnabled, preloadHero, showHeroLoading } from './render/hero-sprites.js';
 import { Renderer } from './render/renderer.js';
@@ -147,6 +148,7 @@ class Game {
       case 'toggle': this.ui.toggle(arg); break;
       case 'item': this.ui.isOpen('shop') ? this.sell(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
+      case 'enhance': this.enhanceItem(arg); break;
       case 'alloc': this.alloc(arg); break;
       case 'spec': this.pickSpec(arg); break;
       case 'sort-inv': this.sortInventory(); break;
@@ -955,6 +957,14 @@ class Game {
     this.refreshStats();
     this.ui.render();
     this.save();
+  }
+
+  enhanceItem(id) {
+    const r = enhance(this.char, id);
+    if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
+    const it = findGear(this.char, id);
+    this.ui.log(`${it.name} aprimorado para +${r.plus} (-${r.cost} 🪙)`, '#ffd34d');
+    this.refreshStats(); this.ui.render(); this.save();
   }
 
   sell(id) {

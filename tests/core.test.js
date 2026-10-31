@@ -192,3 +192,43 @@ test('pareamento por poder é robusto: 640 combinações (nível × classe × se
   assert.equal(n, 640);
   assert.ok(worst <= 0.2, `pior desvio ${(worst * 100).toFixed(1)}%`);
 });
+
+// ---- Aprimoramento de equipamento (ralo de ouro) ----
+import { enhance, enhanceCost, totalEnhanceCost, MAX_PLUS, PLUS_BONUS } from '../public/src/core/enhance.js';
+import { validate } from '../public/src/core/savedoc.js';
+import { checkSave } from '../server/plausible.js';
+import { newOfficialCharacter } from '../server/api.js';
+
+test('aprimorar: cobra ouro, soma 6% por nível aos atributos, para no máximo e recusa sem ouro', () => {
+  const c = newOfficialCharacter('P', 'warrior'); c.gold = 1e9;
+  const w = c.equipment.weapon, base = computeStats(c).power;
+  const cost = enhanceCost(w);
+  const r = enhance(c, w.id);
+  assert.equal(r.ok, true); assert.equal(c.gold, 1e9 - cost); assert.equal(w.plus, 1);
+  assert.ok(computeStats(c).power > base, 'poder sobe');
+  assert.ok(enhanceCost(w) > cost, 'cada nível custa mais');
+  for (let i = 1; i < MAX_PLUS; i++) assert.equal(enhance(c, w.id).ok, true);
+  assert.equal(w.plus, MAX_PLUS);
+  assert.equal(enhance(c, w.id).ok, false, 'máximo');
+  c.gold = 0; w.plus = 0;
+  assert.equal(enhance(c, w.id).ok, false, 'sem ouro');
+  assert.equal(w.plus, 0); assert.equal(c.gold, 0);
+  assert.ok(totalEnhanceCost(w) > 10 * w.value, 'é um ralo grande em comparação ao valor do item');
+  assert.equal(PLUS_BONUS, 0.06);
+});
+
+test('aprimorar: o save mantém +N dentro do limite; servidor recusa item novo aprimorado e saltos grandes', () => {
+  const c = newOfficialCharacter('P', 'warrior'); c.equipment.weapon.plus = 3;
+  assert.equal(validate(structuredClone(c)).char.equipment.weapon.plus, 3);
+  c.equipment.weapon.plus = 99;
+  assert.equal(validate(structuredClone(c)).char.equipment.weapon.plus, MAX_PLUS, 'limitado ao máximo');
+  c.equipment.weapon.plus = 'x';
+  assert.equal(validate(structuredClone(c)).char.equipment.weapon.plus, undefined);
+  const old = newOfficialCharacter('P', 'warrior'), neu = structuredClone(old);
+  neu.equipment.weapon.plus = 2;
+  assert.equal(checkSave(old, neu).ok, true, 'aprimoramento normal');
+  neu.inventory.push({ ...old.equipment.weapon, id: 'novo1', plus: 5 });
+  assert.equal(checkSave(old, neu).reason, 'plus_forged', 'item novo não nasce aprimorado');
+  const neu2 = structuredClone(old); neu2.equipment.weapon.plus = 8; neu2.equipment.armor.plus = 8;
+  assert.equal(checkSave(old, neu2).reason, 'plus_jump', 'salto grande entre gravações');
+});

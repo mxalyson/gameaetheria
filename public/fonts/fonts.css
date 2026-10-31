@@ -1,0 +1,7 @@
+/* Fontes locais (SIL Open Font License 1.1): Cinzel (títulos) e Nunito (texto). Arquivos de Google Fonts, guardados aqui para o jogo funcionar offline. */
+@font-face { font-family: 'Cinzel'; font-weight: 600; font-display: swap; src: url(cinzel-600.ttf) format('truetype'); }
+@font-face { font-family: 'Cinzel'; font-weight: 800; font-display: swap; src: url(cinzel-800.ttf) format('truetype'); }
+@font-face { font-family: 'Nunito'; font-weight: 400; font-display: swap; src: url(nunito-400.ttf) format('truetype'); }
+@font-face { font-family: 'Nunito'; font-weight: 600; font-display: swap; src: url(nunito-600.ttf) format('truetype'); }
+@font-face { font-family: 'Nunito'; font-weight: 800; font-display: swap; src: url(nunito-800.ttf) format('truetype'); }
+@font-face { font-family: 'Nunito'; font-weight: 900; font-display: swap; src: url(nunito-900.ttf) format('truetype'); }

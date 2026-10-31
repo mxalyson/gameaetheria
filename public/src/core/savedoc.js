@@ -4,6 +4,7 @@
 import { CLASSES } from '../data/classes.js';
 import { SLOTS, RARITY, WEAPON_TYPES, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, SPIRIT_RARITY_MUL, MAX_SPIRITS } from '../data/spirits.js';
+import { MAX_PLUS } from './enhance.js';
 import { MAX_LEVEL, POINTS_PER_LEVEL, SAVE_VERSION } from './progression.js';
 import { SPECS, SPEC_LEVEL } from '../data/specs.js';
 import { QUESTS } from '../data/quests.js';
@@ -80,6 +81,7 @@ function cleanItem(it) {
   return {
     id, kind: 'gear', name: cleanText(it.name, 60) || 'Item', slot: it.slot, weaponType, rarity: it.rarity,
     level: int(it.level, 1, 60, 1), reqLevel: int(it.reqLevel, 1, 60, 1), stats, value: int(it.value, 0, 1e6, 0),
+    ...(int(it.plus, 0, MAX_PLUS, 0) > 0 ? { plus: int(it.plus, 0, MAX_PLUS, 0) } : {}),
   };
 }
 

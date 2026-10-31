@@ -6,9 +6,10 @@ import { QUESTS } from '../public/src/data/quests.js';
 import { SERVER_STATS, STAT_KEYS_PROGRESS } from '../public/src/data/achievements.js';
 import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, MAX_ACTIVE, isComplete } from '../public/src/core/journal.js';
 
-export const LIMITS = { levelJump: 2, goldBase: 5000, goldPerLevel: 800, newItems: 12, potions: 25, spirits: 3, waves: 6, statJump: 400, newQuests: 3, doneQuests: 3, newChests: 6 };
+export const LIMITS = { levelJump: 2, goldBase: 5000, goldPerLevel: 800, newItems: 12, potions: 25, spirits: 3, waves: 6, statJump: 400, newQuests: 3, doneQuests: 3, newChests: 6, plusJump: 10 };
 
 const itemIds = (c) => new Set([...Object.values(c.equipment ?? {}), ...(c.inventory ?? [])].map((i) => i.id));
+const plusById = (c) => new Map([...Object.values(c.equipment ?? {}), ...(c.inventory ?? [])].map((i) => [i.id, i.plus ?? 0]));
 const spiritIds = (c) => new Set((c.spirits ?? []).map((s) => s.id));
 
 // Devolve { ok:true, doc } com os campos "do servidor" restaurados, ou { ok:false, reason }.
@@ -25,6 +26,13 @@ export function checkSave(oldDoc, neuDoc, now = Date.now()) {
   let created = 0;
   for (const id of itemIds(neu)) if (!before.has(id)) created++;
   if (created > LIMITS.newItems) return { ok: false, reason: 'item_flood' };
+  // aprimoramento: item novo nasce +0 (drops/lojas nunca vêm aprimorados) e o salto entre gravações é limitado
+  const plusOld = plusById(old); let plusGain = 0;
+  for (const [id, p] of plusById(neu)) {
+    if (!plusOld.has(id)) { if (p > 0) return { ok: false, reason: 'plus_forged' }; continue; }
+    if (p > plusOld.get(id)) plusGain += p - plusOld.get(id);
+  }
+  if (plusGain > LIMITS.plusJump) return { ok: false, reason: 'plus_jump' };
   const sb = spiritIds(old);
   let newSp = 0;
   for (const id of spiritIds(neu)) if (!sb.has(id)) newSp++;

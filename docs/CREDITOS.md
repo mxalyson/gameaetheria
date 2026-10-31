@@ -17,3 +17,6 @@ Atualizado em 2026-10-31. A licença CC BY 4.0 exige atribuição: este texto de
 - Conferir os termos do Meshy ao publicar (podem mudar); guardar captura da página de cada modelo.
 - Místico: classe futura, ainda sem arte.
 - A tela de créditos no jogo real ainda não existe (a integração do visual isométrico está adiada); por ora o crédito aparece no canto do PoC (`public/labs/iso-poc/index.html`) e aqui.
+
+## Fontes
+- **Cinzel** e **Nunito** (Google Fonts), licença SIL Open Font License 1.1; arquivos locais em `public/fonts/` (o jogo não depende mais de recurso externo para a tipografia).

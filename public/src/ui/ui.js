@@ -10,6 +10,7 @@ import { MODES, getRating } from '../core/match.js';
 import { MOBS } from '../data/mobs.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
 import { PRICES } from '../shop.js';
+import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
 import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { DIALOGS } from '../data/dialogs.js';
@@ -433,9 +434,22 @@ export class UI {
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · 🪙 ${potion}</button>
         <button class="btn small" data-action="buy-potion" data-arg="5">5 · 🪙 ${potion * 5}</button></div></div>
       <h3>Equipamentos</h3>${stock}
+      ${this.smithSection()}
       <h3>Vender em lote</h3>
       <div class="row-btns"><button class="btn small" data-action="sell-bulk" data-arg="0">Todos Comuns</button>
       <button class="btn small" data-action="sell-bulk" data-arg="1">Comuns + Incomuns</button></div>`);
+  }
+
+  // Ferreiro: aprimora os equipamentos vestidos (+1 a +${MAX_PLUS}); é o grande ralo de ouro de fim de jogo
+  smithSection() {
+    const { char } = this.game;
+    const rows = SLOTS.map((sl) => char.equipment[sl]).filter(Boolean).map((it) => {
+      const max = (it.plus ?? 0) >= MAX_PLUS, cost = enhanceCost(it);
+      return `<div class="shop-item">${this.itemCell(it, 'unequip', it.slot)}
+        <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
+        ${max ? '<span class="tag">Máximo</span>' : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · 🪙 ${cost}</button>`}</div>`;
+    }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
+    return `<h3>Ferreiro · aprimorar equipado</h3>${rows}`;
   }
 
   panel_arena() {
@@ -617,7 +631,9 @@ export class UI {
     const { char } = this.game;
     const R = RARITY[it.rarity];
     const sub = `${R.name} · ${SLOT_NAMES[it.slot]}${it.weaponType ? ` (${WEAPON_TYPES[it.weaponType].name})` : ''} · Nv ${it.level}`;
-    const lines = Object.entries(it.stats).map(([k, v]) => `<div class="tt-stat">${fmtStat(k, v)}</div>`).join('');
+    const mul = plusMul(it);
+    const lines = Object.entries(it.stats).map(([k, v]) => `<div class="tt-stat">${fmtStat(k, mul === 1 ? v : Math.round(v * mul * 10) / 10)}</div>`).join('');
+    const plusLine = it.plus ? `<div class="tt-sub">Aprimorado +${it.plus} (+${Math.round(PLUS_BONUS * it.plus * 100)}% nos atributos)</div>` : '';
     const eq = char.equipment[it.slot];
     let cmp = '';
     if (eq && eq.id !== it.id) {
@@ -636,7 +652,7 @@ export class UI {
     else if (equipped) action = `${again} para desequipar`;
     else if (this.isOpen('shop')) action = `${again} para vender por 🪙 ${it.value}`;
     else if (ok.ok) action = `${again} para equipar`;
-    return `<div class="tt-name" style="color:${R.color}">${esc(it.name)}</div><div class="tt-sub">${sub}</div>${lines}
+    return `<div class="tt-name" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}
       ${ok.ok ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
       <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? ` · vale 🪙 ${it.value}` : ''}</div>`;
   }
