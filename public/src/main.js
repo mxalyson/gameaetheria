@@ -1,3 +1,4 @@
+import { heroSpritesEnabled, preloadHero, showHeroLoading } from './render/hero-sprites.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { UI } from './ui/ui.js';
@@ -124,6 +125,7 @@ class Game {
     this.ui.hideScreen();
     this.ui.setupHud(char);
     this.touch.setup(char);
+    if (heroSpritesEnabled()) showHeroLoading(preloadHero(char.classId)); // visual novo: espera o herói carregar
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
       this.ui.toast(`Bem-vindo, ${char.name}!`, 'Siga o portal a leste para o Bosque Verdejante', 'gold');
@@ -222,7 +224,7 @@ class Game {
           intents[p.id] = {
             mx: (inp.held('d', 'arrowright') ? 1 : 0) - (inp.held('a', 'arrowleft') ? 1 : 0),
             my: (inp.held('s', 'arrowdown') ? 1 : 0) - (inp.held('w', 'arrowup') ? 1 : 0),
-            aimX: inp.mouse.x + this.cam.x, aimY: inp.mouse.y + this.cam.y,
+            aimX: inp.mouse.x / this.renderer.zoom + this.cam.x, aimY: inp.mouse.y / this.renderer.zoom + this.cam.y,
             attack: inp.mouse.down, cast,
           };
         }

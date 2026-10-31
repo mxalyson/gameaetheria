@@ -10,7 +10,13 @@ Atualizado em 2026-10-31. O jogo **real** não foi alterado pelo trabalho de art
 ## 0.1) Visual novo no JOGO REAL (opcional, desligado por padrão)
 - Adicione **?visual=miniatura** à URL (ex.: https://mxalyson.github.io/gameaetheria/?visual=miniatura): os personagens jogáveis (Guerreiro, Mago, Arqueiro, Clérigo, inclusive o rival do duelo) passam a usar os heróis em miniatura (Paladino, Aprendiz, Franco-atirador, Sacerdote), com andar, golpe, skill, dash, dano e morte. A escolha fica salva no aparelho; **?visual=original** volta ao visual antigo.
 - O resto (mapa, monstros, NPCs, interface) continua o antigo: é o estilo misturado que você já viu na montagem. Serve para você julgar como os personagens ficam **dentro do jogo de verdade** (inclusive no celular).
-- Cada herói carrega só quando aparece (alguns segundos na primeira vez; antes disso aparece o desenho antigo).
+- Ao entrar no jogo aparece a tela **"Preparando seu herói…"** até o herói carregar (o desenho antigo não aparece mais no lugar dele).
+
+## 0.2) Celular: o que mudou em 2026-10-31
+- **Zoom do mundo em telas pequenas:** antes o mundo era desenhado em tamanho de PC (no celular via-se ~650×320 do mapa e tudo ficava gigante). Agora a vista mostra ~1300×520 do mundo (zoom 0,55–0,65 no celular; no PC continua 1).
+- **HUD em telas baixas (navegador com barra de endereço):** minimapa menor (≤ 420 px de altura) e escondido (≤ 360 px); botões de toque um pouco menores, sem nunca ficar abaixo de 44 px.
+- **Direção do herói (visual novo):** andando, ele olha para onde anda; ao golpear/usar skill, olha para o alvo (antes "andava de costas" olhando sempre para a mira automática).
+- Medido em celular emulado (Pixel 7 deitado no navegador, 863×330): 55–67 FPS, também com CPU 4× mais lenta. **GPU e memória do celular real não foram medidas.**
 
 ## 1) O jogo real (é isto que vale como "o jogo")
 1. No terminal, na pasta `H:\aetheria`: `npm start`

@@ -25,9 +25,9 @@ export function heroSpritesEnabled() {
 
 const atlases = new Map();            // id -> { state, meta, sheets }
 function load(id) {
-  const at = { state: 'loading', meta: null, sheets: {} };
+  const at = { state: 'loading', meta: null, sheets: {}, promise: null };
   atlases.set(id, at);
-  (async () => {
+  at.promise = (async () => {
     try {
       const meta = await (await fetch(`${BASE}${id}/${id}.json`)).json();
       for (const name of Object.keys(meta.clips)) {
@@ -40,6 +40,27 @@ function load(id) {
   return at;
 }
 
+// Carrega o herói da classe antes de começar (a tela de carregamento espera por isto).
+export function preloadHero(classId) {
+  const id = CLASS_TO_HERO[classId];
+  if (!id) return Promise.resolve();
+  return (atlases.get(id) ?? load(id)).promise;
+}
+
+// Tela de carregamento por cima do jogo até o herói estar pronto (nunca mostra o desenho antigo no lugar dele).
+export function showHeroLoading(promise) {
+  let el = document.getElementById('hero-loading');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'hero-loading';
+    el.style.cssText = 'position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,#2a2f5a,#141a2e 60%,#0d1122);color:#f3e8c8;font:800 15px Nunito,system-ui,sans-serif;letter-spacing:.04em;transition:opacity .3s';
+    el.innerHTML = '<div style="text-align:center"><div style="width:54px;height:54px;margin:0 auto 14px;border-radius:50%;border:3px solid rgba(255,207,74,.25);border-top-color:#ffcf4a;animation:hl-spin 0.9s linear infinite"></div>Preparando seu herói…</div><style>@keyframes hl-spin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(el);
+  }
+  el.style.opacity = '1'; el.style.pointerEvents = 'auto';
+  const done = () => { el.style.opacity = '0'; el.style.pointerEvents = 'none'; setTimeout(() => el.remove(), 320); };
+  Promise.resolve(promise).then(done, done);
+}
+
 // Direção (8 vistas: 0 S, 1 SE, 2 L, 3 NE, 4 N, 5 NO, 6 O, 7 SO) a partir do ângulo de visão no plano do jogo (y para baixo).
 export function viewFromFacing(face) {
   const phi = Math.atan2(Math.cos(face), Math.sin(face)); // S = 0, L = π/2, N = π, O = -π/2
@@ -49,15 +70,17 @@ export function viewFromFacing(face) {
 const ACTING = new Set(['attack', 'skill', 'dash', 'hit']);
 const states = new WeakMap();
 
-// Desenha o herói `a` com o atlas da sua classe. Retorna false se ainda não dá (carregando/erro): o chamador usa o visual antigo.
+// Desenha o herói `a` com o atlas da sua classe. Retorna true (desenhou), 'wait' (ainda carregando: não desenhar nada,
+// para não "piscar" o desenho antigo) ou false (classe sem herói ou falha ao carregar: o chamador usa o visual antigo).
 export function drawHeroSprite(g, a, t) {
   const id = CLASS_TO_HERO[a.classId];
   if (!id) return false;
   const at = atlases.get(id) ?? load(id);
+  if (at.state === 'loading') return 'wait';
   if (at.state !== 'ready') return false;
   const { meta, sheets } = at, clips = meta.clips;
   let st = states.get(a);
-  if (!st) { st = { clip: 'idle', el: 0, lastT: t, prevSwing: 0, prevHit: 0 }; states.set(a, st); }
+  if (!st) { st = { clip: 'idle', el: 0, lastT: t, prevSwing: 0, prevHit: 0, px: a.x, py: a.y, moveFace: a.facing ?? Math.PI / 2 }; states.set(a, st); }
   const dt = Math.max(0, Math.min(0.1, t - st.lastT)); st.lastT = t;
 
   const restart = (name) => { if (clips[name]) { st.clip = name; st.el = 0; } };
@@ -75,7 +98,10 @@ export function drawHeroSprite(g, a, t) {
   st.el += dt;
   const c = clips[st.clip];
   const f = c.loop ? Math.floor(st.el * c.fps) % c.frames : Math.min(Math.floor(st.el * c.fps), c.frames - 1);
-  const view = viewFromFacing(a.facing ?? Math.PI / 2);
+  const mdx = a.x - st.px, mdy = a.y - st.py; st.px = a.x; st.py = a.y;
+  if (a.moving && Math.hypot(mdx, mdy) > 0.3) st.moveFace = Math.atan2(mdy, mdx);
+  const acting = ACTING.has(st.clip) && st.clip !== 'hit' && !(clips[st.clip].loop) && st.el * c.fps < c.frames;
+  const view = viewFromFacing(a.moving && !acting && !a.dead ? st.moveFace : (a.facing ?? Math.PI / 2));
 
   const sheet = sheets[st.clip], rows = meta.rows ?? meta.views, cw = sheet.width / c.frames, ch = sheet.height / rows;
   const flip = meta.mirror && view > 4, row = flip ? meta.views - view : view;

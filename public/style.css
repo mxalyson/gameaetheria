@@ -271,6 +271,27 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 #rotate-hint b { display: block; font-size: 72px; color: var(--gold); }
 @media (orientation: portrait) and (pointer: coarse) { #rotate-hint { display: grid; } }
 
+/* Celular deitado DENTRO do navegador (barra de endereço ocupa altura): ≤ 420 px de altura.
+   Minimapa menor, botões de toque menores e sem sobrepor o minimapa; tudo continua respeitando a escala da interface (--ui). */
+@media (max-height: 420px) {
+  #minimap { width: 96px; height: 64px; }
+  #zone-name { font-size: 10px; margin-bottom: 3px; }
+  #hud-zone { padding: 5px; }
+  .bars { width: 128px; }
+  #hud-gold { top: 62px; }
+  #stick { transform: scale(calc(var(--ui) * .85)); }
+  #boss-bar { width: min(260px, calc(34vw / var(--ui))); }
+}
+/* Muito baixa (≤ 360 px): o minimapa sai (fica só o nome da zona e os botões de menu) e os botões de toque encolhem um pouco,
+   mas nunca abaixo de 44 px (alvo mínimo de toque): os pequenos crescem antes de encolher. */
+@media (max-height: 360px) {
+  #minimap { display: none; }
+  #tbtns { transform: scale(calc(var(--ui) * .85)); }
+  .tbtn.pot, .tbtn.home { width: 54px; height: 54px; }
+  .portrait { width: 34px; height: 34px; font-size: 17px; }
+  #hud-gold { top: 54px; }
+}
+
 /* Celular na horizontal (pouca altura): HUD compacta, painéis lado a lado. */
 @media (max-height: 520px) {
   #hud-player { left: calc(8px + env(safe-area-inset-left, 0px)); top: 8px; padding: 6px 10px 6px 6px; gap: 8px; border-radius: 14px; }

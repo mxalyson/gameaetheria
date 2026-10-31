@@ -35,6 +35,11 @@ export class Renderer {
     this.dpr = Math.min(this.dprCap, devicePixelRatio || 1);
     this.vw = innerWidth;
     this.vh = innerHeight;
+    // Celular: a tela é pequena, então o mundo é desenhado menor para caber ~980×520 unidades (antes, 1 unidade = 1 px:
+    // num celular deitado via-se só ~650×320 do mundo e tudo parecia gigante). No PC (tela grande) o zoom fica 1.
+    this.zoom = Math.max(0.55, Math.min(1, this.vw / 980, this.vh / 520));
+    this.ww = this.vw / this.zoom; // tamanho da vista em unidades do MUNDO
+    this.wh = this.vh / this.zoom;
     this.c.width = Math.round(this.vw * this.dpr);
     this.c.height = Math.round(this.vh * this.dpr);
     this.vignettes = {};
@@ -55,7 +60,7 @@ export class Renderer {
   camera(world, focus) {
     const z = world.zone;
     const clamp = (v, size, view) => (size <= view ? (size - view) / 2 : Math.max(0, Math.min(size - view, v)));
-    return { x: clamp(focus.x - this.vw / 2, z.w, this.vw), y: clamp(focus.y - this.vh / 2, z.h, this.vh) };
+    return { x: clamp(focus.x - this.ww / 2, z.w, this.ww), y: clamp(focus.y - this.wh / 2, z.h, this.wh) };
   }
 
   draw(world, cam, view = {}) {
@@ -64,10 +69,11 @@ export class Renderer {
     g.fillStyle = z.palette.outside;
     g.fillRect(0, 0, this.vw, this.vh);
     g.save();
+    g.scale(this.zoom, this.zoom);
     g.translate(-Math.round(cam.x), -Math.round(cam.y));
     g.drawImage(this.groundFor(world), 0, 0);
 
-    const x0 = cam.x - 120, y0 = cam.y - 120, x1 = cam.x + this.vw + 120, y1 = cam.y + this.vh + 200;
+    const x0 = cam.x - 120, y0 = cam.y - 120, x1 = cam.x + this.ww + 120, y1 = cam.y + this.wh + 200;
     const vis = (x, y) => x > x0 && x < x1 && y > y0 && y < y1;
     if (z.scenery) drawGroundLife(g, world, t, vis);
 
@@ -129,7 +135,7 @@ export class Renderer {
     g.globalAlpha = 1;
     g.restore();
 
-    drawAtmosphere(g, z, cam, this.vw, this.vh, t, this.quality);
+    g.save(); g.scale(this.zoom, this.zoom); drawAtmosphere(g, z, cam, this.ww, this.wh, t, this.quality); g.restore();
     let vignette = this.vignettes[world.zoneId];
     if (!vignette) {
       const v = document.createElement('canvas');
@@ -421,7 +427,8 @@ function drawActorHero(g, a, t) {
   if (a.dead) { g.globalAlpha = Math.max(0.25, 1 - a.deadT); }
   if (a.dash?.invuln) g.globalAlpha = 0.55;
   // visual novo (opcional, ?visual=miniatura): sprite do herói em miniatura; se ainda não carregou, cai no desenho antigo
-  if (!(heroSpritesEnabled() && drawHeroSprite(g, a, t))) drawHero(g, a, a.classId, t, cls.color, cls.accent);
+  const r = heroSpritesEnabled() ? drawHeroSprite(g, a, t) : false;
+  if (r === false) drawHero(g, a, a.classId, t, cls.color, cls.accent); // 'wait' = carregando: não desenha (a tela de carregamento cobre)
   g.restore();
   drawStatus(g, a, t);
 }
