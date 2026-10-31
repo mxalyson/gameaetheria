@@ -23,6 +23,10 @@ import { RARITY, INVENTORY_SIZE, SLOTS } from './data/items.js';
 import { SPIRITS, SPIRIT_RARITY_MUL, MAX_SPIRITS } from './data/spirits.js';
 
 const TOWN = ZONES.town.spawn;
+// Passo fixo da simulação (60 Hz): mesmo resultado em qualquer taxa de quadros — pré-requisito do servidor autoritativo.
+// 60 Hz (e não 30) evita precisar interpolar o desenho no cliente; o servidor pode enviar snapshots a 20 Hz.
+export const FIXED_DT = 1 / 60;
+const MAX_TICKS = 8;
 
 class Game {
   constructor() {
@@ -60,6 +64,7 @@ class Game {
     if (this.mode === 'title') {
       const w = this.titleWorld;
       w.update(dt);
+      w.events.length = 0;
       const cam = this.renderer.camera(w, { x: 850 + Math.cos(w.time * 0.1) * 320, y: 640 + Math.sin(w.time * 0.13) * 200 });
       this.renderer.draw(w, cam, {});
     } else {
@@ -220,7 +225,7 @@ class Game {
     if (this.mode === 'ended') {
       w.updateVisuals(dt);
     } else {
-      const intents = {};
+      let intents = {};
       if (!p.dead) {
         if (this.touch.active) intents[p.id] = this.touch.read(p, w);
         else {
@@ -234,12 +239,14 @@ class Game {
           };
         }
       }
-      w.update(dt, intents);
-      this.handleEvents();
-      if (this.mode === 'explore') { w.updateSpawns(dt, p); this.checkPortals(); this.regen(dt); }
-      else if (this.mode === 'waves') this.updateWaves(dt);
-      else if (this.mode === 'pvp') this.updateMatch(dt);
-      this.collectDrops();
+      this.acc = Math.min((this.acc ?? 0) + dt, FIXED_DT * MAX_TICKS);
+      while (this.acc >= FIXED_DT) {
+        this.acc -= FIXED_DT;
+        this.tick(FIXED_DT, intents);
+        if (this.world !== w) { this.acc = 0; break; } // trocou de zona no meio dos ticks
+        // o toque na tecla da skill vale uma vez só, não uma por tick
+        for (const k of Object.keys(intents)) intents[k] = { ...intents[k], cast: null };
+      }
     }
 
     this.nearNpc = (w.zone.npcs ?? []).find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 80) ?? null;
@@ -248,6 +255,17 @@ class Game {
     const target = this.renderer.camera(w, focus), k = Math.min(1, dt * 8);
     this.cam = { x: this.cam.x + (target.x - this.cam.x) * k, y: this.cam.y + (target.y - this.cam.y) * k };
     if ((this.saveT -= dt) <= 0) { this.save(); this.saveT = 15; }
+  }
+
+  // Um tick da simulação (passo fixo).
+  tick(dt, intents) {
+    const w = this.world, p = this.player;
+    w.update(dt, intents);
+    this.handleEvents();
+    if (this.mode === 'explore') { w.updateSpawns(dt, p); this.checkPortals(); this.regen(dt); }
+    else if (this.mode === 'waves') this.updateWaves(dt);
+    else if (this.mode === 'pvp') this.updateMatch(dt);
+    this.collectDrops();
   }
 
   handleEvents() {
@@ -327,7 +345,7 @@ class Game {
     const p = this.player;
     this.refreshStats();
     p.hp = p.maxHp;
-    this.world.fx.push({ type: 'ring', x: p.x, y: p.y, r: 120, color: '#ffd34d', t: 0, life: 0.8, follow: p });
+    this.world.addFx({ type: 'ring', x: p.x, y: p.y, r: 120, color: '#ffd34d', t: 0, life: 0.8, follow: p });
     this.world.burst(p.x, p.y, '#ffd34d', 40, 260);
     this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o personagem (C)`, 'gold');
     this.ui.log(`Você alcançou o nível <b>${this.char.level}</b>.`, '#ffd34d');
@@ -348,7 +366,7 @@ class Game {
       if (d.t < 0.4 || Math.hypot(d.x - p.x, d.y - p.y) > 44) continue;
       if (d.kind === 'gold') {
         c.gold += d.amount;
-        w.texts.push({ x: p.x, y: p.y - 34, t: 0, life: 0.8, text: `+${d.amount} 🪙`, size: 13, color: '#ffd34d' });
+        w.addText({ x: p.x, y: p.y - 34, t: 0, life: 0.8, text: `+${d.amount} 🪙`, size: 13, color: '#ffd34d' });
       } else if (d.kind === 'potion') {
         c.potions += d.amount;
         this.ui.log(`+${d.amount} 🧪 Poção de Vida`, '#ff9aa8');

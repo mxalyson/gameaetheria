@@ -76,3 +76,18 @@ test('pareamento por poder: aliados e inimigos nascem com poder ≈ o do jogador
     expect(x.max).toBeLessThanOrEqual(x.mine * 1.15);
   }
 });
+
+test('passo fixo: o mesmo tempo de jogo dá o mesmo estado, em quadros de 8, 16 ou 33 ms', async ({ page }) => {
+  await criar(page);
+  const r = await page.evaluate(() => {
+    const g = window.game;
+    const run = (chunk) => {
+      g.enterZone('forest', 700, 900);
+      for (let t = 0; t < 3 - 1e-9; t += chunk) g.step(chunk);
+      return { ticks: Math.round(g.world.time * 60) };
+    };
+    return [run(0.008), run(0.016), run(0.033)];
+  });
+  // tolerância de 1 tick (o resto do acumulador fica para o próximo quadro)
+  for (const x of r) expect(Math.abs(x.ticks - 180)).toBeLessThanOrEqual(1);
+});

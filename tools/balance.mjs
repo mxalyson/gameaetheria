@@ -22,7 +22,7 @@ function build(classId, level, seed) {
 }
 
 function duel(ca, cb, seed) {
-  const w = new World('arena', { seed });
+  const w = new World('arena', { seed, visuals: false });
   const a = w.add(makeHeroActor(ca, 550, 840, 'rival', 1));
   const b = w.add(makeHeroActor(cb, 550, 260, 'rival', 2));
   let t = 0;

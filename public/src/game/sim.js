@@ -57,12 +57,14 @@ export function makeSpiritActor(sp, owner) {
     kind: 'spirit', team: owner.team, owner: owner.id, spiritType: sp.type, rarity: sp.rarity, level: sp.level,
     name: SPIRITS[sp.type].name, untargetable: true, x: owner.x - 20, y: owner.y - 10, r: 8, hp: 1, maxHp: 1,
     stats: { power: spiritPower(sp), crit: 5, critMult: 1.5, lifesteal: 0, def: 0 },
-    cds: { basic: 1, s0: 1.5 }, bob: Math.random() * 10,
+    cds: { basic: 1, s0: 1.5 }, bob: 0,
   });
 }
 
 export class World {
-  constructor(zoneId, { seed } = {}) {
+  // visuals:false (servidor, simulador de balanceamento): nada de partículas/textos/efeitos é criado — só estado de jogo e eventos.
+  constructor(zoneId, { seed, visuals = true } = {}) {
+    this.visuals = visuals;
     this.zoneId = zoneId;
     this.zone = ZONES[zoneId];
     this.layout = buildLayout(zoneId);
@@ -80,9 +82,10 @@ export class World {
     this.respawnT = 0;
     this.bossT = 0;
     this.rng = makeRng(seed ?? (Date.now() & 0x7fffffff));
+    this.vrng = makeRng(((seed ?? 1) ^ 0x5bd1e995) >>> 0); // RNG só dos efeitos visuais: nunca consome o sorteio do gameplay
   }
 
-  add(a) { a.id = nextId++; this.actors.push(a); return a; }
+  add(a) { a.id = nextId++; if (a.kind === 'spirit') a.bob = (a.id % 7) * 1.3; this.actors.push(a); return a; }
   byId(id) { return this.actors.find((a) => a.id === id); }
   enemiesOf(a) { return this.actors.filter((o) => o.team !== a.team && !o.dead && !o.untargetable); }
   nearestEnemy(a, maxR = Infinity) {
@@ -160,6 +163,7 @@ export class World {
     this.updateTelegraphs(dt);
     this.actors = this.actors.filter((a) => !(a.dead && a.deadT > 0.6 && a.kind !== 'player'));
     this.updateVisuals(dt);
+    if (this.events.length > 2000) this.events.splice(0, this.events.length - 2000);
   }
 
   tickTimers(a, dt) {
@@ -249,8 +253,9 @@ export class World {
     a.lastCombat = this.time;
     const ang = Math.atan2(ay - a.y, ax - a.x);
     a.facing = ang;
+    this.events.push({ type: 'swing', actor: a, ang, t: this.time });
     if (b.kind === 'melee') {
-      this.fx.push({ type: 'slash', x: a.x, y: a.y, ang, arc: b.arc, r: b.range + (a.kind === 'mob' ? a.r * 0.5 : 0), t: 0, life: 0.2, color: b.color });
+      this.addFx({ type: 'slash', x: a.x, y: a.y, ang, arc: b.arc, r: b.range + (a.kind === 'mob' ? a.r * 0.5 : 0), t: 0, life: 0.2, color: b.color });
       for (const e of this.enemiesOf(a)) {
         const d = Math.hypot(e.x - a.x, e.y - a.y);
         if (d <= b.range + e.r + (a.kind === 'mob' ? a.r * 0.5 : 0) && Math.abs(angDiff(Math.atan2(e.y - a.y, e.x - a.x), ang)) <= b.arc / 2 + 0.25) {
@@ -285,7 +290,7 @@ export class World {
     a.facing = ang;
     switch (s.kind) {
       case 'aoe_self':
-        this.fx.push({ type: 'ring', x: a.x, y: a.y, r: s.radius, color: s.color, t: 0, life: 0.45 });
+        this.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius, color: s.color, t: 0, life: 0.45 });
         for (const e of this.enemiesOf(a)) {
           if (Math.hypot(e.x - a.x, e.y - a.y) <= s.radius + e.r) this.damage(a, e, s.mult, { slow: s.slow, slowDur: s.slowDur });
         }
@@ -298,7 +303,8 @@ export class World {
       case 'buff':
         a.buffs.push({ id, t: s.dur, ...s.buff });
         if (s.buff.shieldPct) { a.shield = a.maxHp * s.buff.shieldPct; a.shieldT = s.dur; }
-        this.fx.push({ type: 'ring', x: a.x, y: a.y, r: 60, color: s.color, t: 0, life: 0.5, follow: a });
+        this.events.push({ type: 'status', actor: a, kind: s.buff.shieldPct ? 'shield' : 'buff', dur: s.dur, skill: id, t: this.time });
+        this.addFx({ type: 'ring', x: a.x, y: a.y, r: 60, color: s.color, t: 0, life: 0.5, follow: a });
         this.burst(a.x, a.y, s.color, 16, 120);
         break;
       case 'projectile':
@@ -318,7 +324,7 @@ export class World {
         break;
       }
     }
-    this.events.push({ type: 'cast', actor: a, skill: id });
+    this.events.push({ type: 'cast', actor: a, skill: id, t: this.time });
     return true;
   }
 
@@ -336,7 +342,7 @@ export class World {
         }
       }
     }
-    if (this.particles.length < 700) this.particles.push({ x: a.x, y: a.y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: d.color, size: 7 });
+    if (this.particles.length < 700) this.addParticle({ x: a.x, y: a.y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: d.color, size: 7 });
     if (d.t <= 0) a.dash = null;
   }
 
@@ -365,8 +371,11 @@ export class World {
       this.moveActor(t, Math.cos(ang) * 4, Math.sin(ang) * 4);
     }
     const hurtsPlayer = t.kind === 'player';
-    this.texts.push({
-      x: t.x + this.rng.range(-8, 8), y: t.y - t.r - 12, t: 0, life: 0.9,
+    this.events.push({ type: 'hit', src, target: t, amount: res.amount, absorbed: amt === 0, crit: res.crit, t: this.time });
+    if (opts.stun) this.events.push({ type: 'status', actor: t, kind: 'stun', dur: t.stunT, t: this.time });
+    if (opts.slow) this.events.push({ type: 'status', actor: t, kind: 'slow', dur: opts.slowDur, t: this.time });
+    this.addText({
+      x: t.x + this.vrng.range(-8, 8), y: t.y - t.r - 12, t: 0, life: 0.9,
       text: amt === 0 ? 'absorvido' : String(res.amount), size: res.crit ? 21 : 15,
       color: amt === 0 ? '#ffe9a0' : hurtsPlayer ? '#ff6b6b' : res.crit ? '#ffd166' : '#ffffff',
     });
@@ -389,7 +398,8 @@ export class World {
     const before = a.hp;
     a.hp = Math.min(a.maxHp, a.hp + amount);
     const got = Math.round(a.hp - before);
-    if (!quiet && got >= 1) this.texts.push({ x: a.x, y: a.y - a.r - 14, t: 0, life: 0.9, text: '+' + got, size: 15, color: '#7dff9b' });
+    if (got >= 1) this.events.push({ type: 'heal', actor: a, amount: got, t: this.time });
+    if (!quiet && got >= 1) this.addText({ x: a.x, y: a.y - a.r - 14, t: 0, life: 0.9, text: '+' + got, size: 15, color: '#7dff9b' });
     return got;
   }
 
@@ -398,8 +408,8 @@ export class World {
     for (const p of this.projectiles) {
       p.x += p.vx * dt; p.y += p.vy * dt;
       p.traveled += Math.hypot(p.vx, p.vy) * dt;
-      if (this.particles.length < 700 && Math.random() < 0.7) {
-        this.particles.push({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.25, max: 0.25, color: p.color, size: p.radius * 0.7 });
+      if (this.visuals && this.particles.length < 700 && this.vrng.next() < 0.7) {
+        this.addParticle({ x: p.x, y: p.y, vx: (this.vrng.next() - 0.5) * 30, vy: (this.vrng.next() - 0.5) * 30, life: 0.25, max: 0.25, color: p.color, size: p.radius * 0.7 });
       }
       let done = p.traveled >= p.range;
       for (const e of this.actors) {
@@ -426,7 +436,7 @@ export class World {
   }
 
   explode(p) {
-    this.fx.push({ type: 'ring', x: p.x, y: p.y, r: p.explode, color: p.color, t: 0, life: 0.35 });
+    this.addFx({ type: 'ring', x: p.x, y: p.y, r: p.explode, color: p.color, t: 0, life: 0.35 });
     this.burst(p.x, p.y, p.color, 24, 240);
     for (const e of this.actors) {
       if (e.dead || e.untargetable || e.team === p.team) continue;
@@ -445,9 +455,9 @@ export class World {
           if (e.dead || e.untargetable || e.team === ar.src.team) continue;
           if (Math.hypot(e.x - ar.x, e.y - ar.y) <= ar.r + e.r) this.damage(ar.src, e, ar.mult);
         }
-        for (let i = 0; i < 8; i++) {
-          const ang = Math.random() * TAU, d = Math.random() * ar.r;
-          this.particles.push({ x: ar.x + Math.cos(ang) * d, y: ar.y + Math.sin(ang) * d - 30, vx: 0, vy: 260, life: 0.15, max: 0.15, color: ar.color, size: 3, streak: true });
+        for (let i = 0; this.visuals && i < 8; i++) {
+          const ang = this.vrng.next() * TAU, d = this.vrng.next() * ar.r;
+          this.addParticle({ x: ar.x + Math.cos(ang) * d, y: ar.y + Math.sin(ang) * d - 30, vx: 0, vy: 260, life: 0.15, max: 0.15, color: ar.color, size: 3, streak: true });
         }
       }
     }
@@ -460,7 +470,7 @@ export class World {
       if (tg.t >= tg.delay && !tg.done) {
         tg.done = true;
         if (!tg.src.dead) {
-          this.fx.push({ type: 'ring', x: tg.x, y: tg.y, r: tg.r, color: tg.color, t: 0, life: 0.4 });
+          this.addFx({ type: 'ring', x: tg.x, y: tg.y, r: tg.r, color: tg.color, t: 0, life: 0.4 });
           this.burst(tg.x, tg.y, tg.color, 30, 260);
           for (const e of this.enemiesOf(tg.src)) {
             if (Math.hypot(e.x - tg.x, e.y - tg.y) <= tg.r + e.r) this.damage(tg.src, e, tg.mult, { stun: 0.5 });
@@ -497,7 +507,7 @@ export class World {
       case 'undine':
         if (s.cds.basic <= 0 && o.hp < o.maxHp) {
           this.heal(o, s.stats.power * 1.6);
-          this.fx.push({ type: 'ring', x: o.x, y: o.y, r: 40, color, t: 0, life: 0.4, follow: o });
+          this.addFx({ type: 'ring', x: o.x, y: o.y, r: 40, color, t: 0, life: 0.4, follow: o });
           s.cds.basic = 4;
         }
         if (s.cds.s0 <= 0) shoot(0.5, 2);
@@ -506,13 +516,13 @@ export class World {
         if (s.cds.basic <= 0 && o.lastDamaged > this.time - 2) {
           o.shield = Math.min(o.maxHp * 0.3, o.shield + s.stats.power * 3);
           o.shieldT = 6;
-          this.fx.push({ type: 'ring', x: o.x, y: o.y, r: 34, color, t: 0, life: 0.4, follow: o });
+          this.addFx({ type: 'ring', x: o.x, y: o.y, r: 34, color, t: 0, life: 0.4, follow: o });
           s.cds.basic = 9;
         }
         if (s.cds.s0 <= 0) {
           const near = this.enemiesOf(s).filter((e) => Math.hypot(e.x - o.x, e.y - o.y) < 95 + e.r);
           if (near.length) {
-            this.fx.push({ type: 'ring', x: o.x, y: o.y, r: 95, color, t: 0, life: 0.35 });
+            this.addFx({ type: 'ring', x: o.x, y: o.y, r: 95, color, t: 0, life: 0.35 });
             for (const e of near) this.damage(s, e, 1);
             s.cds.s0 = 3;
           }
@@ -525,10 +535,13 @@ export class World {
   }
 
   // ---------- visuais (sem efeito na lógica) ----------
+  addFx(f) { if (this.visuals) this.fx.push(f); }
+  addText(t) { if (this.visuals) this.texts.push(t); }
+  addParticle(p) { if (this.visuals) this.particles.push(p); }
   burst(x, y, color, n, speed) {
-    for (let i = 0; i < n && this.particles.length < 800; i++) {
-      const ang = Math.random() * TAU, sp = speed * (0.3 + Math.random() * 0.7);
-      this.particles.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 0.45, max: 0.45, color, size: 2 + Math.random() * 3 });
+    for (let i = 0; this.visuals && i < n && this.particles.length < 800; i++) {
+      const ang = this.vrng.next() * TAU, sp = speed * (0.3 + this.vrng.next() * 0.7);
+      this.particles.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 0.45, max: 0.45, color, size: 2 + this.vrng.next() * 3 });
     }
   }
 
