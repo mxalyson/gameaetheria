@@ -180,7 +180,7 @@ test('Clérigo em grupo: Escudo Divino protege também o aliado mais próximo (6
   const ally = w.add(makeHeroActor(hero('archer'), a.x + 100, a.y, 'rival', 1));
   const other = w.add(makeHeroActor(hero('mage'), a.x + 200, a.y, 'rival', 1));
   run(0.05, aimAt(a, b, { cast: 1 }));
-  assert.ok(Math.abs(ally.shield - ally.maxHp * 0.35 * SKILLS.divineshield.allyShield) < 1);
+  assert.ok(Math.abs(ally.shield - ally.maxHp * SKILLS.divineshield.buff.shieldPct * SKILLS.divineshield.allyShield) < 1);
   assert.equal(other.shield, 0, 'só o mais próximo');
   assert.ok(ofType(w, 'status').some((e) => e.kind === 'shield' && e.actor === ally && e.from === a));
 });

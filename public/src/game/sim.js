@@ -14,7 +14,7 @@ import { buildLayout } from './layout.js';
 import { mobIntent, rivalIntent } from './ai.js';
 
 const TAU = Math.PI * 2;
-const PVP_DAMAGE = 0.45;
+export const PVP_DAMAGE = 0.32; // duelos entre heróis mais longos e táticos (medido com npm run balance)
 let nextId = 1;
 
 export const angDiff = (a, b) => {

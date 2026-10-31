@@ -7,7 +7,7 @@ export const CLASSES = {
     id: 'warrior', name: 'Guerreiro', icon: '⚔️', color: '#e0635a', accent: '#f4c7a1',
     desc: 'Linha de frente. Muita vida e defesa, golpes corpo a corpo em área.',
     primary: 'str', base: { str: 9, agi: 4, int: 2, vit: 9 }, growth: { str: 3.0, agi: 1, int: 0, vit: 3.2 },
-    hpBase: 150, weapon: 'sword',
+    hpBase: 165, weapon: 'sword',
     basic: { kind: 'melee', range: 74, arc: 1.8, cd: 0.5, mult: 1.05, color: '#ffe1d0' },
     skills: ['whirlwind', 'charge', 'warcry'],
   },
@@ -22,9 +22,9 @@ export const CLASSES = {
   archer: {
     id: 'archer', name: 'Arqueiro', icon: '🏹', color: '#4fae7a', accent: '#d6f2c2',
     desc: 'Ataques rápidos de longo alcance e grande mobilidade.',
-    primary: 'agi', base: { str: 3, agi: 10, int: 3, vit: 6 }, growth: { str: 0, agi: 1.8, int: 0, vit: 1.2 },
+    primary: 'agi', base: { str: 3, agi: 10, int: 3, vit: 6 }, growth: { str: 0, agi: 1.6, int: 0, vit: 1.2 },
     hpBase: 80, weapon: 'bow',
-    basic: { kind: 'projectile', speed: 700, range: 560, cd: 0.5, mult: 0.62, color: '#eaffc0', radius: 4 },
+    basic: { kind: 'projectile', speed: 700, range: 560, cd: 0.5, mult: 0.7, color: '#eaffc0', radius: 4 },
     skills: ['rain', 'pierce', 'roll'],
   },
   cleric: {
