@@ -1,5 +1,6 @@
 // Tudo é desenhado proceduralmente (sem imagens), num estilo pastel limpo.
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
+import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -419,7 +420,8 @@ function drawActorHero(g, a, t) {
   g.save();
   if (a.dead) { g.globalAlpha = Math.max(0.25, 1 - a.deadT); }
   if (a.dash?.invuln) g.globalAlpha = 0.55;
-  drawHero(g, a, a.classId, t, cls.color, cls.accent);
+  // visual novo (opcional, ?visual=miniatura): sprite do herói em miniatura; se ainda não carregou, cai no desenho antigo
+  if (!(heroSpritesEnabled() && drawHeroSprite(g, a, t))) drawHero(g, a, a.classId, t, cls.color, cls.accent);
   g.restore();
   drawStatus(g, a, t);
 }

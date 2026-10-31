@@ -7,6 +7,11 @@ Atualizado em 2026-10-31. O jogo **real** não foi alterado pelo trabalho de art
 - A versão online é a do último `git push` (repositório https://github.com/mxalyson/gameaetheria, branch `main`); atualizar = commit + push (o Pages republica em ~1–2 min).
 - Verificado em navegador emulado de celular (844×390, toque): vila carrega, personagem criado, HUD visível, sem erros nem arquivos 404. **Não testado em celular de verdade.**
 
+## 0.1) Visual novo no JOGO REAL (opcional, desligado por padrão)
+- Adicione **?visual=miniatura** à URL (ex.: https://mxalyson.github.io/gameaetheria/?visual=miniatura): os personagens jogáveis (Guerreiro, Mago, Arqueiro, Clérigo, inclusive o rival do duelo) passam a usar os heróis em miniatura (Paladino, Aprendiz, Franco-atirador, Sacerdote), com andar, golpe, skill, dash, dano e morte. A escolha fica salva no aparelho; **?visual=original** volta ao visual antigo.
+- O resto (mapa, monstros, NPCs, interface) continua o antigo: é o estilo misturado que você já viu na montagem. Serve para você julgar como os personagens ficam **dentro do jogo de verdade** (inclusive no celular).
+- Cada herói carrega só quando aparece (alguns segundos na primeira vez; antes disso aparece o desenho antigo).
+
 ## 1) O jogo real (é isto que vale como "o jogo")
 1. No terminal, na pasta `H:\aetheria`: `npm start`
 2. Abra **http://localhost:5174/** no Chrome (PC). Para ver como celular: F12 → ícone de celular → 844×390 (paisagem).

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deathPose, hurtPulse, DEATH } from '../public/labs/iso-poc/src/death.js';
+import { deathPose, hurtPulse, DEATH } from '../public/src/render/hero-death.js';
 
 test('morte: sobressalto para trás, tomba até 90° para o lado pedido e acaba no tempo total', () => {
   const a = deathPose(0.07, 1), b = deathPose(DEATH.recoil + DEATH.fall * 0.5, 1), c = deathPose(DEATH.recoil + DEATH.fall + 0.5, 1);

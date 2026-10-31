@@ -13,7 +13,7 @@ import { drawMage, MAGE_FRAME, MAGE_PIVOT } from './src/sprites/rig-mage.js';
 import { drawSlime, SLIME_FRAME, SLIME_PIVOT } from './src/sprites/rig-slime.js';
 import { bakeOak, bakePine, bakeBush, bakeRock, bakeTuft, bakeFlower, drawSprite, glowSprite } from './src/props.js';
 import { bakeGround } from './src/ground.js';
-import { deathPose, hurtPulse, DEATH } from './src/death.js';
+import { deathPose, hurtPulse, DEATH } from '../../src/render/hero-death.js';
 import { HERO_FX, HERO_ACTIONS, spawnVfx, stepVfx, drawVfx, drawVfxGround } from './src/vfx.js';
 
 const $ = (id) => document.getElementById(id);
