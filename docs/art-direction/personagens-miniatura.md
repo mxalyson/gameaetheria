@@ -34,7 +34,16 @@ Classificação: **implementado e testado** (atlas e fichas, `tests/chibi-art.te
   | canvas 4K (DPR 2) | 33 | 32 | 36 | 30 | 29 |
   | 720p, 30° | 117 | 116 | 125 | 135 | 110 |
   | 720p, zoom 1,5 | 156 | 125 | 122 | 128 | 133 |
-  Leitura: os heróis em miniatura ficam no mesmo patamar do mago desenhado; 1080p em uso fica em ~58-73 FPS (meta: 60) e o pior caso (canvas 4K) em ~29-36 FPS (meta: ≥30; o Sacerdote ficou 1 FPS abaixo, dentro da variação). Sem erros de console em nenhuma das 35 medições. Não medido em celular.
+  Leitura: os heróis em miniatura ficam no mesmo patamar do mago desenhado; 1080p em uso fica em ~58-73 FPS (meta: 60) e o pior caso (canvas 4K) em ~29-36 FPS (meta: ≥30; o Sacerdote ficou 1 FPS abaixo, dentro da variação). Sem erros de console em nenhuma das 35 medições.
+- **Estresse com as skills + celular emulado (2026-10-30)** — `tests/perf/poc-skills.spec.js`: golpe básico e as 3 skills sem parar (recargas zeradas só no teste), andando, 40 monstros, 6 s por herói. "Celular" = viewport 844×390, DPR 2, toque, CPU 1× e 4× mais lenta (a throttling foi conferida: um laço JS fica ~2,9× mais lento). **A GPU é a mesma Intel UHD do PC: isto NÃO é um celular real.**
+  | Condição | Paladino | Aprendiz | Franco | Sacerdote |
+  |---|---|---|---|---|
+  | Desktop 1080p | 63 | 62 | 69 | 68 |
+  | Celular emulado, CPU 1× | 106 | 96 | 115 | 95 |
+  | Celular emulado, CPU 4× | 98 | 97 | 105 | 85 |
+  - Pico de 3 a 5 efeitos vivos e até 77 partículas; desenho de 1,5 a 5 ms por quadro; sem erros de console.
+  - Leitura: o custo de CPU/JS do PoC é baixo, mesmo 4× mais lento. **O que o celular real tende a limitar é a GPU e a memória, que esta emulação não reproduz.** Texturas totais da cena: **72 a 76 MiB** (herói ≈24, **slime ≈32**, cenário ≈20). O atlas do slime pesa mais que o do herói: é o primeiro candidato a corte. Alternativas já prontas: variante espelhada do herói (−37%).
+  - **Pendente: medir num celular Android real** (FPS, temperatura e memória), antes de qualquer decisão de portar.
 - **Classe real por herói (2026-10-30):** o jogo já tem 4 classes em `data/classes.js` (Guerreiro, Mago, Arqueiro, **Clérigo**). No PoC, `?hero=` escolhe a classe: Paladino = Guerreiro, Aprendiz = Mago, Franco-atirador = Arqueiro, Sacerdote = Clérigo. Ataque básico, skills 1-3, recargas, dano e HUD são os REAIS dessa classe (sem alterar `public/src/`). O Místico não tem classe no jogo (nova, a desenhar).
   | Herói | Básico | Skill 1 | Skill 2 | Skill 3 |
   |---|---|---|---|---|
