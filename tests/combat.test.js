@@ -160,3 +160,36 @@ test('morte: evento único, ator não recebe mais dano e a vida não fica negati
   assert.equal(w.damage(a, b, 3), 0);
   assert.equal(ofType(w, 'death').length, 1);
 });
+
+test('Clérigo em grupo: Luz Sagrada cura aliados próximos (70%), não inimigos nem aliados distantes', () => {
+  const { w, a, b, run } = duel('cleric', 'warrior', { dist: 80 });
+  const near = w.add(makeHeroActor(hero('mage'), a.x + 60, a.y, 'rival', 1));
+  const far = w.add(makeHeroActor(hero('mage'), a.x + 600, a.y, 'rival', 1));
+  near.hp = near.maxHp * 0.4; far.hp = far.maxHp * 0.4; b.hp = b.maxHp * 0.4;
+  const n0 = near.hp, f0 = far.hp;
+  run(0.05, aimAt(a, b, { cast: 0 }));
+  const expected = near.maxHp * SKILLS.holylight.heal * SKILLS.holylight.allyHeal;
+  assert.ok(Math.abs((near.hp - n0) - expected) < 2, 'aliado próximo curado');
+  assert.equal(far.hp, f0, 'aliado distante intacto');
+  assert.ok(b.hp <= b.maxHp * 0.4, 'inimigo não é curado');
+  assert.ok(ofType(w, 'heal').some((e) => e.actor === near));
+});
+
+test('Clérigo em grupo: Escudo Divino protege também o aliado mais próximo (60%)', () => {
+  const { w, a, b, run } = duel('cleric', 'warrior', { dist: 80 });
+  const ally = w.add(makeHeroActor(hero('archer'), a.x + 100, a.y, 'rival', 1));
+  const other = w.add(makeHeroActor(hero('mage'), a.x + 200, a.y, 'rival', 1));
+  run(0.05, aimAt(a, b, { cast: 1 }));
+  assert.ok(Math.abs(ally.shield - ally.maxHp * 0.35 * SKILLS.divineshield.allyShield) < 1);
+  assert.equal(other.shield, 0, 'só o mais próximo');
+  assert.ok(ofType(w, 'status').some((e) => e.kind === 'shield' && e.actor === ally && e.from === a));
+});
+
+test('Clérigo sozinho continua funcionando (sem aliados, nada quebra)', () => {
+  const { w, a, b, run } = duel('cleric', 'warrior', { dist: 80 });
+  a.hp = a.maxHp * 0.5;
+  run(0.05, aimAt(a, b, { cast: 0 }));
+  assert.ok(a.hp > a.maxHp * 0.5);
+  run(0.05, aimAt(a, b, { cast: 1 }));
+  assert.ok(a.shield > 0);
+});

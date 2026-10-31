@@ -21,10 +21,10 @@ export const SKILLS = {
   roll: { name: 'Rolamento', icon: '💨', cd: 4, kind: 'dash', dist: 200, speed: 1000, mult: 0, invuln: true, color: '#e0f0ff',
     desc: 'Esquiva rápida, invulnerável durante o movimento.' },
 
-  holylight: { name: 'Luz Sagrada', icon: '☀️', cd: 8, kind: 'aoe_self', radius: 130, mult: 1.1, heal: 0.22, color: '#fff2a8',
-    desc: 'Cura 22% da vida e fere inimigos próximos.' },
-  divineshield: { name: 'Escudo Divino', icon: '🛡️', cd: 15, kind: 'buff', dur: 6, buff: { shieldPct: 0.35 }, color: '#ffe9a0',
-    desc: 'Escudo que absorve dano igual a 35% da vida máxima.' },
+  holylight: { name: 'Luz Sagrada', icon: '☀️', cd: 8, kind: 'aoe_self', radius: 130, mult: 1.1, heal: 0.22, allyHeal: 0.7, color: '#fff2a8',
+    desc: 'Cura 22% da vida (aliados próximos recebem 70% disso) e fere inimigos próximos.' },
+  divineshield: { name: 'Escudo Divino', icon: '🛡️', cd: 15, kind: 'buff', dur: 6, buff: { shieldPct: 0.35 }, allyShield: 0.6, allyRange: 260, color: '#ffe9a0',
+    desc: 'Escudo de 35% da vida máxima; o aliado mais próximo (até 260) recebe 60% dele.' },
   judgement: { name: 'Julgamento', icon: '⚖️', cd: 6, kind: 'projectile', speed: 560, range: 560, mult: 2.2, stun: 1.5, radius: 9, color: '#fff6c2',
     desc: 'Raio sagrado que atordoa por 1s.' },
 };

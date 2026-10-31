@@ -88,6 +88,10 @@ export class World {
   add(a) { a.id = nextId++; if (a.kind === 'spirit') a.bob = (a.id % 7) * 1.3; this.actors.push(a); return a; }
   byId(id) { return this.actors.find((a) => a.id === id); }
   enemiesOf(a) { return this.actors.filter((o) => o.team !== a.team && !o.dead && !o.untargetable); }
+  // Aliados vivos (heróis/rivais do mesmo time, sem o próprio ator nem spirits), opcionalmente dentro de um raio.
+  alliesOf(a, maxR = Infinity) {
+    return this.actors.filter((o) => o !== a && o.team === a.team && !o.dead && o.kind !== 'spirit' && o.kind !== 'mob' && Math.hypot(o.x - a.x, o.y - a.y) <= maxR);
+  }
   nearestEnemy(a, maxR = Infinity) {
     let best = null, bd = maxR;
     for (const o of this.actors) {
@@ -294,7 +298,10 @@ export class World {
         for (const e of this.enemiesOf(a)) {
           if (Math.hypot(e.x - a.x, e.y - a.y) <= s.radius + e.r) this.damage(a, e, s.mult, { slow: s.slow, slowDur: s.slowDur });
         }
-        if (s.heal) this.heal(a, a.maxHp * s.heal);
+        if (s.heal) {
+          this.heal(a, a.maxHp * s.heal);
+          if (s.allyHeal) for (const al of this.alliesOf(a, s.radius)) this.heal(al, al.maxHp * s.heal * s.allyHeal);
+        }
         this.burst(a.x, a.y, s.color, 22, 220);
         break;
       case 'dash':
@@ -304,6 +311,15 @@ export class World {
         a.buffs.push({ id, t: s.dur, ...s.buff });
         if (s.buff.shieldPct) { a.shield = a.maxHp * s.buff.shieldPct; a.shieldT = s.dur; }
         this.events.push({ type: 'status', actor: a, kind: s.buff.shieldPct ? 'shield' : 'buff', dur: s.dur, skill: id, t: this.time });
+        if (s.allyShield) {
+          let best = null, bd = s.allyRange;
+          for (const al of this.alliesOf(a, s.allyRange)) { const d = Math.hypot(al.x - a.x, al.y - a.y); if (d <= bd) { bd = d; best = al; } }
+          if (best) {
+            best.shield = Math.max(best.shield, best.maxHp * s.buff.shieldPct * s.allyShield); best.shieldT = s.dur;
+            this.events.push({ type: 'status', actor: best, kind: 'shield', dur: s.dur, skill: id, from: a, t: this.time });
+            this.addFx({ type: 'ring', x: best.x, y: best.y, r: 50, color: s.color, t: 0, life: 0.5, follow: best });
+          }
+        }
         this.addFx({ type: 'ring', x: a.x, y: a.y, r: 60, color: s.color, t: 0, life: 0.5, follow: a });
         this.burst(a.x, a.y, s.color, 16, 120);
         break;

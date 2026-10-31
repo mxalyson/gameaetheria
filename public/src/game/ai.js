@@ -71,7 +71,7 @@ export function rivalIntent(r, w, dt) {
     if (w.rng.chance(0.25)) ai.strafe *= -1;
     ai.jx = w.rng.range(-18, 18);
     ai.jy = w.rng.range(-18, 18);
-    ai.cast = chooseSkill(r, tgt, d);
+    ai.cast = chooseSkill(r, tgt, d, w);
   }
 
   const pref = melee ? 40 : 300;
@@ -116,14 +116,14 @@ function steerAround(r, w, mx, my) {
   return [mx, my];
 }
 
-function chooseSkill(r, tgt, d) {
+function chooseSkill(r, tgt, d, w) {
   const ids = CLASSES[r.classId].skills;
   for (let i = 0; i < ids.length; i++) {
     if (r.cds['s' + i] > 0) continue;
     const s = SKILLS[ids[i]];
     switch (s.kind) {
       case 'aoe_self':
-        if (s.heal ? r.hp < r.maxHp * 0.6 || d < s.radius * 0.8 : d < s.radius * 0.9) return { idx: i };
+        if (s.heal ? r.hp < r.maxHp * 0.6 || d < s.radius * 0.8 || w.alliesOf(r, s.radius).some((al) => al.hp < al.maxHp * 0.5) : d < s.radius * 0.9) return { idx: i };
         break;
       case 'projectile':
         if (d < s.range * 0.85) return { idx: i };
