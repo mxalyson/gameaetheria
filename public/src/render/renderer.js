@@ -639,20 +639,7 @@ function drawMob(g, a, t) {
       break;
     }
     // shroom: só existe pintado (assets/mobs/shroom); o desenho antigo foi removido
-    case 'treant': {
-      g.fillStyle = '#6e5038';
-      g.beginPath(); g.moveTo(-16, 16); g.lineTo(-12, -16); g.lineTo(12, -16); g.lineTo(16, 16); g.quadraticCurveTo(0, 22, -16, 16); g.fill();
-      g.strokeStyle = '#6e5038'; g.lineWidth = 5; g.lineCap = 'round';
-      const sw = Math.sin(t * 2) * 4 + (a.swing > 0 ? 8 : 0);
-      g.beginPath(); g.moveTo(-12, -4); g.lineTo(-26, 6 + sw); g.stroke();
-      g.beginPath(); g.moveTo(12, -4); g.lineTo(26, 6 - sw); g.stroke();
-      g.fillStyle = '#3e6b3a'; circle(g, 0, -26, 22); g.fill();
-      g.fillStyle = '#5a8f4e'; circle(g, -7, -30, 15); g.fill();
-      g.fillStyle = '#7fb06a'; circle(g, -11, -36, 7); g.fill();
-      g.fillStyle = '#ffe27a'; circle(g, -5, -4, 2.6); g.fill(); circle(g, 5, -4, 2.6); g.fill();
-      g.fillStyle = '#3a2a1e'; g.fillRect(-5, 4, 10, 2.5);
-      break;
-    }
+    // treant: só existe pintado (assets/mobs/treant); o desenho antigo foi removido
     case 'golem': {
       g.translate(0, bob * 0.4);
       const sw = a.swing > 0 ? 5 : 0;

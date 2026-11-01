@@ -1,0 +1,21 @@
+{
+ "id": "treant",
+ "cell": [
+  106,
+  144
+ ],
+ "cols": 4,
+ "rows": 8,
+ "frames": 4,
+ "style": "waddle",
+ "ax": 53,
+ "ay": 106,
+ "ppm": 47.26584698103459,
+ "size": [
+  1.413,
+  1.899,
+  1.192
+ ],
+ "src": "meshy-mobs/treant.glb",
+ "v": 1793573127
+}
