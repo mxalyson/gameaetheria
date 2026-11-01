@@ -1,6 +1,7 @@
 // Tudo é desenhado proceduralmente (sem imagens), num estilo pastel limpo.
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
+import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -106,7 +107,7 @@ export class Renderer {
     }
 
     g.globalCompositeOperation = 'lighter';
-    for (const p of world.projectiles) drawProjectile(g, p);
+    for (const p of world.projectiles) { if (!drawSkillProjectile(g, p, t)) drawProjectile(g, p); }
     for (const p of world.particles) {
       const a = Math.max(0, p.life / p.max);
       g.globalAlpha = a;
@@ -117,6 +118,8 @@ export class Renderer {
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
     for (const f of world.fx) drawFx(g, f);
+    drawSkillVfx(g, world, this.quality === 0); // efeitos próprios das 12 habilidades (só apresentação)
+    trackActors(world);
 
     // Barras e nomes por cima de tudo.
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y)) drawBars(g, a, a === player);

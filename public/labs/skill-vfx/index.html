@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prévia — efeitos das habilidades</title>
+<link rel="stylesheet" href="../../fonts/fonts.css" />
+<style>
+  /* Laboratório: usa o MÓDULO REAL (src/render/skill-vfx.js) sobre um mundo de mentira (1 herói de círculo). Só apresentação. */
+  html, body { margin: 0; background: #0b0e1d; color: #f3e8c8; font-family: Nunito, system-ui, sans-serif; }
+  main { max-width: 1060px; margin: 0 auto; padding: 18px 14px 40px; }
+  h1 { font: 800 21px Cinzel, serif; margin: 0 0 6px; }
+  p { color: #b9b39c; font-size: 13px; margin: 4px 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .cell { background: #12162c; border-radius: 12px; padding: 6px; box-shadow: inset 0 0 0 1px #2a3060; }
+  .cell b { font: 800 12.5px Cinzel, serif; display: block; margin: 2px 4px; } .cell small { color: #8d88a8; margin: 0 4px; font-size: 11px; }
+  canvas { width: 100%; display: block; border-radius: 8px; background: #3f6a44; }
+  .row { margin: 0 0 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  button { background: #1b2140; color: #f3e8c8; border: 1px solid #3a4180; border-radius: 10px; padding: 8px 14px; font: 800 13px Nunito; cursor: pointer; }
+  @media (max-width: 800px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Efeitos das 12 habilidades — prévia</h1>
+  <p>Cada quadro toca em laço o efeito real do jogo (cast → efeito; projéteis desenhados à parte). O círculo é só um herói de marcação; fundo verde para ver o brilho aditivo sobre o cenário.</p>
+  <div class="row"><button id="pause">Pausar</button><button id="mid">Congelar no meio do efeito</button></div>
+  <div class="grid" id="grid"></div>
+</main>
+<script type="module">
+import { spawnSkillVfx, drawSkillVfx, drawSkillProjectile, trackActors } from '../../src/render/skill-vfx.js';
+import { SKILLS } from '../../src/data/skills.js';
+import { CLASSES } from '../../src/data/classes.js';
+
+const W = 300, H = 190, CX = 90, CY = 105;
+const cells = [];
+function makeCell(classId, skillId) {
+  const sk = SKILLS[skillId];
+  const el = document.createElement('div'); el.className = 'cell';
+  el.innerHTML = `<canvas width="${W * 2}" height="${H * 2}"></canvas><b>${sk.name}</b><small>${CLASSES[classId].name} · ${sk.kind}</small>`;
+  document.getElementById('grid').appendChild(el);
+  const g = el.querySelector('canvas').getContext('2d'); g.scale(2, 2);
+  const actor = { id: 1, x: CX, y: CY, facing: 0, dead: false, classId, kind: 'player', r: 14 };
+  const world = { time: 0, actors: [actor], svfx: [], zone: {} };
+  const proj = [];
+  const c = { sk, skillId, g, actor, world, proj, t: 0, period: 3.2 };
+  // roteiro do herói por habilidade (o que a simulação faria): avanço, rolamento e teleporte movem o ator
+  c.start = () => {
+    world.time = 0; world.svfx.length = 0; proj.length = 0; c.t = 0; actor.x = CX; actor.y = CY; actor.facing = 0;
+    const tx = skillId === 'rain' ? 215 : null, ty = skillId === 'rain' ? 105 : null;
+    if (skillId === 'blink') { actor.x = CX - 20; trackActors(world); actor.x = CX + 40; }
+    const ev = spawnSkillVfx(world, { actor, skill: skillId, ang: 0, tx, ty });
+    if (sk.kind === 'projectile') proj.push({ x: actor.x + 18, y: actor.y, vx: sk.speed * 0.45, vy: 0, ang: 0, color: sk.color, radius: sk.radius ?? 6, explode: sk.explode ?? 0, pierce: !!sk.pierce, stun: sk.stun ?? 0, src: actor });
+    return ev;
+  };
+  c.step = (dt) => {
+    c.t += dt; world.time = c.t;
+    if (sk.kind === 'dash') actor.x = CX + Math.min(c.t, sk.dist / sk.speed) * sk.speed * 0.55;
+    for (const p of proj) { p.x += p.vx * dt; if (p.x > W - 10) p.dead = true; }
+    if (c.t > c.period) c.start();
+  };
+  c.draw = () => {
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = '#3f6a44'; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(actor.x, actor.y + 12, 16, 6, 0, 0, 7); g.fill();
+    g.fillStyle = CLASSES[classId].color ?? '#ccc'; g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.arc(actor.x, actor.y - 4, 12, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = '#fff'; g.fillRect(actor.x + 4, actor.y - 7, 6, 3);
+    if (sk.kind === 'ground_aoe') { g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '10px Nunito'; g.fillText('alvo', 205, 190); }
+    g.save(); g.globalCompositeOperation = 'lighter';
+    for (const p of proj) if (!p.dead && !drawSkillProjectile(g, p, c.t)) { g.fillStyle = p.color; g.beginPath(); g.arc(p.x, p.y, p.radius, 0, 7); g.fill(); }
+    g.restore();
+    drawSkillVfx(g, world, false);
+    trackActors(world);
+  };
+  c.at = (sec) => { c.start(); for (let t = 0; t < sec; t += 1 / 60) { c.step(1 / 60); c.draw(); } };
+  cells.push(c);
+}
+for (const cls of Object.values(CLASSES)) for (const s of cls.skills) makeCell(cls.id, s);
+let paused = false, last = performance.now();
+for (const c of cells) c.start();
+function loop(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (!paused) for (const c of cells) { c.step(dt); c.draw(); } requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+document.getElementById('pause').onclick = (e) => { paused = !paused; e.target.textContent = paused ? 'Continuar' : 'Pausar'; };
+const MID = { whirlwind: 0.22, charge: 0.28, warcry: 0.6, fireball: 0.5, frostnova: 0.3, blink: 0.18, rain: 1.2, pierce: 0.12, roll: 0.22, holylight: 0.3, divineshield: 1.2, judgement: 0.16 };
+const freeze = () => { paused = true; document.getElementById('pause').textContent = 'Continuar'; for (const c of cells) c.at(MID[c.skillId] ?? 0.3); };
+document.getElementById('mid').onclick = freeze;
+window.__freeze = freeze; window.__cells = cells;
+</script>
+</body>
+</html>

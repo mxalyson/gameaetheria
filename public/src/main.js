@@ -21,6 +21,7 @@ import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
 import { noticeText } from './ui/ui.js';
 import { skillOf } from './core/specs.js';
+import { spawnSkillVfx } from './render/skill-vfx.js';
 import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady } from './core/journal.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
@@ -495,6 +496,7 @@ class Game {
       case 'cast': {
         if (!a) break;
         a.swing = 0.3;
+        spawnSkillVfx(w, { actor: a, skill: e.skill, ang: e.ang ?? a.facing, tx: e.tx, ty: e.ty });
         const s = skillOf(a.classId, a.spec ?? null, e.skill);
         if (s.kind === 'aoe_self' || s.kind === 'buff') { w.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius ?? 60, color: s.color, t: 0, life: 0.45, follow: s.kind === 'buff' ? a : undefined }); w.burst(a.x, a.y, s.color, 18, 180); }
         else if (s.kind === 'projectile') this.netShoot(a, e.ang ?? a.facing, s);
@@ -514,7 +516,7 @@ class Game {
   // projétil só VISUAL (o dano vem do servidor): voa em linha reta até o alcance
   netShoot(a, ang, spec) {
     this.world.projectiles.push({ x: a.x + Math.cos(ang) * (a.r + 4), y: a.y + Math.sin(ang) * (a.r + 4), vx: Math.cos(ang) * spec.speed, vy: Math.sin(ang) * spec.speed, ang,
-      team: a.team, src: a, mult: 0, radius: spec.radius ?? 6, color: spec.color ?? '#fff', range: spec.range ?? 500, traveled: 0, pierce: false, explode: 0, stun: 0, hit: new Set(), dead: false, cosmetic: true });
+      team: a.team, src: a, mult: 0, radius: spec.radius ?? 6, color: spec.color ?? '#fff', range: spec.range ?? 500, traveled: 0, pierce: !!spec.pierce, explode: spec.explode ?? 0, stun: spec.stun ?? 0, hit: new Set(), dead: false, cosmetic: true });
   }
 
   netStep(dt) {
@@ -805,6 +807,7 @@ class Game {
   handleEvents() {
     const events = this.world.events.splice(0);
     for (const ev of events) {
+      if (ev.type === 'cast') { spawnSkillVfx(this.world, ev); continue; } // efeito visual da habilidade (a simulação já decidiu tudo)
       if (ev.type !== 'death') continue;
       const a = ev.actor;
       if (a.kind === 'mob') this.onMobKilled(a);

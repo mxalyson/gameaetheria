@@ -37,3 +37,9 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] **Medir um celular médio/fraco** (o risco real) e testar sessão longa (aquecimento). Liberar espaço no `C:` (≈ 2 GB livres).
 - [ ] Rebaixar a qualidade sozinho quando o FPS cair; o canvas nunca deve ler pixels (cai para CPU).
 - [ ] **Teste e2e `online-match.spec.js` "grupo no jogo real" (4 janelas) trava nesta máquina desde 2026-11-01**: a 3ª e a 4ª janela do Chromium do Playwright não terminam de carregar (`goto` > 15 s) enquanto as duas primeiras rodam o jogo. Passava antes (81/81 e 76/80 de manhã); **falha também com o código anterior aos ícones**, com servidor próprio do Playwright e sem processos órfãos, CPU ociosa e disco liberado, então **não é regressão do código**; causa não identificada (suspeita: Chromium sem GPU compartilhando o processo gráfico entre janelas). Os outros 4 testes do arquivo passam.
+
+## Efeitos e ícones (briefing de ícones/habilidades)
+- [x] Etapa 1: ícones das 12 habilidades + poção no jogo real. [x] Etapa 2: 12 efeitos por habilidade.
+- [ ] Medir os efeitos num celular real (`tools/android-measure.mjs`).
+- [ ] Ícones do **ataque básico** das 4 classes (adiado a pedido do proprietário) e efeitos de impacto/status (lentidão, atordoamento, queimadura, cura em aliados).
+- [ ] Origem/licença das folhas de ícones geradas (CREDITOS.md).
