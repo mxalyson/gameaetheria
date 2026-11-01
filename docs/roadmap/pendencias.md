@@ -72,3 +72,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## B5 parte 2b (2026-11-02)
 - [x] Criação de personagem (moldura, emblemas das classes), diálogo de NPC (peça `dialog.webp`), barra do chefe (plaqueta + trilho dourado, mais baixa no toque para não cobrir os medalhões); corrigido o retângulo translúcido atrás dos vidros de vida/mana (era `backdrop-filter` do HUD antigo; teste de regressão).
 - [ ] Retrato de NPC no oval do diálogo (hoje vazio); ícones de itens/spirits e retratos de classe: prompts em `docs/art-direction/prompts-icones-itens.md`.
+
+## Ícones de equipamento (2026-11-02)
+- [x] 9 ícones pintados (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto) no inventário, loja, ferreiro e painel do personagem (vazios em cinza); emoji só se a imagem faltar.
+- [ ] Faltam: poções, essência, moeda, baú, chave, pergaminho, minério (B); spirits (C); retratos de classe e NPC (D, E). Ícone próprio por faixa de qualidade (hoje o mesmo desenho por tipo).

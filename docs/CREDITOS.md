@@ -31,3 +31,6 @@ Atualizado em 2026-10-31. A licença CC BY 4.0 exige atribuição: este texto de
 
 ## Cenário em sprites (modelos 3D de terceiros)
 - **Stylized Nature MegaKit [Standard]**, de **Quaternius** (https://quaternius.com), licença **CC0 1.0** (domínio público; crédito não é exigido, mas registrado por cortesia: "Models by @Quaternius"). 31 modelos (árvores comuns, pinheiros, árvores retorcidas e mortas, arbustos, samambaia, plantas, cogumelos, capim, pedras) **fotografados** em sprites 2D por `tools/nature-bake.mjs` (câmera ortográfica a 40°) e empacotados por `tools/nature-pack.py` em `public/assets/nature/atlas.webp` (88 KB). Os modelos e as texturas originais (41 MB) ficam em `public/labs/iso-poc/art-local/nature/` (fora do Git); só o atlas vai ao jogo. Ajustes nossos: cores de vértice ignoradas (guardam dados de vento) e folhagem recolorida em tom vivo.
+
+## Ícones de equipamento (arte gerada por IA)
+Espada, cajado, arco, maça, elmo, armadura, botas, anel e amuleto (`public/assets/icons/item/`), recortados das folhas em `docs/art-direction/fontes-icones/` por `tools/item-icons-from-sheets.py`. **Origem/licença: a confirmar** (gerador e termos de uso a registrar pelo proprietário).

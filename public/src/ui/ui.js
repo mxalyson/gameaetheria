@@ -36,7 +36,10 @@ export const noticeText = (n) => {
   return n.code;
 };
 
-export const itemIcon = (it) => (it.slot === 'weapon' ? WEAPON_TYPES[it.weaponType].icon : SLOT_ICONS[it.slot]);
+// Ícone do equipamento: arte pintada por tipo (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto); se a imagem faltar, volta ao emoji.
+const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
+export const itemIcon = (it) => (it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
+const ghostIcon = (s, cls) => (s === 'weapon' ? itemImg(cls.weapon, WEAPON_TYPES[cls.weapon].icon) : itemImg(s, SLOT_ICONS[s]));
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
 
 export class UI {
@@ -368,7 +371,7 @@ export class UI {
     const tier = tierFor(char.arena.rating);
     const equip = SLOTS.map((s) => `
       <div class="eq-slot"><label>${SLOT_NAMES[s]}</label>
-        ${char.equipment[s] ? this.itemCell(char.equipment[s], 'unequip', s) : `<div class="cell empty ghost">${s === 'weapon' ? WEAPON_TYPES[cls.weapon].icon : SLOT_ICONS[s]}</div>`}
+        ${char.equipment[s] ? this.itemCell(char.equipment[s], 'unequip', s) : `<div class="cell empty ghost">${ghostIcon(s, cls)}</div>`}
       </div>`).join('');
     const stats = STAT_KEYS.map((k) => `
       <div class="stat-row ${k === cls.primary ? 'prim' : ''}"><span>${STAT_NAMES[k]}</span><b>${st[k]}</b>
