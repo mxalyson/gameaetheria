@@ -29,6 +29,13 @@
   .x { width: var(--touch-min); height: var(--touch-min); border-radius: 50%; border: 0; background: radial-gradient(circle at 35% 28%, #4a5192, #1a1d40); color: var(--gold-hi); font: 900 18px var(--font-body);
     box-shadow: 0 0 0 2px var(--gold-lo), 0 4px 8px rgba(0,0,0,.45); cursor: pointer; }
 
+  /* ---- PAINEL PINTADO (arte do proprietário, docs/art-direction/fontes-ui): moldura em 9 fatias + plaqueta com asas sobreposta ---- */
+  .pa { position: relative; margin: 26px 8px 8px; border: 54px solid transparent; border-image: url(../../assets/ui/panel-9.webp) 135 134 131 135 fill / 54px stretch; filter: drop-shadow(0 12px 18px rgba(0,0,0,.55)); }
+  .pa .in { margin: -26px; padding: 22px 22px 18px; }
+  .pa .plaque { position: absolute; left: 50%; top: -74px; width: 230px; transform: translateX(-50%); pointer-events: none; }
+  .pa .ptitle { position: absolute; left: 50%; top: -74px; width: 230px; height: 56px; transform: translateX(-50%); display: grid; place-items: center; font: 800 14px var(--font-title); color: var(--ivory); letter-spacing: .8px; text-shadow: 0 2px 0 #000b; padding: 0 66px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pa .x { position: absolute; right: -14px; top: -14px; width: 44px; height: 44px; font-size: 16px; }
+
   /* ---- botões ---- */
   .btn { min-height: var(--touch-min); padding: 0 20px; border-radius: var(--radius-m); border: 0; font: 800 14px var(--font-body); letter-spacing: .3px; cursor: pointer; color: var(--ivory); transition: transform var(--t-fast) var(--ease), filter var(--t-fast); }
   .btn:active { transform: translateY(1px) scale(.98); filter: brightness(1.15); }
@@ -76,6 +83,26 @@
 <main>
   <h1>Kit de interface — identidade v1</h1>
   <p class="n">Componentes da identidade (laje de pedra azul-noite com filete e gemas douradas, molduras por classe, botões de ouro, barras segmentadas, raridades com brilho). Tokens em <code>public/ui-tokens.css</code>. <b>Glifos dos ícones de menu continuam provisórios</b> (ver briefing). Alvos de toque ≥ 44 px, texto ≥ 12 px, respeita <code>prefers-reduced-motion</code>.</p>
+
+  <h2>NOVO — painel com a moldura pintada (peça gerada pelo proprietário)</h2>
+  <p class="n">Pedra entalhada com runas, cantos de bronze com gemas e plaqueta com asas: é a moldura do Prompt 1, cortada em 9 fatias (estica sem deformar os cantos). Compare com a versão em CSS puro mais abaixo.</p>
+  <div class="bg row" style="gap:40px">
+    <div class="pa" style="width:430px"><img class="plaque" src="../../assets/ui/plaque.webp" alt=""><div class="ptitle">Mochila</div><button class="x" aria-label="Fechar">✕</button>
+      <div class="in">
+        <div class="tabs"><button class="tab on">Equipamento</button><button class="tab">Consumíveis</button><button class="tab">Spirits</button></div>
+        <div class="grid">
+          <div class="cell r0">⚔️</div><div class="cell r1">🛡️</div><div class="cell r2">🪖</div><div class="cell r3">💍</div><div class="cell r4">🗡️</div>
+          <div class="cell r0">🥾</div><div class="cell r1">📿</div><div class="cell r2">🏹</div><div class="cell empty">+</div><div class="cell empty">+</div>
+        </div>
+        <p class="n" style="margin:12px 0 8px">🪙 1 240 · Toque em um item para ver detalhes</p>
+        <div class="row" style="gap:8px"><button class="btn glass small">Ordenar</button><button class="btn primary small">Vender comuns</button></div>
+      </div></div>
+    <div class="pa" style="width:360px"><img class="plaque" src="../../assets/ui/plaque.webp" alt=""><div class="ptitle">Guarda Ren</div>
+      <div class="in dialog"><div class="portrait">🛡️</div><div><span class="who">Missão · Limpar o Bosque</span><p>Os limos estão tomando a trilha. Derrote 8 deles e volte aqui.</p><div class="row" style="gap:8px"><button class="btn primary small">Aceitar</button><button class="btn glass small">Depois</button></div></div></div></div>
+  </div>
+
+  <h2>Antes — painel em CSS puro (parecia página de site)</h2>
+  <div class="bg row" style="gap:18px"><div class="slab" style="width:280px"><header><h3>Mochila</h3></header><div class="body"><div class="grid" style="grid-template-columns:repeat(4,56px)"><div class="cell r1">🛡️</div><div class="cell r2">🪖</div><div class="cell r3">💍</div><div class="cell r4">🗡️</div></div></div></div></div>
 
   <h2>Painel de inventário (laje + abas + células por raridade)</h2>
   <div class="bg row">

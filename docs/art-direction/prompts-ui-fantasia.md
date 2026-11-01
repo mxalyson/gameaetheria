@@ -42,3 +42,8 @@ Variações a pedir depois, mesmo prompt trocando o material: **madeira entalhad
 
 ## Dica para ficar menos "de site"
 Peça sempre **assimetria controlada** (ornamento diferente no topo e na base), **espessura de borda ≥ 10% do lado menor**, **uma cor de destaque por tela** (ouro) e **texturas visíveis**. Se a primeira saída vier lisa, acrescente: *"textura de pedra com rachaduras e riscos de uso, bronze com arranhões e oxidação nas bordas, madeira com veios e pregos"*.
+
+## Estado (2026-11-01)
+- **Prompt 0** (folha de conceito) e **Prompt 1** (painel grande) já foram gerados pelo proprietário e aprovados como direção: `docs/art-direction/fontes-ui/`. A moldura do painel virou 9 fatias (`public/assets/ui/panel-9.webp` + `plaque.webp`) e está aplicada no kit do laboratório (`/labs/b1-ui/kit.html`, seção "NOVO"). Resultado: o painel deixou de parecer página de site.
+- **Faltam gerar, na mesma qualidade e um arquivo por peça:** Prompt 2 (botões: normal, pressionado, desativado e principal em ouro), 3 (barras: vidro de poção em calha de metal, como na folha de conceito), 4 (minimapa redondo com bússola de runas), 5 (medalhão de botão redondo: 3 estados), 6 (tooltip, faixa de aviso, diálogo), 7 (células de raridade) e os ícones do `briefing-icones-ui.md` (ataque básico ×4, menu ×7).
+- **Observação sobre a folha de conceito:** o cartão do herói (retrato em moldura de bronze com 4 gemas) e as barras de vidro de poção ficaram ótimos; peça-os como peças separadas (sem o cenário) para eu poder usá-los.
