@@ -3,6 +3,7 @@
 import { CLASSES } from './data/classes.js';
 import { SKILLS } from './data/skills.js';
 import { skillOf } from './core/specs.js';
+import { skillImg, iconImg, POTION_ICON } from './render/skill-icons.js';
 import { stickVector, pickAim, aimModeFor, dragAim } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
@@ -135,7 +136,8 @@ export class TouchControls {
   setup(char) {
     const cls = CLASSES[char.classId];
     $('t-atk-icon').textContent = cls.icon;
-    cls.skills.forEach((s, i) => { this.root.querySelector(`.sk${i} .icon`).textContent = SKILLS[s].icon; });
+    cls.skills.forEach((s, i) => { this.root.querySelector(`.sk${i} .icon`).innerHTML = skillImg(s, SKILLS[s].icon); });
+    this.root.querySelector('.pot .icon').innerHTML = iconImg(POTION_ICON, '🧪');
   }
 
   // Intenção do jogador a partir do toque (mesmo formato do teclado/mouse).

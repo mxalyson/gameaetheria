@@ -20,3 +20,6 @@ Atualizado em 2026-10-31. A licença CC BY 4.0 exige atribuição: este texto de
 
 ## Fontes
 - **Cinzel** e **Nunito** (Google Fonts), licença SIL Open Font License 1.1; arquivos locais em `public/fonts/` (o jogo não depende mais de recurso externo para a tipografia).
+
+## Ícones de habilidades (arte gerada)
+- 12 ícones de habilidades + ícone da poção em `public/assets/icons/`, recortados de duas folhas **geradas por IA** fornecidas pelo proprietário (originais em `docs/art-direction/fontes-icones/`; recorte reproduzível com `tools/skill-icons-from-sheets.py`). Ferramenta/gerador, prompt e termos de uso: **a confirmar com o proprietário** antes de publicar (a proteção de direitos autorais de arte gerada por IA é incerta). Uso atual: desenvolvimento e testes locais.

@@ -61,6 +61,15 @@ button { font-family: inherit; }
 #skillbar { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; background: var(--glass); border: 1px solid var(--line); border-radius: 20px; }
 .slot { --p: 0; position: relative; width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(180deg, #3a3d63, #2a2c4a); border: 1px solid rgba(255,255,255,.12); display: grid; place-items: center; overflow: hidden; }
 .slot .icon { font-size: 26px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)); }
+/* arte própria nas habilidades: a imagem já traz a moldura da classe */
+.slot.art { background: none; border: 0; overflow: visible; box-shadow: none; }
+.slot.art .icon { position: absolute; inset: -3px; font-size: 0; filter: none; }
+img.art { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
+.slot.art .cd { inset: 3px; border-radius: 17%; }
+.slot.art.cooling .icon img { filter: saturate(.5) brightness(.75) drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
+.slot.art.empty .icon img { filter: grayscale(1) brightness(.6); }
+img.tt-ic { width: 22px; height: 22px; vertical-align: -5px; margin-right: 4px; }
+img.cc-sk { width: 20px; height: 20px; vertical-align: -5px; }
 .slot .key { position: absolute; left: 5px; top: 3px; font-size: 10px; font-weight: 900; color: var(--muted); }
 .slot .cd { position: absolute; inset: 0; background: conic-gradient(rgba(10,10,25,.72) calc(var(--p) * 360deg), transparent 0); pointer-events: none; }
 .slot .cdt { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; font-size: 18px; text-shadow: 0 1px 4px #000; pointer-events: none; }
@@ -254,6 +263,12 @@ body.online .online-only { display: inline-block; }
 .tbtn .icon { font-size: 28px; }
 .tbtn.down { filter: brightness(1.45); transform: scale(.93); }
 .tbtn .cd { border-radius: 50%; }
+/* habilidades e poção do toque: quadrado arredondado com a arte da classe (o ataque e a vila seguem redondos) */
+.tbtn.sk, .tbtn.pot { background: none; border: 0; box-shadow: none; border-radius: 17%; }
+.tbtn.sk .icon, .tbtn.pot .icon { position: absolute; inset: -4px; font-size: 0; }
+.tbtn.sk .cd, .tbtn.pot .cd { inset: 3px; border-radius: 17%; }
+.tbtn.sk.down, .tbtn.pot.down { filter: brightness(1.3); }
+.tbtn.pot.empty img { filter: grayscale(1) brightness(.6); }
 .tbtn.atk { width: 86px; height: 86px; right: 0; bottom: 0; background: radial-gradient(circle at 35% 30%, #ff9a7a, #c9483f); }
 .tbtn.atk .icon { font-size: 36px; }
 .tbtn.sk0 { right: 112px; bottom: 12px; }
