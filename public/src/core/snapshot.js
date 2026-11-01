@@ -17,6 +17,9 @@ export class SnapshotDecoder {
 
   apply(msg) {
     const key = msg.k === 1;
+    // exploração: jogadores entram e saem durante a sala (`pj` = estáticos de quem entrou/está, `pl` = quem saiu)
+    for (const p of msg.pj ?? []) if (!this.actors.has(p.id)) this.actors.set(p.id, { id: p.id, team: 1, name: p.name, classId: p.classId, level: p.level, maxHp: p.maxHp, bot: false, x: 0, y: 0, hp: p.maxHp, facing: 0, dead: false, moving: false, swing: false, stun: false, shield: 0, online: true });
+    for (const id of msg.pl ?? []) this.actors.delete(id);
     if (key) { for (const id of this.mobs.keys()) this.mobs.set(id, { ...this.mobs.get(id), _seen: false }); }
     for (const t of msg.a ?? []) {
       const a = this.actors.get(t[0]); if (!a) continue;
@@ -37,7 +40,7 @@ export class SnapshotDecoder {
     const mine = this.actors.get(this.you);
     if (mine && msg.me) { mine.spd = msg.me.spd; mine.cds = { basic: msg.me.c[0], s0: msg.me.c[1], s1: msg.me.c[2], s2: msg.me.c[3] }; }
     const out = { ...msg, actors: actors.map((a) => ({ ...a })) };
-    delete out.a; delete out.m; delete out.n; delete out.g;
+    delete out.a; delete out.m; delete out.n; delete out.g; delete out.pj; delete out.pl;
     out.mobs = [...this.mobs.values()].map(({ _seen, ...m }) => ({ ...m })); // vazio nas partidas sem monstros
     return out;
   }

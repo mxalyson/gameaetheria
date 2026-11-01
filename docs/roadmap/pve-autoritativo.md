@@ -48,3 +48,8 @@ Plano proposto (P11), em sub-fases, cada uma com relatório e aprovação. **Nad
 1. Tamanho máximo por instância de zona (sugestão: **16 jogadores**; abre nova instância ao encher)?
 2. Em zona compartilhada, o que acontece com loot e abates? (sugestão: **loot individual** — cada um vê/pega o seu — e abate conta para quem causou dano relevante, para não haver briga por drop)
 3. PvP aberto na exploração? (sugestão: **não**; PvP só nas arenas)
+
+---
+# Decisão final (2026-10-31): **instâncias solo/grupo (opção B)**, A fica como evolução futura
+O proprietário escolheu manter vila, PvP e cooperativo e fazer a exploração em **instância por jogador ou grupo (até 4)**. Decisões 1–3 acima: instância ≤ 4, loot individual, sem PvP na exploração. Detalhes e medições: `docs/decisions/0015-exploracao-no-servidor-instancias.md`.
+Fases revistas: **P11.1** sala de zona no servidor (**feita e testada**, cliente ainda não usa) · **P11.2** cliente joga na instância · **P11.3** baús/missões e recusa de ganhos do cliente · **P11.4** transações de economia (compra/venda/aprimoramento) · **P11.5** NPCs/missões · **P11.6** carga, fuzz, otimização.

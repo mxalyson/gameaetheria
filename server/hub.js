@@ -4,6 +4,8 @@
 import { randomBytes } from 'node:crypto';
 import { MatchRoom } from './room.js';
 import { CoopRoom } from './coop.js';
+import { ZoneRoom, entryPoint } from './zone.js';
+import { ZONES } from '../public/src/data/zones.js';
 import { MODES } from '../public/src/core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../public/src/core/power.js';
 import { getRating } from '../public/src/core/match.js';
@@ -29,6 +31,7 @@ export class Hub {
     this.parties = new Map();    // id -> { id, leader, members:[sessão], invites: Map(sessão -> expira) }
     this.queue = [];             // entradas { id, mode, members:[sessão], since, rating, power }
     this.rooms = new Map();
+    this.zoneRooms = new Map();  // chave (grupo ou jogador + zona) -> sala de exploração
     this.stats = { staleInputs: 0, matches: 0, botFills: 0 };
     this.toSession = { stats: this.stats, to: (s, m) => this.out.send(s, m), raw: (s, text) => this.out.raw(s, text) };
   }
@@ -85,6 +88,8 @@ export class Hub {
       case 'party_kick': return this.kick(s, m.name, no);
       case 'queue': return this.enqueue(s, m.mode, no);
       case 'queue_cancel': if (s.queued) this.cancelQueue(s); return;
+      case 'zone_enter': return this.zoneEnter(s, m.zone, m.from, no);
+      case 'zone_leave': return this.zoneLeave(s);
     }
   }
 
@@ -263,10 +268,51 @@ export class Hub {
     for (const p of room.humans()) this.sendMatchFound(p.session, room, p);
   }
   sendMatchFound(s, room, p) {
+    if (room.mode === 'zone') return this.sendZoneJoined(s, room);
     this.out.send(s, { t: 'match_found', room: room.id, mode: room.mode, you: p.actor.id, team: p.team, slot: p.team, arena: { w: room.world.zone.w, h: room.world.zone.h, radius: room.world.zone.radius },
       objective: room.world.objective ? { x: room.world.objective.x, y: room.world.objective.y, r: room.world.objective.r } : null,
       players: [...room.players.values()].filter((q) => !q.left).map((q) => ({ id: q.actor.id, team: q.team, name: q.name, classId: q.classId, level: q.actor.level, maxHp: q.actor.maxHp, bot: q.bot })) });
     room.sendKeyframe?.(s); // reconexão: quadro-chave completo para o decodificador recomeçar
+  }
+
+  // ---------- exploração no servidor (P11) ----------
+  // Instância por grupo (ou por jogador, se solo) e por zona: quem do mesmo grupo entra depois cai na mesma sala (até MAX_PARTY).
+  zoneEnter(s, zoneId, from, no) {
+    if (s.queued) return no(REJECT.ALREADY_QUEUED);
+    const at = entryPoint(zoneId, from);
+    if (!at || !ZONES[zoneId].mobs) return no(REJECT.BAD_ZONE);
+    if (s.room) { // atravessando um portal dentro da exploração: sai da sala atual primeiro (só vale de onde ele realmente está)
+      if (s.room.mode !== 'zone' || s.room.zoneId !== from) return no(REJECT.IN_MATCH);
+      s.room.leave(s.player, 'portal');
+    }
+    const key = `${s.partyId ?? 's' + s.id}:${zoneId}`;
+    let room = this.zoneRooms.get(key);
+    if (room && (room.closed || room.size >= MAX_PARTY)) { if (room.closed) this.zoneRooms.delete(key); else return no(REJECT.ROOM_FULL); room = null; }
+    if (!room) {
+      const id = this.nextRoom++;
+      room = new ZoneRoom({ id, key, zoneId, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession, onPortal: (p, pt) => this.zonePortal(room, p, pt) });
+      this.rooms.set(id, room); this.zoneRooms.set(key, room);
+    }
+    room.join(s, at);
+    this.sendZoneJoined(s, room);
+  }
+  sendZoneJoined(s, room) {
+    const p = s.player;
+    this.out.send(s, { t: 'zone_joined', room: room.id, zone: room.zoneId, you: p.actor.id, x: p.actor.x, y: p.actor.y, w: room.world.zone.w, h: room.world.zone.h,
+      players: room.statics([...room.players.values()].filter((q) => !q.left)).map((q) => ({ ...q, team: 1 })) });
+    room.sendKeyframe(s);
+  }
+  zoneLeave(s) {
+    const room = s.room;
+    if (!room || room.mode !== 'zone') return;
+    room.leave(s.player, 'left');
+    this.out.send(s, { t: 'zone_exit', to: 'town' });
+  }
+  zonePortal(room, p, pt) {
+    const s = p.session;
+    if (!s) return;
+    if (pt.to === 'town') { room.leave(p, 'portal'); this.out.send(s, { t: 'zone_exit', to: 'town', x: pt.tx, y: pt.ty }); return; }
+    this.zoneEnter(s, pt.to, room.zoneId, (code) => this.out.send(s, { t: 'reject', code }));
   }
 
   // ---------- relógio ----------
@@ -278,6 +324,7 @@ export class Hub {
       room.step();
       if (room.closed) {
         this.rooms.delete(room.id);
+        if (room.key && this.zoneRooms.get(room.key) === room) this.zoneRooms.delete(room.key);
         for (const p of room.humans()) { if (p.session.room === room) { p.session.room = null; p.session.player = null; this.out.send(p.session, { t: 'match_end', room: room.id, winner: room.winner, reason: room.reason }); } }
       }
     }

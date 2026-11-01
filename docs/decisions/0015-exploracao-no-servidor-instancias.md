@@ -1,0 +1,17 @@
+# 0015 — Exploração no servidor por instâncias solo/grupo (P11)
+Data: 2026-10-31 · Status: **P11.1 implementada e testada no servidor; cliente ainda NÃO usa** (P11.2). Decisão do proprietário: instâncias (opção B) em vez de zonas compartilhadas persistentes (opção A).
+
+## Decisão
+- A exploração (Bosque, Planície, Ruínas) passa a rodar no servidor numa **`ZoneRoom` por grupo (ou por jogador, se solo) e por zona**, até 4 jogadores (`MAX_PARTY`). Vila, arenas PvP e cooperativo seguem como estão. Quem entra depois num grupo cai na mesma instância; sala vazia fecha.
+- O cliente só envia **intenções** (`input`) e `zone_enter {zone, from}` / `zone_leave`. O servidor confere que existe o portal `from → zone` (`entryPoint`) e decide onde o jogador nasce. Respostas: `zone_joined`, snapshots por delta (`mode:'zone'`), `zone_reward`, `zone_exit`. Portais dentro da zona são tratados pelo servidor. **Protocolo continua v4** (mensagens novas, nada removido; o decodificador ganhou `pj`/`pl` para quem entra/sai).
+- **Recompensas só no servidor:** XP, ouro, poções, itens (ids do servidor) e essências sorteados com o RNG da sala; **loot individual** (cada membro perto do abate rola o seu, com a própria classe). Acumulam por jogador e são gravados em lote por `applyZoneBatch` numa operação idempotente a cada 10 s, ao sair, ao trocar de zona e no timeout de reconexão. Morte: renasce na entrada após 4 s, −10% do ouro. Contadores de abate alimentam missões/conquistas no servidor.
+- **PvP não existe na exploração.**
+
+## Desempenho (esta máquina; `node tools/zone-bench.mjs [salas] [jogadores]`)
+- Primeira medida: ≈ **0,22 ms/tick por sala solo** (50 salas = 66% de um núcleo) — **10× mais caro que uma sala PvP 4×4** (≈ 0,03 ms). O perfil mostrou 56% em `collide` (busca linear em centenas de obstáculos por ator).
+- Correção: **grade espacial** de obstáculos em `game/sim.js` (`nearObstacles`), mesma ordem de resolução. Teste novo prova resultado **idêntico** à busca linear (3 zonas, 6 000 passos aleatórios). Depois: 50 salas solo **4,5 ms/tick (27% de um núcleo)**; 100 salas solo 8,8 ms (53%); 50 salas × 4 jogadores 7,9 ms (48%). Snapshot ≈ 620–790 B.
+- Leitura honesta: ≈ **150–200 jogadores explorando por núcleo** nesta máquina, bem abaixo do PvP. Os picos (p99 ≈ 11–35 ms, máx. 40–100 ms) ainda são altos: **pendente** otimizar `separate`, IA e coleta de lixo (P11.6). Ganho colateral: a grade também acelera PvP/cooperativo.
+
+## O que falta (próximas fases)
+P11.2 cliente joga na instância (movimento previsto, desenho de snapshots, drops/ouro/XP mostrados a partir de `zone_reward`, poção, spirit, baús) · P11.3 baús/missões no servidor e recusa de ganhos de PvE vindos do cliente em `plausible.js` · P11.4 compra/venda/aprimoramento como transações do servidor · P11.5 NPCs/missões · P11.6 carga, fuzz e otimização.
+**Limitações atuais da sala:** sem poções, sem spirit, sem baús, sem NPCs; a gravação do lote só ocorre com banco (convidados não ganham nada). Nenhuma delas é usada pelo cliente ainda.

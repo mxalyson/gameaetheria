@@ -17,7 +17,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 
 ## Técnico pendente
 - [ ] Prova de conceito **Canvas 2D × PixiJS** (decisão 0001 segue valendo).
-- [ ] Exploração PvE ainda é calculada no cliente (servidor só aplica limites de plausibilidade). **Proposta de desenho em `docs/roadmap/pve-autoritativo.md`: precisa da sua decisão (escopo e custo).**
+- [ ] Exploração PvE ainda é calculada no cliente (servidor só aplica limites de plausibilidade). **Decidido: instâncias solo/grupo. P11.1 (servidor) feita; faltam P11.2 a P11.6 (`docs/decisions/0015-exploracao-no-servidor-instancias.md`).**
 - [ ] Rodar `docs/roadmap/teste-android.md` no seu aparelho e me trazer FPS/RAM.
 - [x] Heróis em miniatura viraram o padrão (jogo e app instalado); `?visual=original` volta ao antigo. Monstros/NPCs/cenário seguem no visual antigo (fases B2–B5).
 - [ ] Picos de coleta de lixo no servidor (perfil `--cpu-prof` em carga longa; reuso de objetos).

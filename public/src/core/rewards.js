@@ -4,6 +4,7 @@ import { eloDelta, tierFor } from './combat.js';
 import { getRating, setRating, MODES } from './match.js';
 import { validate } from './savedoc.js';
 import { INVENTORY_SIZE } from '../data/items.js';
+import { MAX_SPIRITS } from '../data/spirits.js';
 import { ensureJournal, recordEvent } from './journal.js';
 
 // Aplica o resultado de uma partida (1×1, 2×2 ou 4×4) a UM personagem. `result`: 'win' | 'loss' | 'draw'.
@@ -51,4 +52,31 @@ export function applyCoopResult(doc, { gold = 0, xp = 0, items = [], potions = 0
   const v = validate(c);
   if (!v.ok) throw new Error('documento inválido após recompensa coop: ' + v.reason);
   return { doc: v.char, summary: { mode: 'coop', gold: v.char.gold - before.gold, xp, levels, level: v.char.level, items: kept.length, converted: converted.length, potions, achievements: prog.achievements, quests: prog.quests.filter((q) => q.complete).map((q) => q.id) } };
+}
+
+// Lote de recompensas da EXPLORAÇÃO (PvE no servidor): abates acumulados pela sala de zona e gravados em operação idempotente.
+// `batch`: { xp, gold, potions, items:[com id do servidor], essences:[espíritos já sorteados], kills:[{mobId,boss}], zoneId, deaths }.
+// Inventário cheio: o item vira ouro (valor de venda); spirits além do limite viram 100 de ouro; cada morte custa 10% do ouro (como no jogo offline).
+export function applyZoneBatch(doc, batch) {
+  const c = structuredClone(doc);
+  const before = { level: c.level, gold: c.gold };
+  c.gold += batch.gold ?? 0;
+  for (let i = 0; i < (batch.deaths ?? 0); i++) c.gold -= Math.floor(c.gold * 0.1);
+  const levels = addXp(c, batch.xp ?? 0);
+  let kept = 0, converted = 0;
+  for (const it of batch.items ?? []) {
+    if (c.inventory.length < INVENTORY_SIZE) { c.inventory.push(it); kept++; } else { c.gold += it.value; converted++; }
+  }
+  for (const sp of batch.essences ?? []) {
+    if (c.spirits.length < MAX_SPIRITS) { c.spirits.push(sp); if (!c.activeSpirit) c.activeSpirit = sp.id; } else c.gold += 100;
+  }
+  c.potions = Math.min(999, c.potions + (batch.potions ?? 0));
+  ensureJournal(c);
+  const ach = [], quests = [];
+  for (const k of batch.kills ?? []) { const r = recordEvent(c, { type: 'kill', mobId: k.mobId, zoneId: batch.zoneId, boss: !!k.boss }); ach.push(...r.achievements); quests.push(...r.quests.filter((q) => q.complete).map((q) => q.id)); }
+  if (levels) recordEvent(c, { type: 'level', level: c.level });
+  if (c.spirits.length) recordEvent(c, { type: 'spirit', count: c.spirits.length });
+  const v = validate(c);
+  if (!v.ok) throw new Error('documento inválido após recompensa de zona: ' + v.reason);
+  return { doc: v.char, summary: { mode: 'zone', zone: batch.zoneId, gold: v.char.gold - before.gold, xp: batch.xp ?? 0, levels, level: v.char.level, items: kept, converted, potions: batch.potions ?? 0, kills: (batch.kills ?? []).length, deaths: batch.deaths ?? 0, achievements: ach, quests } };
 }

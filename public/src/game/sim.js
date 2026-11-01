@@ -213,7 +213,8 @@ export class World {
       a.x = Math.max(a.r, Math.min(z.w - a.r, a.x));
       a.y = Math.max(a.r, Math.min(z.h - a.r, a.y));
     }
-    for (const o of this.layout.obstacles) {
+    // grade espacial: só os obstáculos perto do ator (zonas têm centenas; a busca linear custava ~55% do servidor de exploração). Mesma ordem de resolução.
+    for (const o of this.nearObstacles(a)) {
       if (o.w) {
         const cx = Math.max(o.x, Math.min(o.x + o.w, a.x)), cy = Math.max(o.y, Math.min(o.y + o.h, a.y));
         const dx = a.x - cx, dy = a.y - cy, d = Math.hypot(dx, dy);
@@ -226,6 +227,31 @@ export class World {
         if (d < min && d > 0.001) { a.x = o.x + dx / d * min; a.y = o.y + dy / d * min; }
       }
     }
+  }
+
+  nearObstacles(a) {
+    const L = this.layout;
+    const obs = L.obstacles;
+    if (obs.length < 24) return obs;
+    let g = L.grid;
+    if (!g) { // constrói uma vez por layout (o layout é compartilhado entre mundos da mesma zona)
+      const C = 128, cols = Math.ceil(this.zone.w / C) + 1, rows = Math.ceil(this.zone.h / C) + 1, cells = Array.from({ length: cols * rows }, () => []);
+      obs.forEach((o, i) => {
+        const x0 = o.w ? o.x : o.x - o.r, x1 = o.w ? o.x + o.w : o.x + o.r, y0 = o.w ? o.y : o.y - o.r, y1 = o.w ? o.y + o.h : o.y + o.r;
+        for (let cy = Math.max(0, Math.floor(y0 / C)); cy <= Math.min(rows - 1, Math.floor(y1 / C)); cy++) for (let cx = Math.max(0, Math.floor(x0 / C)); cx <= Math.min(cols - 1, Math.floor(x1 / C)); cx++) cells[cy * cols + cx].push(i);
+      });
+      g = L.grid = { C, cols, rows, cells, out: [], seen: new Int32Array(obs.length), stamp: 0 };
+    }
+    const m = a.r * 2 + 2; // o ator pode ser empurrado até ~a.r por um obstáculo: consulta com folga
+    const cx0 = Math.max(0, Math.floor((a.x - m) / g.C)), cx1 = Math.min(g.cols - 1, Math.floor((a.x + m) / g.C));
+    const cy0 = Math.max(0, Math.floor((a.y - m) / g.C)), cy1 = Math.min(g.rows - 1, Math.floor((a.y + m) / g.C));
+    const ids = (g.ids ??= []); ids.length = 0;
+    const st = ++g.stamp;
+    for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) for (const i of g.cells[cy * g.cols + cx]) if (g.seen[i] !== st) { g.seen[i] = st; ids.push(i); }
+    ids.sort((p, q) => p - q);
+    const out = g.out; out.length = 0;
+    for (const i of ids) out.push(obs[i]);
+    return out;
   }
 
   separate() {

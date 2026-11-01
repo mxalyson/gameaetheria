@@ -232,3 +232,20 @@ test('aprimorar: o save mantém +N dentro do limite; servidor recusa item novo a
   const neu2 = structuredClone(old); neu2.equipment.weapon.plus = 8; neu2.equipment.armor.plus = 8;
   assert.equal(checkSave(old, neu2).reason, 'plus_jump', 'salto grande entre gravações');
 });
+
+test('colisão com grade espacial dá exatamente o mesmo resultado da busca linear (3 zonas, 6 000 passos aleatórios)', () => {
+  for (const zone of ['forest', 'plains', 'ruins']) {
+    const fast = new World(zone, { seed: 5, visuals: false }), slow = new World(zone, { seed: 5, visuals: false });
+    slow.nearObstacles = function () { return this.layout.obstacles; };
+    const rng = makeRng(77);
+    const mk = () => ({ x: rng.range(200, 2500), y: rng.range(200, 1700), r: rng.pick([12, 16, 22, 30]) });
+    for (let n = 0; n < 40; n++) {
+      const a = mk(), b = { ...a };
+      for (let i = 0; i < 150; i++) {
+        const dx = rng.range(-40, 40), dy = rng.range(-40, 40);
+        fast.moveActor(a, dx, dy); slow.moveActor(b, dx, dy);
+        assert.ok(Math.abs(a.x - b.x) < 1e-9 && Math.abs(a.y - b.y) < 1e-9, `${zone}: divergiu no passo ${i}`);
+      }
+    }
+  }
+});

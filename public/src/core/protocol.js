@@ -18,7 +18,7 @@ export const REJECT = {
   BAD_TOKEN: 'bad_token', BAD_ORIGIN: 'bad_origin', SERVER_BUSY: 'server_busy',
   PVP_LOCKED: 'pvp_locked', BAD_MODE: 'bad_mode', ALREADY_QUEUED: 'already_queued', IN_MATCH: 'in_match', NOT_IN_PARTY: 'not_in_party', NOT_LEADER: 'not_leader',
   PARTY_FULL: 'party_full', PARTY_TOO_BIG: 'party_too_big', NO_SUCH_PLAYER: 'no_such_player', NO_INVITE: 'no_invite', ALREADY_IN_PARTY: 'already_in_party', SELF: 'self', MEMBER_OFFLINE: 'member_offline',
-  AUTH_REQUIRED: 'auth_required', BAD_SESSION: 'bad_session', BAD_CHARACTER: 'bad_character', ALREADY_ONLINE: 'already_online',
+  BAD_ZONE: 'bad_zone', AUTH_REQUIRED: 'auth_required', BAD_SESSION: 'bad_session', BAD_CHARACTER: 'bad_character', ALREADY_ONLINE: 'already_online',
 };
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -63,7 +63,9 @@ export function parseClientMessage(data) {
     }
     case 'queue':
       return QUEUE_MODES.includes(data.mode) ? { ok: true, msg: { t: 'queue', mode: data.mode } } : { ok: false, code: REJECT.BAD_MODE };
-    case 'queue_cancel': case 'party_create': case 'party_leave':
+    case 'zone_enter': // exploração no servidor: `zone` = zona de destino, `from` = zona de onde vem (o servidor confere o portal e decide o ponto de entrada)
+      return ['forest', 'plains', 'ruins'].includes(data.zone) && ['town', 'forest', 'plains', 'ruins'].includes(data.from) ? { ok: true, msg: { t: 'zone_enter', zone: data.zone, from: data.from } } : { ok: false, code: REJECT.BAD_MESSAGE };
+    case 'queue_cancel': case 'party_create': case 'party_leave': case 'zone_leave':
       return { ok: true, msg: { t: data.t } };
     case 'party_invite': case 'party_kick':
       if (typeof data.name !== 'string' || data.name.length < 1 || data.name.length > 40) return { ok: false, code: REJECT.BAD_MESSAGE };
