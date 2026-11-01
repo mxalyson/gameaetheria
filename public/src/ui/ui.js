@@ -40,11 +40,14 @@ export const noticeText = (n) => {
 const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
 const spiritImg = (type, cls = '') => `<img class="sp-img ${cls}" src="${spiritUrl(type)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
+// Retratos pintados (busto): classes no cartão do herói, no painel do personagem e na criação; NPCs no oval do diálogo. Sem a imagem, volta ao emblema/emoji.
+const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src="assets/portraits/class-${classId}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
+const npcPortrait = (id) => `<img class="por" src="assets/portraits/npc-${id === 'merchant' ? 'merchant' : id}.webp" alt="" draggable="false">`;
 // Emblema no oval do diálogo (provisório até haver retrato pintado de cada NPC): moeda, espada, spirit, escudo, cruz.
 const NPC_EMBLEM = { shop: '<img src="assets/icons/item/res-gold-coin.webp" alt="">', arena: null, sage: null, guard: null, herbalist: null };
 const npcEmblem = (id) => {
-  const html = id === 'merchant' || id === 'shop' ? NPC_EMBLEM.shop : id === 'sage' ? spiritImg('zephyr') : id === 'herbalist' ? attackImg('cleric', '✚') : attackImg('warrior', '⚔');
-  return `<span class="npc-emb">${html}</span>`;
+  const html = ['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith'].includes(id) ? npcPortrait(id) : id === 'shop' ? NPC_EMBLEM.shop : attackImg('warrior', '⚔');
+  return `<span class="npc-emb por">${html}</span>`;
 };
 // moeda e poção pintadas no lugar dos emojis 🪙 🧪 dentro dos painéis
 const COIN = '<img class="coin" src="assets/icons/item/res-gold-coin.webp" alt="🪙" draggable="false">';
@@ -181,7 +184,7 @@ export class UI {
     this.createClass = this.createClass ?? 'warrior';
     const cards = Object.values(CLASSES).map((c) => `
       <button class="class-card ${c.id === this.createClass ? 'sel' : ''}" data-action="pick-class" data-arg="${c.id}" style="--cc:${c.color}">
-        <div class="cc-icon art">${attackImg(c.id, c.icon)}</div>
+        <div class="cc-icon art">${classPortrait(c.id, c.icon)}</div>
         <div class="cc-name">${c.name}</div>
         <div class="cc-desc">${c.desc}</div>
         <div class="cc-stat">Atributo principal: <b>${STAT_NAMES[c.primary]}</b></div>
@@ -222,7 +225,7 @@ export class UI {
   setupHud(char) {
     $('hud').classList.remove('hidden');
     const cls = CLASSES[char.classId];
-    $('hud-portrait').innerHTML = attackImg(char.classId, cls.icon); // provisório: emblema da classe até haver retrato pintado
+    $('hud-portrait').innerHTML = classPortrait(char.classId, cls.icon); // busto pintado da classe
     $('hud-portrait').style.setProperty('--cc', cls.color);
     const slots = [
       { key: 'LMB', id: 'basic', icon: attackImg(char.classId, '🖱️'), art: true, tip: 'skill:basic' },
@@ -393,7 +396,7 @@ export class UI {
     ].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('');
     return this.frame('character', 'Personagem', `
       <div class="char-head" style="--cc:${cls.color}">
-        <div class="avatar art">${attackImg(char.classId, cls.icon)}</div>
+        <div class="avatar art">${classPortrait(char.classId, cls.icon)}</div>
         <div><div class="nm">${esc(char.name)}</div><div class="sub">${cls.name} · Nível ${char.level}</div>
         <div class="sub" style="color:${tier.color}">Arena: ${tier.name} (${char.arena.rating})</div></div>
       </div>
@@ -448,7 +451,7 @@ export class UI {
         <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${it.value * PRICES.itemMarkup}</button></div>`).join('') || '<p class="empty-msg">Estoque esgotado. Volte após subir de nível.</p>';
     const potion = PRICES.potion(char.level);
     return this.frame('shop', 'Mercadora Lia', `
-      <p class="npc-line">${npcEmblem('shop')}"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
+      <p class="npc-line">${npcEmblem('merchant')}"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
       <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false"></span></div>
         <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>

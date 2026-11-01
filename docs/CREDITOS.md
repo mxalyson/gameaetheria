@@ -37,3 +37,6 @@ Espada, cajado, arco, maça, elmo, armadura, botas, anel e amuleto (`public/asse
 
 ## Spirits (arte gerada por IA)
 Fagulha, Ondina, Rochedo, Zéfiro (forma 1 e forma evoluída) e o ovo (`public/assets/icons/spirit/`), recortados de imagens guardadas em `docs/art-direction/fontes-icones/` por `tools/spirit-icons-from-images.py`. **Origem/licença: a confirmar.**
+
+## Retratos (arte gerada por IA)
+Bustos das 4 classes e de 6 NPCs (guarda, Mestre Doran, herbalista, mercadora, sábia, ferreiro) em `public/assets/portraits/`, recortados de `docs/art-direction/fontes-icones/retratos-*.jpg` por `tools/portraits-from-sheets.py`. **Origem/licença: a confirmar.**

@@ -91,3 +91,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] **Criação do Místico** (5º herói: conceito, 3D, atlas, kit de habilidades, ícones).
 - [ ] **Evolução de spirits** (forma 2 já recortada; falta a mecânica e a proposta de regras).
 - [ ] **Rodada de balanceamento e progressão** (o jogo "acaba" em ~20 min: nível 20 e fim do conteúdo): balanço entre classes, evoluções, dificuldade, **melhorar e dificultar o farm** (XP/ouro/drop por zona, curva de nível até 30, chefes e dificuldade escalável). Ferramentas já existentes: `npm run balance`, `npm run economy`, `docs/gameplay/economia.md`. Medir o tempo até o nível 20/30 antes e depois.
+
+## Retratos pintados (2026-11-02)
+- [x] Bustos das 4 classes no cartão do herói, painel do personagem e criação; dos NPCs no oval do diálogo (mercadora, Doran, sábia, guarda, herbalista; o ferreiro está recortado em `npc-smith.webp`, mas o painel do ferreiro não tem diálogo próprio, ficou sem uso).
+- [ ] Retrato do Místico (junto com a criação dele); NPCs novos futuros; retrato de monstros/chefes na barra do chefe (B2).

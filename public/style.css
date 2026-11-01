@@ -549,3 +549,10 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .result h1 { text-shadow: 0 2px 0 #000b; }
 .result .sub { color: #cdd3ea; }
 @media (max-height: 520px) { .result { --pb: 22px; padding: 0 14px 4px; } }
+
+/* retratos pintados */
+#hud-portrait img.por { width: 100%; height: 100%; object-fit: cover; object-position: 50% 14%; display: block; }
+.npc-emb.por { width: 17%; aspect-ratio: 1; left: 2.8%; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 35%, #34476e, #141a2e); }
+.npc-emb.por img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; filter: none; }
+.char-head .avatar.art img.por { border-radius: 50%; object-fit: cover; object-position: 50% 14%; background: radial-gradient(circle at 50% 35%, #34476e, #141a2e); box-shadow: 0 0 0 2px #c9a24a; }
+.cc-icon.art img.por { border-radius: 50%; object-fit: cover; object-position: 50% 14%; background: radial-gradient(circle at 50% 35%, #34476e, #141a2e); box-shadow: 0 0 0 2px #c9a24a; }
