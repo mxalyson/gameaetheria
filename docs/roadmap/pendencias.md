@@ -55,3 +55,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] B5: aplicar o HUD pintado no jogo real (retrato real do herói, ícones de menu e ataque pintados), com medição de desempenho.
 - [x] 4 folhas reenviadas e recortadas (21 peças). **Ataque básico das 4 classes já está no jogo real** (botão de toque e barra do teclado).
 - [ ] B5: aplicar no jogo real os ícones de menu pintados, raridades (7 molduras: comum=0, incomum=1, raro=4, épico=6, lendário=5; 2 e 3 sobram), dica/faixa/diálogo, cartão do herói, barras de poção e minimapa de runas. Falta o **retrato do herói** (hoje emoji no laboratório).
+
+## Cenário em sprites (pacote Quaternius, CC0)
+- [x] 31 sprites no Bosque, Planície (arbustos e capim) e Ruínas (árvores retorcidas e mortas). Interruptor `?cenario=original`.
+- [ ] Você aprovar o estilo (ou pedir ajustes de cor/tamanho/densidade); usar flores, trevos, pedrinhas e pedras de trilha no chão; balanço ao vento; sombras próprias; medir no celular.

@@ -2,6 +2,7 @@
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
+import { loadNature, setNatureZone, drawNature } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -24,6 +25,7 @@ const circle = (g, x, y, r) => { g.beginPath(); g.arc(x, y, Math.max(0.1, r), 0,
 export class Renderer {
   constructor(canvas) {
     this.c = canvas;
+    loadNature(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
     this.g = canvas.getContext('2d');
     this.grounds = new Map();
     this.dprCap = 2;
@@ -66,6 +68,7 @@ export class Renderer {
 
   draw(world, cam, view = {}) {
     const g = this.g, z = world.zone, t = world.time;
+    setNatureZone(world.zoneId);
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.fillStyle = z.palette.outside;
     g.fillRect(0, 0, this.vw, this.vh);
@@ -291,6 +294,7 @@ function drawShadow(g, it) {
 
 // ---------------- decoração ----------------
 function drawDecor(g, d, t, z, player) {
+  if (drawNature(g, d, player)) return; // cenário em sprites (modelos 3D fotografados); sem atlas, ou em tipos não cobertos, segue o desenho antigo abaixo
   switch (d.type) {
     case 'tree': {
       if (z.scenery) { drawTreeRich(g, d, t, z, player); break; }

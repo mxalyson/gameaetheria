@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Fotografia de cenário (modelos 3D → sprites 2D)</title>
+<style>body{margin:0;background:#3f6a44;color:#fff;font:12px system-ui}</style>
+<script type="importmap">{"imports":{"three":"../iso-poc/vendor/three/build/three.module.js"}}</script>
+</head><body>
+<script type="module">
+// Laboratório: fotografa modelos glTF (Quaternius Stylized Nature MegaKit, CC0) em sprites 2D, câmera ORTOGRÁFICA a 40° de elevação, vista de frente (sul),
+// escala fixa em pixels por metro (árvore, arbusto e pedra mantêm a proporção real entre si). Usa o three.js do laboratório do herói; NADA de 3D vai ao jogo.
+// Uso: window.bake('CommonTree_1', { ppm: 26, el: 40 }) → { name, png (dataURL), w, h, ax, ay (âncora = pé do objeto), ppm, size:[x,y,z] metros }
+import * as THREE from 'three';
+import { GLTFLoader } from '../iso-poc/vendor/three/examples/jsm/loaders/GLTFLoader.js';
+
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+// luz alegre e legível ao ar livre: a mesma direção do resto do jogo (alto-esquerda-frente), preenchimento forte para não "morrer" nas sombras
+const key = new THREE.DirectionalLight(0xfff1dc, 2.2); key.position.set(-3, 6, 4); scene.add(key);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa890, 1.35));
+const loader = new GLTFLoader();
+const greenLeaf = await new THREE.TextureLoader().loadAsync('../iso-poc/art-local/nature/Leaves_NormalTree_C.png'); greenLeaf.flipY = false; greenLeaf.colorSpace = THREE.SRGBColorSpace; // folha verde para os arbustos (a textura deles é a outonal vermelha)
+
+window.bake = async (name, { ppm = 26, el = 40, aa = 2, pad = 0.08 } = {}) => {
+  const gltf = await loader.loadAsync(`../iso-poc/art-local/nature/${name}.gltf`);
+  const obj = gltf.scene; scene.add(obj);
+  // As cores de vértice deste pacote guardam dados de VENTO (máscara), não cor: ignorá-las. As folhas ganham um tom vivo (a textura "_C" é um verde-oliva chapado).
+  obj.traverse((o) => {
+    if (!o.isMesh) return;
+    for (const m of [].concat(o.material)) {
+      m.vertexColors = false; m.needsUpdate = true;
+      const n = m.name || '';
+      if (/^Bush/.test(name) && /^Leaves/.test(n)) m.map = greenLeaf;
+      if (/^Leaf_Pine/.test(n)) m.color = new THREE.Color(0.75, 1.55, 0.95);          // pinheiro: verde-floresta frio
+      else if (/^Leaves_TwistedTree/.test(n) && !/^Bush/.test(name)) m.color = new THREE.Color(1.1, 0.9, 0.9); // árvores retorcidas: folhagem outonal vermelha (combina com as Ruínas)
+      else if (/^Leaves/.test(n)) m.color = new THREE.Color(1.3, 1.85, 0.9);         // copa comum e arbustos: verde-limão vivo
+      else if (/^Grass/.test(n)) m.color = new THREE.Color(1.1, 1.6, 0.8);
+    }
+  });
+  const box = new THREE.Box3().setFromObject(obj), sz = box.getSize(new THREE.Vector3());
+  const E = THREE.MathUtils.degToRad(el), dist = 30;
+  const cam = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 200);
+  cam.position.set(0, Math.sin(E) * dist, Math.cos(E) * dist); cam.lookAt(0, 0, 0); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+  // limites projetados do modelo (em metros no plano da câmera) → janela justa
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9; const inv = cam.matrixWorldInverse;
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    const v = new THREE.Vector3(x, y, z).applyMatrix4(inv); minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+  }
+  minX -= pad; maxX += pad; minY -= pad; maxY += pad;
+  const origin = new THREE.Vector3(0, 0, 0).applyMatrix4(inv); // pé do objeto (origem do modelo) no plano da câmera
+  cam.left = minX; cam.right = maxX; cam.top = maxY; cam.bottom = minY; cam.updateProjectionMatrix();
+  ppm = Math.min(ppm, 235 / (maxY - minY), 235 / (maxX - minX)); // teto de ~235 px por lado: modelos gigantes (árvores retorcidas) não geram sprites pesados
+  const W = Math.ceil((maxX - minX) * ppm), H = Math.ceil((maxY - minY) * ppm);
+  renderer.setSize(W * aa, H * aa); renderer.setClearColor(0x000000, 0); renderer.render(scene, cam);
+  const out = document.createElement('canvas'); out.width = W; out.height = H; const g = out.getContext('2d'); g.imageSmoothingQuality = 'high';
+  g.drawImage(renderer.domElement, 0, 0, W, H);
+  scene.remove(obj);
+  obj.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
+  return { name, png: out.toDataURL('image/png'), w: W, h: H, ax: Math.round((origin.x - minX) / (maxX - minX) * W), ay: Math.round((maxY - origin.y) / (maxY - minY) * H), ppm, size: sz.toArray().map((v) => +v.toFixed(2)) };
+};
+window.bakeReady = true;
+</script>
+</body></html>
