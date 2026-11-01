@@ -36,6 +36,12 @@
   .pa .ptitle { position: absolute; left: 50%; top: -74px; width: 230px; height: 56px; transform: translateX(-50%); display: grid; place-items: center; font: 800 14px var(--font-title); color: var(--ivory); letter-spacing: .8px; text-shadow: 0 2px 0 #000b; padding: 0 66px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pa .x { position: absolute; right: -14px; top: -14px; width: 44px; height: 44px; font-size: 16px; }
 
+  /* peças pintadas de raridade, dica, faixa e diálogo (texto e ícone são código; só a "pele" é arte) */
+  .rc { position: relative; width: 74px; height: 74px; } .rc img { position: absolute; inset: 0; width: 100%; height: 100%; } .rc span { position: absolute; left: 22%; top: 22%; width: 56%; height: 56%; display: grid; place-items: center; font-size: 26px; } .rc small { position: absolute; left: 0; right: 0; bottom: -17px; text-align: center; font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; }
+  .tipimg { position: relative; width: 230px; } .tipimg img { width: 100%; display: block; } .tipimg div { position: absolute; left: 12%; right: 12%; top: 16%; bottom: 30%; font-size: 12.5px; line-height: 1.35; color: #e8dcc0; } .tipimg b { display: block; font: 800 14px var(--font-title); color: var(--gold-hi); }
+  .bannerimg { position: relative; width: 300px; } .bannerimg img { width: 100%; display: block; } .bannerimg b { position: absolute; inset: 0; display: grid; place-items: center; font: 800 20px var(--font-title); color: var(--gold-hi); text-shadow: 0 2px 0 #000b; }
+  .dialogimg { position: relative; width: 420px; } .dialogimg img { width: 100%; display: block; } .dialogimg div { position: absolute; left: 24%; right: 6%; top: 14%; bottom: 14%; font-size: 13px; line-height: 1.35; color: #f0e4c8; display: grid; align-content: center; } .dialogimg .who { font: 800 13px var(--font-title); color: var(--gold); }
+
   /* ---- botões ---- */
   .btn { min-height: var(--touch-min); padding: 0 20px; border-radius: var(--radius-m); border: 0; font: 800 14px var(--font-body); letter-spacing: .3px; cursor: pointer; color: var(--ivory); transition: transform var(--t-fast) var(--ease), filter var(--t-fast); }
   .btn:active { transform: translateY(1px) scale(.98); filter: brightness(1.15); }
@@ -83,6 +89,14 @@
 <main>
   <h1>Kit de interface — identidade v1</h1>
   <p class="n">Componentes da identidade (laje de pedra azul-noite com filete e gemas douradas, molduras por classe, botões de ouro, barras segmentadas, raridades com brilho). Tokens em <code>public/ui-tokens.css</code>. <b>Glifos dos ícones de menu continuam provisórios</b> (ver briefing). Alvos de toque ≥ 44 px, texto ≥ 12 px, respeita <code>prefers-reduced-motion</code>.</p>
+
+  <h2>PINTADO — raridades, dica, faixa de aviso e diálogo (peças geradas)</h2>
+  <div class="bg row" style="gap:18px;align-items:center">
+    <div class="row" style="gap:8px"><div class="rc"><img src="../../assets/ui/rarity-0.webp" alt=""><span>⚔️</span><small>Comum</small></div><div class="rc"><img src="../../assets/ui/rarity-1.webp" alt=""><span>🛡️</span><small>Incomum</small></div><div class="rc"><img src="../../assets/ui/rarity-4.webp" alt=""><span>🪖</span><small>Raro</small></div><div class="rc"><img src="../../assets/ui/rarity-6.webp" alt=""><span>💍</span><small>Épico</small></div><div class="rc"><img src="../../assets/ui/rarity-5.webp" alt=""><span>🗡️</span><small>Lendário</small></div></div>
+    <div class="tipimg"><img src="../../assets/ui/tip.webp" alt=""><div><b>Poção de Vida</b>Cura 35% da vida. Recarga 8s.</div></div>
+    <div class="bannerimg"><img src="../../assets/ui/banner.webp" alt=""><b>Nível 5!</b></div>
+    <div class="dialogimg"><img src="../../assets/ui/dialog.webp" alt=""><div><span class="who">Guarda Ren</span>Os limos estão tomando a trilha. Derrote 8 deles e volte aqui.</div></div>
+  </div>
 
   <h2>NOVO — painel com a moldura pintada (peça gerada pelo proprietário)</h2>
   <p class="n">Pedra entalhada com runas, cantos de bronze com gemas e plaqueta com asas: é a moldura do Prompt 1, cortada em 9 fatias (estica sem deformar os cantos). Compare com a versão em CSS puro mais abaixo.</p>

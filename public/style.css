@@ -405,3 +405,9 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 .tt-cat { background: none; position: static; width: auto; height: auto; transform: none; clip-path: none; box-shadow: none; }
 .slot.art.blocked .icon img, .tbtn.sk.blocked .icon img { filter: grayscale(1) brightness(.55); }
 .slot.art.blocked::after, .tbtn.sk.blocked::after { content: '✕'; position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255,120,120,.85); font: 900 22px Nunito, sans-serif; text-shadow: 0 1px 4px #000; pointer-events: none; z-index: 3; }
+
+/* ---- ataque básico com arte própria por classe (emblema redondo; o recarga cônica continua por cima) ---- */
+.tbtn.atk { background: none; border: 0; box-shadow: none; }
+.tbtn.atk .icon { position: absolute; inset: -3px; font-size: 0; }
+.tbtn.atk.down { filter: brightness(1.25); }
+.slot.art .icon img.art[src*="/attack/"] { border-radius: 50%; }

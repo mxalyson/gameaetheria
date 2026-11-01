@@ -23,3 +23,8 @@ test('categoria de cada habilidade (dano/cura/reforço/controle) sai dos dados r
   const esperado = { whirlwind: 'dano', charge: 'controle', warcry: 'buff', fireball: 'dano', frostnova: 'controle', blink: 'buff', rain: 'dano', pierce: 'dano', roll: 'buff', holylight: 'cura', divineshield: 'buff', judgement: 'controle' };
   for (const [id, cat] of Object.entries(esperado)) assert.equal(skillCategory(SKILLS[id]), cat, id);
 });
+
+import { attackIconUrl } from '../public/src/render/skill-icons.js';
+test('as 4 classes têm o emblema do ataque básico e ele é leve', () => {
+  for (const id of Object.keys(CLASSES)) { const f = 'public/' + attackIconUrl(id); assert.ok(existsSync(f), 'falta ' + f); assert.ok(statSync(f).size > 5000 && statSync(f).size < 150_000, f); }
+});

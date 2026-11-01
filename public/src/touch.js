@@ -3,7 +3,7 @@
 import { CLASSES } from './data/classes.js';
 import { SKILLS } from './data/skills.js';
 import { skillOf } from './core/specs.js';
-import { skillImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
+import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { stickVector, pickAim, aimModeFor, dragAim } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
@@ -135,7 +135,7 @@ export class TouchControls {
   // Ícones dependem da classe escolhida.
   setup(char) {
     const cls = CLASSES[char.classId];
-    $('t-atk-icon').textContent = cls.icon;
+    $('t-atk-icon').innerHTML = attackImg(char.classId, cls.icon);
     cls.skills.forEach((s, i) => {
       const b = this.root.querySelector(`.sk${i}`), c = skillCategory(skillOf(char.classId, null, s));
       b.querySelector('.icon').innerHTML = skillImg(s, SKILLS[s].icon);

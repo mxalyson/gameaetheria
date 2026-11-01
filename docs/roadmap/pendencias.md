@@ -53,3 +53,5 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [x] Peças pintadas recebidas e recortadas: painel (9 fatias), botões ×4, cartão do herói, barras de poção (vazio/vida/mana), minimapa redondo, medalhão ×3 → `/labs/b1-ui/hud.html` (HUD completo) e `/labs/b1-ui/kit.html`.
 - [ ] **Reenviar 4 folhas que não foram gravadas como arquivo** (só apareceram na conversa): tooltip/faixa/diálogo, 7 molduras de raridade, 4 ataques básicos, 7 ícones de menu.
 - [ ] B5: aplicar o HUD pintado no jogo real (retrato real do herói, ícones de menu e ataque pintados), com medição de desempenho.
+- [x] 4 folhas reenviadas e recortadas (21 peças). **Ataque básico das 4 classes já está no jogo real** (botão de toque e barra do teclado).
+- [ ] B5: aplicar no jogo real os ícones de menu pintados, raridades (7 molduras: comum=0, incomum=1, raro=4, épico=6, lendário=5; 2 e 3 sobram), dica/faixa/diálogo, cartão do herói, barras de poção e minimapa de runas. Falta o **retrato do herói** (hoje emoji no laboratório).
