@@ -36,8 +36,13 @@ def cut(im, box, bg, tol=16, hole=None, pad=4):
     m = Image.fromarray(alpha).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.9))
     out = crop.convert('RGBA'); out.putalpha(m); return out
 
+# tamanho máximo (lado maior) por peça: o HUD mostra cada uma com 40–230 px CSS; 3× de densidade basta. Botões ficam inteiros (usados em 9 fatias por pixel).
+MAXPX = {'hero-card': 480, 'vial-': 520, 'minimap-ring': 380, 'medal-': 200, 'rarity-': 240, 'tip': 520, 'banner': 640, 'dialog': 640}
+
 def save(img, name):
-    img.save(OUT + name, 'WEBP', quality=94, method=6); print('ok', name, img.size)
+    for k, n in MAXPX.items():
+        if name.startswith(k): r = n / max(img.size); img = img.resize((round(img.width * r), round(img.height * r)), Image.LANCZOS) if r < 1 else img; break
+    img.save(OUT + name, 'WEBP', quality=92, method=6); print('ok', name, img.size)
 
 def same_window(pieces):
     """peças iguais (estados): mesma largura/altura, centradas na própria caixa"""

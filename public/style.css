@@ -411,3 +411,50 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 .tbtn.atk .icon { position: absolute; inset: -3px; font-size: 0; }
 .tbtn.atk.down { filter: brightness(1.25); }
 .slot.art .icon img.art[src*="/attack/"] { border-radius: 50%; }
+
+/* =====================================================================================================================================
+   HUD PINTADO (B5): cartão do herói + vidros de poção, minimapa redondo de runas e medalhões de menu — peças aprovadas em public/assets/ui.
+   Só muda a "pele": ids, data-action e a lógica de updateHud continuam iguais. FICA NO FIM do arquivo de propósito (vence as regras de tamanho acima).
+   ===================================================================================================================================== */
+:root { --card-w: 150px; --map: 124px; }
+@media (max-height: 520px) { :root { --card-w: 128px; --map: 104px; } }
+@media (max-height: 420px) { :root { --card-w: 120px; --map: 96px; } }
+@media (max-height: 360px) { :root { --card-w: 112px; --map: 104px; } }
+@media (max-height: 320px) { :root { --card-w: 100px; --map: 96px; } }
+
+/* cartão do herói: moldura de bronze com 4 gemas; o retrato entra no vão escuro (10%,15,4% · 44,3%×69%) e os dois tubos saem pela direita */
+#hud-player { left: calc(8px + env(safe-area-inset-left, 0px)); top: 8px; width: var(--card-w); height: calc(var(--card-w) * .637); padding: 0; gap: 0; display: block; background: url(assets/ui/hero-card.webp) center/100% 100% no-repeat; border: 0; border-radius: 0; box-shadow: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
+#hud-player .portrait { position: absolute; left: 10%; top: 15.4%; width: 44.3%; height: 69%; border-radius: 6px; background: #141a28; box-shadow: none; border: 0; font-size: 0; overflow: hidden; display: grid; place-items: center; z-index: 2; }
+#hud-player .portrait img { width: 96%; height: 96%; object-fit: contain; filter: none; }
+#hud-player .bars { display: contents; }
+#hud-player .name-row { display: contents; }
+#hud-name { position: absolute; left: 40%; top: 1%; max-width: 135%; font: 800 10px Nunito, sans-serif; color: #fff6d6; text-shadow: 0 1px 2px #000, 0 0 4px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hud-player .name-row #hud-level, #hud-level { position: absolute; left: 1%; bottom: -8%; min-width: 22px; height: 20px; padding: 0 6px; display: grid; place-items: center; z-index: 3; border-radius: 10px; font: 900 11px Nunito, sans-serif; color: #3a2600; background: radial-gradient(circle at 35% 30%, #fff0a6, #c98f12); box-shadow: 0 0 0 1.5px #8a5d08, 0 2px 4px rgba(0,0,0,.45); }
+/* vidros de poção: tubo vazio por baixo; o líquido (vida vermelha, XP azul) só aparece até a fração --v (11,9%–84% da peça = parte de vidro) */
+#hud-player .bar { position: absolute; left: 38.7%; width: 135.5%; height: auto; aspect-ratio: 520 / 117; margin: 0; border-radius: 0; background: url(assets/ui/vial-empty.webp) center/100% 100% no-repeat; overflow: visible; }
+#hud-player .bar.hp { top: 16.5%; } #hud-player .bar.xp { top: 47%; height: auto; }
+#hud-player .bar .fill { position: absolute; inset: 0; width: 100% !important; height: 100% !important; border-radius: 0; transition: clip-path .15s; clip-path: inset(0 calc(100% - (11.9% + var(--v, 1) * 72.1%)) 0 0); }
+#hud-player .bar.hp .fill:not(.shield) { background: url(assets/ui/vial-hp.webp) center/100% 100% no-repeat; }
+#hud-player .bar.xp .fill { background: url(assets/ui/vial-mp.webp) center/100% 100% no-repeat; }
+#hud-player .bar.hp .fill.shield { inset: auto; left: 11.9%; top: 26%; height: 5px !important; width: calc(var(--s, 0) * 72.1%) !important; clip-path: none; background: rgba(255,226,120,.9); border-radius: 3px; box-shadow: 0 0 4px rgba(255,200,60,.8); }
+#hud-player .bar span { left: 12%; right: 16%; font: 900 10px Nunito, sans-serif; color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; z-index: 2; }
+#hud-player .bar.xp span { font-size: 9px; }
+#hud-gold { left: calc(8px + env(safe-area-inset-left, 0px)); top: calc(8px + var(--card-w) * .637 + 10px); }
+#hud-gold > span { font-size: 12px; padding: 3px 10px; }
+
+/* minimapa: anel pintado por cima de um canvas redondo (radar centrado no jogador); o vão do anel é 19,7%–80,4% */
+#hud-zone { right: calc(8px + env(safe-area-inset-right, 0px)); top: 8px; width: var(--map); height: var(--map); padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
+#hud-zone::after { content: ''; position: absolute; inset: 0; background: url(assets/ui/minimap-ring.webp) center/100% 100% no-repeat; pointer-events: none; z-index: 2; }
+#hud-zone #minimap, body.touch #minimap { position: absolute; display: block; left: 19.7%; top: 19.4%; width: 60.7%; height: 61%; margin: 0; border-radius: 50%; background: rgba(20,30,40,.5); box-shadow: none; }
+#zone-name { display: none; }
+body:not(.touch) #zone-name { display: block; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin: -2px 0 0; white-space: nowrap; font: 800 12px Cinzel, serif; color: #fff6d6; text-shadow: 0 1px 3px #000, 0 0 5px #000; }
+body:not(.online) .menu-btns .online-only { display: none; } /* grupo só com conta (a regra de grade abaixo o reexibiria) */
+/* medalhões de menu: fileira ao lado do minimapa (toque) ou sob ele (teclado e mouse) */
+.menu-btns { position: absolute; top: calc(100% + 22px); right: 0; margin: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; width: 250px; }
+.menu-btns button, body.touch .menu-btns button { width: 40px; height: 40px; padding: 0; background: none; border: 0; border-radius: 50%; box-shadow: none; font-size: 0; display: grid; place-items: center; }
+.menu-btns button img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.menu-btns button:active img { filter: brightness(1.25) drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.menu-btns button.txt { background: url(assets/ui/medal-normal.webp) center/100% 100% no-repeat; font-size: 17px; color: #fff0a6; }
+body.touch .menu-btns { position: fixed; top: 8px; right: calc(8px + var(--map) + 8px + env(safe-area-inset-right, 0px)); width: auto; flex-wrap: nowrap; justify-content: flex-start; gap: 4px; }
+@media (max-height: 420px) { .menu-btns button, body.touch .menu-btns button { width: 36px; height: 36px; } }
+@media (max-height: 320px) { .menu-btns button, body.touch .menu-btns button { width: 34px; height: 34px; } }

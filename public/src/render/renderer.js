@@ -165,8 +165,11 @@ export class Renderer {
   drawMinimap(canvas, world, player) {
     const g = canvas.getContext('2d'), z = world.zone;
     const W = canvas.width, H = canvas.height;
-    const s = Math.min(W / z.w, H / z.h), ox = (W - z.w * s) / 2, oy = (H - z.h * s) / 2;
+    const round = W === H && !!player; // canvas quadrado = minimapa redondo (anel pintado): radar centrado no jogador, ~700 unidades de raio
+    const R = Math.min(700, Math.max(z.w, z.h) / 2);
+    const s = round ? W / 2 / R : Math.min(W / z.w, H / z.h), ox = round ? W / 2 - player.x * s : (W - z.w * s) / 2, oy = round ? H / 2 - player.y * s : (H - z.h * s) / 2;
     g.clearRect(0, 0, W, H);
+    if (round) { g.save(); g.beginPath(); g.arc(W / 2, H / 2, W / 2, 0, Math.PI * 2); g.clip(); g.fillStyle = 'rgba(24,34,48,0.9)'; g.fillRect(0, 0, W, H); }
     g.fillStyle = z.palette.ground;
     if (z.circle) { circle(g, ox + z.w * s / 2, oy + z.h * s / 2, z.radius * s); g.fill(); }
     else g.fillRect(ox, oy, z.w * s, z.h * s);
@@ -187,6 +190,7 @@ export class Renderer {
       g.fillStyle = '#ffffff'; g.strokeStyle = '#223'; g.lineWidth = 1.5;
       circle(g, ox + player.x * s, oy + player.y * s, 3.5); g.fill(); g.stroke();
     }
+    if (round) g.restore();
   }
 }
 

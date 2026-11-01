@@ -36,3 +36,8 @@ Carregar `ui-tokens.css`, trocar `style.css`/`ui.js` por estes componentes mante
 
 ## 7. Limites desta versão
 É um **kit em HTML/CSS no laboratório**, não o jogo. Não medi desempenho dos efeitos de vidro/sombra em celular real. Os pilares e a assinatura aguardam sua aprovação; a fase B5 também.
+
+## 8. B5 — HUD pintado no jogo real (2026-11-01) — implementado e testado no navegador
+- **No jogo:** cartão do herói (moldura de bronze com 4 gemas; retrato = emblema da classe, provisório), **vidros de poção** (vida vermelha, XP azul, líquido proporcional por \`--v\`; escudo como filete dourado), **minimapa redondo de runas** (radar de ~700 unidades centrado no jogador, só desenho), **medalhões de menu pintados** (mochila, personagem, spirits, diário, mapa, grupo, opções) e ataque básico por classe. Ids, \`data-action\` e a lógica de \`updateHud\` não mudaram. Assets em \`public/assets/ui\` e \`public/assets/icons\` (≈ 0,5 MB das peças do HUD, reduzidas para 3× a tela do celular); recorte reproduzível: \`tools/ui-pieces-from-sheets.py\`.
+- **Tamanho no celular:** o cartão e o minimapa seguem variáveis (\`--card-w\`, \`--map\`) por altura de tela (de 150/124 px a 100/96 px); menu em fileira ao lado do minimapa no toque e sob ele no teclado.
+- **Testes:** os de celular, ícones, efeitos, missões, salvamento, PWA e orçamento de textura (37 e2e) e os unitários passam. **Não medido em celular real.** Pendentes: retrato pintado por classe; painéis internos (inventário, loja, personagem) ainda no estilo antigo (a moldura em 9 fatias e os botões pintados estão prontos no kit); cartão com nome/nível improvisados (nome sobre a moldura, nível em pílula dourada).

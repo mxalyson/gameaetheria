@@ -208,7 +208,7 @@ export class UI {
   setupHud(char) {
     $('hud').classList.remove('hidden');
     const cls = CLASSES[char.classId];
-    $('hud-portrait').textContent = cls.icon;
+    $('hud-portrait').innerHTML = attackImg(char.classId, cls.icon); // provisório: emblema da classe até haver retrato pintado
     $('hud-portrait').style.setProperty('--cc', cls.color);
     const slots = [
       { key: 'LMB', id: 'basic', icon: attackImg(char.classId, '🖱️'), art: true, tip: 'skill:basic' },
@@ -244,9 +244,13 @@ export class UI {
     this.set('hud-level', 'text', `Nv ${char.level}`);
     this.set('hud-hp', 'width', `${(100 * player.hp) / player.maxHp}%`);
     this.set('hud-shield', 'width', `${Math.min(100, (100 * player.shield) / player.maxHp)}%`);
+    // barras de poção: o líquido é mostrado até esta fração (0–1) do tubo; escudo idem
+    this.set('hud-hp-bar', '--v', String(Math.max(0, Math.min(1, player.hp / player.maxHp)).toFixed(3)));
+    this.set('hud-hp-bar', '--s', String(Math.max(0, Math.min(1, player.shield / player.maxHp)).toFixed(3)));
     this.set('hud-hp-text', 'text', `${Math.ceil(player.hp)} / ${player.maxHp}`);
     const need = xpToNext(char.level);
     this.set('hud-xp', 'width', char.level >= MAX_LEVEL ? '100%' : `${(100 * char.xp) / need}%`);
+    this.set('hud-xp-bar', '--v', String(char.level >= MAX_LEVEL ? 1 : Math.max(0, Math.min(1, char.xp / need)).toFixed(3)));
     this.set('hud-xp-text', 'text', char.level >= MAX_LEVEL ? 'Nível máximo' : `${char.xp} / ${need} XP`);
     this.set('hud-gold', 'html', `<span>🪙 ${char.gold}</span>${char.statPoints ? `<span class="pts" data-action="toggle" data-arg="character">+${char.statPoints} pontos</span>` : ''}`);
     this.set('zone-name', 'text', world.zone.name);

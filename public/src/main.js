@@ -196,7 +196,9 @@ class Game {
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
       this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Siga o portal a leste para o Bosque Verdejante', 'gold');
-      this.ui.log('Arraste à esquerda para andar · botão grande ataca · círculos menores são as habilidades', '#cfe8ff');
+      // o tutorial segue o modo de controle (toque é o padrão; teclado e mouse só se escolhido nas opções)
+      if (this.touch?.active) this.ui.log('Arraste à esquerda para andar · botão grande ataca · círculos menores são as habilidades', '#cfe8ff');
+      else this.ui.log('Mover: arraste o botão esquerdo do mouse ou use as setas · clique ataca · habilidades nos botões', '#cfe8ff');
       this.ui.log('💬 conversa com NPCs · 🧪 poção · 🏠 volta à vila · 🎒 mochila · 🧙 personagem · 🔮 spirits · 📖 diário', '#cfe8ff');
       const sp = SPIRITS[char.spirits[0].type];
       this.ui.log(`Um spirit te acompanha: <b style="color:${sp.color}">${sp.name}</b> (${sp.element}).`, sp.color);
