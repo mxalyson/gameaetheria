@@ -1,7 +1,9 @@
 // Service worker (P10): o jogo abre sem rede depois da primeira visita.
-// Estratégia: "stale-while-revalidate" para arquivos do mesmo site (responde do cache e atualiza em segundo plano);
-// nada de WebSocket, API ou outras origens (login/salvamento na nuvem passam direto). Subir VERSION invalida o cache antigo.
-const VERSION = 'aetheria-v1';
+// Código (HTML/JS/CSS/manifesto): REDE PRIMEIRO, ignorando o cache HTTP do servidor (o GitHub Pages manda max-age=600, o que deixava versões velhas por 10 min),
+// e cai no cache só se estiver offline. Arte pesada (PNG, fontes, SVG): cache primeiro e atualiza em segundo plano.
+// Nada de WebSocket, API ou outras origens (login/salvamento na nuvem passam direto). Subir VERSION invalida o cache antigo.
+const VERSION = 'aetheria-v2';
+const HEAVY = /\.(png|ttf|woff2?|svg|jpg|webp)$/i;
 
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(VERSION).then((c) => c.addAll(['./', 'index.html', 'style.css', 'fonts/fonts.css', 'manifest.webmanifest', 'icon.svg']))); });
 self.addEventListener('activate', (e) => {
@@ -16,8 +18,8 @@ self.addEventListener('fetch', (e) => {
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
     const hit = await cache.match(req, { ignoreSearch: req.mode === 'navigate' });
-    const net = fetch(req).then((r) => { if (r.ok) cache.put(req, r.clone()); return r; }).catch(() => null);
-    if (hit) { e.waitUntil(net); return hit; }
-    return (await net) || new Response('offline', { status: 503 });
+    const fresh = () => fetch(req, { cache: 'no-cache' }).then((r) => { if (r.ok) cache.put(req, r.clone()); return r; }).catch(() => null);
+    if (HEAVY.test(url.pathname) && hit) { e.waitUntil(fresh()); return hit; }
+    return (await fresh()) || hit || new Response('offline', { status: 503 });
   })());
 });
