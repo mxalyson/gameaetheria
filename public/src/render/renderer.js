@@ -620,17 +620,8 @@ function drawMob(g, a, t) {
     circle(g, sep + fx * 2.5, y + Math.max(0, fy) * 1.5, r); g.fill();
   };
   switch (M.shape) {
-    case 'slime': {
-      const sq = Math.sin(t * 6 + a.id) * 0.09;
-      const grd = g.createRadialGradient(-4, -6, 2, 0, 0, 18);
-      grd.addColorStop(0, shade(c, 0.2)); grd.addColorStop(1, shade(c, -0.08));
-      g.fillStyle = grd;
-      g.beginPath(); g.ellipse(0, 4, 16 * (1 + sq), 13 * (1 - sq), 0, Math.PI, 0); g.lineTo(16 * (1 + sq), 10); g.quadraticCurveTo(0, 14, -16 * (1 + sq), 10); g.closePath(); g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.55)'; ellipse(g, -6, -4, 4, 2.5); g.fill();
-      eyes(0);
-      break;
-    }
-    case 'wolf': {
+    // slime: só existe pintado (assets/mobs/slime); o desenho antigo foi removido
+    case 'wolf': { // só o Lobo de Cristal (o Lobo Cinzento é pintado); sai quando ele tiver arte
       g.rotate(a.facing);
       const leg = a.moving ? Math.sin(a.walk * 1.5) * 4 : 0;
       g.fillStyle = shade(c, -0.15);

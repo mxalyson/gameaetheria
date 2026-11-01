@@ -52,6 +52,7 @@ const lerp = (a, b, k) => a + (b - a) * k;
 // Desenha o monstro `a` como sprite; devolve false se não há arte pronta (o chamador usa o desenho antigo).
 export function drawMobSprite(g, a, t) {
   const it = load(a.mobId);
+  if (it.state === 'loading') return true; // carregando: não desenha (senão o desenho antigo piscava antes do pintado)
   if (it.state !== 'ready') return false;
   const { meta, img } = it, [cw, ch] = meta.cell, art = ART[a.mobId] ?? ART.default;
   const view = viewFromFacing(a.facing ?? Math.PI / 2);
