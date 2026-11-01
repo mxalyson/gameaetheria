@@ -1,8 +1,15 @@
 {
  "ids": [
+  "colossus",
+  "crystalwolf",
+  "gargoyle",
+  "guardian",
+  "knight",
   "shroom",
   "slime",
   "treant",
-  "wolf"
+  "wisp",
+  "wolf",
+  "wraith"
  ]
 }

@@ -1,0 +1,21 @@
+{
+ "id": "wraith",
+ "cell": [
+  95,
+  120
+ ],
+ "cols": 5,
+ "rows": 8,
+ "frames": 5,
+ "style": "hop",
+ "ax": 48,
+ "ay": 88,
+ "ppm": 132.2138024240952,
+ "size": [
+  0.371,
+  0.513,
+  0.449
+ ],
+ "src": "meshy-mobs/guardian.glb",
+ "v": 1793573691
+}

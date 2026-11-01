@@ -1,0 +1,21 @@
+{
+ "id": "wisp",
+ "cell": [
+  80,
+  120
+ ],
+ "cols": 5,
+ "rows": 8,
+ "frames": 5,
+ "style": "hop",
+ "ax": 40,
+ "ay": 92,
+ "ppm": 175.3448087309626,
+ "size": [
+  0.25,
+  0.445,
+  0.253
+ ],
+ "src": "meshy-mobs/guardian.glb",
+ "v": 1793573590
+}

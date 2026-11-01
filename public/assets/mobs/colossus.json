@@ -1,0 +1,21 @@
+{
+ "id": "colossus",
+ "cell": [
+  117,
+  144
+ ],
+ "cols": 4,
+ "rows": 8,
+ "frames": 4,
+ "style": "waddle",
+ "ax": 59,
+ "ay": 103,
+ "ppm": 166.8058069214111,
+ "size": [
+  0.489,
+  0.482,
+  0.353
+ ],
+ "src": "meshy-mobs/guardian.glb",
+ "v": 1793573613
+}

@@ -619,27 +619,9 @@ function drawMob(g, a, t) {
     circle(g, -sep + fx * 2.5, y + Math.max(0, fy) * 1.5, r); g.fill();
     circle(g, sep + fx * 2.5, y + Math.max(0, fy) * 1.5, r); g.fill();
   };
+  // Pintados (assets/mobs, sem desenho por código): slime, wolf, shroom, treant, crystalwolf, wisp, wraith, knight, guardian. Sobra o golem (também gargoyle/colossus no código) até ter arte.
   switch (M.shape) {
     // slime: só existe pintado (assets/mobs/slime); o desenho antigo foi removido
-    case 'wolf': { // só o Lobo de Cristal (o Lobo Cinzento é pintado); sai quando ele tiver arte
-      g.rotate(a.facing);
-      const leg = a.moving ? Math.sin(a.walk * 1.5) * 4 : 0;
-      g.fillStyle = shade(c, -0.15);
-      g.fillRect(-8 + leg, -9, 4, 4); g.fillRect(-8 - leg, 5, 4, 4); g.fillRect(6 - leg, -9, 4, 4); g.fillRect(6 + leg, 5, 4, 4);
-      g.fillStyle = shade(c, -0.08);
-      g.beginPath(); g.moveTo(-14, 0); g.quadraticCurveTo(-24, -6 + Math.sin(t * 8) * 3, -22, 2); g.closePath(); g.fill();
-      g.fillStyle = c; ellipse(g, -2, 0, 14, 8.5); g.fill();
-      g.fillStyle = shade(c, 0.12); ellipse(g, -2, -2, 9, 4); g.fill();
-      g.fillStyle = c; circle(g, 12, 0, 7.5); g.fill();
-      g.beginPath(); g.moveTo(10, -5); g.lineTo(9, -12); g.lineTo(14, -6); g.fill();
-      g.beginPath(); g.moveTo(10, 5); g.lineTo(9, 12); g.lineTo(14, 6); g.fill();
-      g.fillStyle = shade(c, 0.2); ellipse(g, 18, 0, 4.5, 3.5); g.fill();
-      g.fillStyle = '#2a2333'; circle(g, 22, 0, 1.6); g.fill();
-      g.fillStyle = '#ffdd66'; circle(g, 14, -3.2, 1.5); g.fill(); circle(g, 14, 3.2, 1.5); g.fill();
-      break;
-    }
-    // shroom: só existe pintado (assets/mobs/shroom); o desenho antigo foi removido
-    // treant: só existe pintado (assets/mobs/treant); o desenho antigo foi removido
     case 'golem': {
       g.translate(0, bob * 0.4);
       const sw = a.swing > 0 ? 5 : 0;
@@ -653,44 +635,6 @@ function drawMob(g, a, t) {
       g.beginPath(); g.moveTo(-14, -12); g.lineTo(-10, -24); g.lineTo(-6, -12); g.fill();
       g.beginPath(); g.moveTo(8, -12); g.lineTo(13, -22); g.lineTo(15, -10); g.fill();
       g.fillStyle = '#9ff5ff'; g.fillRect(-6 + fx * 2, -17, 4, 2.5); g.fillRect(2 + fx * 2, -17, 4, 2.5);
-      break;
-    }
-    case 'wisp': {
-      g.translate(0, bob * 2 - 6);
-      g.globalCompositeOperation = 'lighter';
-      const grd = g.createRadialGradient(0, 0, 1, 0, 0, 18);
-      grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.35, c); grd.addColorStop(1, c + '00');
-      g.fillStyle = grd; circle(g, 0, 0, 18); g.fill();
-      g.globalCompositeOperation = 'source-over';
-      g.fillStyle = c;
-      g.beginPath(); g.moveTo(-8, 2); g.quadraticCurveTo(0, -22 - Math.sin(t * 10) * 3, 8, 2); g.quadraticCurveTo(0, 10, -8, 2); g.fill();
-      eyes(0, 3, 1.4, '#1d3550');
-      break;
-    }
-    case 'wraith': {
-      g.translate(0, bob * 1.5 - 4);
-      g.globalAlpha *= 0.88;
-      g.fillStyle = c;
-      g.beginPath(); g.moveTo(-12, 12);
-      for (let i = 0; i <= 4; i++) g.lineTo(-12 + i * 6, 12 + (i % 2 ? 5 : 0) + Math.sin(t * 6 + i) * 2);
-      g.lineTo(12, -6); g.quadraticCurveTo(0, -24, -12, -6); g.closePath(); g.fill();
-      g.fillStyle = shade(c, -0.35); ellipse(g, fx * 2, -7, 7, 6); g.fill();
-      g.fillStyle = '#e8d8ff'; circle(g, -2.5 + fx * 2, -7, 1.6); g.fill(); circle(g, 2.5 + fx * 2, -7, 1.6); g.fill();
-      break;
-    }
-    case 'knight': {
-      const legs = a.moving ? Math.sin(a.walk) * 3 : 0;
-      g.fillStyle = shade(c, -0.25); g.fillRect(-7, 8 + legs * 0.3, 5, 6); g.fillRect(2, 8 - legs * 0.3, 5, 6);
-      g.fillStyle = c;
-      g.beginPath(); g.roundRect(-11, -8, 22, 18, 5); g.fill();
-      g.fillStyle = shade(c, 0.15);
-      g.beginPath(); g.roundRect(-8, -22, 16, 15, 5); g.fill();
-      g.fillStyle = '#c9a8ff'; g.fillRect(-5 + fx * 2, -16, 10, 2.5);
-      g.save(); g.rotate(a.facing + (a.swing > 0 ? (a.swing / 0.25 - 0.5) * 2.2 : 0));
-      g.fillStyle = '#d6dae4'; g.fillRect(12, -2, 20, 4); g.fillStyle = '#6b5a4a'; g.fillRect(6, -2, 7, 4);
-      g.restore();
-      g.fillStyle = shade(c, -0.1);
-      g.beginPath(); g.roundRect(-16 - fx * 2, -6, 7, 14, 3); g.fill();
       break;
     }
   }

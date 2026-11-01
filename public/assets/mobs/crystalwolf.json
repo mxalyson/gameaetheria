@@ -1,0 +1,21 @@
+{
+ "id": "crystalwolf",
+ "cell": [
+  105,
+  120
+ ],
+ "cols": 5,
+ "rows": 8,
+ "frames": 5,
+ "style": "trot",
+ "ax": 53,
+ "ay": 84,
+ "ppm": 47.94698940758278,
+ "size": [
+  0.684,
+  1.293,
+  1.897
+ ],
+ "src": "meshy-mobs/crystalwolf.glb",
+ "v": 1793573508
+}

@@ -1,0 +1,21 @@
+{
+ "id": "gargoyle",
+ "cell": [
+  103,
+  120
+ ],
+ "cols": 5,
+ "rows": 8,
+ "frames": 5,
+ "style": "waddle",
+ "ax": 52,
+ "ay": 84,
+ "ppm": 130.15069826621777,
+ "size": [
+  0.412,
+  0.483,
+  0.528
+ ],
+ "src": "meshy-mobs/guardian.glb",
+ "v": 1793573641
+}
