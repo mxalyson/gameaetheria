@@ -33,3 +33,4 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## Mobile-first (decisão 0016)
 - [ ] Medir toque e desempenho em aparelho real (emulador/celular via adb).
 - [ ] Painéis e loja com alvos de toque maiores e menu superior redesenhado (fase B1).
+- [ ] **Medição em celular real** com `tools/android-measure.mjs` (o emulador não rodou nesta máquina; ver `docs/roadmap/android.md`). Liberar espaço no `C:` (≈ 2 GB livres).

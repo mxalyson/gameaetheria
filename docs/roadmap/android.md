@@ -34,3 +34,9 @@ Data: 2026-10-31 · Status: **preparado, NÃO testado em aparelho nem empacotado
 - [ ] Medir FPS em PvP 4×4 com qualidade média e baixa; anotar RAM (chrome://inspect).
 - [ ] Conferir área segura (notch), bloqueio de rotação e botões de toque em telas de 5" a 7".
 - [ ] Reconexão ao trocar Wi-Fi ↔ 4G (a sala segura o jogador por `reconnectSec`).
+
+## Tentativa de medição no emulador (2026-10-31) — SEM RESULTADO
+- Ambiente achado: Android Studio em `E:androidstudio`, SDK em `%LOCALAPPDATA%AndroidSdk` (adb 37, plataforma 37, build-tools 36), AVD `Medium_Phone` (Android 17, 2 GB). WHPX ok.
+- **`C:` tem só ~2 GB livres** (o emulador pede 12 GB): criei uma cópia do AVD em `E:android-avd` (dados de 6 GB) e subi com `ANDROID_AVD_HOME`.
+- O emulador **não ficou utilizável** nesta máquina: ficou "offline" no adb por vários minutos e, depois de iniciar, o próprio Android reportou "Pixel Launcher / Process system isn't responding" (qemu com 6 GB de RAM e ~1 700 s de CPU, PC com ~5 GB livres e o Android Studio aberto). Medir FPS assim daria números falsos, então **não medi nada** e encerrei o emulador.
+- `tools/android-measure.mjs` está pronto (Chrome do aparelho via adb + DevTools; mede FPS, quadros lentos, memória e texturas em 4 cenários) e **não apaga dados nem muda configurações de um celular real**. **Falta rodar num celular de verdade** (USB, depuração ligada): `npm start` e depois `node tools/android-measure.mjs`.
