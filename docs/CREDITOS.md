@@ -40,3 +40,6 @@ Fagulha, Ondina, Rochedo, Zéfiro (forma 1 e forma evoluída) e o ovo (`public/a
 
 ## Retratos (arte gerada por IA)
 Bustos das 4 classes e de 6 NPCs (guarda, Mestre Doran, herbalista, mercadora, sábia, ferreiro) em `public/assets/portraits/`, recortados de `docs/art-direction/fontes-icones/retratos-*.jpg` por `tools/portraits-from-sheets.py`. **Origem/licença: a confirmar.**
+
+## Texturas de chão e água (arte gerada por IA)
+Grama (Bosque, Planície), lajes (Ruínas), terra e lajes de trilha e água (lago e cristal) em `public/assets/ground/`, vindas de `docs/art-direction/fontes-cenario/chao-*.jpg`; tornadas sem emenda e reduzidas por `tools/ground-textures-from-images.py`. **Origem/licença: a confirmar.**

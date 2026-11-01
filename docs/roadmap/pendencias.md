@@ -95,3 +95,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## Retratos pintados (2026-11-02)
 - [x] Bustos das 4 classes no cartão do herói, painel do personagem e criação; dos NPCs no oval do diálogo (mercadora, Doran, sábia, guarda, herbalista; o ferreiro está recortado em `npc-smith.webp`, mas o painel do ferreiro não tem diálogo próprio, ficou sem uso).
 - [ ] Retrato do Místico (junto com a criação dele); NPCs novos futuros; retrato de monstros/chefes na barra do chefe (B2).
+
+## Texturas de chão e água (2026-11-02)
+- [x] Grama, lajes, trilhas e água pintadas no Bosque, na Planície e nas Ruínas (interruptor `?chao=original`).
+- [ ] Vila de Lúmen (a textura gerada repete em padrão visível: pedir outra com pedras espalhadas sem aglomerado), margem de lago com a faixa `shore`, água animada por cima, arenas, peças 3D que faltam (cerejeira rosa, cristais, ruínas, casas), medir no celular real.

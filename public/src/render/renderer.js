@@ -2,6 +2,7 @@
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
+import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-textures.js';
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
 import { loadNature, setNatureZone, drawNature, stampGround, groundReady } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
@@ -26,7 +27,7 @@ const circle = (g, x, y, r) => { g.beginPath(); g.arc(x, y, Math.max(0.1, r), 0,
 export class Renderer {
   constructor(canvas) {
     this.c = canvas;
-    loadNature(); preloadSpirits(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
+    loadNature(); preloadSpirits(); loadGroundTextures(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
     this.g = canvas.getContext('2d');
     this.grounds = new Map();
     this.dprCap = 2;
@@ -58,8 +59,9 @@ export class Renderer {
 
   groundFor(world) {
     // o atlas de chão carrega depois do 1º quadro: refaz o terreno uma vez quando ele chega
-    if (this.grounds.has(world.zoneId) && !this.groundsNat?.has(world.zoneId) && groundReady()) this.grounds.delete(world.zoneId);
-    if (!this.grounds.has(world.zoneId)) { this.grounds.set(world.zoneId, buildGround(world)); (this.groundsNat ??= new Set())[groundReady() ? 'add' : 'delete'](world.zoneId); }
+    const rdy = (groundReady() ? 1 : 0) + (groundTexReady() ? 2 : 0);
+    if (this.grounds.has(world.zoneId) && (this.groundsNat?.get(world.zoneId) ?? 0) < rdy) this.grounds.delete(world.zoneId);
+    if (!this.grounds.has(world.zoneId)) { this.grounds.set(world.zoneId, buildGround(world)); (this.groundsNat ??= new Map()).set(world.zoneId, rdy); }
     return this.grounds.get(world.zoneId);
   }
 
@@ -236,7 +238,8 @@ function buildGround(world) {
     return cv;
   }
 
-  const patches = Math.round((z.w * z.h) / 30000);
+  const textured = !!z.scenery && fillGroundTexture(g, z.scenery.kind, z.w, z.h); // grama/lajes pintadas no lugar das manchas por código
+  const patches = textured ? 0 : Math.round((z.w * z.h) / 30000);
   for (let i = 0; i < patches; i++) {
     const x = rng.range(0, z.w), y = rng.range(0, z.h), r = rng.range(70, 260);
     const grd = g.createRadialGradient(x, y, 0, x, y, r);

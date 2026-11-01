@@ -56,6 +56,8 @@ const STYLE = {
 };
 
 // ---------- chão: camadas extras assadas no cache do terreno ----------
+import { trailPattern, waterPattern, groundTexReady } from './ground-textures.js';
+
 export function paintGroundScenery(g, world, rng) {
   const z = world.zone, L = world.layout, P = z.palette, sc = z.scenery;
   if (sc.kind === 'ruins') paintRuinsGround(g, world, rng);
@@ -76,7 +78,7 @@ function paintNatureGround(g, world, rng, S) {
   const blobs = S.blobs;
   for (let i = 0; i < Math.round(z.w * z.h / 80000); i++) {
     const [c, a] = rng.pick(blobs);
-    g.globalAlpha = a; g.fillStyle = c;
+    g.globalAlpha = groundTexReady() ? a * 0.3 : a; g.fillStyle = c;
     blob(g, rng.range(0, z.w), rng.range(0, z.h), rng.range(60, 190), rng); g.fill();
   }
   g.globalAlpha = 1;
@@ -90,8 +92,10 @@ function paintNatureGround(g, world, rng, S) {
   // Trilha de terra batida.
   if (L.trail.length > 1) {
     g.lineCap = 'round'; g.lineJoin = 'round';
+    const sand = trailPattern(g, world.zone.scenery.kind);
     for (const [w, c] of S.trail) {
-      g.strokeStyle = c; g.lineWidth = w; smoothPath(g, L.trail); g.stroke();
+      if (sand && w === 30) continue;
+      g.strokeStyle = sand && w === 54 ? sand : c; g.lineWidth = sand && w === 54 ? 58 : w; smoothPath(g, L.trail); g.stroke();
     }
     for (let i = 0; i < L.trail.length * 5; i++) {
       const p = L.trail[Math.floor(rng.range(0, L.trail.length))], a = rng.range(0, TAU), d = rng.range(18, 44);
@@ -107,7 +111,7 @@ function paintNatureGround(g, world, rng, S) {
     g.fillStyle = S.shore[2]; ellipse(g, 0, 4, p.rx + 5, p.ry + 5); g.fill();
     const gr = g.createLinearGradient(0, -p.ry, 0, p.ry);
     gr.addColorStop(0, S.water[0]); gr.addColorStop(1, S.water[1]);
-    g.fillStyle = gr; ellipse(g, 0, 0, p.rx, p.ry); g.fill();
+    g.fillStyle = waterPattern(g, z.scenery.kind) ?? gr; ellipse(g, 0, 0, p.rx, p.ry); g.fill();
     g.fillStyle = 'rgba(255,255,255,0.22)'; ellipse(g, -p.rx * 0.25, -p.ry * 0.35, p.rx * 0.5, p.ry * 0.22); g.fill();
     for (let i = 0; i < 5; i++) {
       const a = rng.range(0, TAU), d = rng.range(0.15, 0.7), x = Math.cos(a) * p.rx * d, y = Math.sin(a) * p.ry * d, r = rng.range(8, 13);
@@ -148,7 +152,7 @@ function paintTownCobbles(g, z, rng) {
 function paintRuinsGround(g, world, rng) {
   const z = world.zone, L = world.layout;
   // Lajes rachadas em manchas irregulares.
-  for (let i = 0; i < Math.round(z.w * z.h / 120000); i++) {
+  for (let i = 0; i < (groundTexReady() ? 0 : Math.round(z.w * z.h / 120000)); i++) {
     const x = rng.range(80, z.w - 80), y = rng.range(80, z.h - 80), r = rng.range(90, 210);
     g.save(); blob(g, x, y, r, rng); g.clip();
     g.fillStyle = 'rgba(90,86,120,0.28)'; g.fillRect(x - r * 1.2, y - r * 1.2, r * 2.4, r * 2.4);
@@ -165,8 +169,10 @@ function paintRuinsGround(g, world, rng) {
   // Trilha de lajes até o guardião.
   if (L.trail.length > 1) {
     g.lineCap = 'round'; g.lineJoin = 'round';
+    const slabs = trailPattern(g, 'ruins');
     for (const [w, c] of [[96, 'rgba(25,20,50,0.28)'], [76, '#6f6b8d'], [62, '#8d89ab'], [50, '#9a96b8']]) {
-      g.strokeStyle = c; g.lineWidth = w; smoothPath(g, L.trail); g.stroke();
+      if (slabs && w === 50) continue;
+      g.strokeStyle = slabs && w === 62 ? slabs : c; g.lineWidth = w; smoothPath(g, L.trail); g.stroke();
     }
     g.strokeStyle = 'rgba(40,36,70,0.35)'; g.lineWidth = 1.5;
     for (let i = 0; i < L.trail.length - 1; i++) {
