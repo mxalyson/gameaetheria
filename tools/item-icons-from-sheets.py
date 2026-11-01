@@ -1,5 +1,6 @@
 # Recorta os ícones de equipamento das folhas geradas (fundo verde #00ff00) -> public/assets/icons/item/item-<tipo>.webp
 # Uso: python tools/item-icons-from-sheets.py <folha-espada.jpg> <folha-8-itens.jpg>
+#      python tools/item-icons-from-sheets.py --consumiveis <folha-consumiveis.jpg>   (poções, essência, moeda, baú, chave, pergaminho, minério -> res-<nome>.webp)
 # Fontes ficam em docs/art-direction/fontes-icones/ (copiadas por este script).
 import sys, os, shutil
 import numpy as np
@@ -37,6 +38,24 @@ def crop_save(im, mask, name, pad=0.06):
     sq.save(os.path.join(out, f'item-{name}.webp'), 'WEBP', quality=92, method=6)
     print(name, c.size, '->', MAXPX)
 
+
+if sys.argv[1] == '--consumiveis':
+    shutil.copy(sys.argv[2], os.path.join(src, 'itens-consumiveis.jpg'))
+    im, al = key(Image.open(sys.argv[2]))
+    lab, n = ndi.label(ndi.binary_dilation(ndi.binary_closing(al > 0.5, iterations=3), iterations=3))
+    H, W = al.shape; comps = []
+    for i in range(1, n + 1):
+        m = lab == i
+        if m.sum() < 4000: continue
+        ys, xs = np.where(m); comps.append((i, xs.mean() / W, ys.mean() / H))
+    def near(cx, cy): return min(comps, key=lambda c: (c[1] - cx) ** 2 + (c[2] - cy) ** 2)[0]
+    # posições na folha (colunas x linhas); os repetidos (baú, pergaminho, minério na 3ª linha) ficam de fora
+    for nm, (cx, cy) in {'potion-health': (.14, .15), 'potion-mana': (.39, .15), 'essence': (.62, .15), 'gold-coin': (.87, .15), 'chest': (.2, .47), 'key': (.47, .47), 'scroll': (.66, .47), 'ore': (.86, .47)}.items():
+        crop_save(im, (lab == near(cx, cy)) & (al > 0.05), nm.replace('potion-', 'potion-'))
+    for f in os.listdir(out):
+        if f.startswith('item-') and f.split('-', 1)[1][:-5] in ('potion-health', 'potion-mana', 'essence', 'gold-coin', 'chest', 'key', 'scroll', 'ore'):
+            os.replace(os.path.join(out, f), os.path.join(out, 'res-' + f[5:]))
+    sys.exit(0)
 
 sword, sheet = sys.argv[1], sys.argv[2]
 shutil.copy(sword, os.path.join(src, 'item-sword.jpg')); shutil.copy(sheet, os.path.join(src, 'itens-equipamentos.jpg'))

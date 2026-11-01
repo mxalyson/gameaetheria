@@ -534,3 +534,5 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .cell .it-img { width: 84%; height: 84%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); pointer-events: none; }
 .cell.ghost { opacity: .45; }
 .cell.ghost .it-img { filter: grayscale(1) brightness(.7); }
+.coin { width: 1.2em; height: 1.2em; object-fit: contain; vertical-align: -.26em; margin-right: .1em; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+#hud-gold .coin { width: 1.35em; height: 1.35em; }

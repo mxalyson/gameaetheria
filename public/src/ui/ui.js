@@ -38,6 +38,9 @@ export const noticeText = (n) => {
 
 // Ícone do equipamento: arte pintada por tipo (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto); se a imagem faltar, volta ao emoji.
 const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
+// moeda e poção pintadas no lugar dos emojis 🪙 🧪 dentro dos painéis
+const COIN = '<img class="coin" src="assets/icons/item/res-gold-coin.webp" alt="🪙" draggable="false">';
+const POT = '<img class="coin" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false">';
 export const itemIcon = (it) => (it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
 const ghostIcon = (s, cls) => (s === 'weapon' ? itemImg(cls.weapon, WEAPON_TYPES[cls.weapon].icon) : itemImg(s, SLOT_ICONS[s]));
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
@@ -255,7 +258,7 @@ export class UI {
     this.set('hud-xp', 'width', char.level >= MAX_LEVEL ? '100%' : `${(100 * char.xp) / need}%`);
     this.set('hud-xp-bar', '--v', String(char.level >= MAX_LEVEL ? 1 : Math.max(0, Math.min(1, char.xp / need)).toFixed(3)));
     this.set('hud-xp-text', 'text', char.level >= MAX_LEVEL ? 'Nível máximo' : `${char.xp} / ${need} XP`);
-    this.set('hud-gold', 'html', `<span>🪙 ${char.gold}</span>${char.statPoints ? `<span class="pts" data-action="toggle" data-arg="character">+${char.statPoints} pontos</span>` : ''}`);
+    this.set('hud-gold', 'html', `<span>${COIN} ${char.gold}</span>${char.statPoints ? `<span class="pts" data-action="toggle" data-arg="character">+${char.statPoints} pontos</span>` : ''}`);
     this.set('zone-name', 'text', world.zone.name);
 
     const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, potion: game.potionCd, hearth: 0 };
@@ -360,7 +363,7 @@ export class UI {
     const hint = this.isOpen('shop') ? 'Toque em um item para <b>vender</b>.' : 'Toque para equipar · Atributos no 🧙.';
     return this.frame('inventory', `Inventário <small>${char.inventory.length}/${INVENTORY_SIZE}</small>`, `
       <div class="inv-grid">${cells.join('')}</div>
-      <div class="inv-foot"><span>🪙 ${char.gold}</span><span>🧪 ${char.potions}</span><span class="hint">${hint}</span></div>
+      <div class="inv-foot"><span>${COIN} ${char.gold}</span><span>${POT} ${char.potions}</span><span class="hint">${hint}</span></div>
       <div class="row-btns"><button class="btn small" data-action="sort-inv">Ordenar</button></div>`);
   }
 
@@ -401,7 +404,7 @@ export class UI {
     const cards = Object.entries(list).map(([id, sp]) => `
       <div class="shop-item ${char.spec === id ? 'sel' : ''}"><div class="cell r-epic"><span class="ic">${sp.icon}</span></div>
         <div><div class="nm">${sp.name}${char.spec === id ? ' ✔' : ''}</div><div class="sub">${sp.desc}</div></div>
-        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}">${cost ? '🪙 ' + cost : 'Escolher'}</button>`}</div>`).join('');
+        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}">${cost ? '${COIN} ' + cost : 'Escolher'}</button>`}</div>`).join('');
     return `<h3>Especialização ${char.spec ? `<span class="pts">${specInfo(char.classId, char.spec).name}</span>` : '<span class="pts">escolha uma</span>'}</h3>${cards}`;
   }
 
@@ -434,14 +437,14 @@ export class UI {
     const stock = shopStock.map((it, i) => `
       <div class="shop-item">${this.itemCell(it, 'buy-item', i)}
         <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level}</div></div>
-        <button class="btn small" data-action="buy-item" data-arg="${i}">🪙 ${it.value * PRICES.itemMarkup}</button></div>`).join('') || '<p class="empty-msg">Estoque esgotado. Volte após subir de nível.</p>';
+        <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${it.value * PRICES.itemMarkup}</button></div>`).join('') || '<p class="empty-msg">Estoque esgotado. Volte após subir de nível.</p>';
     const potion = PRICES.potion(char.level);
     return this.frame('shop', 'Mercadora Lia', `
       <p class="npc-line">"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
-      <div class="shop-item"><div class="cell r-common"><span class="ic">🧪</span></div>
-        <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão 🧪</div></div>
-        <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · 🪙 ${potion}</button>
-        <button class="btn small" data-action="buy-potion" data-arg="5">5 · 🪙 ${potion * 5}</button></div></div>
+      <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false"></span></div>
+        <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
+        <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>
+        <button class="btn small" data-action="buy-potion" data-arg="5">5 · ${COIN} ${potion * 5}</button></div></div>
       <h3>Equipamentos</h3>${stock}
       ${this.smithSection()}
       <h3>Vender em lote</h3>
@@ -456,7 +459,7 @@ export class UI {
       const max = (it.plus ?? 0) >= MAX_PLUS, cost = enhanceCost(it);
       return `<div class="shop-item">${this.itemCell(it, 'unequip', it.slot)}
         <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
-        ${max ? '<span class="tag">Máximo</span>' : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · 🪙 ${cost}</button>`}</div>`;
+        ${max ? '<span class="tag">Máximo</span>' : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
     }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
     return `<h3>Ferreiro · aprimorar equipado</h3>${rows}`;
   }
@@ -516,7 +519,7 @@ export class UI {
     ensureJournal(char);
     const ready = readyFor(char, npc.id)[0], offer = offeredBy(char, npc.id, { server: !!g.online })[0], active = activeFor(char, npc.id)[0];
     let text = D.greet, body = '';
-    const rewardLine = (q) => { const r = q.reward; return `<p class="hint">Recompensa: ${[r.gold ? `🪙 ${r.gold}` : '', r.xp ? `${r.xp} XP` : '', r.potions ? `🧪 ${r.potions}` : '', ...(r.items ?? []).map((i) => `item ${RARITY[i.rarity]?.name ?? ''}`)].filter(Boolean).join(' · ')}</p>`; };
+    const rewardLine = (q) => { const r = q.reward; return `<p class="hint">Recompensa: ${[r.gold ? `${COIN} ${r.gold}` : '', r.xp ? `${r.xp} XP` : '', r.potions ? `🧪 ${r.potions}` : '', ...(r.items ?? []).map((i) => `item ${RARITY[i.rarity]?.name ?? ''}`)].filter(Boolean).join(' · ')}</p>`; };
     if (ready) { const q = QUESTS[ready]; text = q.text.done; body = `<h3>✔ ${q.name}</h3>${rewardLine(q)}<button class="btn primary wide" data-action="quest-turnin" data-arg="${q.id}">Entregar missão</button>`; }
     else if (offer) { const q = offer; text = q.text.offer; body = `<h3>❗ ${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
     else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>⏳ ${q.name}</h3>${this.questLines(char, active)}`; }
@@ -565,10 +568,10 @@ export class UI {
       <div class="sage-types">${types}</div>
       <div class="shop-item"><div class="cell r-uncommon"><span class="ic">🔮</span></div>
         <div><div class="nm">Essência Selvagem</div><div class="sub">Spirit aleatório</div></div>
-        <button class="btn small" data-action="buy-essence" data-arg="wild">🪙 ${PRICES.essence(char.level)}</button></div>
+        <button class="btn small" data-action="buy-essence" data-arg="wild">${COIN} ${PRICES.essence(char.level)}</button></div>
       <div class="shop-item"><div class="cell r-epic"><span class="ic">💠</span></div>
         <div><div class="nm">Essência Prismática</div><div class="sub">Spirit Raro ou melhor</div></div>
-        <button class="btn small" data-action="buy-essence" data-arg="prism">🪙 ${PRICES.prism(char.level)}</button></div>
+        <button class="btn small" data-action="buy-essence" data-arg="prism">${COIN} ${PRICES.prism(char.level)}</button></div>
       <div class="row-btns"><button class="btn small" data-action="toggle" data-arg="spirits">Ver meus spirits (P)</button></div>`);
   }
 
@@ -657,13 +660,13 @@ export class UI {
     const inShop = this.game.shopStock.some((s) => s.id === it.id);
     let action = '';
     const again = this.game.touch?.active ? 'Toque de novo' : 'Clique';
-    if (inShop) action = `Preço: 🪙 ${it.value * PRICES.itemMarkup}`;
+    if (inShop) action = `Preço: ${COIN} ${it.value * PRICES.itemMarkup}`;
     else if (equipped) action = `${again} para desequipar`;
-    else if (this.isOpen('shop')) action = `${again} para vender por 🪙 ${it.value}`;
+    else if (this.isOpen('shop')) action = `${again} para vender por ${COIN} ${it.value}`;
     else if (ok.ok) action = `${again} para equipar`;
     return `<div class="tt-name" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}
       ${ok.ok ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
-      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? ` · vale 🪙 ${it.value}` : ''}</div>`;
+      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? ` · vale ${COIN} ${it.value}` : ''}</div>`;
   }
 }
 

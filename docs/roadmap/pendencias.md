@@ -76,3 +76,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## Ícones de equipamento (2026-11-02)
 - [x] 9 ícones pintados (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto) no inventário, loja, ferreiro e painel do personagem (vazios em cinza); emoji só se a imagem faltar.
 - [ ] Faltam: poções, essência, moeda, baú, chave, pergaminho, minério (B); spirits (C); retratos de classe e NPC (D, E). Ícone próprio por faixa de qualidade (hoje o mesmo desenho por tipo).
+
+## Consumíveis pintados (2026-11-02)
+- [x] Moeda e poção de vida pintadas nos painéis, no HUD de ouro, no inventário e na loja (`res-*.webp`). Também recortados e prontos, **ainda sem uso**: poção de mana, essência, baú, chave, pergaminho, minério (`public/assets/icons/item/res-*.webp`).
+- [ ] Usar a essência na loja/spirits, o baú no mundo (hoje desenhado por código) e o pergaminho no diário; trocar os emojis restantes em logs e avisos de texto; spirits (C) e retratos (D, E).
