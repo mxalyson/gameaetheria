@@ -63,4 +63,8 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## Chão em sprites + texturas (2026-11-02)
 - [x] Atlas de chão (flores, trevos, pedrinhas, pedras de trilha) carimbado no terreno do Bosque e da Planície; pedrinhas nas Ruínas.
 - [ ] Gerar com IA as texturas de chão, caminhos e água e as peças 3D que faltam: `docs/art-direction/prompts-cenario.md` (origem/licença a confirmar).
-- [ ] Teste e2e `mobile › joystick move o herói` está **instável** nesta máquina (passou 1 de 3 com o visual padrão; 4 de 4 com `?visual=original`): a carga dos heróis em miniatura atrasa o joystick. Não vem do cenário. Investigar (esperar o carregamento dos heróis no teste).
+- [x] Teste `mobile › joystick` instável: a tela "Preparando seu herói" (`#hero-loading`) cobre o jogo até o atlas carregar e engole o toque; o teste agora espera ela sumir (14/14 passam). Possível melhoria de UX: deixar a tela cobrir só enquanto o herói não está pronto, o que já é o caso.
+
+## B5 parte 2 — painéis pintados (2026-11-02)
+- [x] Moldura em 9 fatias nos painéis (inventário, personagem, spirits, diário, loja, etc.), botões pintados (normal/pressionado/principal/desativado), botão de fechar em medalhão, células com moldura de raridade (comum=0, incomum=1, raro=4, épico=6, lendário=5), dica pintada e faixa de arena, emblema da classe no painel do personagem. Só CSS (+1 linha em `ui.js`); marcação e ações iguais.
+- [ ] Ainda emoji/provisório: ícones de itens e spirits, retrato pintado por classe (hoje o emblema do ataque), diálogos de NPC com `dialog.webp`, barra do chefe, tela de título e criação de personagem; conferir loja/ferreiro/arena em celular real.

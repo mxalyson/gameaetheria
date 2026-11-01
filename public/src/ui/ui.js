@@ -379,7 +379,7 @@ export class UI {
     ].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('');
     return this.frame('character', 'Personagem', `
       <div class="char-head" style="--cc:${cls.color}">
-        <div class="avatar">${cls.icon}</div>
+        <div class="avatar art">${attackImg(char.classId, cls.icon)}</div>
         <div><div class="nm">${esc(char.name)}</div><div class="sub">${cls.name} · Nível ${char.level}</div>
         <div class="sub" style="color:${tier.color}">Arena: ${tier.name} (${char.arena.rating})</div></div>
       </div>

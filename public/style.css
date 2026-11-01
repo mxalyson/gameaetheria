@@ -458,3 +458,43 @@ body:not(.online) .menu-btns .online-only { display: none; } /* grupo só com co
 body.touch .menu-btns { position: fixed; top: 8px; right: calc(8px + var(--map) + 8px + env(safe-area-inset-right, 0px)); width: auto; flex-wrap: nowrap; justify-content: flex-start; gap: 4px; }
 @media (max-height: 420px) { .menu-btns button, body.touch .menu-btns button { width: 36px; height: 36px; } }
 @media (max-height: 320px) { .menu-btns button, body.touch .menu-btns button { width: 34px; height: 34px; } }
+
+/* ===== PAINÉIS PINTADOS (B5, parte 2): moldura em 9 fatias, botões, células de raridade, dica e faixa — só a "pele" mudou; marcação e ações iguais ===== */
+.panel { --pb: 26px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; box-shadow: none; backdrop-filter: none; filter: drop-shadow(0 14px 22px rgba(0,0,0,.55)); }
+.panel header { padding: 0 2px 6px; }
+.panel h2 { color: #f6ebc9; text-shadow: 0 2px 0 #000b; letter-spacing: .6px; }
+.panel .body { padding: 0 4px 4px; }
+.panel .x { width: 36px; height: 36px; border-radius: 50%; border: 0; background: url(assets/ui/medal-normal.webp) center / 100% 100% no-repeat; color: #f6ebc9; font-weight: 900; text-shadow: 0 1px 0 #000; }
+.panel .x:hover { background: url(assets/ui/medal-normal.webp) center / 100% 100% no-repeat; filter: brightness(1.2); }
+.panel .x:active { background-image: url(assets/ui/medal-pressed.webp); }
+body.touch .panel .x { width: 42px; height: 42px; }
+
+.btn { --bb: 14px; min-height: 36px; border: var(--bb) solid transparent; border-image: url(assets/ui/btn-normal.webp) 80 fill / var(--bb) stretch; border-radius: 0; background: none; padding: 0 8px; margin: -4px 0; color: #f6ebc9; text-shadow: 0 2px 0 #000b; letter-spacing: .3px; transition: filter .1s, transform .1s; }
+.btn:hover { background: none; filter: brightness(1.15); transform: none; }
+.btn:active { border-image-source: url(assets/ui/btn-pressed.webp); transform: translateY(1px); }
+.btn.primary, .btn.sel { background: none; border-color: transparent; border-image-source: url(assets/ui/btn-primary.webp); color: #fff6d6; }
+.btn.primary:hover { background: none; }
+.btn:disabled, .btn.disabled { border-image-source: url(assets/ui/btn-disabled.webp); color: #a8a6a0; cursor: default; filter: none; }
+.btn.ghost { border-image-source: url(assets/ui/btn-normal.webp); opacity: .85; }
+.btn.small { padding: 0 4px; min-height: 30px; --bb: 12px; }
+.btn.big { padding: 0 18px; min-height: 46px; --bb: 16px; }
+.btn.wide { padding: 0 8px; min-height: 44px; margin: 2px 0; }
+body.touch .btn.small { padding: 0 6px; }
+
+.cell { width: 54px; height: 54px; border: 0; border-radius: 0; box-shadow: none; background: url(assets/ui/rarity-0.webp) center / 100% 100% no-repeat; }
+.cell.r-uncommon { background-image: url(assets/ui/rarity-1.webp); }
+.cell.r-rare { background-image: url(assets/ui/rarity-4.webp); box-shadow: none; }
+.cell.r-epic { background-image: url(assets/ui/rarity-6.webp); box-shadow: none; }
+.cell.r-legendary { background-image: url(assets/ui/rarity-5.webp); box-shadow: none; }
+.cell.empty { background: url(assets/ui/rarity-0.webp) center / 100% 100% no-repeat; opacity: .38; border: 0; }
+.cell .ic { text-shadow: 0 1px 3px #000a; }
+
+#tooltip { --tb: 22px; max-width: 300px; padding: 0; border: var(--tb) solid transparent; border-image: url(assets/ui/tip.webp) 70 fill / var(--tb) stretch; border-radius: 0; background: none; box-shadow: none; filter: drop-shadow(0 8px 14px rgba(0,0,0,.5)); }
+#arena-banner { background: url(assets/ui/banner.webp) center / 100% 100% no-repeat; padding: .35em 1.6em; text-shadow: 0 2px 0 #000b; }
+@media (max-height: 520px) { .panel { --pb: 20px; } .cell { width: 48px; height: 48px; } }
+.inv-grid { grid-template-columns: repeat(6, minmax(0, 56px)); gap: 4px; }
+.inv-grid .cell { width: 100%; height: auto; aspect-ratio: 1; }
+.shop-item { grid-template-columns: 56px 1fr auto; }
+.equip-grid .cell { margin: 0 auto; }
+.char-head .avatar.art { background: none; border-radius: 0; width: 64px; height: 64px; overflow: visible; }
+.char-head .avatar.art img { width: 100%; height: 100%; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }

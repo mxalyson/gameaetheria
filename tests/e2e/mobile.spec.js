@@ -10,6 +10,7 @@ async function startGame(page) {
   await page.locator('[data-action="new-char"]').tap();
   await page.locator('[data-action="create"]').tap();
   await page.waitForFunction(() => window.game?.player && !document.getElementById('screen').classList.contains('visible'));
+  await page.waitForSelector('#hero-loading', { state: 'detached', timeout: 20000 }); // a tela "Preparando seu herói" bloqueia o toque até o atlas carregar
   await page.waitForTimeout(400);
 }
 
@@ -60,8 +61,7 @@ test('joystick move o herói e para ao soltar', async ({ page }) => {
   const a = await page.evaluate(() => ({ x: window.game.player.x, y: window.game.player.y }));
   await t.down(1, 150, 260);
   await t.move(1, 150 + 60, 260);
-  await page.waitForTimeout(150);
-  expect(await page.locator('#stick').isVisible()).toBe(true);
+  await expect(page.locator('#stick')).toBeVisible({ timeout: 4000 }); // com os heróis em miniatura carregando, o quadro pode atrasar
   await page.waitForTimeout(500);
   const b = await page.evaluate(() => ({ x: window.game.player.x, y: window.game.player.y }));
   await page.screenshot({ path: 'test-results/mobile-joystick.png' });
