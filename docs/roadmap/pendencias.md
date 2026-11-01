@@ -118,3 +118,11 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] **Você gerar os GLB** pela ordem de `docs/art-direction/b2-monstros-npcs.md` (1º `slime`, 2º `treant`; depois o resto e os 6 NPCs). Com eles: bake, ajuste de tamanho (`ART` em `mob-sprites.js`), captura no jogo, créditos.
 - [ ] NPCs pintados: falta o módulo `npc-sprites` (1 vista de frente + espelho) no lugar dos heróis recoloridos; retrato do chefe na barra do chefe.
 - [ ] Decidir se lobos, cavaleiros e gárgula merecem esqueleto (como os heróis) quando o método sem esqueleto se mostrar fraco neles.
+
+## Ajustes de visual (2026-11-02, feedback do proprietário)
+- [x] Faixa da arena ("1×1 — começa em 3", "Lute!") sobrepunha o nome do rival (barra do chefe/rival): desceu para baixo da barra.
+- [x] Sobras do estilo antigo: avisos (toasts), ouro/pontos e linhas do log trocados pelas molduras pintadas e pela fonte Cinzel.
+- [x] Estátuas do Meshy (cavaleiro e coruja) maiores e mais numerosas nas Ruínas: 4 fixas guardando a entrada e a subida ao Guardião + 5 espalhadas (o baú ruins:2 andou 60 px para não encostar numa estátua).
+- [x] Retratos dos NPCs enquadrados no oval do diálogo.
+- [ ] Ainda pode haver sobras antigas que não identifiquei sem captura (log do PvP, textos sobre o chão: nomes, números de dano; painéis de rede/grupo); o proprietário vai apontar com capturas.
+- [ ] **NPCs no mundo ainda são os heróis em miniatura recoloridos** (`NPC_LOOK` em `renderer.js`), não os personagens dos retratos. Para ficarem fiéis aos retratos: gerar corpo inteiro a partir de cada retrato (prompts em `b2-monstros-npcs.md` §2.2), GLB no Meshy e módulo `npc-sprites`.

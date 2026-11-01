@@ -101,7 +101,7 @@ export const ZONES = {
     name: 'Ruínas Sombrias', w: 2800, h: 1900, border: true, level: [12, 20], scale: true,
     mobs: [['wraith', 3], ['knight', 3], ['gargoyle', 3]], count: 28,
     boss: { id: 'guardian', level: 21, x: 2350, y: 950 },
-    chests: [{ id: 'ruins:1', x: 700, y: 600, tier: 1.5 }, { id: 'ruins:2', x: 1300, y: 1400, tier: 1.5 }, { id: 'ruins:3', x: 1800, y: 700, tier: 1.5 }, { id: 'ruins:4', x: 1600, y: 1100, tier: 2 }],
+    chests: [{ id: 'ruins:1', x: 700, y: 600, tier: 1.5 }, { id: 'ruins:2', x: 1360, y: 1480, tier: 1.5 }, { id: 'ruins:3', x: 1800, y: 700, tier: 1.5 }, { id: 'ruins:4', x: 1600, y: 1100, tier: 2 }],
     palette: { ground: '#8d89ac', ground2: '#837fa4', outside: '#2b2840' },
     treeColors: ['#46565f', '#587077', '#789098'],
     treeType: 'pine', rockType: 'pillar',
@@ -110,6 +110,8 @@ export const ZONES = {
     // Cenário rico: estrada de lajes até o Guardião, círculos rúnicos, braseiros, estátuas e névoa.
     scenery: {
       kind: 'ruins', runes: 3, trailAmp: 200,
+      // estátuas guardando a entrada e a subida ao Guardião (aparecem logo, em vez de só 5 espalhadas numa zona enorme)
+      fixed: [['statue', 330, 790, 28, 0.9], ['statue', 330, 1110, 28, 0.9], ['statue', 2130, 760, 30, 0.9], ['statue', 2130, 1140, 30, 0.9]],
       extras: [['rubble', 30, 16, 26, 0], ['brazier', 9, 14, 16, 0.9], ['statue', 5, 22, 28, 0.9], ['deadtree', 8, 26, 34, 0.5], ['runestone', 6, 22, 28, 0.6]],
     },
     atmosphere: {

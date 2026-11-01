@@ -556,3 +556,18 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .npc-emb.por img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; filter: none; }
 .char-head .avatar.art img.por { border-radius: 50%; object-fit: cover; object-position: 50% 14%; background: radial-gradient(circle at 50% 35%, #34476e, #141a2e); box-shadow: 0 0 0 2px #c9a24a; }
 .cc-icon.art img.por { border-radius: 50%; object-fit: cover; object-position: 50% 14%; background: radial-gradient(circle at 50% 35%, #34476e, #141a2e); box-shadow: 0 0 0 2px #c9a24a; }
+
+/* ===== B5 parte 2c: avisos, ouro e log pintados (sobras do estilo antigo: caixas escuras e fonte comum) ===== */
+.toast { --tb: 20px; background: none; border: var(--tb) solid transparent; border-image: url(assets/ui/tip.webp) 70 fill / var(--tb) stretch; border-radius: 0; padding: 0 10px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); box-shadow: none; }
+.toast.gold { border-color: transparent; box-shadow: none; filter: drop-shadow(0 0 12px rgba(255,211,77,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+.toast .t1 { color: #fff0c8; text-shadow: 0 2px 0 #000b; }
+.toast .t2 { color: #e6dcc0; font-family: Cinzel, serif; font-weight: 700; font-size: 12px; text-shadow: 0 1px 0 #000a; }
+#hud-gold > span { --bb: 12px; background: none; border: var(--bb) solid transparent; border-image: url(assets/ui/btn-normal.webp) 80 fill / var(--bb) stretch; border-radius: 0; padding: 0 6px; font: 800 13px Cinzel, serif; color: #f6ebc9; text-shadow: 0 2px 0 #000b; margin: -4px 0; }
+#hud-gold .pts { border-image-source: url(assets/ui/btn-primary.webp); color: #fff6d6; background: none; }
+.log-line { --db: 12px; background: none; border: var(--db) solid transparent; border-image: url(assets/ui/tip.webp) 70 fill / var(--db) stretch; border-radius: 0; padding: 0 4px; font: 700 12px Cinzel, serif; color: #f6ebc9; margin: -6px 0; }
+/* a faixa da arena ("1×1 — começa em 3", "Lute!") ficava em cima da barra do rival: desce abaixo dela */
+#arena-banner { top: 36%; }
+@media (max-height: 520px) { #arena-banner { top: 38%; font-size: 20px; } }
+/* retrato de NPC enquadrado no oval da faixa pintada (o oval é mais alto que largo): preenche toda a abertura, cabeça no topo */
+.npc-emb.por { left: 4.4%; top: 50%; width: 14.4%; height: 76%; aspect-ratio: auto; transform: translateY(-50%); border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 30%, #3d5078, #141a2e); }
+.npc-emb.por img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 6%; transform: scale(1.12); transform-origin: 50% 14%; }

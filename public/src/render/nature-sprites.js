@@ -63,7 +63,7 @@ export const SET = {
   },
   ruins: {
     pillar: { h: 4.4, ref: 0, v: ['m_pillar_1', 'm_pillar_2', 'm_pillar_1', 'm_pillar_2', 'm_arch_broken'], behind: true }, // pilares com hera; de vez em quando um arco partido
-    statue: { h: 5.4, ref: 0, v: ['m_statue_knight', 'm_statue_owl'], behind: true },
+    statue: { h: 7.2, ref: 0, v: ['m_statue_knight', 'm_statue_owl'], behind: true }, // grandes: são o marco das Ruínas
     runestone: { w: 2.1, ref: 0, v: ['m_boulder'] },
     rubble: { w: 1.7, ref: 0, v: ['m_slab', 'm_boulder'] },
     pine: { h: 3.2, ref: 17, v: P('TwistedTree', 1, 3), behind: true }, // árvores retorcidas de folhagem outonal: combinam com o crepúsculo das Ruínas
