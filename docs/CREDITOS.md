@@ -54,4 +54,4 @@ Modelos 3D do Meshy (CC BY 4.0) fotografados em 8 direções por `tools/mob-bake
 Geleia (`slime`) e Lobo Cinzento (`wolf`): modelos 3D gerados no Meshy a partir de imagens de conceito do proprietário, fotografados em 8 direções por `tools/mob-bake.mjs` (`public/assets/mobs/`). Imagens de conceito: origem/licença a confirmar.
 Cogumelo Esporento (`shroom`): mesma origem (Meshy, CC BY 4.0), animado por deformação `waddle`.
 Carvalho Ancestral (`treant`, chefe do Bosque): mesma origem (Meshy, CC BY 4.0).
-Lobo de Cristal, Fogo-fátuo, Golem de Quartzo, Espectro, Cavaleiro Caído, Gárgula e Guardião das Ruínas: mesma origem (Meshy, CC BY 4.0); os seis últimos vieram num só GLB (`Chibi_Fantasy_Guardia`), separados por peças em `tools/mob-bake.mjs`.
+Lobo de Cristal, Fogo-fátuo, Colosso de Cristal, Espectro, Cavaleiro Caído, Gárgula e Guardião das Ruínas: mesma origem (Meshy, CC BY 4.0); os seis últimos vieram num só GLB (`Chibi_Fantasy_Guardia`), separados por peças em `tools/mob-bake.mjs`.

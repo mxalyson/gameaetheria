@@ -27,7 +27,7 @@ function loadIndex() {
 }
 
 // Quanto o desenho da célula (com margem) é mais alto que o raio de colisão da criatura; ajustável por criatura.
-const ART = { default: { h: 3.4 }, slime: { h: 3.0 }, treant: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
+const ART = { default: { h: 3.4 }, slime: { h: 3.0 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
 
 function load(id) {
   let it = items.get(id);
