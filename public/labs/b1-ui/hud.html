@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>B1 — HUD com as peças pintadas</title>
+<link rel="stylesheet" href="../../fonts/fonts.css" />
+<link rel="stylesheet" href="../../ui-tokens.css" />
+<style>
+  /* Laboratório: HUD montado com as PEÇAS PINTADAS aprovadas (public/assets/ui). Nada daqui entra no jogo antes da B5.
+     Provisórios nesta prévia: retrato do herói, ícones de menu e ícone do ataque (emojis). */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0b0e1d; color: var(--ivory); font-family: var(--font-body); }
+  main { max-width: 900px; margin: 0 auto; padding: 18px 14px 40px; }
+  h1 { font: 800 21px var(--font-title); margin: 0 0 4px; } h2 { font: 800 15px var(--font-title); color: var(--gold); margin: 22px 0 8px; }
+  p.n { color: #b9b39c; font-size: 13px; margin: 4px 0 10px; line-height: 1.5; }
+  .stage { position: relative; width: 844px; height: 390px; background: url(scene.png) center/cover; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 5px #05070f, 0 0 0 6px #2a2f55; transform-origin: top left; }
+  .abs { position: absolute; } img { display: block; user-select: none; -webkit-user-drag: none; } .f { filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
+
+  /* cartão do herói: o retrato entra no vão escuro da peça (92..500 × 90..494 de 920×586) */
+  .hero { left: 8px; top: 6px; width: 124px; height: 79px; }
+  .hero .portrait { z-index: 2; position: absolute; left: 10%; top: 15.4%; width: 44.3%; height: 69%; border-radius: 6px; overflow: hidden; background: #1a2030; display: grid; place-items: center; font-size: 30px; }
+  .hero .portrait img { width: 100%; height: 100%; object-fit: cover; }
+  .lvl { position: absolute; left: 3px; bottom: -2px; width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--gold-hi), var(--gold-lo)); box-shadow: 0 0 0 1.5px var(--gold-deep); font: 900 12px var(--font-body); color: #3a2600; display: grid; place-items: center; z-index: 3; }
+  /* barras de poção: o tubo vazio por baixo; o líquido por cima, cortado na porcentagem (líquido ocupa 11,9%–84% da peça) */
+  .vial { position: absolute; width: 168px; height: 37.5px; --v: 0.84; }
+  .vial img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .vial .fill { clip-path: inset(0 calc(100% - (11.9% + var(--v) * 72.1%)) 0 0); }
+  .vial b { position: absolute; left: 12%; right: 16%; top: 0; bottom: 0; display: grid; place-items: center; font: 900 11px var(--font-body); color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; z-index: 3; }
+  .gold { left: 10px; top: 92px; height: 26px; padding: 0 12px 0 8px; display: flex; align-items: center; gap: 6px; font: 900 13px var(--font-body); border-radius: 13px; background: linear-gradient(180deg,#232857,#141838); box-shadow: inset 0 0 0 1.5px var(--gold-lo); }
+  .coin { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--gold-hi), var(--gold-lo)); }
+
+  /* minimapa: o anel pintado por cima do mapa (vão em 19,7%–80,4% × 19,4%–80,4% de 1010×1002) */
+  .map { right: 8px; top: 6px; width: 104px; height: 103px; }
+  .map .view { position: absolute; left: 19.7%; top: 19.4%; width: 60.7%; height: 61%; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #7fb26a, #5f9955); }
+  .map .view svg { width: 100%; height: 100%; } .map > img { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* medalhões de menu (3 estados) com ícone por cima */
+  .med { position: relative; width: 36px; height: 36.7px; }
+  .med img { position: absolute; inset: 0; width: 100%; height: 100%; } .med span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; padding-top: 2px; }
+  .menu { right: 118px; top: 8px; display: flex; gap: 5px; }
+  .med.off img { content: url(../../assets/ui/medal-disabled.webp); } .med.pressed img { content: url(../../assets/ui/medal-pressed.webp); }
+
+  .skill { position: absolute; width: 56px; height: 56px; }
+  .med.atk { position: absolute; right: 10px; bottom: 10px; width: 84px; height: 85.7px; } .atk span { font-size: 34px; }
+
+  /* botões pintados: 9 fatias com a peça de 440×251 */
+  .pbtn { display: inline-grid; place-items: center; min-width: 120px; min-height: 48px; padding: 4px 20px; border: 0; background: none; font: 800 14px var(--font-title); letter-spacing: .6px; color: var(--ivory); text-shadow: 0 2px 0 #000b; cursor: pointer;
+    border: 17px solid transparent; border-image: var(--src) 80 fill / 17px stretch; margin: -6px; }
+  .pbtn.n { --src: url(../../assets/ui/btn-normal.webp); } .pbtn.p { --src: url(../../assets/ui/btn-pressed.webp); } .pbtn.d { --src: url(../../assets/ui/btn-disabled.webp); color: #a8a6a0; } .pbtn.g { --src: url(../../assets/ui/btn-primary.webp); color: #fff6d6; text-shadow: 0 2px 0 #000c; }
+  .row { display: flex; gap: 22px; flex-wrap: wrap; padding: 18px; background: url(scene.png) center/cover; border-radius: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>HUD com as peças pintadas — proposta</h1>
+  <p class="n">Cartão do herói, barras de vida e mana como vidros de poção, minimapa redondo de runas, medalhões de menu, habilidades e botões: todas as peças são as imagens aprovadas (recortadas em <code>public/assets/ui</code>). <b>Provisórios aqui:</b> retrato do herói, ícones de menu e do ataque (emojis). Tamanhos reais de celular (844×390).</p>
+  <div class="stage" id="stage">
+    <div class="abs hero"><img class="f" src="../../assets/ui/hero-card.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%"><div class="portrait"><span>⚔️</span></div><div class="lvl">1</div></div>
+    <div class="vial" style="left:48px;top:13px;--v:.84"><img src="../../assets/ui/vial-empty.webp" alt=""><img class="fill" src="../../assets/ui/vial-hp.webp" alt=""><b>243 / 289</b></div>
+    <div class="vial" style="left:48px;top:37px;--v:.6"><img src="../../assets/ui/vial-empty.webp" alt=""><img class="fill" src="../../assets/ui/vial-mp.webp" alt=""><b>60 / 100</b></div>
+    <div class="abs gold"><span class="coin"></span>60</div>
+
+    <div class="abs menu"><div class="med"><img src="../../assets/ui/medal-normal.webp" alt=""><span>🎒</span></div><div class="med"><img src="../../assets/ui/medal-normal.webp" alt=""><span>🧙</span></div><div class="med"><img src="../../assets/ui/medal-normal.webp" alt=""><span>🔮</span></div><div class="med"><img src="../../assets/ui/medal-normal.webp" alt=""><span>📖</span></div><div class="med"><img src="../../assets/ui/medal-normal.webp" alt=""><span>🗺️</span></div><div class="med pressed"><img src="../../assets/ui/medal-normal.webp" alt=""><span>⚙️</span></div></div>
+    <div class="abs map"><div class="view"><svg viewBox="0 0 100 100"><g fill="#3d6b3a" opacity=".7"><rect x="14" y="22" width="16" height="10" rx="2"/><rect x="66" y="20" width="16" height="10" rx="2"/><rect x="20" y="64" width="16" height="10" rx="2"/><rect x="68" y="62" width="16" height="10" rx="2"/></g><circle cx="50" cy="48" r="8" fill="#7cc6e8" stroke="#e9d9a8" stroke-width="2"/><circle cx="56" cy="54" r="4" fill="#fff" stroke="#141a2e" stroke-width="1.6"/><g fill="#ffcf4a"><circle cx="30" cy="40" r="2.4"/><circle cx="72" cy="46" r="2.4"/><circle cx="44" cy="76" r="2.4"/></g></svg></div><img class="f" src="../../assets/ui/minimap-ring.webp" alt=""></div>
+
+    <div class="skill" style="right:150px;bottom:12px"><img class="f" src="../../assets/icons/skills/whirlwind.webp" alt="" width="56" height="56"></div>
+    <div class="skill" style="right:112px;bottom:76px"><img class="f" src="../../assets/icons/skills/charge.webp" alt="" width="56" height="56" style="filter:saturate(.5) brightness(.75)"></div>
+    <div class="skill" style="right:40px;bottom:110px"><img class="f" src="../../assets/icons/skills/warcry.webp" alt="" width="56" height="56"></div>
+    <div class="skill" style="right:208px;bottom:10px;width:46px;height:46px"><img class="f" src="../../assets/icons/status/potion.webp" alt="" width="46" height="46"></div>
+    <div class="abs med atk"><img class="f" src="../../assets/ui/medal-normal.webp" alt=""><span>⚔️</span></div>
+  </div>
+
+  <h2>Botões pintados (normal, pressionado, desativado, principal)</h2>
+  <div class="row"><button class="pbtn n">Ordenar</button><button class="pbtn p">Pressionado</button><button class="pbtn d">Desativado</button><button class="pbtn g">Aceitar missão</button></div>
+</main>
+<script>
+  const fit = () => { const s = Math.min(1, (innerWidth - 28) / 844), st = document.getElementById('stage'); st.style.transform = `scale(${s})`; st.style.marginBottom = `${-(1 - s) * 390}px`; };
+  addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

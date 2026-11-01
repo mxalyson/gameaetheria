@@ -50,3 +50,6 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] **Aprovar** pilares (luminoso, artesanal, misterioso) e a assinatura (ouro + gema em losango + eco).
 - [ ] Gerar a arte que falta (`docs/art-direction/briefing-icones-ui.md`): ataque básico ×4, menu ×7, emblemas, raridades, status, logo, key art.
 - [ ] B5: migrar as telas reais para o kit (só após aprovação).
+- [x] Peças pintadas recebidas e recortadas: painel (9 fatias), botões ×4, cartão do herói, barras de poção (vazio/vida/mana), minimapa redondo, medalhão ×3 → `/labs/b1-ui/hud.html` (HUD completo) e `/labs/b1-ui/kit.html`.
+- [ ] **Reenviar 4 folhas que não foram gravadas como arquivo** (só apareceram na conversa): tooltip/faixa/diálogo, 7 molduras de raridade, 4 ataques básicos, 7 ícones de menu.
+- [ ] B5: aplicar o HUD pintado no jogo real (retrato real do herói, ícones de menu e ataque pintados), com medição de desempenho.

@@ -26,3 +26,4 @@ Atualizado em 2026-10-31. A licença CC BY 4.0 exige atribuição: este texto de
 
 ## Interface pintada (arte gerada)
 - Moldura de painel de pedra com cantos de bronze, gemas e plaqueta com asas (`public/assets/ui/panel-9.webp`, `plaque.webp`) e a folha de conceito do HUD (`docs/art-direction/fontes-ui/`): imagens **geradas por IA** fornecidas pelo proprietário a partir dos prompts de `docs/art-direction/prompts-ui-fantasia.md`; recorte reproduzível com `tools/ui-frame-from-sheet.py`. Ferramenta, prompt exato e termos de uso: **a confirmar com o proprietário** antes de publicar.
+- Peças de interface pintadas (botões, cartão do herói, barras de poção, minimapa redondo, medalhão): folhas em `docs/art-direction/fontes-ui/`, recortadas com `tools/ui-pieces-from-sheets.py` para `public/assets/ui/*.webp`. Origem, prompt e termos de uso: **a confirmar com o proprietário**.
