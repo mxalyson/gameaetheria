@@ -112,3 +112,9 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] Poço, ponte, cercas e arcos inteiros pedem pontos fixos no layout (`data/zones.js` › `scenery.fixed`): é mudança em `game/`, decidir com o proprietário. Decor das Ruínas ainda tem braseiros, runestones e árvores mortas do desenho antigo/Quaternius.
 - [ ] Os sprites do Meshy são 3D-realistas (texturas pintadas) e os personagens/monstros/UI são mais "cartoon": avaliar harmonia no celular e, se preciso, suavizar a saturação.
 - **Lição de desempenho (medida):** com um segundo atlas de 1024×2048 (8 MB decodificados) o desenho do Bosque foi de ~1 ms para ~6 ms por quadro, mesmo sem usar os sprites novos (estouro do orçamento de textura do Chromium em CPU). Com o atlas do Meshy em 1024×1024 (peças a 170 px) voltou a ~1 ms. O teste unitário limita a soma dos atlas a 10 MiB decodificados. Medir no celular real continua pendente.
+
+## B2 — monstros e NPCs (2026-11-02)
+- [x] Pipeline pronto e validado com uma criatura de teste: `tools/mob-bake.mjs` (8 direções, grade 4×2, janela e âncora iguais), `render/mob-sprites.js` (vista pela direção, animação por código, carga por zona, `?monstros=original`), índice `assets/mobs/index.json`, testes unitários e e2e (fixture em `tests/fixtures`). **Nenhum monstro pintado está no jogo ainda** (índice vazio): os monstros seguem no desenho antigo até chegar a arte.
+- [ ] **Você gerar os GLB** pela ordem de `docs/art-direction/b2-monstros-npcs.md` (1º `slime`, 2º `treant`; depois o resto e os 6 NPCs). Com eles: bake, ajuste de tamanho (`ART` em `mob-sprites.js`), captura no jogo, créditos.
+- [ ] NPCs pintados: falta o módulo `npc-sprites` (1 vista de frente + espelho) no lugar dos heróis recoloridos; retrato do chefe na barra do chefe.
+- [ ] Decidir se lobos, cavaleiros e gárgula merecem esqueleto (como os heróis) quando o método sem esqueleto se mostrar fraco neles.

@@ -2,6 +2,7 @@
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
+import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
 import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-textures.js';
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
 import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite } from './nature-sprites.js';
@@ -73,7 +74,7 @@ export class Renderer {
 
   draw(world, cam, view = {}) {
     const g = this.g, z = world.zone, t = world.time;
-    setNatureZone(world.zoneId);
+    setNatureZone(world.zoneId); if (this.mobZone !== world.zoneId) { this.mobZone = world.zoneId; prepareMobs(world.zone); };
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.fillStyle = z.palette.outside;
     g.fillRect(0, 0, this.vw, this.vh);
@@ -602,6 +603,10 @@ function drawStatus(g, a, t) {
 
 // ---------------- mobs ----------------
 function drawMob(g, a, t) {
+  if (mobSpritesEnabled() && drawMobSprite(g, a, t)) { // criatura pintada (B2); sem arte ou ?monstros=original vale o desenho abaixo
+    if (a.elite && !a.dead) { g.strokeStyle = `rgba(255,190,80,${0.5 + Math.sin(t * 4) * 0.25})`; g.lineWidth = 2; ellipse(g, a.x, a.y + a.r * 0.8, a.r + 4, (a.r + 4) * 0.4); g.stroke(); }
+    drawStatus(g, a, t); return;
+  }
   const M = MOBS[a.mobId], k = a.r / M.size, c = M.color;
   const fx = Math.cos(a.facing), fy = Math.sin(a.facing);
   g.save();

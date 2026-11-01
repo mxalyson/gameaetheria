@@ -46,3 +46,6 @@ Grama (Bosque, Planície), lajes (Ruínas), terra e lajes de trilha e água (lag
 
 ## Cenário em sprites a partir de modelos do Meshy
 Cinco conjuntos gerados no Meshy (licença **CC BY 4.0**, a mesma dos heróis; crédito: "Modelos gerados com Meshy AI"): *Cozy Medieval Village* (casas, poço, lanternas, placa, toco, tronco, ponte, cercas), *Overgrown Ruins Set* (pilares e arcos com hera), *Mossbound Sentinels* (estátuas do cavaleiro e da coruja), *Pastel Crystal Cluster* (cristais) e *Cherry Blossom Trio* (cerejeiras). Cada GLB traz várias peças numa malha só: `public/labs/nature/glb.html` as separa por partes conectadas e `tools/glb-bake.mjs` + `tools/meshy-pack.py` as fotografam no atlas `public/assets/nature/meshy.webp` (23 peças, ~70 KB). Os GLB (10–15 MB cada) ficam fora do Git, em `public/labs/iso-poc/art-local/meshy-cenario/`.
+
+## Monstros e NPCs (B2, em andamento)
+Modelos 3D do Meshy (CC BY 4.0) fotografados em 8 direções por `tools/mob-bake.mjs`. Nenhum entrou no jogo ainda; o briefing e os prompts estão em `docs/art-direction/b2-monstros-npcs.md`. A criatura de teste (`tests/fixtures/mob-teste.*`) é uma estátua do conjunto *Mossbound Sentinels* (Meshy), usada só em testes.

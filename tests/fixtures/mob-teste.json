@@ -1,0 +1,18 @@
+{
+ "id": "knight",
+ "cell": [
+  109,
+  168
+ ],
+ "cols": 4,
+ "rows": 2,
+ "ax": 55,
+ "ay": 130,
+ "ppm": 83.40519009406377,
+ "size": [
+  0.787,
+  1.45,
+  0.798
+ ],
+ "src": "meshy-cenario/Meshy_AI_Mossbound_Sentinels_1101193555_texture.glb"
+}
