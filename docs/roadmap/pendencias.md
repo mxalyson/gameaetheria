@@ -33,4 +33,6 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## Mobile-first (decisão 0016)
 - [ ] Medir toque e desempenho em aparelho real (emulador/celular via adb).
 - [ ] Painéis e loja com alvos de toque maiores e menu superior redesenhado (fase B1).
-- [ ] **Medição em celular real** com `tools/android-measure.mjs` (o emulador não rodou nesta máquina; ver `docs/roadmap/android.md`). Liberar espaço no `C:` (≈ 2 GB livres).
+- [x] Medição em celular de topo (Galaxy S23): 60 FPS em todos os cenários (ver `docs/roadmap/android.md`).
+- [ ] **Medir um celular médio/fraco** (o risco real) e testar sessão longa (aquecimento). Liberar espaço no `C:` (≈ 2 GB livres).
+- [ ] Rebaixar a qualidade sozinho quando o FPS cair; o canvas nunca deve ler pixels (cai para CPU).

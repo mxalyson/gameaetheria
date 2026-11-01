@@ -40,3 +40,21 @@ Data: 2026-10-31 · Status: **preparado, NÃO testado em aparelho nem empacotado
 - **`C:` tem só ~2 GB livres** (o emulador pede 12 GB): criei uma cópia do AVD em `E:android-avd` (dados de 6 GB) e subi com `ANDROID_AVD_HOME`.
 - O emulador **não ficou utilizável** nesta máquina: ficou "offline" no adb por vários minutos e, depois de iniciar, o próprio Android reportou "Pixel Launcher / Process system isn't responding" (qemu com 6 GB de RAM e ~1 700 s de CPU, PC com ~5 GB livres e o Android Studio aberto). Medir FPS assim daria números falsos, então **não medi nada** e encerrei o emulador.
 - `tools/android-measure.mjs` está pronto (Chrome do aparelho via adb + DevTools; mede FPS, quadros lentos, memória e texturas em 4 cenários) e **não apaga dados nem muda configurações de um celular real**. **Falta rodar num celular de verdade** (USB, depuração ligada): `npm start` e depois `node tools/android-measure.mjs`.
+
+## Medição em celular real (2026-11-01) — Samsung Galaxy S23 (SM-S911B)
+Aparelho **de topo**: Snapdragon 8 Gen 2, GPU Adreno 740, 8 GB de RAM, Chrome 156, tela 1080×2340 (dpr 3). Medido com `tools/android-measure.mjs` pelo cabo (jogo servido do PC por `adb reverse`), página recém-aberta, **amostras de 8–12 s** por cenário, intervalo entre quadros por `requestAnimationFrame` (limitado a 60 Hz).
+
+| Cenário (modo de qualidade ativo: alta, textura 1×) | FPS | p95 do quadro | quadros > 33 ms |
+|---|---|---|---|
+| Vila parado | 59,9 | 16,8 ms | 0 |
+| Vila andando | 59,8 | 16,8 ms | 0 |
+| Bosque andando e lutando (25 monstros) | 59,9 | 16,8 ms | 0 |
+| Arena PvP 4×4 offline (12 atores, 4 heróis carregados = **86,8 MiB** de textura) | 59,8 | 16,8 ms | 1 |
+| Bosque lutando, qualidade **baixa** (canvas 705×274) / **média** (1058×411) / **alta** (1410×548) | 59,9 / 59,9 / 59,9 | 16,8 ms | 0 |
+
+**Leitura honesta**
+- Neste aparelho o Canvas 2D **segura 60 FPS** em todos os cenários, até na qualidade alta com a textura cheia. **Não há dado que justifique trocar para PixiJS** (decisão 0001 mantida). Isso vale para um celular **de topo**: celulares médios/fracos **não foram medidos** e é onde o risco está.
+- Não medi: aquecimento em sessão longa (10+ min), bateria, 120 Hz, rede, nem o modo online.
+- **Alerta real (armadilha medida):** numa primeira tentativa eu usei `getImageData` para medir o custo de desenho e o Chrome **rebaixou o canvas para desenho por CPU**; a mesma cena caiu para **41 / 30 / 20 FPS** (qualidade baixa / média / alta) **no mesmo S23**. Ou seja: se um WebView ou aparelho cair no desenho por CPU (aceleração desligada, navegadores embutidos, modos economia), o jogo fica jogável só na qualidade baixa e em celular forte. Ação futura: **detectar queda de FPS e reduzir a qualidade sozinho** e **nunca ler pixels do canvas** no jogo.
+- O padrão 'auto' em celular escolhe qualidade **média** (textura 0,75×, 48,8 MiB para os 4 heróis); a medição começou em 'alta' porque a página já tinha essa preferência salva.
+- Lição de método: o primeiro resultado (59,9 FPS cravado em tudo) estava errado porque as ações dos cenários não rodavam por um erro no meu script; só aceitei os números depois de conferir o estado do jogo em cada amostra (zona, monstros, atores).

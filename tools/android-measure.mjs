@@ -40,22 +40,33 @@ await page.waitForTimeout(1500);
 
 // amostrador de quadros: intervalos de requestAnimationFrame por cenário
 const sample = (label, ms, setup) => page.evaluate(async ([label, ms, setupSrc]) => {
-  if (setupSrc) await (0, eval)(setupSrc)();
+  if (setupSrc) await (0, eval)('(' + setupSrc + ')')();
   const ts = []; let last = performance.now(); const t0 = last;
   await new Promise((res) => { const f = (t) => { ts.push(t - last); last = t; if (t - t0 < ms) requestAnimationFrame(f); else res(); }; requestAnimationFrame(f); });
   ts.shift(); const s = [...ts].sort((a, b) => a - b); const avg = ts.reduce((a, b) => a + b, 0) / ts.length;
+  const g = window.game, state = { mode: g.mode, zone: g.world.zoneId, actors: g.world.actors.length, mobs: g.world.actors.filter((a) => a.kind === 'mob').length, moving: !!g.player.moving, zoom: g.renderer.zoom, canvas: [g.canvas.width, g.canvas.height] };
   const mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null;
-  return { label, frames: ts.length, fps: +(1000 / avg).toFixed(1), p95ms: +s[Math.floor(s.length * 0.95)].toFixed(1), p99ms: +s[Math.floor(s.length * 0.99)].toFixed(1), maxMs: +s[s.length - 1].toFixed(1), over33: ts.filter((x) => x > 33.4).length, jsHeapMB: mem, hero: window.heroSprites ? { ...window.heroSprites } : null };
+  return { label, frames: ts.length, fps: +(1000 / avg).toFixed(1), p95ms: +s[Math.floor(s.length * 0.95)].toFixed(1), p99ms: +s[Math.floor(s.length * 0.99)].toFixed(1), maxMs: +s[s.length - 1].toFixed(1), over33: ts.filter((x) => x > 33.4).length, jsHeapMB: mem, state, hero: window.heroSprites ? { ...window.heroSprites } : null };
 }, [label, ms, setup ?? null]);
 
+const temp = () => { try { return Number((sh('dumpsys battery').match(/temperature: (d+)/) ?? [])[1]) / 10; } catch { return null; } };
+const tempStart = temp();
 const results = [];
 results.push(await sample('vila parado', 8000));
-results.push(await sample('vila andando', 8000, '() => async () => { const g = window.game; g.touch.move = { x: 1, y: 0, mag: 1 }; setTimeout(() => { g.touch.move = { x: -1, y: 0.3, mag: 1 }; }, 2500); setTimeout(() => { g.touch.move = { x: 0, y: -1, mag: 1 }; }, 5000); setTimeout(() => { g.touch.move = { x: 0, y: 0, mag: 0 }; }, 7500); }'));
-results.push(await sample('bosque andando e lutando', 12000, '() => async () => { const g = window.game; g.enterZone("forest", 700, 900); await new Promise((r) => setTimeout(r, 1500)); g.touch.attack = true; g.touch.move = { x: 0.7, y: 0.5, mag: 1 }; setTimeout(() => { g.touch.move = { x: -0.7, y: -0.2, mag: 1 }; }, 5000); setTimeout(() => { g.touch.move = { x: 0.2, y: 0.9, mag: 1 }; }, 9000); }'));
+results.push(await sample('vila andando', 8000, 'async () => { const g = window.game; g.touch.move = { x: 1, y: 0, mag: 1 }; setTimeout(() => { g.touch.move = { x: -1, y: 0.3, mag: 1 }; }, 2500); setTimeout(() => { g.touch.move = { x: 0, y: -1, mag: 1 }; }, 5000); setTimeout(() => { g.touch.move = { x: 0, y: 0, mag: 0 }; }, 7500); }'));
+results.push(await sample('bosque andando e lutando', 12000, 'async () => { const g = window.game; g.enterZone("forest", 700, 900); await new Promise((r) => setTimeout(r, 1500)); g.touch.attack = true; g.touch.move = { x: 0.7, y: 0.5, mag: 1 }; setTimeout(() => { g.touch.move = { x: -0.7, y: -0.2, mag: 1 }; }, 5000); setTimeout(() => { g.touch.move = { x: 0.2, y: 0.9, mag: 1 }; }, 9000); }'));
 await page.evaluate(() => { window.game.touch.attack = false; window.game.touch.move = { x: 0, y: 0, mag: 0 }; });
-results.push(await sample('arena PvP 4x4 offline (8 atores)', 10000, '() => async () => { const g = window.game; g.char.level = Math.max(g.char.level, 10); g.startMatch ? g.startMatch("4v4") : g.act("match", "4v4"); await new Promise((r) => setTimeout(r, 4000)); }'));
+results.push(await sample('arena PvP 4x4 offline (8 atores)', 10000, 'async () => { const g = window.game; g.char.level = Math.max(g.char.level, 10); g.startMatch ? g.startMatch("4v4") : g.act("match", "4v4"); await new Promise((r) => setTimeout(r, 4000)); }'));
 
-const out = { when: new Date().toISOString(), url: URL, device: info, quality: await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aetheria_prefs_v1') ?? '{}'); } catch { return {}; } }), results };
+// qualidade gráfica (Opções): mesma cena de combate no Bosque com 25 monstros em cada nível. NÃO usa leitura de pixels (o Chrome rebaixa o canvas para CPU depois de várias)
+for (const q of ['low', 'medium', 'high']) {
+  results.push(await sample('bosque lutando, qualidade ' + q, 8000, 'async () => { const g = window.game; g.setPref("quality:' + q + '"); g.enterZone("forest", 700, 900); await new Promise((r) => setTimeout(r, 1500)); g.touch.attack = true; g.touch.move = { x: 0.6, y: 0.4, mag: 1 }; setTimeout(() => { g.touch.move = { x: -0.5, y: 0.3, mag: 1 }; }, 4000); }'));
+  results[results.length - 1].canvas = await page.evaluate(() => [window.game.canvas.width, window.game.canvas.height]);
+}
+await page.evaluate(() => { window.game.touch.attack = false; window.game.touch.move = { x: 0, y: 0, mag: 0 }; window.game.setPref('quality:auto'); });
+const tempEnd = temp();
+
+const out = { tempBatteryC: [tempStart, tempEnd], when: new Date().toISOString(), url: URL, device: info, quality: await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('aetheria_prefs_v1') ?? '{}'); } catch { return {}; } }), results };
 mkdirSync('test-results', { recursive: true });
 writeFileSync('test-results/android-measure.json', JSON.stringify(out, null, 2));
 console.log(JSON.stringify({ device: info, results: results.map(({ hero, ...r }) => ({ ...r, tex: hero && { loadedHeroes: hero.loaded, texMiB: +(hero.texBytes / 1048576).toFixed(1), scale: hero.texScale } })) }, null, 2));
