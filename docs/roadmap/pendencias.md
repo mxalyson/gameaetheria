@@ -44,3 +44,9 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] Ícones do **ataque básico** das 4 classes (adiado a pedido do proprietário) e efeitos de impacto/status (lentidão, atordoamento, queimadura, cura em aliados).
 - [ ] Origem/licença das folhas de ícones geradas (CREDITOS.md).
 - [x] Etapa 3 (categorias, indisponível, crítico/absorção/cura). [ ] Efeito/evento de **esquiva** (exige evento novo na simulação: decidir) e arte pintada de status.
+
+## B1 (identidade e interface)
+- [x] Identidade v1 (`docs/art-direction/identidade-visual-v1.md`) + tokens (`public/ui-tokens.css`, ainda não carregado) + kit de componentes (`/labs/b1-ui/kit.html`).
+- [ ] **Aprovar** pilares (luminoso, artesanal, misterioso) e a assinatura (ouro + gema em losango + eco).
+- [ ] Gerar a arte que falta (`docs/art-direction/briefing-icones-ui.md`): ataque básico ×4, menu ×7, emblemas, raridades, status, logo, key art.
+- [ ] B5: migrar as telas reais para o kit (só após aprovação).

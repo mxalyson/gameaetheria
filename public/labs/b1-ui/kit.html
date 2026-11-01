@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>B1 — Kit de interface v1</title>
+<link rel="stylesheet" href="../../fonts/fonts.css" />
+<link rel="stylesheet" href="../../ui-tokens.css" />
+<style>
+  /* Kit de componentes da identidade v1 (laboratório). Nada daqui entra no jogo antes da B5. Alvos de toque ≥ 44 px; texto ≥ 12 px. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0b0e1d; color: var(--ivory); font-family: var(--font-body); }
+  main { max-width: 1120px; margin: 0 auto; padding: 20px 14px 60px; }
+  h1 { font: 800 22px var(--font-title); margin: 0 0 4px; } h2 { font: 800 15px var(--font-title); color: var(--gold); margin: 26px 0 10px; letter-spacing: .5px; }
+  p.n { color: #b9b39c; font-size: 13px; margin: 4px 0 10px; line-height: 1.5; }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+  .bg { background: url(scene.png) center/cover; border-radius: 16px; padding: 18px; }
+
+  /* ---- laje de pedra: painel base com filete dourado, cantos com gema ---- */
+  .slab { position: relative; border-radius: var(--radius-l); background:
+      radial-gradient(120% 90% at 20% 0%, rgba(255,255,255,.07), transparent 55%),
+      linear-gradient(180deg, var(--slab-1), var(--slab-2) 60%, var(--slab-3));
+    box-shadow: inset 0 0 0 1.5px var(--slab-line), inset 0 0 0 4px rgba(10,13,31,.9), inset 0 0 0 5px rgba(255,207,74,.2), 0 12px 30px rgba(0,0,0,.5); }
+  .slab::before, .slab::after { content: ''; position: absolute; top: -5px; width: 12px; height: 12px; background: linear-gradient(135deg, var(--gold-hi), var(--gold-lo)); transform: rotate(45deg); border-radius: 2px; box-shadow: 0 0 0 1.5px var(--gold-deep); }
+  .slab::before { left: 22px; } .slab::after { right: 22px; }
+  .slab > header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
+  .slab > header h3 { margin: 0; font: 800 17px var(--font-title); color: var(--ivory); letter-spacing: .6px; text-shadow: 0 2px 0 #000a; }
+  .slab > .body { padding: 6px 16px 16px; }
+  .x { width: var(--touch-min); height: var(--touch-min); border-radius: 50%; border: 0; background: radial-gradient(circle at 35% 28%, #4a5192, #1a1d40); color: var(--gold-hi); font: 900 18px var(--font-body);
+    box-shadow: 0 0 0 2px var(--gold-lo), 0 4px 8px rgba(0,0,0,.45); cursor: pointer; }
+
+  /* ---- botões ---- */
+  .btn { min-height: var(--touch-min); padding: 0 20px; border-radius: var(--radius-m); border: 0; font: 800 14px var(--font-body); letter-spacing: .3px; cursor: pointer; color: var(--ivory); transition: transform var(--t-fast) var(--ease), filter var(--t-fast); }
+  .btn:active { transform: translateY(1px) scale(.98); filter: brightness(1.15); }
+  .btn.primary { color: #3a2600; background: linear-gradient(180deg, var(--gold-hi), var(--gold) 55%, var(--gold-lo)); box-shadow: inset 0 1px 0 #fff9, inset 0 -2px 0 rgba(120,70,0,.5), 0 0 0 2px var(--gold-deep), 0 5px 10px rgba(0,0,0,.4); }
+  .btn.glass { background: linear-gradient(180deg, #3a4180, #232857); box-shadow: inset 0 0 0 1.5px rgba(255,207,74,.5), 0 4px 8px rgba(0,0,0,.4); }
+  .btn.danger { background: linear-gradient(180deg, #ff8a8a, #d44a4a 60%, #8a2230); box-shadow: inset 0 1px 0 #fff6, 0 0 0 2px #5a1420, 0 5px 10px rgba(0,0,0,.4); }
+  .btn[disabled] { filter: grayscale(1) brightness(.6); cursor: default; }
+  .btn.small { min-height: 36px; padding: 0 14px; font-size: 13px; }
+
+  /* ---- barras ---- */
+  .bar { position: relative; height: 20px; border-radius: 10px; background: var(--ink); box-shadow: inset 0 0 0 1.5px rgba(201,143,18,.6); overflow: hidden; }
+  .bar i { position: absolute; inset: 2px; border-radius: 8px; width: var(--v, 60%); background: linear-gradient(180deg, #8ff0b0, var(--life) 50%, var(--life-lo)); box-shadow: inset 0 3px 0 rgba(255,255,255,.22); }
+  .bar.seg::after { content: ''; position: absolute; inset: 2px; background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1.5px), rgba(10,13,31,.55) calc(25% - 1.5px) 25%); border-radius: 8px; }
+  .bar.xp { height: 8px; } .bar.xp i { background: linear-gradient(90deg, #6e8cff, #b9ccff); inset: 1px; border-radius: 6px; }
+  .bar.boss { height: 22px; } .bar.boss i { background: linear-gradient(180deg, #ff9a9a, #d44a4a 55%, #8a2230); }
+  .bar b { position: absolute; inset: 0; display: grid; place-items: center; font: 900 12px var(--font-body); color: #fff; text-shadow: 0 1px 2px #000c; z-index: 2; }
+
+  /* ---- molduras de classe (as mesmas dos ícones aprovados) ---- */
+  .frame { position: relative; width: 84px; height: 84px; border-radius: 18px; padding: 6px; background: linear-gradient(145deg, var(--f-hi), var(--f) 50%, var(--f-lo)); box-shadow: 0 5px 10px rgba(0,0,0,.45), inset 0 0 0 1.5px rgba(0,0,0,.35); }
+  .frame img { width: 100%; height: 100%; display: block; border-radius: 12px; object-fit: cover; }
+  .frame.w { --f-hi: var(--warrior-hi); --f: var(--warrior); --f-lo: var(--warrior-lo); } .frame.m { --f-hi: var(--mage-hi); --f: var(--mage); --f-lo: var(--mage-lo); }
+  .frame.a { --f-hi: var(--archer-hi); --f: var(--archer); --f-lo: var(--archer-lo); } .frame.c { --f-hi: var(--cleric-hi); --f: var(--cleric); --f-lo: var(--cleric-lo); }
+
+  /* ---- raridades: moldura + brilho crescente ---- */
+  .cell { position: relative; width: 56px; height: 56px; border-radius: 12px; background: linear-gradient(180deg, #232857, #14172e); box-shadow: inset 0 0 0 2px var(--rc), 0 0 var(--glow, 0px) var(--rc); display: grid; place-items: center; font-size: 26px; }
+  .cell.r0 { --rc: var(--r-common); } .cell.r1 { --rc: var(--r-uncommon); --glow: 4px; } .cell.r2 { --rc: var(--r-rare); --glow: 7px; } .cell.r3 { --rc: var(--r-epic); --glow: 10px; } .cell.r4 { --rc: var(--r-legendary); --glow: 14px; animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { filter: brightness(1.3); } } @media (prefers-reduced-motion: reduce) { .cell.r4 { animation: none; } }
+  .cell.empty { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.12); opacity: .7; font-size: 18px; color: #6b6f9a; }
+  .grid { display: grid; grid-template-columns: repeat(5, 56px); gap: 8px; }
+
+  /* ---- tooltip, aviso e diálogo ---- */
+  .tip { max-width: 270px; padding: 12px 14px; border-radius: var(--radius-m); background: linear-gradient(180deg, #1c2140, #121630); box-shadow: inset 0 0 0 1.5px var(--slab-line), 0 10px 24px rgba(0,0,0,.5); font-size: 13px; line-height: 1.45; }
+  .tip b { display: block; font: 800 15px var(--font-title); color: var(--r-epic); } .tip i { color: var(--mana); font-style: normal; font-size: 12px; } .tip .up { color: var(--life); } .tip .down { color: var(--danger); }
+  .toast { padding: 10px 26px; border-radius: 999px; text-align: center; background: linear-gradient(180deg, #222855, #141838); box-shadow: inset 0 0 0 1.5px var(--gold), 0 8px 20px rgba(0,0,0,.5); }
+  .toast b { font: 800 18px var(--font-title); color: var(--gold-hi); display: block; } .toast span { font-size: 12.5px; color: #cfc9b2; }
+  .dialog { display: flex; gap: 12px; align-items: flex-start; }
+  .dialog .portrait { flex: none; width: 64px; height: 64px; border-radius: 16px; background: radial-gradient(circle at 35% 28%, #5a6ab8, #1a1d40); box-shadow: 0 0 0 2.5px var(--gold-lo); display: grid; place-items: center; font-size: 34px; }
+  .dialog p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; } .dialog .who { font: 800 13px var(--font-title); color: var(--gold); display: block; margin-bottom: 2px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; } .tab { min-height: 40px; padding: 0 14px; border-radius: 12px 12px 0 0; border: 0; background: #1a1e3a; color: #a8a3c4; font: 800 13px var(--font-body); }
+  .tab.on { background: linear-gradient(180deg, #3a4180, #232857); color: var(--gold-hi); box-shadow: inset 0 2px 0 var(--gold); }
+  .type { display: grid; gap: 6px; } .type div { display: flex; align-items: baseline; gap: 12px; } .type small { color: #8d88a8; font-size: 11px; width: 130px; flex: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Kit de interface — identidade v1</h1>
+  <p class="n">Componentes da identidade (laje de pedra azul-noite com filete e gemas douradas, molduras por classe, botões de ouro, barras segmentadas, raridades com brilho). Tokens em <code>public/ui-tokens.css</code>. <b>Glifos dos ícones de menu continuam provisórios</b> (ver briefing). Alvos de toque ≥ 44 px, texto ≥ 12 px, respeita <code>prefers-reduced-motion</code>.</p>
+
+  <h2>Painel de inventário (laje + abas + células por raridade)</h2>
+  <div class="bg row">
+    <div class="slab" style="width:380px">
+      <header><h3>Mochila</h3><button class="x" aria-label="Fechar">✕</button></header>
+      <div class="body">
+        <div class="tabs"><button class="tab on">Equipamento</button><button class="tab">Consumíveis</button><button class="tab">Spirits</button></div>
+        <div class="grid">
+          <div class="cell r0">⚔️</div><div class="cell r1">🛡️</div><div class="cell r2">🪖</div><div class="cell r3">💍</div><div class="cell r4">🗡️</div>
+          <div class="cell r0">🥾</div><div class="cell r1">📿</div><div class="cell r2">🏹</div><div class="cell empty">+</div><div class="cell empty">+</div>
+        </div>
+        <p class="n" style="margin:12px 0 8px">🪙 1 240 · Toque em um item para ver detalhes</p>
+        <div class="row" style="gap:8px"><button class="btn glass small">Ordenar</button><button class="btn primary small">Vender comuns</button></div>
+      </div>
+    </div>
+    <div class="tip"><b>Lâmina do Crepúsculo</b><i>Épico · Arma (Espada) · Nv 14</i><br>+38 Ataque<br>+9% Chance crítica<div class="up">▲ +12 Ataque vs equipado</div><div class="down">▼ −3 Defesa vs equipado</div><i>Toque de novo para equipar · vale 🪙 210</i></div>
+  </div>
+
+  <h2>Diálogo de NPC, aviso e botões</h2>
+  <div class="bg row">
+    <div class="slab" style="width:420px"><header><h3>Guarda Ren</h3><button class="x" aria-label="Fechar">✕</button></header><div class="body dialog"><div class="portrait">🛡️</div><div><span class="who">Missão · Limpar o Bosque</span><p>Os limos estão tomando a trilha. Derrote 8 deles e volte aqui.</p><div class="row" style="gap:8px"><button class="btn primary">Aceitar</button><button class="btn glass">Depois</button></div></div></div></div>
+    <div style="display:grid;gap:12px">
+      <div class="toast"><b>Nível 5!</b><span>+5 pontos de atributo — abra o personagem</span></div>
+      <div class="row" style="gap:8px"><button class="btn primary">Principal</button><button class="btn glass">Secundário</button><button class="btn danger">Descartar</button><button class="btn primary" disabled>Indisponível</button></div>
+    </div>
+  </div>
+
+  <h2>Barras (vida segmentada, XP, chefe) e molduras por classe</h2>
+  <div class="bg row" style="gap:22px">
+    <div style="width:300px;display:grid;gap:10px"><div class="bar seg" style="--v:84%"><i></i><b>243 / 289</b></div><div class="bar xp" style="--v:46%"><i></i></div><div class="bar boss seg" style="--v:62%"><i></i><b>Carvalho Ancestral · Nv 7</b></div></div>
+    <div class="row" style="gap:12px">
+      <div class="frame w"><img src="../../assets/icons/skills/whirlwind.webp" alt=""></div>
+      <div class="frame m"><img src="../../assets/icons/skills/frostnova.webp" alt=""></div>
+      <div class="frame a"><img src="../../assets/icons/skills/rain.webp" alt=""></div>
+      <div class="frame c"><img src="../../assets/icons/skills/holylight.webp" alt=""></div>
+    </div>
+  </div>
+
+  <h2>Tipografia (títulos Cinzel, texto Nunito)</h2>
+  <div class="slab" style="padding:16px"><div class="type">
+    <div><small>Título de painel 17–22</small><span style="font:800 20px var(--font-title)">Planície de Cristal</span></div>
+    <div><small>Aviso grande 18–34</small><span style="font:800 28px var(--font-title);color:var(--gold-hi)">Vitória!</span></div>
+    <div><small>Corpo 13–14</small><span style="font-size:14px">Cura 18% da vida; aliados próximos recebem 70% disso.</span></div>
+    <div><small>Detalhe 12 (mínimo)</small><span style="font-size:12px;color:#b9b39c">Recarga 8s · Reforço</span></div>
+    <div><small>Números (dano) 800</small><span style="font:800 24px var(--font-body);color:#ffd166;text-shadow:0 2px 0 #000a">1 240</span></div>
+  </div></div>
+</main>
+</body>
+</html>

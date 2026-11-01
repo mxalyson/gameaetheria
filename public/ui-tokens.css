@@ -1,0 +1,24 @@
+/* Aetheria — tokens da identidade visual v1 (B1). AINDA NÃO é carregado pelo jogo: o kit do laboratório (labs/b1-ui/kit.html) o usa; a B5 migra as telas reais para estes valores.
+   Origem das cores: molduras dos ícones aprovados (bronze do Guerreiro, roxo do Mago, folhas do Arqueiro, ouro do Clérigo) + ouro "eco" e azul-noite do HUD. */
+:root {
+  /* assinatura */
+  --gold: #ffcf4a; --gold-hi: #fff0a6; --gold-lo: #c98f12; --gold-deep: #8a5d08;
+  --ivory: #f3e8c8; --ink: #0a0d1f;
+  /* laje de pedra (fundo de painéis): azul-noite com leve calor */
+  --slab-1: #2a2f45; --slab-2: #1a1e33; --slab-3: #11142a; --slab-line: rgba(255,207,74,.55);
+  /* classes: [moldura clara, moldura base, moldura escura, realce] */
+  --warrior-hi: #c98a5a; --warrior: #84543c; --warrior-lo: #4a2a18; --warrior-glow: #ff6a2a;
+  --mage-hi: #b79bff; --mage: #6a4cc8; --mage-lo: #2a1860; --mage-glow: #7a4dff;
+  --archer-hi: #8fd07a; --archer: #3f8f3f; --archer-lo: #1a4a24; --archer-glow: #7bdc4a;
+  --cleric-hi: #fff0a6; --cleric: #d9a82e; --cleric-lo: #8a5d08; --cleric-glow: #ffcf4a;
+  /* estados e categorias (cor + forma na interface) */
+  --life: #5fd38a; --life-lo: #2a9a5d; --mana: #8fb4ff; --danger: #ff6a6a;
+  --cat-dano: #ff5a5a; --cat-cura: #3fcf7a; --cat-buff: #ffc233; --cat-controle: #b77cff;
+  /* raridades (as mesmas de data/items.js) */
+  --r-common: #c9ccd3; --r-uncommon: #7bd88f; --r-rare: #5fa8ff; --r-epic: #b77cff; --r-legendary: #ffa53d;
+  /* forma e movimento */
+  --radius-s: 8px; --radius-m: 14px; --radius-l: 20px; --touch-min: 44px;
+  --ease: cubic-bezier(.2,.8,.2,1); --t-fast: .12s; --t-med: .22s;
+  --font-title: Cinzel, serif; --font-body: Nunito, system-ui, sans-serif;
+}
+@media (prefers-reduced-motion: reduce) { :root { --t-fast: 0s; --t-med: 0s; } }
