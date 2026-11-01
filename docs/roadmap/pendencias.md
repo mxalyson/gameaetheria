@@ -85,3 +85,8 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [x] Forma 1 dos 4 spirits no painel, na lista do sábio, no HUD e no mundo (companheiro flutuante, com balanço leve); sem a imagem vale o desenho antigo. `render/spirit-sprites.js`.
 - [ ] **Evolução de spirits (ideia do proprietário, não aprovada):** forma 2 já recortada (`spirit-*-2.webp`) e o ovo (`spirit-egg.webp`), sem mecânica. Proposta a escrever antes de mexer em `core/`: nível mínimo, custo em essência/ouro, bônus de poder, versão do documento do personagem e do servidor, teste em `tests/core.test.js`, nota em `docs/gameplay/economia.md`.
 - [ ] Ovo na loja do sábio ao comprar essência; halo amarelo-esverdeado da Fagulha evoluída (limpar se for usar).
+
+## Adiados por decisão do proprietário (2026-11-02) — "deixe salvo para depois"
+- [ ] **Criação do Místico** (5º herói: conceito, 3D, atlas, kit de habilidades, ícones).
+- [ ] **Evolução de spirits** (forma 2 já recortada; falta a mecânica e a proposta de regras).
+- [ ] **Rodada de balanceamento e progressão** (o jogo "acaba" em ~20 min: nível 20 e fim do conteúdo): balanço entre classes, evoluções, dificuldade, **melhorar e dificultar o farm** (XP/ouro/drop por zona, curva de nível até 30, chefes e dificuldade escalável). Ferramentas já existentes: `npm run balance`, `npm run economy`, `docs/gameplay/economia.md`. Medir o tempo até o nível 20/30 antes e depois.
