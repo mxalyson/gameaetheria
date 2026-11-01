@@ -17,3 +17,9 @@ test('as 12 habilidades das 4 classes têm ícone, sem repetição, e a poção 
   }
   assert.ok(existsSync('public/' + POTION_ICON));
 });
+
+import { skillCategory } from '../public/src/render/skill-icons.js';
+test('categoria de cada habilidade (dano/cura/reforço/controle) sai dos dados reais', () => {
+  const esperado = { whirlwind: 'dano', charge: 'controle', warcry: 'buff', fireball: 'dano', frostnova: 'controle', blink: 'buff', rain: 'dano', pierce: 'dano', roll: 'buff', holylight: 'cura', divineshield: 'buff', judgement: 'controle' };
+  for (const [id, cat] of Object.entries(esperado)) assert.equal(skillCategory(SKILLS[id]), cat, id);
+});

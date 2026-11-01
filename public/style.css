@@ -394,3 +394,14 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 @media (max-height: 360px) { body.touch #minimap { width: 88px; height: 58px; } body.touch .menu-btns { right: calc(8px + 88px + 12px + env(safe-area-inset-right, 0px)); } }
 @media (max-height: 320px) { body.touch #minimap { width: 76px; height: 50px; } body.touch .menu-btns { right: calc(8px + 76px + 12px + env(safe-area-inset-right, 0px)); } #tbtns { transform: scale(calc(var(--ui) * .72)); } }
 @media (display-mode: fullscreen), (display-mode: standalone) { .menu-btns [data-action="fullscreen"] { display: none; } }
+
+/* ---- categorias das habilidades: cor + FORMA (dano ■ vermelho · cura ● verde · reforço ▲ dourado · controle ◆ roxo) e estado indisponível ---- */
+.cat { position: absolute; right: 1px; top: 1px; width: 12px; height: 12px; z-index: 2; pointer-events: none; box-shadow: 0 0 0 1.5px rgba(10,12,28,.9); }
+.cat-dano { background: #ff5a5a; border-radius: 2px; }
+.cat-cura { background: #3fcf7a; border-radius: 50%; }
+.cat-buff { background: #ffc233; clip-path: polygon(50% 0, 100% 100%, 0 100%); box-shadow: none; }
+.cat-controle { background: #b77cff; transform: rotate(45deg) scale(.8); border-radius: 2px; }
+.tt-cat { font-weight: 800; } .tt-cat.cat-dano { color: #ff8a8a; } .tt-cat.cat-cura { color: #6fe8a0; } .tt-cat.cat-buff { color: #ffd45e; } .tt-cat.cat-controle { color: #cfa6ff; }
+.tt-cat { background: none; position: static; width: auto; height: auto; transform: none; clip-path: none; box-shadow: none; }
+.slot.art.blocked .icon img, .tbtn.sk.blocked .icon img { filter: grayscale(1) brightness(.55); }
+.slot.art.blocked::after, .tbtn.sk.blocked::after { content: '✕'; position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255,120,120,.85); font: 900 22px Nunito, sans-serif; text-shadow: 0 1px 4px #000; pointer-events: none; z-index: 3; }

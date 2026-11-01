@@ -3,7 +3,7 @@
 import { CLASSES } from './data/classes.js';
 import { SKILLS } from './data/skills.js';
 import { skillOf } from './core/specs.js';
-import { skillImg, iconImg, POTION_ICON } from './render/skill-icons.js';
+import { skillImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { stickVector, pickAim, aimModeFor, dragAim } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
@@ -136,7 +136,11 @@ export class TouchControls {
   setup(char) {
     const cls = CLASSES[char.classId];
     $('t-atk-icon').textContent = cls.icon;
-    cls.skills.forEach((s, i) => { this.root.querySelector(`.sk${i} .icon`).innerHTML = skillImg(s, SKILLS[s].icon); });
+    cls.skills.forEach((s, i) => {
+      const b = this.root.querySelector(`.sk${i}`), c = skillCategory(skillOf(char.classId, null, s));
+      b.querySelector('.icon').innerHTML = skillImg(s, SKILLS[s].icon);
+      b.querySelector('.cat')?.remove(); b.insertAdjacentHTML('beforeend', `<i class="cat cat-${c}" title="${CATEGORIES[c]}"></i>`);
+    });
     this.root.querySelector('.pot .icon').innerHTML = iconImg(POTION_ICON, '🧪');
   }
 
@@ -165,7 +169,8 @@ export class TouchControls {
       const t = el.querySelector('.cdt');
       if (t) t.textContent = text && cd > 0 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
     };
-    cls.skills.forEach((s, i) => setCd(this.root.querySelector(`.sk${i}`), cdOf[i], skillOf(p.classId, p.spec, s).cd, true));
+    const blocked = p.stunT > 0 || p.dead || !!p.dash;
+    cls.skills.forEach((s, i) => { const b = this.root.querySelector(`.sk${i}`); setCd(b, cdOf[i], skillOf(p.classId, p.spec, s).cd, true); b.classList.toggle('blocked', blocked); });
     setCd(this.root.querySelector('.atk'), p.cds.basic, cls.basic.cd / p.stats.atkSpeed, false);
     const pot = this.root.querySelector('.pot');
     setCd(pot, game.potionCd, 8, false);

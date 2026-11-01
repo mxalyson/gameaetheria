@@ -21,7 +21,7 @@ import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
 import { noticeText } from './ui/ui.js';
 import { skillOf } from './core/specs.js';
-import { spawnSkillVfx } from './render/skill-vfx.js';
+import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
 import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady } from './core/journal.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
@@ -478,12 +478,14 @@ class Game {
       case 'hit': {
         const t = this.netEntity(e.target); if (!t) break;
         t.hitFlash = 0.12;
+        spawnEventVfx(w, { type: 'hit', target: t, crit: e.crit, absorbed: e.absorbed });
         const mine = t === this.player;
         w.addText({ x: t.x + (Math.random() - 0.5) * 16, y: t.y - t.r - 12, t: 0, life: 0.9, text: e.absorbed ? 'absorvido' : String(e.amount), size: e.crit ? 21 : 15, color: e.absorbed ? '#ffe9a0' : mine ? '#ff6b6b' : e.crit ? '#ffd166' : '#ffffff' });
         w.burst(t.x, t.y, mine ? '#ff8080' : '#ffffff', e.crit ? 10 : 5, 140);
         break;
       }
-      case 'heal': if (a) w.addText({ x: a.x, y: a.y - a.r - 14, t: 0, life: 0.9, text: '+' + e.amount, size: 15, color: '#7dff9b' }); break;
+      case 'heal': if (a) spawnEventVfx(w, { type: 'heal', actor: a, amount: e.amount });
+        if (a) w.addText({ x: a.x, y: a.y - a.r - 14, t: 0, life: 0.9, text: '+' + e.amount, size: 15, color: '#7dff9b' }); break;
       case 'swing': {
         if (!a) break;
         a.swing = 0.25;
@@ -808,6 +810,7 @@ class Game {
     const events = this.world.events.splice(0);
     for (const ev of events) {
       if (ev.type === 'cast') { spawnSkillVfx(this.world, ev); continue; } // efeito visual da habilidade (a simulação já decidiu tudo)
+      if (ev.type === 'hit' || ev.type === 'heal') { spawnEventVfx(this.world, ev); continue; } // crítico, absorção e cura
       if (ev.type !== 'death') continue;
       const a = ev.actor;
       if (a.kind === 'mob') this.onMobKilled(a);

@@ -7,3 +7,13 @@ export const iconImg = (src, emoji = '', cls = 'art') => `<img class="${cls}" sr
 export const skillImg = (id, emoji = '', cls = 'art') => iconImg(skillIconUrl(id), emoji, cls);
 // aquece o cache do navegador (evita o ícone "piscar" ao abrir a barra)
 export function preloadSkillIcons(ids) { for (const id of [...ids, null]) { const i = new Image(); i.src = id ? skillIconUrl(id) : POTION_ICON; } }
+
+// Categoria da habilidade para a interface (cor + FORMA, para não depender só da cor): dano, cura, buff (reforço/proteção/mobilidade) ou controle (atordoa/desacelera).
+// Calculada dos dados reais de data/skills.js: não há campo novo e a mecânica não muda.
+export const CATEGORIES = { dano: 'Dano', cura: 'Cura', buff: 'Reforço', controle: 'Controle' };
+export function skillCategory(s) {
+  if (s.heal) return 'cura';
+  if (s.stun || s.slow) return 'controle';
+  if (s.kind === 'buff' || s.kind === 'blink' || s.invuln) return 'buff';
+  return 'dano';
+}

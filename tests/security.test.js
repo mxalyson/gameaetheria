@@ -163,9 +163,11 @@ test('injeção de SQL: cargas maliciosas em e-mail, senha, nome e ids não alte
   assert.ok(count('accounts') >= before.accounts, 'nenhuma conta foi apagada pelas cargas');
   const permitidos = new Set(evil.map((e) => (e + '@x.com').toLowerCase()));
   for (const { email } of db.raw.prepare('select email from accounts').all()) assert.ok(email === 'normal@exemplo.com' || permitidos.has(email), 'conta inesperada: ' + email);
-  assert.equal(count('sessions'), before.sessions);
+  // cada conta nova registrada (e-mail literal, ver acima) abre uma sessão; fora isso nenhuma sessão some nem surge
+  assert.equal(count('sessions') - before.sessions, count('accounts') - before.accounts, 'sessões só pelas contas novas');
   assert.ok(count('characters') >= before.characters);
   assert.equal(db.character(char.id).name, 'Heroi');
+  await new Promise((r) => setTimeout(r, 1200)); // o limite de login é de 10 por SEGUNDO por IP: as cargas acima o estouram; espera a janela abrir para provar que a conta legítima segue intacta
   assert.equal(json(await call('POST', '/api/login', { email: 'normal@exemplo.com', password: 'segredo-bom-123' })).account.email, 'normal@exemplo.com');
   for (const t of ['accounts', 'characters', 'sessions', 'recovery_codes', 'operations', 'audit']) assert.doesNotThrow(() => count(t), `tabela ${t} intacta`);
   close();

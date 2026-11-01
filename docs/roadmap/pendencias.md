@@ -43,3 +43,4 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] Medir os efeitos num celular real (`tools/android-measure.mjs`).
 - [ ] Ícones do **ataque básico** das 4 classes (adiado a pedido do proprietário) e efeitos de impacto/status (lentidão, atordoamento, queimadura, cura em aliados).
 - [ ] Origem/licença das folhas de ícones geradas (CREDITOS.md).
+- [x] Etapa 3 (categorias, indisponível, crítico/absorção/cura). [ ] Efeito/evento de **esquiva** (exige evento novo na simulação: decidir) e arte pintada de status.

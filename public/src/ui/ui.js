@@ -10,7 +10,7 @@ import { MODES, getRating } from '../core/match.js';
 import { MOBS } from '../data/mobs.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
 import { PRICES } from '../shop.js';
-import { skillImg, iconImg, POTION_ICON, preloadSkillIcons } from '../render/skill-icons.js';
+import { skillImg, iconImg, POTION_ICON, preloadSkillIcons, skillCategory, CATEGORIES } from '../render/skill-icons.js';
 import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
 import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
@@ -212,13 +212,13 @@ export class UI {
     $('hud-portrait').style.setProperty('--cc', cls.color);
     const slots = [
       { key: 'LMB', id: 'basic', icon: '🖱️', tip: 'skill:basic' },
-      ...cls.skills.map((s, i) => ({ key: String(i + 1), id: 's' + i, icon: skillImg(s, SKILLS[s].icon), art: true, tip: 'skill:' + s })),
+      ...cls.skills.map((s, i) => ({ key: String(i + 1), id: 's' + i, icon: skillImg(s, SKILLS[s].icon), art: true, cat: skillCategory(skillOf(char.classId, null, s)), tip: 'skill:' + s })),
       { key: 'Q', id: 'potion', icon: iconImg(POTION_ICON, '🧪'), art: true, tip: 'potion' },
       { key: 'H', id: 'hearth', icon: '🏠', tip: 'hearth' },
     ];
     $('skillbar').innerHTML = slots.map((s) => `
       <div class="slot${s.art ? ' art' : ''}" id="slot-${s.id}" data-tip="${s.tip}">
-        <span class="icon">${s.icon}</span><span class="key">${s.key}</span>
+        <span class="icon">${s.icon}</span>${s.cat ? `<i class="cat cat-${s.cat}" title="${CATEGORIES[s.cat]}"></i>` : ''}<span class="key">${s.key}</span>
         <div class="cd"></div><span class="cdt"></span>${s.id === 'potion' ? '<span class="count" id="potion-count"></span>' : ''}
       </div>`).join('') + '<div class="slot spirit" id="slot-spirit" data-tip="spirit-active"><span class="icon" id="spirit-icon"></span><span class="key">P</span></div>';
     preloadSkillIcons(cls.skills);
@@ -258,7 +258,7 @@ export class UI {
       const cd = cdOf[id];
       const pct = cd > 0 ? Math.min(1, cd / maxOf[id]) : 0;
       this.set(`slot-${id}`, '--p', pct.toFixed(3));
-      this.set(`slot-${id}`, 'class', 'slot' + (id.startsWith('s') && id !== 'spirit' || id === 'potion' ? ' art' : '') + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
+      this.set(`slot-${id}`, 'class', 'slot' + (id.startsWith('s') && id !== 'spirit' || id === 'potion' ? ' art' : '') + (id.startsWith('s') && (player.stunT > 0 || player.dead || player.dash) ? ' blocked' : '') + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
     }
     for (const id of ['s0', 's1', 's2']) {
       const cd = player.cds[id];
@@ -615,7 +615,7 @@ export class UI {
           <div>${b.kind === 'melee' ? 'Golpe corpo a corpo em arco' : 'Projétil à distância'} · ${Math.round(b.mult * 100)}% do poder</div>`;
       }
       const s = skillOf(char.classId, activeSpec(char), arg);
-      return `<div class="tt-name">${skillImg(arg, s.icon, 'tt-ic')} ${s.name}</div><div class="tt-sub">Recarga ${s.cd}s</div><div>${s.desc}</div>
+      return `<div class="tt-name">${skillImg(arg, s.icon, 'tt-ic')} ${s.name}</div><div class="tt-sub">Recarga ${s.cd}s · <span class="tt-cat cat-${skillCategory(s)}">${CATEGORIES[skillCategory(s)]}</span></div><div>${s.desc}</div>
         ${s.mult ? `<div class="tt-stat">${Math.round(s.mult * 100)}% do poder${s.ticks ? ` × ${s.ticks}` : ''}</div>` : ''}`;
     }
     if (kind === 'potion') return `<div class="tt-name">${iconImg(POTION_ICON, '🧪', 'tt-ic')} Poção de Vida</div><div>Cura 35% da vida. Recarga 8s.</div><div class="tt-sub">Você tem ${char.potions}. Desativada no duelo PvP.</div>`;

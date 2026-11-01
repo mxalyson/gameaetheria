@@ -63,3 +63,20 @@ test('limite de efeitos simultâneos (evita acumular se o jogador spammar)', () 
   for (let i = 0; i < 80; i++) spawnSkillVfx(w, { actor: a, skill: 'whirlwind', ang: 0 });
   assert.ok(w.svfx.length <= 22, 'passou do teto: ' + w.svfx.length);
 });
+
+import { spawnEventVfx } from '../public/src/render/skill-vfx.js';
+test('crítico, golpe absorvido e cura relevante geram efeito; hit comum e cura de regeneração não; cura repetida é limitada', () => {
+  const w = mkWorld(), alvo = { ...mkActor('warrior'), maxHp: 200, r: 14 };
+  assert.equal(spawnEventVfx(w, { type: 'hit', target: alvo, crit: true })?.kind, 'crit');
+  assert.equal(spawnEventVfx(w, { type: 'hit', target: alvo, absorbed: true })?.kind, 'absorb');
+  assert.equal(spawnEventVfx(w, { type: 'hit', target: alvo }), null, 'golpe comum já tem os efeitos antigos');
+  assert.equal(spawnEventVfx(w, { type: 'heal', actor: alvo, amount: 2 }), null, 'regeneração pequena não gera efeito');
+  assert.equal(spawnEventVfx(w, { type: 'heal', actor: alvo, amount: 30 })?.kind, 'heal');
+  assert.equal(spawnEventVfx(w, { type: 'heal', actor: alvo, amount: 30 }), null, 'segunda cura em menos de 0,5 s é ignorada');
+  w.time += 0.6; assert.equal(spawnEventVfx(w, { type: 'heal', actor: alvo, amount: 30 })?.kind, 'heal');
+  // desenho sem número inválido durante todo o ciclo
+  const bad = [], g = fakeCtx(bad);
+  for (let t = 0; t < 1; t += 1 / 30) { w.time += 1 / 30; drawSkillVfx(g, w, false); }
+  assert.deepEqual(bad, []);
+  assert.equal(spawnEventVfx(w, { type: 'hit', target: null, crit: true }), null);
+});

@@ -16,7 +16,26 @@ const KIND = {
   rain: 'rain', pierce: 'pierce', roll: 'roll',
   holylight: 'sun', divineshield: 'bubble', judgement: 'beam',
 };
-const LIFE = { whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.45 };
+const LIFE = { crit: 0.32, absorb: 0.4, heal: 0.85, whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.45 };
+
+// Acerto crítico, golpe absorvido por escudo e cura relevante (eventos reais `hit` e `heal`; o servidor manda os mesmos no online). Cura de regeneração (pequena e constante) não gera efeito.
+const healAt = new WeakMap();
+export function spawnEventVfx(world, ev) {
+  const a = ev.type === 'heal' ? ev.actor : ev.target;
+  if (!a || !world) return null;
+  let kind = null;
+  if (ev.type === 'hit') kind = ev.absorbed ? 'absorb' : ev.crit ? 'crit' : null;
+  else if (ev.type === 'heal' && ev.amount >= (a.maxHp ?? 100) * 0.04) {
+    const last = healAt.get(a);
+    if (last === undefined || world.time - last >= 0.5) { healAt.set(a, world.time); kind = 'heal'; }
+  }
+  if (!kind) return null;
+  const list = (world.svfx ??= []);
+  if (list.length >= MAX_FX) list.shift();
+  const f = { kind, skill: null, t0: world.time, life: LIFE[kind], actor: a, x: a.x, y: a.y, ang: 0, color: '', r: a.r ?? 14, tx: null, ty: null, ox: a.x, oy: a.y, seed: (a.id ?? 1) * 7919, pts: null, dur: 0, range: 0 };
+  list.push(f);
+  return f;
+}
 
 // posição anterior de cada ator (para achar a ORIGEM do Teleporte, já que o evento chega depois de o ator se mover)
 const lastPos = new WeakMap();
@@ -112,6 +131,9 @@ export function drawSkillVfx(g, world, lite = false) {
       case 'sun': drawSun(g, f, k, cx, cy, lite); break;
       case 'bubble': drawBubble(g, f, el, cx, cy); break;
       case 'beam': drawBeam(g, f, k, cx, cy); break;
+      case 'crit': drawCrit(g, f, k, cx, cy); break;
+      case 'absorb': drawAbsorb(g, f, k, cx, cy); break;
+      case 'heal': drawHeal(g, f, k, cx, cy); break;
     }
   }
   g.restore();
@@ -253,6 +275,35 @@ function drawBeam(g, f, k, cx, cy) { // raio sagrado até o fim do alcance
   g.strokeStyle = '#ffffff'; g.lineWidth = 3 * o; g.stroke();
   const ex = x0 + cos * L, ey = y0 + sin * L; g.strokeStyle = '#d98f00'; g.lineWidth = 4 * o + 0.5; circle(g, ex, ey, 10 + 36 * ease(k)); g.stroke();
   g.globalAlpha = o * 0.95; g.fillStyle = '#ffd24a'; for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4; circle(g, ex + Math.cos(a) * (8 + k * 30), ey + Math.sin(a) * (8 + k * 30), 2.4 * o + 0.5); g.fill(); }
+}
+
+function drawCrit(g, f, k, cx, cy) { // estrela de oito pontas que estoura no alvo
+  const o = 1 - k, R = 12 + 30 * ease(k);
+  g.globalAlpha = o;
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4 + 0.3, len = R * (i % 2 ? 0.6 : 1), w = 0.13;
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * 5, cy + Math.sin(a) * 5); g.lineTo(cx + Math.cos(a - w) * len, cy + Math.sin(a - w) * len); g.lineTo(cx + Math.cos(a + w) * len, cy + Math.sin(a + w) * len); g.closePath();
+    g.fillStyle = i % 2 ? '#ff9a2e' : '#ffe27a'; g.fill(); g.strokeStyle = '#a8460d'; g.lineWidth = 1.2; g.stroke();
+  }
+  g.strokeStyle = '#ff6a2a'; g.lineWidth = 3 * o + 0.5; circle(g, cx, cy, R * 0.8); g.stroke();
+}
+function drawAbsorb(g, f, k, cx, cy) { // escudo absorveu o golpe: hexágono dourado que cintila
+  const o = 1 - k, R = (f.r ?? 14) + 12 + 8 * ease(k);
+  g.globalAlpha = o; g.beginPath();
+  for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + k; const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R * 0.9; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+  g.closePath(); g.fillStyle = 'rgba(255,200,60,0.28)'; g.fill();
+  g.strokeStyle = '#8a5d08'; g.lineWidth = 4 * o + 1; g.stroke(); g.strokeStyle = '#ffe27a'; g.lineWidth = 2 * o + 0.5; g.stroke();
+}
+function drawHeal(g, f, k, cx, cy) { // cruzes verdes subindo do alvo
+  const o = 1 - k * k;
+  for (let i = 0; i < 4; i++) {
+    const u = clamp01(k * 1.15 - i * 0.07); if (u <= 0) continue;
+    const x = cx + Math.sin(i * 2.1 + k * 3) * 14, y = cy - 6 - u * 40, s = 5.5 * (1 - u * 0.4);
+    g.globalAlpha = o * (1 - u * 0.4); g.lineCap = 'butt';
+    g.strokeStyle = '#1f7a3a'; g.lineWidth = 5.2; g.beginPath(); g.moveTo(x - s, y); g.lineTo(x + s, y); g.moveTo(x, y - s); g.lineTo(x, y + s); g.stroke();
+    g.strokeStyle = '#8dffb3'; g.lineWidth = 2.6; g.stroke();
+  }
+  g.lineCap = 'round'; g.globalAlpha = o * 0.7; g.strokeStyle = '#2fb866'; g.lineWidth = 2.5 * (1 - k) + 0.5; circle(g, cx, cy + 4, 12 + 16 * ease(k)); g.stroke();
 }
 
 // o desenho chama isto uma vez por quadro: guarda a posição anterior dos atores que podem se teleportar

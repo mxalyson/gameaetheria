@@ -50,3 +50,23 @@ test('escolha de classe lista as habilidades com ícone', async ({ page }) => {
   await page.click('[data-action="new-char"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.class-card img.cc-sk')].length === 12 && [...document.querySelectorAll('.class-card img.cc-sk')].every((i) => i.complete && i.naturalWidth > 0));
 });
+
+test('categorias e estado indisponível: selo de categoria em cada habilidade, tooltip com categoria e ícone bloqueado quando atordoado', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  await criar(page, 'cleric');
+  await page.waitForTimeout(500);
+  const cats = await page.evaluate(() => [...document.querySelectorAll('#touch .tbtn.sk .cat')].map((c) => c.className.replace('cat cat-', '')));
+  expect(cats).toEqual(['cura', 'buff', 'controle']); // Luz Sagrada, Escudo Divino, Julgamento
+  expect(await page.evaluate(() => document.querySelectorAll('#skillbar .slot .cat').length)).toBe(3);
+  expect(await page.evaluate(() => window.game.ui.tooltipHtml('skill:judgement'))).toContain('Controle');
+  await page.evaluate(() => { window.game.player.stunT = 1; });
+  await page.waitForTimeout(250);
+  expect(await page.evaluate(() => [...document.querySelectorAll('#touch .tbtn.sk')].every((b) => b.classList.contains('blocked')))).toBe(true);
+  expect(await page.evaluate(() => [...document.querySelectorAll('#skillbar .slot.art')].filter((b) => b.id !== 'slot-potion').every((b) => b.classList.contains('blocked')))).toBe(true);
+  await page.screenshot({ path: 'test-results/icones-bloqueado.png' });
+  await page.evaluate(() => { window.game.player.stunT = 0; });
+  await page.waitForTimeout(250);
+  expect(await page.evaluate(() => document.querySelectorAll('#touch .tbtn.sk.blocked').length)).toBe(0);
+  await ctx.close();
+});
