@@ -145,7 +145,7 @@ class Game {
         break;
       }
       case 'close': this.ui.close(arg); break;
-      case 'toggle': this.ui.toggle(arg); break;
+      case 'toggle': this.togglePanel(arg); break;
       case 'item': this.ui.isOpen('shop') ? this.sell(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
       case 'enhance': this.enhanceItem(arg); break;
@@ -348,8 +348,11 @@ class Game {
         queue: () => { refresh(); },
         invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (tecla G)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
-        reject: (m) => { if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast('Servidor de partidas', noticeText({ ...m, t: 'reject' }), ''); },
+        reject: (m) => { this.zoneBusy = false; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast('Servidor de partidas', noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
+        zoneJoined: (m) => this.enterNetZone(m),
+        zoneReward: (m) => this.onZoneReward(m),
+        zoneExit: (m) => this.leaveNetMatch(m),
         snap: (s) => this.onNetSnap(s),
         reward: (m) => this.onNetReward(m),
         matchEnd: () => { this.netEnded = true; },
@@ -366,6 +369,64 @@ class Game {
     if (this.mode !== 'explore') return;
     await this.cloud?.flush(); // grava o progresso ANTES: as recompensas da partida são gravadas pelo servidor em cima dessa versão
     this.net.queueFor(mode);
+  }
+
+  // exploração dentro de uma instância do servidor (P11)
+  inNetZone() { return this.mode === 'net' && this.netInfo?.mode === 'zone'; }
+  // equipamento/atributos/spirits mudam o personagem no cliente; na instância o servidor é o dono do personagem (transações de loja/equipar: P11.4)
+  togglePanel(id) {
+    if (this.inNetZone() && ['inventory', 'character', 'spirits'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à vila (H) para mexer no equipamento e nos atributos.', '');
+    this.ui.toggle(id);
+  }
+  async enterZoneOnline(zone, from) {
+    if (this.zoneBusy) return;
+    this.zoneBusy = true; this.portalCd = 3;
+    setTimeout(() => { this.zoneBusy = false; }, 6000); // sem resposta do servidor: libera para tentar de novo
+    await this.cloud?.flush(); // grava o progresso ANTES: o servidor soma as recompensas em cima desta versão do personagem
+    this.net.send({ t: 'zone_enter', zone, from });
+  }
+  enterNetZone(m) {
+    this.zoneBusy = false;
+    const info = { ...m, mode: 'zone', team: 1 };
+    if (this.mode === 'net' && this.netInfo?.room === m.room) { this.netInfo = info; this.netDec = new SnapshotDecoder().init(m); return; } // reconexão
+    this.ui.closePanels(); this.ui.hideScreen();
+    this.netDec = new SnapshotDecoder().init(m);
+    if (this.cloud) this.cloud.paused = true; // na instância o servidor altera o personagem
+    const w = new World(m.zone, { visuals: true });
+    this.world = w; this.mode = 'net'; this.netInfo = info; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
+    this.netActors = new Map(); this.netMobs = new Map(); this.netSnaps = []; this.netLast = null; this.netPred = null; this.netT = 0; this.netCastPending = null; this.netVProj = [];
+    for (const p of m.players) this.netAddHero(p, m.you);
+    this.player = this.netActors.get(m.you);
+    const st = computeStats(this.char);
+    Object.assign(this.player, { stats: st, maxHp: st.maxHp, hp: st.maxHp, classId: this.char.classId, spec: activeSpec(this.char), level: this.char.level, x: m.x, y: m.y });
+    this.netPred = { x: m.x, y: m.y };
+    this.cam = this.renderer.camera(w, this.player);
+    this.ui.banner(null);
+    const z = w.zone;
+    this.ui.toast(z.name, `Nível ${z.level[0]}–${z.level[1]} · instância ${this.net?.party ? 'do grupo' : 'solo'} (H volta à vila)`);
+  }
+  netAddHero(p, you) {
+    const doc = newCharacter(p.name, p.classId, makeRng(p.id)); doc.level = p.level ?? 1;
+    const mine = p.id === you;
+    const a = makeHeroActor(doc, 550, 550, mine ? 'player' : 'rival', 1);
+    a.name = p.name; a.netId = p.id; a.mark = mine ? null : 'ally';
+    this.world.add(a); this.netActors.set(p.id, a);
+    return a;
+  }
+  // recompensas gravadas pelo servidor: avisa e adota o personagem oficial (o servidor é quem soma XP/ouro/itens)
+  async onZoneReward(r) {
+    if (!this.inNetZone()) return;
+    const parts = [];
+    if (r.gold) parts.push(`${r.gold > 0 ? '+' : ''}${r.gold} 🪙`);
+    if (r.xp) parts.push(`+${r.xp} XP`);
+    if (r.items) parts.push(`${r.items} item(ns)`);
+    if (r.potions) parts.push(`+${r.potions} 🧪`);
+    if (parts.length) this.ui.log(parts.join(' · '), '#ffd27a');
+    if (r.deaths) this.ui.log('Você caiu: −10% do ouro.', '#ffb4a8');
+    if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos na vila (C).', 'gold');
+    for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
+    for (const id of r.achievements ?? []) this.announceAchievements([id]);
+    try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char); } } catch { /* tenta no próximo lote */ }
   }
 
   enterNetMatch(m) {
@@ -442,7 +503,7 @@ class Game {
       case 'wave': this.ui.toast(e.boss ? 'Onda final: o chefe!' : `Onda ${e.n}`, '', 'gold'); break;
       case 'wave_clear': this.ui.toast(`Onda ${e.n} vencida!`, 'Recuperem o fôlego…', 'gold'); break;
       case 'revive': if (a) w.burst(a.x, a.y, '#ffe9a0', 20, 160); break;
-      case 'left': this.ui.log('Um jogador saiu da partida.', '#ffb4a8'); break;
+      case 'left': if (this.netInfo?.mode !== 'zone') this.ui.log('Um jogador saiu da partida.', '#ffb4a8'); break;
     }
   }
 
@@ -498,6 +559,11 @@ class Game {
       ent.hitFlash = Math.max(0, (ent.hitFlash ?? 0) - dt);
       if (se.moving) ent.walk += dt * (se.spd ?? 200) / 28;
     };
+    if (this.netInfo.mode === 'zone') { // instância: jogadores entram e saem durante a sala
+      const ids = new Set(last.actors.map((x) => x.id));
+      for (const se of last.actors) if (!this.netActors.has(se.id)) this.netAddHero(se, this.netInfo.you);
+      for (const [id, a] of this.netActors) if (!ids.has(id)) { w.actors = w.actors.filter((x) => x !== a); this.netActors.delete(id); }
+    }
     for (const se of last.actors) {
       const ent = this.netActors.get(se.id); if (!ent) continue;
       apply(ent, se, false);
@@ -508,6 +574,7 @@ class Game {
         if (se.dead || Math.hypot(pr.x - se.x, pr.y - se.y) > 120 || last.state !== 'fight') { pr.x = se.x; pr.y = se.y; }
         else { if (len > 0.01) { pr.x += (i.mx / len) * se.spd * dt; pr.y += (i.my / len) * se.spd * dt; } pr.x += (se.x - pr.x) * 0.12; pr.y += (se.y - pr.y) * 0.12; }
         ent.x = pr.x; ent.y = pr.y;
+        if (this.netInfo.mode === 'zone' && !se.dead) { w.collide(ent); pr.x = ent.x; pr.y = ent.y; } // mesma colisão do servidor: não atravessa árvores
         ent.cds = { ...se.cds };
         if (se.maxHp) { ent.hp = se.hp; ent.maxHp = se.maxHp; }
       }
@@ -530,6 +597,7 @@ class Game {
     w.telegraphs = w.telegraphs.filter((tg) => !tg.done);
     w.time += dt;
     w.updateVisuals(dt);
+    if (this.netInfo.mode === 'zone') { this.ui.banner(this.player.dead ? 'Você caiu… renasce na entrada em instantes' : null); return; }
     // faixa de informação da partida
     if (!this.netOver) {
       const my = this.netInfo.team;
@@ -570,12 +638,13 @@ class Game {
   }
 
   // volta ao jogo normal: adota o personagem OFICIAL do servidor (com as recompensas) e retoma a sincronização
-  async leaveNetMatch() {
+  async leaveNetMatch(exit = null) {
     this.ui.hideScreen(); this.ui.banner(null);
     this.netInfo = null; this.netLast = null; this.netActors = null; this.netMobs = null;
     try { const r = await this.online.getCharacter(this.charId); this.char = r.character; this.cloud.attach(this.charId, r.rev, () => this.char); } catch { /* mantém o local */ }
     if (this.cloud) this.cloud.paused = false;
-    this.enterZone('town', TOWN.x, TOWN.y);
+    this.zoneBusy = false;
+    this.enterZone('town', exit?.x ?? TOWN.x, exit?.y ?? TOWN.y);
   }
 
   // Avisa o jogador quando o save foi migrado, corrigido ou recuperado do backup.
@@ -671,9 +740,9 @@ class Game {
     this.portalCd -= dt;
 
     if (inp.hit('escape')) this.ui.closePanels();
-    if (inp.hit('i') || inp.hit('b')) this.ui.toggle('inventory');
-    if (inp.hit('c')) this.ui.toggle('character');
-    if (inp.hit('p')) this.ui.toggle('spirits');
+    if (inp.hit('i') || inp.hit('b')) this.togglePanel('inventory');
+    if (inp.hit('c')) this.togglePanel('character');
+    if (inp.hit('p')) this.togglePanel('spirits');
     if (inp.hit('q')) this.usePotion();
     if (inp.hit('h')) this.hearth();
     if (inp.hit('g') && this.online) this.ui.toggle('party');
@@ -744,7 +813,10 @@ class Game {
     if (this.portalCd > 0) return;
     const p = this.player;
     for (const pt of this.world.zone.portals ?? []) {
-      if (Math.hypot(pt.x - p.x, pt.y - p.y) < 50) { this.enterZone(pt.to, pt.tx, pt.ty); return; }
+      if (Math.hypot(pt.x - p.x, pt.y - p.y) < 50) {
+        if (this.online && this.net?.joined && ZONES[pt.to].mobs) { this.enterZoneOnline(pt.to, this.world.zoneId); return; } // exploração é do servidor
+        this.enterZone(pt.to, pt.tx, pt.ty); return;
+      }
     }
   }
 
@@ -820,6 +892,7 @@ class Game {
 
   usePotion() {
     const p = this.player, c = this.char;
+    if (this.inNetZone()) return this.ui.log('Poções ainda não funcionam nas instâncias do servidor (em breve).', '#ffb4a8');
     if (this.mode === 'pvp' || this.mode === 'net') return this.ui.log('Poções são proibidas nas partidas.', '#ffb4a8');
     if (p.dead || this.potionCd > 0) return;
     if (!c.potions) return this.ui.log('Sem poções! Compre com a Mercadora Lia.', '#ffb4a8');
@@ -831,6 +904,7 @@ class Game {
   }
 
   hearth() {
+    if (this.inNetZone()) { if (!this.player.dead) this.net.send({ t: 'zone_leave' }); return; }
     if (this.mode !== 'explore' || this.world.zoneId === 'town' || this.player.dead) return;
     if (this.world.time - this.player.lastCombat < 4) return this.ui.log('Não é possível retornar em combate.', '#ffb4a8');
     this.enterZone('town', TOWN.x, TOWN.y);

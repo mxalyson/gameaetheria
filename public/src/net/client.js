@@ -45,6 +45,9 @@ export class NetClient {
       case 'snap': this.h.snap?.(m); break;
       case 'reward': this.h.reward?.(m); break;
       case 'match_end': this.match = null; this.h.matchEnd?.(m); break;
+      case 'zone_joined': this.queue = null; this.match = m; this.h.zoneJoined?.(m); break;
+      case 'zone_reward': this.h.zoneReward?.(m); break;
+      case 'zone_exit': this.match = null; this.h.zoneExit?.(m); break;
       case 'notice': this.notes.push(m); this.h.notice?.(m); break;
       case 'reject': this.h.reject?.(m); break;
       case 'pong': this.rtt = Math.round(performance.now() - m.ts); break;

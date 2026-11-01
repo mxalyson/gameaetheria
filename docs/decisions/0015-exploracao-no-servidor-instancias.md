@@ -1,5 +1,5 @@
 # 0015 — Exploração no servidor por instâncias solo/grupo (P11)
-Data: 2026-10-31 · Status: **P11.1 implementada e testada no servidor; cliente ainda NÃO usa** (P11.2). Decisão do proprietário: instâncias (opção B) em vez de zonas compartilhadas persistentes (opção A).
+Data: 2026-10-31 · Status: **P11.1 (servidor) e P11.2 (cliente) implementadas e testadas** — online, o portal da vila leva à instância do servidor; offline segue local. Decisão do proprietário: instâncias (opção B) em vez de zonas compartilhadas persistentes (opção A).
 
 ## Decisão
 - A exploração (Bosque, Planície, Ruínas) passa a rodar no servidor numa **`ZoneRoom` por grupo (ou por jogador, se solo) e por zona**, até 4 jogadores (`MAX_PARTY`). Vila, arenas PvP e cooperativo seguem como estão. Quem entra depois num grupo cai na mesma instância; sala vazia fecha.
@@ -15,3 +15,11 @@ Data: 2026-10-31 · Status: **P11.1 implementada e testada no servidor; cliente 
 ## O que falta (próximas fases)
 P11.2 cliente joga na instância (movimento previsto, desenho de snapshots, drops/ouro/XP mostrados a partir de `zone_reward`, poção, spirit, baús) · P11.3 baús/missões no servidor e recusa de ganhos de PvE vindos do cliente em `plausible.js` · P11.4 compra/venda/aprimoramento como transações do servidor · P11.5 NPCs/missões · P11.6 carga, fuzz e otimização.
 **Limitações atuais da sala:** sem poções, sem spirit, sem baús, sem NPCs; a gravação do lote só ocorre com banco (convidados não ganham nada). Nenhuma delas é usada pelo cliente ainda.
+
+## P11.2 — cliente jogando na instância (2026-10-31)
+- **Fluxo:** com `?api=` e o servidor de partidas conectado, o portal da vila chama `enterZoneOnline` (grava o progresso na nuvem primeiro, envia `zone_enter`); `zone_joined` monta o mundo da zona no cliente (mesmo layout determinístico) e liga o modo `net` com `netInfo.mode='zone'`. Portais dentro da zona e `H` (envia `zone_leave`) levam adiante/à vila; `zone_exit` traz de volta com o personagem oficial. Sem servidor conectado, a exploração continua **local** como antes.
+- **Desenho:** os monstros e os outros jogadores vêm dos snapshots (mesmo caminho do cooperativo); jogadores que entram/saem são criados/removidos; a previsão do próprio movimento agora usa a **mesma colisão do servidor** (não atravessa árvores).
+- **Recompensas:** `zone_reward` mostra o resumo e o cliente **re-lê o personagem oficial** (`GET /api/characters/:id`) — a nuvem fica pausada na instância, então não há duas gravações brigando. Custo: uma leitura do documento por lote (≈ a cada 10 s com atividade); **otimização pendente** (enviar só o delta).
+- **Bloqueios temporários (até a P11.4):** equipamento, atributos e spirits ficam trancados na instância (toast manda voltar à vila), e poções não funcionam lá (o servidor ainda não as trata). Sem spirit, baús e NPCs na instância.
+- **Testes:** `tests/e2e/zona-online.spec.js` (jogo real + servidor real: portal → instância → abate → XP gravado no banco → H volta; e mensagens de ganho forjadas ignoradas).
+- **Não validado:** sensação de controle com latência real/celular (só localhost), grupo de 2+ navegadores na instância (testado só no nível do servidor).
