@@ -59,3 +59,8 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## Cenário em sprites (pacote Quaternius, CC0)
 - [x] 31 sprites no Bosque, Planície (arbustos e capim) e Ruínas (árvores retorcidas e mortas). Interruptor `?cenario=original`.
 - [ ] Você aprovar o estilo (ou pedir ajustes de cor/tamanho/densidade); usar flores, trevos, pedrinhas e pedras de trilha no chão; balanço ao vento; sombras próprias; medir no celular.
+
+## Chão em sprites + texturas (2026-11-02)
+- [x] Atlas de chão (flores, trevos, pedrinhas, pedras de trilha) carimbado no terreno do Bosque e da Planície; pedrinhas nas Ruínas.
+- [ ] Gerar com IA as texturas de chão, caminhos e água e as peças 3D que faltam: `docs/art-direction/prompts-cenario.md` (origem/licença a confirmar).
+- [ ] Teste e2e `mobile › joystick move o herói` está **instável** nesta máquina (passou 1 de 3 com o visual padrão; 4 de 4 com `?visual=original`): a carga dos heróis em miniatura atrasa o joystick. Não vem do cenário. Investigar (esperar o carregamento dos heróis no teste).

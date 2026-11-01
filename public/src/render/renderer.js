@@ -2,7 +2,7 @@
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
-import { loadNature, setNatureZone, drawNature } from './nature-sprites.js';
+import { loadNature, setNatureZone, drawNature, stampGround, groundReady } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -56,7 +56,9 @@ export class Renderer {
   }
 
   groundFor(world) {
-    if (!this.grounds.has(world.zoneId)) this.grounds.set(world.zoneId, buildGround(world));
+    // o atlas de chão carrega depois do 1º quadro: refaz o terreno uma vez quando ele chega
+    if (this.grounds.has(world.zoneId) && !this.groundsNat?.has(world.zoneId) && groundReady()) this.grounds.delete(world.zoneId);
+    if (!this.grounds.has(world.zoneId)) { this.grounds.set(world.zoneId, buildGround(world)); (this.groundsNat ??= new Set())[groundReady() ? 'add' : 'delete'](world.zoneId); }
     return this.grounds.get(world.zoneId);
   }
 
@@ -259,8 +261,9 @@ function buildGround(world) {
     for (const [ax, ay, bx, by] of z.paths ?? []) { g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke(); }
   }
 
+  const stamped = stampGround(g, world, rng); // flores, trevos, pedrinhas e pedras de trilha em sprites (atlas de chão)
   const tuft = shade(P.ground, -0.12);
-  for (const d of L.ground) {
+  for (const d of stamped ? [] : L.ground) {
     if (d.type === 'flower') {
       g.fillStyle = d.color;
       for (let i = 0; i < 5; i++) {

@@ -36,3 +36,11 @@ test('custo de desenho no Bosque: sprites não pesam mais que o desenho antigo (
   console.log(`# desenho no Bosque: sprites média ${n.avg.toFixed(2)} ms (p95 ${n.p95.toFixed(2)}) · antigo ${o.avg.toFixed(2)} ms (p95 ${o.p95.toFixed(2)})`);
   expect(n.avg).toBeLessThan(o.avg + 2); // no máximo 2 ms a mais (na prática costuma ser menor)
 });
+
+test('chão em sprites: flores, trevos e pedras de trilha carimbados no terreno', async ({ page }) => {
+  await page.goto('/?api=&cenario=natureza');
+  await page.click('[data-action="new-char"]'); await page.click('[data-action="create"]');
+  await page.waitForFunction(() => window.game?.mode === 'explore', null, { timeout: 20000 });
+  await page.evaluate(() => window.game.enterZone('forest', 420, 900));
+  await page.waitForFunction(() => window.natureStats?.ground > 500, null, { timeout: 15000 });
+});

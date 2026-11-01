@@ -22,3 +22,7 @@ Desenho do Bosque: **1,10 ms** com sprites contra **2,08 ms** com o desenho anti
 - Sem animação (balanço ao vento) nem sombra própria (a sombra antiga continua).
 - Ainda não usados: flores em grupo (Flower_3/4), trevos, pedrinhas e **pedras de trilha** (RockPath_*), que serviriam para o caminho e o chão; as 68 peças do pacote gratuito incluem mais variações.
 - Os modelos copiados (41 MB) ficam fora do Git (`art-local`); para refazer o atlas basta o pacote original.
+
+## Atualização: chão em sprites (2026-11-02)
+Segundo atlas `public/assets/nature/ground.webp` (35 peças, 40 KB): trevos, grupos e flores avulsas, capim curto, pétalas, 11 pedrinhas, `Plant_7` e pedras de trilha pequenas. `render/nature-sprites.js › stampGround` as **carimba uma vez no cache do terreno** (custo por quadro: zero), em posições determinísticas, fora de lagoas e trilhas. Além do espalhamento por densidade da zona (flores em grupos), há **pedras alinhadas nas duas bordas da trilha** e pedrinhas/capim na **margem das lagoas**. Substitui as flores/tufos vetoriais no Bosque e na Planície; nas Ruínas só entram pedrinhas. O atlas carrega depois do primeiro quadro: o terreno é refeito uma vez quando ele chega. Refazer: `node tools/nature-bake.mjs 48 40 chao && python tools/nature-pack.py chao`.
+A 1ª versão ficou carregada demais (escondia inimigos) e as pedras de trilha largas pareciam entulho; reduzi densidades e deixei só as pedras pequenas. Capturas: `capturas/chao-*.png`. Prompts de texturas de chão, água, caminhos e peças que faltam: `prompts-cenario.md`.

@@ -7,8 +7,10 @@ import path from 'node:path';
 
 const ppm = Number(process.argv[2]) || 26, el = Number(process.argv[3]) || 40;
 const dir = 'public/labs/iso-poc/art-local/nature';
-const names = fs.readdirSync(dir).filter((f) => f.endsWith('.gltf')).map((f) => f.replace('.gltf', '')).sort();
-const dest = 'test-results/nature-bake'; fs.mkdirSync(dest, { recursive: true });
+// 3º argumento 'chao': fotografa só as peças pequenas de chão (flores, trevos, pedrinhas, pedras de trilha, pétalas, capim curto) para o atlas ground.*
+const ground = process.argv[4] === 'chao', GROUND = /^(Clover|Flower_[34]_(Group|Single)|Pebble|RockPath|Petal|Grass_Wispy_Short|Plant_7)/;
+const names = fs.readdirSync(dir).filter((f) => f.endsWith('.gltf')).map((f) => f.replace('.gltf', '')).filter((n) => ground ? GROUND.test(n) : !GROUND.test(n)).sort();
+const dest = ground ? 'test-results/nature-ground' : 'test-results/nature-bake'; fs.mkdirSync(dest, { recursive: true });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 400, height: 300 } });
 page.on('pageerror', (e) => console.log('pageerror:', e.message));
