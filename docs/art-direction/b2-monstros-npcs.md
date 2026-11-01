@@ -72,4 +72,5 @@ Mande 1 e 2 primeiro; eu devolvo capturas no jogo e só então você gera o rest
 ## 5. Limites desta fase
 - Sem esqueleto: nada de pernas/braços animados; a sensação de movimento é balanço e deslize.
 - Projéteis e efeitos dos monstros (esporos, fogo-fátuo) continuam procedurais.
+- Animação: mobs são assados com deformação por estilo (hop/waddle/trot), 6 quadros × 8 direções (~2,4 MiB decodificados cada); pernas do lobo só "deslizam" em pares, sem dobrar de verdade.
 - Origem/licença da arte gerada: **a confirmar** (Meshy CC BY 4.0 para os GLB; imagens de conceito conforme o gerador).

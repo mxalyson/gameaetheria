@@ -1,5 +1,5 @@
 // Monstros e chefes PINTADOS (B2): criaturas 3D do Meshy fotografadas em 8 direções (tools/mob-bake.mjs → assets/mobs/<id>.webp + .json), animadas por código
-// (balanço ao andar, respiração, avanço no golpe, flash ao apanhar, tombo ao morrer). SEM esqueleto: a criatura desliza e balança, não move pernas.
+// (ciclo de quadros deformados no 3D quando o atlas é animado — `tools/mob-bake.mjs … hop|waddle|trot` —, senão balanço ao andar, respiração, avanço no golpe, flash ao apanhar, tombo ao morrer). SEM esqueleto: a criatura desliza e balança, não move pernas.
 // Só desenho: nada aqui altera a simulação. Sem o arquivo da criatura (ou com ?monstros=original, que fica salvo) vale o desenho antigo do renderer.
 import { viewFromFacing } from './hero-sprites.js';
 import { deathPose } from './hero-death.js';
@@ -55,9 +55,10 @@ export function drawMobSprite(g, a, t) {
   const H = a.r * art.h, k = H / ch, W = cw * k;
   const ph = a.walk ?? 0;
   const moving = !!a.moving && !a.dead;
-  const bob = moving ? Math.abs(Math.sin(ph)) * H * 0.05 : 0;
+  const nf = meta.frames ?? 0; // atlas animado: o ciclo já traz o salto/andar; por código fica só o resto
+  const bob = moving && !nf ? Math.abs(Math.sin(ph)) * H * 0.05 : 0;
   const sway = moving ? Math.sin(ph) * 0.045 : Math.sin(t * 1.6 + a.id) * 0.012;
-  const squash = moving ? 1 + Math.sin(ph * 2) * 0.035 : 1 + Math.sin(t * 2.2 + a.id) * 0.018;
+  const squash = nf ? 1 : moving ? 1 + Math.sin(ph * 2) * 0.035 : 1 + Math.sin(t * 2.2 + a.id) * 0.018;
   let lunge = 0; if (a.swing > 0 && !a.dead) lunge = Math.sin((1 - Math.min(1, a.swing / 0.25)) * Math.PI) * H * 0.16; // avanço no golpe, na direção que olha
   const fx = Math.cos(a.facing ?? 0), fy = Math.sin(a.facing ?? 0) * 0.5;
   const footY = a.y + a.r * 0.8; // onde o desenho antigo apoiava a sombra
@@ -65,7 +66,9 @@ export function drawMobSprite(g, a, t) {
   g.translate(a.x + fx * lunge, footY + fy * lunge - bob);
   if (a.dead) { const P = deathPose(a.deadT ?? 0, view >= 1 && view <= 3 ? -1 : 1); g.rotate(P.rot); g.scale(1, P.squash); g.globalAlpha *= P.alpha; }
   g.rotate(sway); g.scale(1 / squash, squash);
-  const sx = (view % 4) * cw, sy = Math.floor(view / 4) * ch;
+  // quadro do ciclo: andando, segue a fase do passo; parado, um ciclo lento (a criatura nunca fica congelada)
+  const fr = nf ? Math.floor((((moving ? ph / (2 * Math.PI) : t * 0.8 + a.id * 0.37) % 1) + 1) % 1 * nf) : 0;
+  const sx = nf ? fr * cw : (view % 4) * cw, sy = nf ? view * ch : Math.floor(view / 4) * ch;
   g.drawImage(img, sx, sy, cw, ch, -meta.ax * k, -meta.ay * k, W, H);
   if (a.hitFlash > 0 && !a.dead) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = Math.min(0.55, a.hitFlash * 5); g.drawImage(img, sx, sy, cw, ch, -meta.ax * k, -meta.ay * k, W, H); }
   g.restore(); stats.drawn++;
