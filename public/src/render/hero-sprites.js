@@ -32,7 +32,7 @@ export function heroSpritesEnabled() {
   try {
     const q = new URLSearchParams(location.search).get('visual');
     if (q === 'miniatura' || q === 'original') localStorage.setItem(KEY, q);
-    enabled = (q ?? localStorage.getItem(KEY)) === 'miniatura';
+    enabled = (q ?? localStorage.getItem(KEY) ?? 'miniatura') === 'miniatura'; // padrão: miniatura; ?visual=original volta ao visual antigo
   } catch { enabled = false; }
   if (enabled) window.heroSprites = stats; // gancho de teste/diagnóstico
   return enabled;
