@@ -36,7 +36,10 @@ function load(id) {
   loadIndex().then(async () => {
     if (!index.has(id)) { it.state = 'none'; return; }
     try {
-      const [meta, img] = await Promise.all([fetch(`assets/mobs/${id}.json`).then((r) => r.json()), new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/mobs/${id}.webp`; })]);
+      // o json vem primeiro: seu `v` (muda a cada bake) vai na URL da imagem, senão o service worker (cache primeiro p/ .webp) serve a imagem velha com o json novo
+      const meta = await fetch(`assets/mobs/${id}.json`).then((r) => r.json());
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/mobs/${id}.webp?v=${meta.v ?? 0}`; });
+      if (img.naturalWidth !== meta.cell[0] * meta.cols || img.naturalHeight !== meta.cell[1] * meta.rows) { it.state = 'none'; return; } // imagem e medidas não combinam: desenho antigo em vez de sprite quebrado
       await img.decode?.(); it.meta = meta; it.img = img; it.state = 'ready'; stats.loaded++;
     } catch { it.state = 'none'; }
   });

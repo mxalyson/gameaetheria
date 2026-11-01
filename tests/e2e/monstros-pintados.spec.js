@@ -6,7 +6,7 @@ import fs from 'node:fs';
 async function entrar(page, qs = '') {
   await page.route('**/assets/mobs/index.json', (r) => r.fulfill({ contentType: 'application/json', body: '{"ids":["knight"]}' }));
   await page.route('**/assets/mobs/knight.json', (r) => r.fulfill({ contentType: 'application/json', body: fs.readFileSync('tests/fixtures/mob-teste.json') }));
-  await page.route('**/assets/mobs/knight.webp', (r) => r.fulfill({ contentType: 'image/webp', body: fs.readFileSync('tests/fixtures/mob-teste.webp') }));
+  await page.route('**/assets/mobs/knight.webp*', (r) => r.fulfill({ contentType: 'image/webp', body: fs.readFileSync('tests/fixtures/mob-teste.webp') }));
   await page.goto('/?api=&visual=original' + qs);
   await page.click('[data-action="new-char"]'); await page.click('[data-action="create"]');
   await page.waitForFunction(() => window.game?.mode === 'explore', null, { timeout: 20000 });

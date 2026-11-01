@@ -12,7 +12,7 @@ const parts = await p.evaluate((f) => window.loadGlb(f), file); console.log(part
 const r = style ? await p.evaluate(([i, m, st, n]) => window.bakeAnim(i, { max: m, style: st, frames: n }), [Number(part), Number(max), style, Number(frames)]) : await p.evaluate(([i, m]) => window.bakeDirs(i, { max: m }), [Number(part), Number(max)]);
 fs.mkdirSync('test-results/mob-bake', { recursive: true }); fs.writeFileSync(`test-results/mob-bake/${id}.png`, Buffer.from(r.png.split(',')[1], 'base64'));
 const { png, ...meta } = r; fs.mkdirSync('public/assets/mobs', { recursive: true });
-fs.writeFileSync(`public/assets/mobs/${id}.json`, JSON.stringify({ id, ...meta, src: file }, null, 1));
+fs.writeFileSync(`public/assets/mobs/${id}.json`, JSON.stringify({ id, ...meta, src: file, v: Math.floor(Date.now() / 1000) }, null, 1));
 // índice das criaturas com arte (o jogo só pede os arquivos que estão aqui)
 const idxPath = 'public/assets/mobs/index.json', ids = new Set(fs.existsSync(idxPath) ? JSON.parse(fs.readFileSync(idxPath, 'utf8')).ids : []); ids.add(id);
 fs.writeFileSync(idxPath, JSON.stringify({ ids: [...ids].sort() }, null, 1));
