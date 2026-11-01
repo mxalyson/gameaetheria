@@ -99,3 +99,10 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## Texturas de chão e água (2026-11-02)
 - [x] Grama, lajes, trilhas e água pintadas no Bosque, na Planície e nas Ruínas (interruptor `?chao=original`).
 - [ ] Vila de Lúmen (a textura gerada repete em padrão visível: pedir outra com pedras espalhadas sem aglomerado), margem de lago com a faixa `shore`, água animada por cima, arenas, peças 3D que faltam (cerejeira rosa, cristais, ruínas, casas), medir no celular real.
+
+## Adiados: o que ficou de fora do chão (2026-11-02) — "guarde para depois"
+- [ ] **Vila de Lúmen:** textura de chão nova (a gerada repete em padrão visível); pedir com pedrinhas espalhadas, sem aglomerados.
+- [ ] **Margem de lago:** usar a faixa `docs/art-direction/fontes-cenario/chao-shore.jpg` (guardada, sem uso).
+- [ ] **Água animada** por cima da textura dos lagos.
+- [ ] **Peças 3D que o pacote não cobre** (cerejeira rosa, cristais, ruínas, casas): o proprietário vai enviar os GLB (2026-11-02); fluxo: copiar para `public/labs/iso-poc/art-local/`, fotografar com `tools/nature-bake.mjs`, montar atlas e ligar em `render/nature-sprites.js`.
+- [ ] Medir chão, cenário e efeitos no celular real.
