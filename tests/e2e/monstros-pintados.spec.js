@@ -34,6 +34,7 @@ test('monstro pintado aparece (e some com ?monstros=original); sem erro de conso
 });
 
 test('sem arte de monstros no índice: nenhum arquivo de monstro é pedido (nada de 404)', async ({ page }) => {
+  await page.route('**/assets/mobs/index.json', (r) => r.fulfill({ contentType: 'application/json', body: '{"ids":[]}' })); // índice vazio, independente da arte já entregue
   const reqs = []; page.on('request', (r) => { if (/assets\/mobs\//.test(r.url())) reqs.push(r.url()); });
   const bad = []; page.on('response', (r) => { if (r.status() >= 400) bad.push(r.status() + ' ' + r.url()); });
   await page.goto('/?api=&visual=original');

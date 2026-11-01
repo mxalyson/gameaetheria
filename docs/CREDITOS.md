@@ -49,3 +49,6 @@ Cinco conjuntos gerados no Meshy (licença **CC BY 4.0**, a mesma dos heróis; c
 
 ## Monstros e NPCs (B2, em andamento)
 Modelos 3D do Meshy (CC BY 4.0) fotografados em 8 direções por `tools/mob-bake.mjs`. Nenhum entrou no jogo ainda; o briefing e os prompts estão em `docs/art-direction/b2-monstros-npcs.md`. A criatura de teste (`tests/fixtures/mob-teste.*`) é uma estátua do conjunto *Mossbound Sentinels* (Meshy), usada só em testes.
+
+## Monstros (Meshy, CC BY 4.0)
+Geleia (`slime`) e Lobo Cinzento (`wolf`): modelos 3D gerados no Meshy a partir de imagens de conceito do proprietário, fotografados em 8 direções por `tools/mob-bake.mjs` (`public/assets/mobs/`). Imagens de conceito: origem/licença a confirmar.
