@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prévia — ícones de habilidades</title>
+<link rel="stylesheet" href="../../fonts/fonts.css" />
+<style>
+  /* PRÉVIA (laboratório): 12 ícones das habilidades reais (data/skills.js) desenhados em SVG, com moldura por classe, recarga radial e tooltip.
+     Nada aqui entra no jogo antes da aprovação. Os ícones são uma APROXIMAÇÃO em SVG; a arte final pintada (como nas referências) pede ilustrador ou gerador. */
+  :root { --gold: #ffcf4a; --ivory: #f3e8c8; }
+  html, body { margin: 0; background: #0b0e1d; color: var(--ivory); font-family: Nunito, system-ui, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 22px 16px 60px; }
+  h1 { font: 800 22px Cinzel, serif; margin: 0 0 4px; } h2 { font: 800 15px Cinzel, serif; color: var(--gold); margin: 26px 0 10px; letter-spacing: .5px; }
+  p.n { color: #b9b39c; font-size: 13px; margin: 4px 0 10px; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cls { background: #12162c; border-radius: 16px; padding: 12px; box-shadow: inset 0 0 0 1px #2a3060; }
+  .cls h3 { margin: 0 0 8px; font: 800 14px Cinzel, serif; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+  .row small { color: #b9b39c; font-size: 11px; line-height: 1.3; }
+  .row b { font-size: 13px; }
+  svg { display: block; }
+  .ic { position: relative; flex: none; }
+  .tip { background: #141a2e; border-radius: 12px; padding: 10px 12px; max-width: 260px; box-shadow: inset 0 0 0 1px rgba(255,207,74,.5); font-size: 12.500px; }
+  .tip b { font: 800 14px Cinzel, serif; display: block; } .tip i { color: #8fb4ff; font-style: normal; font-size: 11.500px; }
+  .strip { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  @media (max-width: 760px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ícones das 12 habilidades — prévia</h1>
+  <p class="n">Habilidades e nomes <b>reais</b> do jogo (<code>data/skills.js</code>). Moldura e paleta por classe: <b>Guerreiro</b> vermelho/aço/laranja · <b>Mago</b> azul/violeta · <b>Arqueiro</b> verde/esmeralda · <b>Clérigo</b> dourado/branco. Ilustração central em SVG (camadas, brilho, silhueta forte).</p>
+  <div class="grid" id="classes"></div>
+  <h2>Legibilidade em 64 px e 48 px (tamanho real no celular)</h2>
+  <div class="strip" id="small"></div>
+  <h2>Recarga radial, tempo restante e indisponível</h2>
+  <p class="n">Anel que se fecha no sentido horário; número no centro; sem recurso ou atordoado = ícone dessaturado e escurecido (o cadeado ainda não foi desenhado).</p>
+  <div class="strip" id="cd"></div>
+  <h2>Tooltip e categorias (cor + forma, para não depender só da cor)</h2>
+  <div class="strip" id="tips"></div>
+</main>
+<script>
+const SKILLS = { // nomes, recargas e descrições copiados de data/skills.js
+  whirlwind: ['Golpe Giratório', 5, 'Gira a lâmina, ferindo todos ao redor.', 'dano'],
+  charge: ['Investida', 6, 'Avança até o cursor, atordoando quem atingir.', 'controle'],
+  warcry: ['Grito de Guerra', 14, '+35% de dano e -25% de dano recebido por 6s.', 'buff'],
+  fireball: ['Bola de Fogo', 3.5, 'Projétil que explode em área.', 'dano'],
+  frostnova: ['Nova de Gelo', 8, 'Explosão gélida que fere e desacelera em 50%.', 'controle'],
+  blink: ['Teleporte', 6, 'Teleporta na direção do cursor.', 'buff'],
+  rain: ['Chuva de Flechas', 8, 'Bombardeia a área do cursor várias vezes.', 'dano'],
+  pierce: ['Tiro Perfurante', 5, 'Flecha que atravessa todos os inimigos.', 'dano'],
+  roll: ['Rolamento', 4, 'Esquiva rápida, invulnerável durante o movimento.', 'buff'],
+  holylight: ['Luz Sagrada', 8, 'Cura 18% da vida (aliados próximos recebem 70% disso) e fere inimigos próximos.', 'cura'],
+  divineshield: ['Escudo Divino', 15, 'Escudo de 28% da vida máxima; o aliado mais próximo recebe 60% dele.', 'buff'],
+  judgement: ['Julgamento', 6, 'Raio sagrado que atordoa por 1s.', 'controle'],
+};
+const CLASSES = [
+  { id: 'warrior', name: 'Guerreiro', skills: ['whirlwind', 'charge', 'warcry'], bg: ['#8a2433', '#3a0f1d', '#16060d'], rim: ['#d9dde6', '#8a93a6', '#4a5266'], glow: '#ff8a3d' },
+  { id: 'mage', name: 'Mago', skills: ['fireball', 'frostnova', 'blink'], bg: ['#4b3fd0', '#231a6b', '#0c0a30'], rim: ['#e8e0ff', '#9a8cff', '#4a3aa8'], glow: '#9fe3ff' },
+  { id: 'archer', name: 'Arqueiro', skills: ['rain', 'pierce', 'roll'], bg: ['#2f8f55', '#14452c', '#06180f'], rim: ['#d8f2c0', '#7fc06a', '#3b7a3f'], glow: '#c8e68a' },
+  { id: 'cleric', name: 'Clérigo', skills: ['holylight', 'divineshield', 'judgement'], bg: ['#c99a2e', '#7a5410', '#2e1e05'], rim: ['#fff6d6', '#ffcf4a', '#a8760d'], glow: '#fff2a8' },
+];
+// Ilustração central (viewBox 0 0 100 100, área útil 14–86). Formas com camadas: sombra, corpo, luz.
+const ART = {
+  whirlwind: (c) => `<g fill="none" stroke-linecap="round"><path d="M50 18a32 32 0 0 1 31 30" stroke="#ff7a3a" stroke-width="9"/><path d="M50 18a32 32 0 0 1 31 30" stroke="#ffd27a" stroke-width="3.500"/><path d="M82 52a32 32 0 0 1-30 31" stroke="#ff7a3a" stroke-width="9"/><path d="M82 52a32 32 0 0 1-30 31" stroke="#ffd27a" stroke-width="3.500"/><path d="M48 84a32 32 0 0 1-31-30" stroke="#ff7a3a" stroke-width="9"/><path d="M48 84a32 32 0 0 1-31-30" stroke="#ffd27a" stroke-width="3.500"/></g><path d="M44 62 66 30l4 3-20 33z" fill="#e6eaf2" stroke="#4a5266" stroke-width="1.500"/><path d="M42 60l-8 8 3 3 8-8z" fill="#b5842f"/><circle cx="33" cy="71" r="3" fill="#ffcf4a"/>`,
+  charge: (c) => `<g stroke-linecap="round"><path d="M10 40h28M6 52h34M12 64h26" stroke="#ffb27a" stroke-width="4" opacity=".75"/></g><path d="M36 28h22l20 22-20 22H36l12-22z" fill="#ff7a3a" stroke="#7a1d0f" stroke-width="2"/><path d="M42 33h14l15 17-15 17H42l9-17z" fill="#ffd27a"/><circle cx="82" cy="50" r="7" fill="#fff6d6"/><path d="M82 36v-8M82 72v8M92 50h6M94 40l5-4M94 60l5 4" stroke="#fff6d6" stroke-width="3" stroke-linecap="round"/>`,
+  warcry: (c) => `<path d="M16 58V42l44-16v48z" fill="#d9dde6" stroke="#4a5266" stroke-width="2"/><path d="M16 42l44-16v10L16 50z" fill="#fff" opacity=".5"/><path d="M60 26a24 24 0 0 1 0 48" fill="none" stroke="#ff7a3a" stroke-width="5" stroke-linecap="round"/><path d="M70 34a14 14 0 0 1 0 32" fill="none" stroke="#ffd27a" stroke-width="4" stroke-linecap="round"/><path d="M80 14c3 6 9 8 6 16-3-3-5-3-6-8-1 5-4 6-4 10-5-6 0-12 4-18z" fill="#ff7a3a"/><path d="M22 60l4 14h10" fill="none" stroke="#b5842f" stroke-width="5" stroke-linecap="round"/>`,
+  fireball: (c) => `<path d="M82 18C60 22 40 34 28 52c-6 9-4 22 8 26 14 5 30-4 36-18 4-10 2-22 10-42z" fill="#c8321a"/><path d="M76 24C58 30 44 42 36 56c-4 8-1 16 8 18 11 2 22-6 26-16 4-9 2-20 6-34z" fill="#ff7a3a"/><circle cx="46" cy="64" r="15" fill="#ffd27a"/><circle cx="43" cy="61" r="8" fill="#fffbe6"/><path d="M60 34c4-2 8-2 12-1M52 44c3-2 6-3 10-3" stroke="#fff3c4" stroke-width="2.500" stroke-linecap="round" fill="none" opacity=".8"/>`,
+  frostnova: (c) => `<g stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="30" fill="none" stroke="#9fe3ff" stroke-width="2.500" opacity=".6"/>${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => `<path transform="rotate(${a} 50 50)" d="M50 50 44 28 50 14 56 28z" fill="${a % 90 ? '#7ccaf0' : '#d9f6ff'}" stroke="#2a6a9a" stroke-width="1.200"/>`).join('')}<circle cx="50" cy="50" r="9" fill="#fff"/><circle cx="50" cy="50" r="5" fill="#9fe3ff"/></g>`,
+  blink: (c) => `<ellipse cx="32" cy="50" rx="13" ry="26" fill="none" stroke="#c7b8ff" stroke-width="5"/><ellipse cx="32" cy="50" rx="6" ry="16" fill="#4a3aa8"/><ellipse cx="72" cy="50" rx="13" ry="26" fill="none" stroke="#9fe3ff" stroke-width="5"/><ellipse cx="72" cy="50" rx="6" ry="16" fill="#fff" opacity=".9"/><path d="M42 50h18" stroke="#fff" stroke-width="3" stroke-dasharray="3 5" stroke-linecap="round"/><path d="M52 30l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#fff6d6"/><circle cx="50" cy="72" r="2.500" fill="#fff6d6"/><circle cx="46" cy="24" r="2" fill="#c7b8ff"/>`,
+  rain: (c) => `<ellipse cx="50" cy="76" rx="32" ry="9" fill="none" stroke="#c8e68a" stroke-width="3" opacity=".8"/><ellipse cx="50" cy="76" rx="18" ry="5" fill="#c8e68a" opacity=".35"/>${[[24, 26, 8], [48, 14, 0], [72, 28, 8]].map(([x, y]) => `<g transform="translate(${x} ${y}) rotate(14)"><path d="M0 0v34" stroke="#7a5a2a" stroke-width="3.500" stroke-linecap="round"/><path d="M-4 40 0 52 4 40z" fill="#eaffb0" stroke="#4a6a2a" stroke-width="1.200"/><path d="M-5-2 0 6 5-2M-5 6 0 14 5 6" fill="none" stroke="#fff" stroke-width="2.500" stroke-linecap="round"/></g>`).join('')}`,
+  pierce: (c) => `<circle cx="64" cy="50" r="22" fill="none" stroke="#c8e68a" stroke-width="4" opacity=".85"/><circle cx="64" cy="50" r="12" fill="none" stroke="#eaffb0" stroke-width="3" opacity=".7"/><path d="M6 50h22" stroke="#eaffb0" stroke-width="3" stroke-linecap="round" opacity=".5"/><path d="M14 44h18M14 56h18" stroke="#eaffb0" stroke-width="2" stroke-linecap="round" opacity=".4"/><path d="M26 50H84" stroke="#7a5a2a" stroke-width="4" stroke-linecap="round"/><path d="M84 42l12 8-12 8z" fill="#eaffb0" stroke="#4a6a2a" stroke-width="1.500"/><path d="M22 44l8 6-8 6M30 44l8 6-8 6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`,
+  roll: (c) => `<path d="M20 70c6-30 38-44 62-30" fill="none" stroke="#e0f0ff" stroke-width="5" stroke-linecap="round" opacity=".85"/><path d="M26 82c12-24 36-34 56-22" fill="none" stroke="#7fc06a" stroke-width="5" stroke-linecap="round" opacity=".9"/><circle cx="62" cy="50" r="19" fill="#3b7a3f" stroke="#d8f2c0" stroke-width="3"/><path d="M62 31a19 19 0 0 1 17 11M62 69a19 19 0 0 1-17-11" fill="none" stroke="#eaffb0" stroke-width="4" stroke-linecap="round"/><path d="M76 38l9-3-3 9" fill="none" stroke="#fff" stroke-width="3.500" stroke-linecap="round" stroke-linejoin="round"/><circle cx="62" cy="50" r="5" fill="#d8f2c0"/>`,
+  holylight: (c) => `<g stroke-linecap="round">${Array.from({ length: 12 }, (_, i) => `<path transform="rotate(${i * 30} 50 50)" d="M50 10v${i % 2 ? 9 : 16}" stroke="#fff6d6" stroke-width="${i % 2 ? 3.500 : 5}"/>`).join('')}</g><circle cx="50" cy="50" r="24" fill="#ffcf4a" stroke="#a8760d" stroke-width="2.500"/><circle cx="50" cy="50" r="17" fill="#fff6d6"/><path d="M50 38v24M38 50h24" stroke="#c99a2e" stroke-width="6" stroke-linecap="round"/><path d="M50 62 36 48a7 7 0 0 1 14-6 7 7 0 0 1 14 6z" fill="none"/>`,
+  divineshield: (c) => `<path d="M14 40c-4-14 4-24 14-26-2 10 4 18 12 22zM86 40c4-14-4-24-14-26 2 10-4 18-12 22z" fill="#fff6d6" stroke="#a8760d" stroke-width="2"/><path d="M50 14 78 24v26c0 18-12 30-28 38C34 80 22 68 22 50V24z" fill="#ffcf4a" stroke="#7a5410" stroke-width="3"/><path d="M50 20 72 28v22c0 14-9 24-22 31-13-7-22-17-22-31V28z" fill="#fff6d6"/><path d="M50 30v40M38 42h24" stroke="#c99a2e" stroke-width="7" stroke-linecap="round"/><circle cx="50" cy="42" r="3" fill="#fff"/>`,
+  judgement: (c) => `<circle cx="50" cy="76" r="22" fill="none" stroke="#fff2a8" stroke-width="3.500" opacity=".85"/><ellipse cx="50" cy="76" rx="22" ry="6" fill="#ffcf4a" opacity=".5"/><path d="M42 6h16l6 62H36z" fill="#fff6d6" opacity=".55"/><path d="M46 6h8l3 62H43z" fill="#fff"/><path d="M50 38l-7 12h5l-3 14 12-18h-6l5-12z" fill="#ffcf4a" stroke="#a8760d" stroke-width="1.500" stroke-linejoin="round"/><path d="M26 24l4 6 6 1-6 1-2 6-3-6-6-1 6-1zM74 20l3 5 5 1-5 1-2 5-2-5-5-1 5-1z" fill="#fff6d6"/>`,
+};
+// moldura: quadrado chanfrado em duas camadas (aro metálico + miolo), rebites nos cantos, brilho no topo
+const frame = (cl, inner, id, state = '') => `<svg viewBox="0 0 100 100" width="100%" height="100%">
+  <defs><linearGradient id="r${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cl.rim[0]}"/><stop offset=".5" stop-color="${cl.rim[1]}"/><stop offset="1" stop-color="${cl.rim[2]}"/></linearGradient>
+  <radialGradient id="b${id}" cx=".5" cy=".35" r=".85"><stop offset="0" stop-color="${cl.bg[0]}"/><stop offset=".6" stop-color="${cl.bg[1]}"/><stop offset="1" stop-color="${cl.bg[2]}"/></radialGradient>
+  <clipPath id="k${id}"><path d="M14 6h72l8 8v72l-8 8H14l-8-8V14z"/></clipPath></defs>
+  <path d="M14 6h72l8 8v72l-8 8H14l-8-8V14z" fill="url(#r${id})"/>
+  <g clip-path="url(#k${id})"><path d="M16 11h68l5 5v68l-5 5H16l-5-5V16z" fill="url(#b${id})" stroke="#0006" stroke-width="2"/>
+    <circle cx="50" cy="52" r="40" fill="${cl.glow}" opacity=".18"/><g style="${state === 'off' ? 'filter:grayscale(1) brightness(.55)' : ''}">${inner}</g>
+    <path d="M16 11h68l5 5v14C70 22 30 22 11 30V16z" fill="#fff" opacity=".12"/></g>
+  <path d="M16 11h68l5 5v68l-5 5H16l-5-5V16z" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="1.500"/>
+  <g fill="${cl.rim[0]}" stroke="#0007" stroke-width=".8"><circle cx="13" cy="13" r="2.600"/><circle cx="87" cy="13" r="2.600"/><circle cx="13" cy="87" r="2.600"/><circle cx="87" cy="87" r="2.600"/></g></svg>`;
+const icon = (cl, key, size, extra = '', id = Math.random().toString(36).slice(2, 7)) => `<div class="ic" style="width:${size}px;height:${size}px">${frame(cl, ART[key](cl), id, extra)}</div>`;
+// anel de recarga: arco que se fecha (sentido horário), com número
+const cooldown = (cl, key, size, frac, label) => { const R = 42, C = 2 * Math.PI * R; const id = Math.random().toString(36).slice(2, 7);
+  return `<div class="ic" style="width:${size}px;height:${size}px">${frame(cl, ART[key](cl), id)}<svg viewBox="0 0 100 100" style="position:absolute;inset:0"><path d="M16 11h68l5 5v68l-5 5H16l-5-5V16z" fill="#06081a" opacity=".62"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="#8fb4ff" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(C * (1 - frac)).toFixed(1)} 999" transform="rotate(-90 50 50)"/><text x="50" y="63" text-anchor="middle" font-family="Nunito" font-weight="900" font-size="36" fill="#fff" stroke="#000" stroke-opacity=".7" stroke-width="4" paint-order="stroke">${label}</text></svg></div>`; };
+const $ = (s) => document.querySelector(s);
+$('#classes').innerHTML = CLASSES.map((cl) => `<div class="cls"><h3 style="color:${cl.rim[1]}">${cl.name}</h3>${cl.skills.map((k) => `<div class="row">${icon(cl, k, 96)}<div><b>${SKILLS[k][0]}</b><br><small>${SKILLS[k][1]}s · ${SKILLS[k][3]}</small></div></div>`).join('')}</div>`).join('');
+$('#small').innerHTML = [64, 48].map((s) => `<div><p class="n">${s} px</p><div class="strip">${CLASSES.flatMap((cl) => cl.skills.map((k) => icon(cl, k, s))).join('')}</div></div>`).join('');
+const demo = [[0, 'whirlwind', 0.4, '3'], [1, 'frostnova', 0.75, '6'], [2, 'rain', 0.2, '1.6'], [3, 'divineshield', 0.9, '14']];
+$('#cd').innerHTML = demo.map(([ci, k, f, t]) => `<div><div style="width:84px">${cooldown(CLASSES[ci], k, 84, f, t)}</div><p class="n" style="text-align:center">${SKILLS[k][0]}</p></div>`).join('')
+  + `<div><div style="width:84px">${icon(CLASSES[1], 'blink', 84, 'off')}</div><p class="n" style="text-align:center">indisponível</p></div>`;
+const kinds = { dano: ['#ff6a6a', 'M10 2 12 8l6 1-5 4 2 6-5-3-5 3 2-6-5-4 6-1z'], cura: ['#5fd38a', 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z'], buff: ['#ffcf4a', 'M12 3 20 13h-5v8H9v-8H4z'], controle: ['#b77cff', 'M12 3a9 9 0 1 0 9 9M12 7a5 5 0 1 0 5 5M12 11a1 1 0 1 0 1 1'] };
+$('#tips').innerHTML = `<div class="tip"><b>Golpe Giratório</b><i>Recarga 5s · dano</i><div>${SKILLS.whirlwind[2]}</div></div><div class="tip"><b>Escudo Divino</b><i>Recarga 15s · buff</i><div>${SKILLS.divineshield[2]}</div></div>`
+  + Object.entries(kinds).map(([n, [c, d]]) => `<div style="text-align:center"><svg width="44" height="44" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="${n === 'cura' ? 11 : n === 'buff' ? 4 : n === 'controle' ? 8 : 2}" fill="#141a2e" stroke="${c}" stroke-width="1.600"/><path d="${d}" fill="${n === 'controle' ? 'none' : c}" stroke="${c}" stroke-width="${n === 'controle' ? 1.800 : 0}" stroke-linecap="round" transform="translate(4 4) scale(.66)"/></svg><div class="n" style="margin:2px 0">${n}</div></div>`).join('');
+</script>
+</body>
+</html>
