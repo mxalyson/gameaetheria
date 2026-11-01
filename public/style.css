@@ -498,3 +498,33 @@ body.touch .btn.small { padding: 0 6px; }
 .equip-grid .cell { margin: 0 auto; }
 .char-head .avatar.art { background: none; border-radius: 0; width: 64px; height: 64px; overflow: visible; }
 .char-head .avatar.art img { width: 100%; height: 100%; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
+
+/* ===== B5 parte 2b: criação de personagem, diálogo de NPC e barra do chefe pintados ===== */
+.create-wrap { --pb: 30px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; padding: 4px 8px 8px; filter: drop-shadow(0 16px 28px rgba(0,0,0,.6)); }
+.create-wrap h1 { text-shadow: 0 2px 0 #000b; letter-spacing: 1px; }
+.class-card { background: rgba(8,10,26,.55); border: 2px solid rgba(201,162,74,.28); border-radius: 12px; }
+.class-card.sel { border-color: color-mix(in srgb, var(--cc) 55%, #e8c46a); background: color-mix(in srgb, var(--cc) 20%, rgba(8,10,26,.6)); }
+.cc-icon.art { background: none; border-radius: 0; width: 60px; height: 60px; font-size: 0; }
+.cc-icon.art img { width: 100%; height: 100%; filter: drop-shadow(0 3px 4px rgba(0,0,0,.55)); }
+.create-row input { background: rgba(8,10,26,.7); border: 2px solid rgba(201,162,74,.55); }
+@media (max-height: 520px) { .create-wrap { --pb: 22px; } .cc-icon.art { width: 40px; height: 40px; } }
+
+.npc-line { --db: 18px; margin: 0 0 10px; padding: 2px 6px; border: var(--db) solid transparent; border-image: url(assets/ui/dialog.webp) 60 fill / var(--db) stretch; color: #3b2a14; font-style: italic; font-weight: 700; text-shadow: 0 1px 0 rgba(255,246,214,.5); }
+
+#boss-bar { width: min(460px, 56vw); }
+#boss-name { position: relative; margin: 0 auto 2px; padding: 5px 40px 7px; width: max-content; max-width: 100%; background: url(assets/ui/plaque.webp) center / 100% 100% no-repeat; color: #fff0d6; text-shadow: 0 2px 0 #000b; }
+#boss-bar .bar { height: 14px; border: 2px solid #c9a24a; border-radius: 8px; background: #2a0e12; box-shadow: 0 0 0 1px #4a2a18, 0 4px 10px rgba(0,0,0,.5); }
+#boss-bar .fill { border-radius: 5px; background: linear-gradient(180deg, #ff9a88 0%, #d9473b 55%, #9c2a24 100%); }
+.npc-line { border: 0; border-image: none; background: url(assets/ui/dialog.webp) center / 100% 100% no-repeat; padding: 16px 18px 16px 21%; color: #f6ebc9; text-shadow: 0 2px 0 #000b; min-height: 74px; display: flex; align-items: center; }
+body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
+@media (max-height: 520px) {
+  .create-wrap { padding: 0 6px 4px; }
+  .create-wrap h1 { font-size: 18px; margin: 0 0 6px; }
+  .class-card { padding: 6px 8px; }
+  .cc-icon.art { width: 34px; height: 34px; } .cc-name { margin: 2px 0 1px; } .cc-desc { margin: 0; } .cc-stat { margin: 3px 0; }
+  .create-row { margin: 6px 0 2px; gap: 8px; } .create-row input { padding: 6px 12px; width: 220px; }
+  .create-wrap > .btn, .create-wrap .btn.ghost { margin: 0; }
+}
+
+/* o desfoque de fundo do HUD antigo aparecia como um retângulo translúcido atrás dos vidros de vida/mana (a arte pintada já tem forma própria) */
+#hud-player, #hud-zone, #hud-zone .menu-btns, .menu-btns button, #boss-bar, #hud-level { backdrop-filter: none; -webkit-backdrop-filter: none; }

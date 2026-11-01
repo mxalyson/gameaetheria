@@ -68,3 +68,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## B5 parte 2 — painéis pintados (2026-11-02)
 - [x] Moldura em 9 fatias nos painéis (inventário, personagem, spirits, diário, loja, etc.), botões pintados (normal/pressionado/principal/desativado), botão de fechar em medalhão, células com moldura de raridade (comum=0, incomum=1, raro=4, épico=6, lendário=5), dica pintada e faixa de arena, emblema da classe no painel do personagem. Só CSS (+1 linha em `ui.js`); marcação e ações iguais.
 - [ ] Ainda emoji/provisório: ícones de itens e spirits, retrato pintado por classe (hoje o emblema do ataque), diálogos de NPC com `dialog.webp`, barra do chefe, tela de título e criação de personagem; conferir loja/ferreiro/arena em celular real.
+
+## B5 parte 2b (2026-11-02)
+- [x] Criação de personagem (moldura, emblemas das classes), diálogo de NPC (peça `dialog.webp`), barra do chefe (plaqueta + trilho dourado, mais baixa no toque para não cobrir os medalhões); corrigido o retângulo translúcido atrás dos vidros de vida/mana (era `backdrop-filter` do HUD antigo; teste de regressão).
+- [ ] Retrato de NPC no oval do diálogo (hoje vazio); ícones de itens/spirits e retratos de classe: prompts em `docs/art-direction/prompts-icones-itens.md`.

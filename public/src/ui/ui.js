@@ -167,7 +167,7 @@ export class UI {
     this.createClass = this.createClass ?? 'warrior';
     const cards = Object.values(CLASSES).map((c) => `
       <button class="class-card ${c.id === this.createClass ? 'sel' : ''}" data-action="pick-class" data-arg="${c.id}" style="--cc:${c.color}">
-        <div class="cc-icon">${c.icon}</div>
+        <div class="cc-icon art">${attackImg(c.id, c.icon)}</div>
         <div class="cc-name">${c.name}</div>
         <div class="cc-desc">${c.desc}</div>
         <div class="cc-stat">Atributo principal: <b>${STAT_NAMES[c.primary]}</b></div>

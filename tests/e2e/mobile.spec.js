@@ -192,3 +192,9 @@ test('telas de título e criação de personagem cabem na paisagem', async ({ pa
   expect(r.cw).toBeLessThanOrEqual(r.ch);
   expect(r.btnBottom).toBeLessThanOrEqual(r.ch);
 });
+
+test('HUD pintado: nenhum desfoque de fundo atrás dos vidros de vida/mana e dos medalhões', async ({ page }) => {
+  await startGame(page);
+  const bf = await page.evaluate(() => [...document.querySelectorAll('#hud, #hud *')].filter((e) => getComputedStyle(e).backdropFilter !== 'none').map((e) => e.id || e.className));
+  expect(bf).toEqual([]);
+});
