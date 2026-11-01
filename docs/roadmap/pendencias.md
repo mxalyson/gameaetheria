@@ -104,5 +104,11 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] **Vila de Lúmen:** textura de chão nova (a gerada repete em padrão visível); pedir com pedrinhas espalhadas, sem aglomerados.
 - [ ] **Margem de lago:** usar a faixa `docs/art-direction/fontes-cenario/chao-shore.jpg` (guardada, sem uso).
 - [ ] **Água animada** por cima da textura dos lagos.
-- [ ] **Peças 3D que o pacote não cobre** (cerejeira rosa, cristais, ruínas, casas): o proprietário vai enviar os GLB (2026-11-02); fluxo: copiar para `public/labs/iso-poc/art-local/`, fotografar com `tools/nature-bake.mjs`, montar atlas e ligar em `render/nature-sprites.js`.
+- [x] **Peças 3D do Meshy** (casas, ruínas, estátuas, cristais, cerejeiras) fotografadas e ligadas na Vila, Planície, Ruínas e Bosque. Poço, ponte, cercas e arcos inteiros ficaram FORA do atlas (sem uso) para poupar memória de textura; refazer com `node tools/glb-bake.mjs 170 && python tools/meshy-pack.py` (editar a lista KEEP).
 - [ ] Medir chão, cenário e efeitos no celular real.
+
+## Cenário do Meshy (2026-11-02)
+- [x] Vila: 4 casas (uma por canto), lanternas, placa, árvores/pedras/arbustos do Bosque; Planície: cerejeiras e cristais; Ruínas: pilares com hera, arco partido, estátuas (cavaleiro e coruja), pedras; Bosque: toco e tronco.
+- [ ] Poço, ponte, cercas e arcos inteiros pedem pontos fixos no layout (`data/zones.js` › `scenery.fixed`): é mudança em `game/`, decidir com o proprietário. Decor das Ruínas ainda tem braseiros, runestones e árvores mortas do desenho antigo/Quaternius.
+- [ ] Os sprites do Meshy são 3D-realistas (texturas pintadas) e os personagens/monstros/UI são mais "cartoon": avaliar harmonia no celular e, se preciso, suavizar a saturação.
+- **Lição de desempenho (medida):** com um segundo atlas de 1024×2048 (8 MB decodificados) o desenho do Bosque foi de ~1 ms para ~6 ms por quadro, mesmo sem usar os sprites novos (estouro do orçamento de textura do Chromium em CPU). Com o atlas do Meshy em 1024×1024 (peças a 170 px) voltou a ~1 ms. O teste unitário limita a soma dos atlas a 10 MiB decodificados. Medir no celular real continua pendente.

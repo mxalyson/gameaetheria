@@ -25,6 +25,12 @@ export function loadNature() {
       meta = m.sprites; atlas = img; stats.sprites = Object.keys(meta).length; window.natureStats = stats;
     } catch { atlas = null; } // sem atlas: fica o desenho antigo
     try {
+      const [m, img] = await Promise.all([fetch('assets/nature/meshy.json').then((r) => r.json()), new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'assets/nature/meshy.webp'; })]);
+      await img.decode?.();
+      if (meta) for (const [k, v] of Object.entries(m.sprites)) meta['m_' + k] = { ...v, im: img }; // peças do Meshy (CC BY 4.0): casas, estátuas, ruínas, cerejeiras, cristais...
+      stats.meshy = Object.keys(m.sprites).length;
+    } catch { /* sem o atlas do Meshy: valem o Quaternius e o desenho antigo */ }
+    try {
       const [m, img] = await Promise.all([fetch('assets/nature/ground.json').then((r) => r.json()), new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'assets/nature/ground.webp'; })]);
       await img.decode?.();
       gMeta = m.sprites; gAtlas = img;
@@ -41,20 +47,33 @@ export const SET = {
   forest: {
     tree: { h: 3.0, ref: 7.6, v: [...P('CommonTree', 1, 5), ...P('CommonTree', 1, 5), ...P('Pine', 1, 4)], behind: true },
     rock: { w: 2.9, ref: 3.2, v: P('Rock_Medium', 1, 3) },
+    stump: { h: 2.0, ref: 0, v: ['m_stump'] },
+    log: { w: 4.1, ref: 0, v: ['m_log'] },
     bush: { w: 2.7, ref: 1.9, v: ['Bush_Common', 'Bush_Common_Flowers'] },
     fern: { w: 3.0, ref: 9, v: ['Fern_1', 'Plant_1', 'Fern_1'] },
     mushrooms: { w: 1.9, ref: 0.9, v: ['Mushroom_Common', 'Mushroom_Laetiporus'] },
   },
   plains: {
+    tree: { h: 3.4, ref: 0, v: ['m_cherry_1', 'm_cherry_2', 'm_cherry_3'], behind: true }, // cerejeiras no lugar das árvores rosa de código
+    crystal: { h: 2.9, ref: 0, v: ['m_crystal_1', 'm_crystal_2', 'm_crystal_3', 'm_crystal_4', 'm_crystal_5'] },
+    geode: { h: 2.2, ref: 0, v: ['m_crystal_3', 'm_crystal_1'] },
     bush: { w: 2.7, ref: 1.9, v: ['Bush_Common_Flowers', 'Bush_Common'] },
     tallgrass: { h: 1.5, ref: 1.9, v: ['Grass_Common_Tall', 'Grass_Wispy_Tall', 'Grass_Common_Short'] },
     mushrooms: { w: 1.9, ref: 0.9, v: ['Mushroom_Common', 'Mushroom_Laetiporus'] },
   },
   ruins: {
+    pillar: { h: 4.4, ref: 0, v: ['m_pillar_1', 'm_pillar_2', 'm_pillar_1', 'm_pillar_2', 'm_arch_broken'], behind: true }, // pilares com hera; de vez em quando um arco partido
+    statue: { h: 5.4, ref: 0, v: ['m_statue_knight', 'm_statue_owl'], behind: true },
+    runestone: { w: 2.1, ref: 0, v: ['m_boulder'] },
+    rubble: { w: 1.7, ref: 0, v: ['m_slab', 'm_boulder'] },
     pine: { h: 3.2, ref: 17, v: P('TwistedTree', 1, 3), behind: true }, // árvores retorcidas de folhagem outonal: combinam com o crepúsculo das Ruínas
     deadtree: { h: 3.3, ref: 11, v: P('DeadTree', 1, 3), behind: true },
   },
 };
+// vila: casas por canto (cada casa do layout ganha o seu desenho), lanternas e placa
+export const HOUSE_SET = { town: { house: { house: true, v: ['m_house_tile', 'm_house_big', 'm_house_thatch', 'm_house_porch'], pick: (d) => (d.x < 850 ? 0 : 1) + (d.y < 600 ? 0 : 2) }, lantern: { h: 5.6, ref: 0, v: ['m_lamp'] }, signpost: { h: 5, ref: 0, v: ['m_sign'] } } };
+Object.assign(SET, HOUSE_SET);
+SET.town = { ...SET.town, tree: SET.forest.tree, rock: SET.forest.rock, bush: SET.forest.bush }; // a vila usa as mesmas árvores, pedras e arbustos do Bosque (um único estilo)
 let zoneSet = null;
 export function setNatureZone(zoneId) { zoneSet = atlas ? SET[zoneId] ?? null : null; }
 
@@ -62,15 +81,17 @@ export function setNatureZone(zoneId) { zoneSet = atlas ? SET[zoneId] ?? null : 
 export function drawNature(g, d, player) {
   const cfg = zoneSet?.[d.type];
   if (!cfg) return false;
-  const name = cfg.v[Math.min(cfg.v.length - 1, Math.floor(d.v * cfg.v.length))], sp = meta[name];
+  const name = cfg.v[cfg.pick ? cfg.pick(d) : Math.min(cfg.v.length - 1, Math.floor((d.v ?? 0) * cfg.v.length))], sp = meta[name];
   if (!sp) return false;
+  if (cfg.ref === 0 && !cfg._ref) { const vs = cfg.v.map((n) => meta[n]).filter(Boolean); cfg._ref = vs.reduce((a, b) => a + (cfg.h ? b.my : b.mx), 0) / vs.length; } // ref 0: tamanho médio das variantes (peças do Meshy vêm sem escala própria)
   // tamanho: pela altura (árvores, capim) ou pela largura (pedras, arbustos...), relativo ao tamanho típico do tipo para as variantes terem proporção própria
-  const k = cfg.h ? (d.s * cfg.h * (sp.my / cfg.ref)) / sp.h : (d.s * cfg.w * (sp.mx / cfg.ref)) / sp.w;
-  const w = sp.w * k, h = sp.h * k, x = d.x - sp.ax * k, y = d.y - sp.ay * k;
+  const ref = cfg.ref || cfg._ref;
+  const k = cfg.house ? (d.w * 1.08) / sp.w : cfg.h ? (d.s * cfg.h * (sp.my / ref)) / sp.h : (d.s * cfg.w * (sp.mx / ref)) / sp.w;
+  const w = sp.w * k, h = sp.h * k, x = (cfg.house ? d.x + d.w / 2 : d.x) - sp.ax * k, y = d.y - sp.ay * k;
   let fade = false;
   if (cfg.behind && player) fade = Math.abs(player.x - d.x) < w * 0.35 && player.y < d.y && player.y > d.y - h * 0.9; // o herói atrás da copa a deixa translúcida
   if (fade) g.globalAlpha = 0.45;
-  g.drawImage(atlas, sp.x, sp.y, sp.w, sp.h, x, y, w, h); stats.drawn++;
+  g.drawImage(sp.im ?? atlas, sp.x, sp.y, sp.w, sp.h, x, y, w, h); stats.drawn++;
   if (fade) g.globalAlpha = 1;
   return true;
 }
@@ -154,3 +175,6 @@ export function stampGround(g, world, rng) {
   stats.ground = list.length;
   return kind !== 'ruins'; // nas Ruínas ficam os tufos vetoriais
 }
+
+// A decoração `d` desta zona vira sprite? (as sombras de código dos desenhos antigos não servem para sprites)
+export const hasNatureSprite = (d) => !!zoneSet?.[d.type];

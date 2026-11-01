@@ -43,3 +43,6 @@ Bustos das 4 classes e de 6 NPCs (guarda, Mestre Doran, herbalista, mercadora, s
 
 ## Texturas de chão e água (arte gerada por IA)
 Grama (Bosque, Planície), lajes (Ruínas), terra e lajes de trilha e água (lago e cristal) em `public/assets/ground/`, vindas de `docs/art-direction/fontes-cenario/chao-*.jpg`; tornadas sem emenda e reduzidas por `tools/ground-textures-from-images.py`. **Origem/licença: a confirmar.**
+
+## Cenário em sprites a partir de modelos do Meshy
+Cinco conjuntos gerados no Meshy (licença **CC BY 4.0**, a mesma dos heróis; crédito: "Modelos gerados com Meshy AI"): *Cozy Medieval Village* (casas, poço, lanternas, placa, toco, tronco, ponte, cercas), *Overgrown Ruins Set* (pilares e arcos com hera), *Mossbound Sentinels* (estátuas do cavaleiro e da coruja), *Pastel Crystal Cluster* (cristais) e *Cherry Blossom Trio* (cerejeiras). Cada GLB traz várias peças numa malha só: `public/labs/nature/glb.html` as separa por partes conectadas e `tools/glb-bake.mjs` + `tools/meshy-pack.py` as fotografam no atlas `public/assets/nature/meshy.webp` (23 peças, ~70 KB). Os GLB (10–15 MB cada) ficam fora do Git, em `public/labs/iso-poc/art-local/meshy-cenario/`.

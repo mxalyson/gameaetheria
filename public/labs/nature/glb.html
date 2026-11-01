@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Fotografia de conjuntos GLB (Meshy)</title>
+<style>body{margin:0;background:#3f6a44;color:#fff;font:12px system-ui}</style>
+<script type="importmap">{"imports":{"three":"../iso-poc/vendor/three/build/three.module.js"}}</script>
+</head><body>
+<script type="module">
+// Laboratório: cada GLB do Meshy traz VÁRIAS peças fundidas numa malha só (3 árvores, 4 casas...). Aqui a malha é dividida em peças pelas partes conectadas
+// (vértices soldados por posição) e cada peça é fotografada como sprite 2D (câmera ortográfica, mesma luz do bake.html). NADA de 3D vai ao jogo.
+// Uso: await window.loadGlb('arquivo.glb') -> [{idx, tris, size:[x,y,z], center:[x,y,z]}] ; await window.bakePart(idx, {ppm, el, flatten}) -> {png, w, h, ax, ay, ppm, size}; window.previewAll({el})
+import * as THREE from 'three';
+import { GLTFLoader } from '../iso-poc/vendor/three/examples/jsm/loaders/GLTFLoader.js';
+
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const key = new THREE.DirectionalLight(0xfff1dc, 2.2); key.position.set(-3, 6, 4); scene.add(key);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa890, 1.35));
+const loader = new GLTFLoader();
+let parts = [], material = null, rootObj = null;
+
+window.loadGlb = async (file) => {
+  const gltf = await loader.loadAsync(`../iso-poc/art-local/meshy-cenario/${file}`);
+  let mesh = null; gltf.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
+  mesh.updateWorldMatrix(true, false);
+  const geo = mesh.geometry.clone(); geo.applyMatrix4(mesh.matrixWorld);
+  material = mesh.material; material.vertexColors = false; material.needsUpdate = true;
+  const pos = geo.attributes.position, idx = geo.index ? geo.index.array : null, nV = pos.count, nT = (idx ? idx.length : nV) / 3;
+  // solda vértices coincidentes (costuras de UV) e une os triângulos por partes conectadas
+  const q = 1e4, map = new Map(), weld = new Int32Array(nV); let next = 0;
+  for (let i = 0; i < nV; i++) { const k = Math.round(pos.getX(i) * q) + ',' + Math.round(pos.getY(i) * q) + ',' + Math.round(pos.getZ(i) * q); let w = map.get(k); if (w === undefined) { w = next++; map.set(k, w); } weld[i] = w; }
+  const parent = new Int32Array(next).map((_, i) => i);
+  const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  const V = (t, c) => weld[idx ? idx[t * 3 + c] : t * 3 + c];
+  for (let t = 0; t < nT; t++) { const a = find(V(t, 0)), b = find(V(t, 1)), c = find(V(t, 2)); parent[b] = a; parent[find(c)] = a; }
+  const comp = new Map(); for (let t = 0; t < nT; t++) { const r = find(V(t, 0)); (comp.get(r) ?? comp.set(r, []).get(r)).push(t); }
+  parts = []; const MIN = nT * 0.004; // ignora lascas (< 0,4% dos triângulos)
+  for (const tris of comp.values()) {
+    if (tris.length < MIN) continue;
+    // geometria compacta só com os vértices da peça (e a caixa calculada deles)
+    const remap = new Map(), P = [], N = [], UV = []; const ids = new Uint32Array(tris.length * 3); let n = 0;
+    tris.forEach((t, i) => { for (let c = 0; c < 3; c++) { const v = idx ? idx[t * 3 + c] : t * 3 + c; let r = remap.get(v); if (r === undefined) { r = n++; remap.set(v, r); P.push(pos.getX(v), pos.getY(v), pos.getZ(v)); if (geo.attributes.normal) N.push(geo.attributes.normal.getX(v), geo.attributes.normal.getY(v), geo.attributes.normal.getZ(v)); if (geo.attributes.uv) UV.push(geo.attributes.uv.getX(v), geo.attributes.uv.getY(v)); } ids[i * 3 + c] = r; } });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); if (N.length) g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); if (UV.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); g.setIndex(new THREE.BufferAttribute(ids, 1));
+    g.computeBoundingBox(); const bb = g.boundingBox, c = bb.getCenter(new THREE.Vector3()), s = bb.getSize(new THREE.Vector3());
+    parts.push({ geo: g, tris: tris.length, bb, center: c, size: s });
+  }
+  parts.sort((a, b) => a.center.x - b.center.x || a.center.z - b.center.z);
+  return parts.map((p, i) => ({ idx: i, tris: p.tris, size: p.size.toArray().map((v) => +v.toFixed(3)), center: p.center.toArray().map((v) => +v.toFixed(3)), min: p.bb.min.toArray().map((v) => +v.toFixed(3)) }));
+};
+
+function cameraFor(box, el, ppmWanted) {
+  const E = THREE.MathUtils.degToRad(el), dist = 30, cam = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 200);
+  cam.position.set(0, Math.sin(E) * dist, Math.cos(E) * dist); cam.lookAt(0, 0, 0); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9; const inv = cam.matrixWorldInverse;
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) { const v = new THREE.Vector3(x, y, z).applyMatrix4(inv); minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
+  return { cam, minX, maxX, minY, maxY, inv };
+}
+
+// Fotografa a peça `idx` (base do objeto no plano y = mínimo da peça), ppm = pixels por unidade do modelo (limitado a `max` px no maior lado)
+window.bakePart = async (idx, { el = 40, max = 230, aa = 2, pad = 0.04, tex = null } = {}) => {
+  const p = parts[idx], mesh = new THREE.Mesh(p.geo, material);
+  // o pé da peça vira a origem (x,z no centro da base, y no mínimo) para o sprite ancorar no chão
+  const foot = new THREE.Vector3(p.center.x, p.bb.min.y, p.center.z); mesh.position.sub(foot); scene.add(mesh);
+  const box = new THREE.Box3().setFromObject(mesh); const { cam, minX, maxX, minY, maxY, inv } = cameraFor(box, el);
+  const w0 = maxX - minX, h0 = maxY - minY, ppm = max / Math.max(w0 * (1 + 2 * pad), h0 * (1 + 2 * pad));
+  const px = pad * Math.max(w0, h0); const L = minX - px, R = maxX + px, B = minY - px, T = maxY + px;
+  cam.left = L; cam.right = R; cam.top = T; cam.bottom = B; cam.updateProjectionMatrix();
+  const W = Math.ceil((R - L) * ppm), H = Math.ceil((T - B) * ppm); renderer.setSize(W * aa, H * aa); renderer.setClearColor(0x000000, 0); renderer.render(scene, cam);
+  const out = document.createElement('canvas'); out.width = W; out.height = H; const g = out.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(renderer.domElement, 0, 0, W, H);
+  scene.remove(mesh); const o = new THREE.Vector3(0, 0, 0).applyMatrix4(inv);
+  return { png: out.toDataURL('image/png'), w: W, h: H, ax: Math.round((o.x - L) / (R - L) * W), ay: Math.round((T - o.y) / (T - B) * H), ppm, size: p.size.toArray().map((v) => +v.toFixed(3)) };
+};
+
+// Visão geral do conjunto inteiro (para ver o que há dentro do arquivo)
+window.previewAll = async ({ el = 40, w = 1400 } = {}) => {
+  const group = new THREE.Group(); for (const p of parts) group.add(new THREE.Mesh(p.geo, material)); scene.add(group);
+  const box = new THREE.Box3().setFromObject(group), { cam, minX, maxX, minY, maxY } = cameraFor(box, el);
+  cam.left = minX - 0.05; cam.right = maxX + 0.05; cam.top = maxY + 0.05; cam.bottom = minY - 0.05; cam.updateProjectionMatrix();
+  const h = Math.round(w * (cam.top - cam.bottom) / (cam.right - cam.left)); renderer.setSize(w, h); renderer.setClearColor(0x6fae6c, 1); renderer.render(scene, cam);
+  const url = renderer.domElement.toDataURL('image/png'); scene.remove(group); renderer.setClearColor(0x000000, 0); return url;
+};
+window.glbReady = true;
+</script>
+</body></html>

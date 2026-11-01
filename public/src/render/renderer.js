@@ -4,7 +4,7 @@ import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
 import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-textures.js';
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
-import { loadNature, setNatureZone, drawNature, stampGround, groundReady } from './nature-sprites.js';
+import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -295,7 +295,7 @@ function drawShadow(g, it) {
   else if (it.k === 'drop') { ellipse(g, o.x, o.y + 4, 7, 3); g.fill(); }
   else if (o.type === 'tree' || o.type === 'pine') { ellipse(g, o.x + 8, o.y + 2, o.s * 0.85, o.s * 0.32); g.fill(); }
   else if (o.type === 'rock' || o.type === 'crystal' || o.type === 'bush' || o.type === 'pillar') { ellipse(g, o.x + 4, o.y + o.s * 0.35, o.s * 0.9, o.s * 0.3); g.fill(); }
-  else if (o.type === 'house') { g.fillRect(o.x + 8, o.y - 6, o.w, 14); }
+  else if (o.type === 'house') { if (hasNatureSprite(o)) ellipse(g, o.x + o.w / 2, o.y - 2, o.w * 0.56, 11); else g.fillRect(o.x + 8, o.y - 6, o.w, 14); }
   else sceneryShadow(g, o);
 }
 
