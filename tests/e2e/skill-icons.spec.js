@@ -48,5 +48,5 @@ test('modo teclado: a barra mostra a arte com a tecla, e o tooltip tem ícone, n
 test('escolha de classe lista as habilidades com ícone', async ({ page }) => {
   await page.goto('/?api=&visual=original');
   await page.click('[data-action="new-char"]');
-  expect(await carregou(page, '.class-card img.cc-sk')).toEqual(Array(12).fill(true));
+  await page.waitForFunction(() => [...document.querySelectorAll('.class-card img.cc-sk')].length === 12 && [...document.querySelectorAll('.class-card img.cc-sk')].every((i) => i.complete && i.naturalWidth > 0));
 });

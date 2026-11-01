@@ -31,3 +31,22 @@ for k, im in tiles.items():
     dest = 'icons/status/potion.webp' if k == 'potion' else f'icons/skills/{k}.webp'
     cut(im).save(os.path.join(root, 'public/assets', dest), 'WEBP', quality=92, method=6)
     print('ok', dest)
+
+# ---- Mago: moldura única (roxa). Bola de Fogo (bronze) e Nova de Gelo (azul) vieram com molduras de outras classes: recolore SÓ o aro (hue → roxo). ----
+import colorsys
+def purple_frame(path, inset=0.115, radius=0.10):
+    im = Image.open(path).convert('RGBA'); w, h = im.size
+    inner = Image.new('L', (w, h), 0); d = ImageDraw.Draw(inner)
+    d.rounded_rectangle((w * inset, h * inset, w * (1 - inset), h * (1 - inset)), radius=int(w * radius), fill=255)
+    px = im.load(); ip = inner.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b, al = px[x, y]
+            if al == 0 or ip[x, y]: continue
+            hh, ss, vv = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            ss = max(ss, 0.42) if vv > 0.12 else ss
+            r2, g2, b2 = colorsys.hsv_to_rgb(0.74, min(1, ss * 0.95 + 0.1), min(1, vv * 0.86))
+            px[x, y] = (int(r2 * 255), int(g2 * 255), int(b2 * 255), al)
+    im.save(path, 'WEBP', quality=92, method=6)
+for k in ('fireball', 'frostnova'):
+    purple_frame(os.path.join(root, 'public/assets/icons/skills', k + '.webp')); print('moldura roxa', k)

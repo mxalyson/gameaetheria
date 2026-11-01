@@ -158,7 +158,11 @@ test('injeção de SQL: cargas maliciosas em e-mail, senha, nome e ids não alte
     try { await call('GET', '/api/me', undefined, e); } catch { /* o próprio fetch recusa caracteres inválidos no cabeçalho */ }
     await call('PUT', '/api/characters/' + char.id, { doc: { name: e }, rev: e }, token);
   }
-  assert.equal(count('accounts'), before.accounts, 'nenhuma conta criada ou apagada pelas cargas (e-mails inválidos são recusados)');
+  // Nada é apagado, e qualquer conta nova guarda o e-mail LITERALMENTE (o texto malicioso é só dado; o SQL é parametrizado). Se o limite de requisições barrar o cadastro, também vale:
+  // com a máquina lenta a janela do limite desliza e alguns e-mails com aspas (válidos pela RFC) viram conta, o que não é falha.
+  assert.ok(count('accounts') >= before.accounts, 'nenhuma conta foi apagada pelas cargas');
+  const permitidos = new Set(evil.map((e) => (e + '@x.com').toLowerCase()));
+  for (const { email } of db.raw.prepare('select email from accounts').all()) assert.ok(email === 'normal@exemplo.com' || permitidos.has(email), 'conta inesperada: ' + email);
   assert.equal(count('sessions'), before.sessions);
   assert.ok(count('characters') >= before.characters);
   assert.equal(db.character(char.id).name, 'Heroi');

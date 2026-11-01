@@ -147,7 +147,7 @@ class Game {
         break;
       }
       case 'close': this.ui.close(arg); break;
-      case 'toggle': this.togglePanel(arg); break;
+      case 'toggle': this.togglePanel(arg); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'item': this.ui.isOpen('shop') ? this.sell(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
       case 'enhance': this.enhanceItem(arg); break;
@@ -155,7 +155,7 @@ class Game {
       case 'spec': this.pickSpec(arg); break;
       case 'sort-inv': this.sortInventory(); break;
       case 'pref': this.setPref(arg); break;
-      case 'fullscreen': this.toggleFullscreen(); break;
+      case 'fullscreen': this.toggleFullscreen(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'buy-potion': this.buyPotion(Number(arg)); break;
       case 'buy-item': this.buyItem(Number(arg)); break;
       case 'sell-bulk': this.sellBulk(Number(arg)); break;

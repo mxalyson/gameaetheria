@@ -63,7 +63,7 @@ button { font-family: inherit; }
 .slot .icon { font-size: 26px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)); }
 /* arte própria nas habilidades: a imagem já traz a moldura da classe */
 .slot.art { background: none; border: 0; overflow: visible; box-shadow: none; }
-.slot.art .icon { position: absolute; inset: -3px; font-size: 0; filter: none; }
+.slot.art .icon { position: absolute; inset: -2px; font-size: 0; filter: none; }
 img.art { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
 .slot.art .cd { inset: 3px; border-radius: 17%; }
 .slot.art.cooling .icon img { filter: saturate(.5) brightness(.75) drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
@@ -265,7 +265,7 @@ body.online .online-only { display: inline-block; }
 .tbtn .cd { border-radius: 50%; }
 /* habilidades e poção do toque: quadrado arredondado com a arte da classe (o ataque e a vila seguem redondos) */
 .tbtn.sk, .tbtn.pot { background: none; border: 0; box-shadow: none; border-radius: 17%; }
-.tbtn.sk .icon, .tbtn.pot .icon { position: absolute; inset: -4px; font-size: 0; }
+.tbtn.sk .icon, .tbtn.pot .icon { position: absolute; inset: -2px; font-size: 0; }
 .tbtn.sk .cd, .tbtn.pot .cd { inset: 3px; border-radius: 17%; }
 .tbtn.sk.down, .tbtn.pot.down { filter: brightness(1.3); }
 .tbtn.pot.empty img { filter: grayscale(1) brightness(.6); }
@@ -304,7 +304,7 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
    mas nunca abaixo de 44 px (alvo mínimo de toque): os pequenos crescem antes de encolher. */
 @media (max-height: 360px) {
   #minimap { width: 84px; height: 56px; }
-  #tbtns { transform: scale(calc(var(--ui) * .85)); }
+  #tbtns { transform: scale(calc(var(--ui) * .72)); }
   .tbtn.pot, .tbtn.home { width: 54px; height: 54px; }
   .portrait { width: 34px; height: 34px; font-size: 17px; }
   #hud-gold { top: 54px; }
@@ -381,3 +381,16 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 .qlist li { opacity: .92; } .qlist li.done { color: #9be8b0; } .qlist li b { margin-left: 4px; }
 .map-link { text-align: center; color: var(--muted, #9aa3b8); font-size: 12px; margin: 2px 0; }
 .shop-item.locked { opacity: .6; } .shop-item.sel { outline: 2px solid #ffcf4a; border-radius: 12px; }
+
+/* ---- Celular deitado (pouca altura): só o MINIMAPA no canto (sem painel, nome da zona nem moldura) e os ícones do menu numa fileira SEMPRE visível ao lado dele.
+   Provisório: o desenho final dessa área é da B1/B5 (decisão do proprietário). Fica NO FIM do arquivo para vencer as regras de tamanho acima. ---- */
+@media (max-height: 520px) {
+  body.touch #hud-zone { background: none; box-shadow: none; padding: 0; border-radius: 10px; }
+  body.touch #zone-name { display: none; }
+  body.touch #minimap { display: block; width: 104px; height: 70px; margin: 0; border-radius: 10px; box-shadow: 0 0 0 2px rgba(20,26,46,.9), 0 0 0 3px rgba(255,207,74,.55), 0 4px 10px rgba(0,0,0,.4); }
+  body.touch .menu-btns { position: fixed; top: 8px; right: calc(8px + 104px + 12px + env(safe-area-inset-right, 0px)); display: flex; flex-wrap: nowrap; gap: 5px; margin: 0; }
+  body.touch .menu-btns button { width: 36px; height: 36px; font-size: 16px; border-radius: 12px; }
+}
+@media (max-height: 360px) { body.touch #minimap { width: 88px; height: 58px; } body.touch .menu-btns { right: calc(8px + 88px + 12px + env(safe-area-inset-right, 0px)); } }
+@media (max-height: 320px) { body.touch #minimap { width: 76px; height: 50px; } body.touch .menu-btns { right: calc(8px + 76px + 12px + env(safe-area-inset-right, 0px)); } #tbtns { transform: scale(calc(var(--ui) * .72)); } }
+@media (display-mode: fullscreen), (display-mode: standalone) { .menu-btns [data-action="fullscreen"] { display: none; } }
