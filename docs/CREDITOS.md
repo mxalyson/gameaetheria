@@ -34,3 +34,6 @@ Atualizado em 2026-10-31. A licença CC BY 4.0 exige atribuição: este texto de
 
 ## Ícones de equipamento (arte gerada por IA)
 Espada, cajado, arco, maça, elmo, armadura, botas, anel e amuleto (`public/assets/icons/item/`), recortados das folhas em `docs/art-direction/fontes-icones/` por `tools/item-icons-from-sheets.py`. **Origem/licença: a confirmar** (gerador e termos de uso a registrar pelo proprietário).
+
+## Spirits (arte gerada por IA)
+Fagulha, Ondina, Rochedo, Zéfiro (forma 1 e forma evoluída) e o ovo (`public/assets/icons/spirit/`), recortados de imagens guardadas em `docs/art-direction/fontes-icones/` por `tools/spirit-icons-from-images.py`. **Origem/licença: a confirmar.**

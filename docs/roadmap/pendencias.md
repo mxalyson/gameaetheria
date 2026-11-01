@@ -80,3 +80,8 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 ## Consumíveis pintados (2026-11-02)
 - [x] Moeda e poção de vida pintadas nos painéis, no HUD de ouro, no inventário e na loja (`res-*.webp`). Também recortados e prontos, **ainda sem uso**: poção de mana, essência, baú, chave, pergaminho, minério (`public/assets/icons/item/res-*.webp`).
 - [ ] Usar a essência na loja/spirits, o baú no mundo (hoje desenhado por código) e o pergaminho no diário; trocar os emojis restantes em logs e avisos de texto; spirits (C) e retratos (D, E).
+
+## Spirits pintados (2026-11-02)
+- [x] Forma 1 dos 4 spirits no painel, na lista do sábio, no HUD e no mundo (companheiro flutuante, com balanço leve); sem a imagem vale o desenho antigo. `render/spirit-sprites.js`.
+- [ ] **Evolução de spirits (ideia do proprietário, não aprovada):** forma 2 já recortada (`spirit-*-2.webp`) e o ovo (`spirit-egg.webp`), sem mecânica. Proposta a escrever antes de mexer em `core/`: nível mínimo, custo em essência/ouro, bônus de poder, versão do documento do personagem e do servidor, teste em `tests/core.test.js`, nota em `docs/gameplay/economia.md`.
+- [ ] Ovo na loja do sábio ao comprar essência; halo amarelo-esverdeado da Fagulha evoluída (limpar se for usar).

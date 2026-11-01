@@ -2,6 +2,7 @@
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
+import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
 import { loadNature, setNatureZone, drawNature, stampGround, groundReady } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
@@ -25,7 +26,7 @@ const circle = (g, x, y, r) => { g.beginPath(); g.arc(x, y, Math.max(0.1, r), 0,
 export class Renderer {
   constructor(canvas) {
     this.c = canvas;
-    loadNature(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
+    loadNature(); preloadSpirits(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
     this.g = canvas.getContext('2d');
     this.grounds = new Map();
     this.dprCap = 2;
@@ -733,6 +734,7 @@ function drawMob(g, a, t) {
 function drawSpirit(g, s, t) {
   const S = SPIRITS[s.spiritType];
   const y = s.y + Math.sin(s.bob * 3) * 3;
+  if (drawSpiritSprite(g, s, y, t)) return; // spirit pintado; sem a imagem vale o desenho antigo abaixo
   g.globalCompositeOperation = 'lighter';
   const grd = g.createRadialGradient(s.x, y, 1, s.x, y, 20);
   grd.addColorStop(0, S.glow + 'cc'); grd.addColorStop(1, S.color + '00');

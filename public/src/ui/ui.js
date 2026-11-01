@@ -38,6 +38,8 @@ export const noticeText = (n) => {
 
 // Ícone do equipamento: arte pintada por tipo (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto); se a imagem faltar, volta ao emoji.
 const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
+import { spiritUrl } from '../render/spirit-sprites.js';
+const spiritImg = (type, cls = '') => `<img class="sp-img ${cls}" src="${spiritUrl(type)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
 // moeda e poção pintadas no lugar dos emojis 🪙 🧪 dentro dos painéis
 const COIN = '<img class="coin" src="assets/icons/item/res-gold-coin.webp" alt="🪙" draggable="false">';
 const POT = '<img class="coin" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false">';
@@ -278,7 +280,7 @@ export class UI {
     }
     this.set('potion-count', 'text', String(char.potions));
     const sp = char.spirits.find((s) => s.id === char.activeSpirit);
-    this.set('spirit-icon', 'html', sp ? `<i class="orb" style="--sc:${SPIRITS[sp.type].color}"></i>` : '·');
+    this.set('spirit-icon', 'html', sp ? spiritImg(sp.type, 'hud') : '·');
 
     // Barra de chefe / rival.
     const boss = game.mode === 'pvp' ? game.rival : world.actors.find((a) => (a.boss || a.elite) && !a.dead && Math.hypot(a.x - player.x, a.y - player.y) < 650);
@@ -415,7 +417,7 @@ export class UI {
       const active = char.activeSpirit === sp.id;
       const need = spiritXpToNext(sp.level);
       return `<div class="sp-card ${active ? 'active' : ''}" style="--sc:${S.color};--rc:${R.color}">
-        <i class="orb big"></i>
+        ${spiritImg(sp.type, 'big')}
         <div class="sp-info">
           <div class="nm">${S.name} <span class="rar">${R.name}</span></div>
           <div class="sub">${S.element} · ${S.role} · Nv ${sp.level} · Poder ${spiritPower(sp)}</div>
@@ -562,7 +564,7 @@ export class UI {
 
   panel_sage() {
     const { char } = this.game;
-    const types = Object.values(SPIRITS).map((S) => `<div class="sage-type" style="--sc:${S.color}"><i class="orb"></i><b>${S.name}</b><span>${S.element} · ${S.role}</span></div>`).join('');
+    const types = Object.values(SPIRITS).map((S) => `<div class="sage-type" style="--sc:${S.color}">${spiritImg(Object.keys(SPIRITS).find((k) => SPIRITS[k] === S))}<b>${S.name}</b><span>${S.element} · ${S.role}</span></div>`).join('');
     return this.frame('sage', 'Sábia Yun', `
       <p class="npc-line">"Spirits são ecos da natureza. Escolha bem quem caminha ao seu lado."</p>
       <div class="sage-types">${types}</div>
