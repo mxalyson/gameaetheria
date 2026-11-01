@@ -348,7 +348,7 @@ export class UI {
       const it = char.inventory[i];
       cells.push(it ? this.itemCell(it, 'item', it.id) : '<div class="cell empty"></div>');
     }
-    const hint = this.isOpen('shop') ? 'Clique em um item para <b>vender</b>.' : 'Clique para equipar · Equipamento em <b>C</b>.';
+    const hint = this.isOpen('shop') ? 'Toque em um item para <b>vender</b>.' : 'Toque para equipar · Atributos no 🧙.';
     return this.frame('inventory', `Inventário <small>${char.inventory.length}/${INVENTORY_SIZE}</small>`, `
       <div class="inv-grid">${cells.join('')}</div>
       <div class="inv-foot"><span>🪙 ${char.gold}</span><span>🧪 ${char.potions}</span><span class="hint">${hint}</span></div>
@@ -430,7 +430,7 @@ export class UI {
     return this.frame('shop', 'Mercadora Lia', `
       <p class="npc-line">"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
       <div class="shop-item"><div class="cell r-common"><span class="ic">🧪</span></div>
-        <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · tecla Q</div></div>
+        <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão 🧪</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · 🪙 ${potion}</button>
         <button class="btn small" data-action="buy-potion" data-arg="5">5 · 🪙 ${potion * 5}</button></div></div>
       <h3>Equipamentos</h3>${stock}
@@ -477,7 +477,7 @@ export class UI {
     const modes = Object.entries(MODES).map(([id, md]) => `<button class="btn ${pvp ? 'primary' : ''} wide" data-action="net-queue" data-arg="${id}" ${pvp ? '' : 'disabled'}>🌐 ${md.label} com jogadores reais · rating ${getRating(char, id)}</button>`).join('');
     return `<h3>Jogadores reais</h3>${pvp ? '' : `<p class="hint">🔒 PvP online libera no nível ${PVP_MIN_LEVEL}.</p>`}${modes}
       <button class="btn wide" data-action="net-queue" data-arg="coop">🤝 Cooperativo: ondas e chefe (1–4 jogadores)</button>
-      <p class="hint">Aliados e adversários são pareados por rating e poder; vagas vazias são preenchidas por bots. Grupo: tecla <b>G</b>.</p>
+      <p class="hint">Aliados e adversários são pareados por rating e poder; vagas vazias são preenchidas por bots. Grupo: botão 👥.</p>
       <button class="btn small" data-action="toggle" data-arg="party">👥 Grupo</button>`;
   }
 
@@ -545,7 +545,7 @@ export class UI {
       return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : ['🏠', '🌲', '💎', '🏚️'][i]}</span></div>
       <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div></div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
     const arenas = '<div class="shop-item"><div class="cell"><span class="ic">⚔️</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>';
-    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas. Tecla <b>H</b> volta à vila fora de combate.</p>${rows}${arenas}`);
+    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas. O botão 🏠 volta à vila fora de combate.</p>${rows}${arenas}`);
   }
 
   panel_sage() {
@@ -573,7 +573,7 @@ export class UI {
         <button class="btn small" data-action="pref" data-arg="scale:+10" ${pr.scale >= SCALE_MAX ? 'disabled' : ''}>+</button></div></div>
       <div class="opt-row"><b>Qualidade gráfica</b>${seg('quality', [['auto', 'Auto'], ['high', 'Alta'], ['medium', 'Média'], ['low', 'Baixa']])}</div>
       <p class="hint">Baixa e média reduzem névoa, partículas e resolução: ajudam em celulares fracos e economizam bateria.</p>
-      <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Auto'], ['touch', 'Toque'], ['keyboard', 'Teclado e mouse']])}</div>
+      <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Toque (padrão)'], ['keyboard', 'Teclado e mouse']])}</div>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
       ${this.game.online ? '<div class="opt-row"><b>Conta</b><div class="seg"><button class="btn small" data-action="switch-char">Trocar personagem</button><button class="btn small" data-action="logout">Sair</button></div></div>' : ''}

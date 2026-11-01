@@ -66,8 +66,10 @@ class Game {
     // Com API configurada o jogo exige conta (login → personagens na nuvem). Sem API, segue offline como antes.
     const base = apiUrl();
     this.online = null; this.cloud = null; this.charId = null;
+    document.body.classList.remove('online');
     if (base) {
       this.online = new Online(base);
+      document.body.classList.add('online'); // libera os botões que só fazem sentido com conta (grupo)
       this.cloud = new CloudSave(this.online, { onSync: (doc) => this.mergeServerFields(doc), onReject: (doc, e) => this.resync(doc, e) });
       this.bootOnline();
     } else {
@@ -193,8 +195,8 @@ class Game {
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
       this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Siga o portal a leste para o Bosque Verdejante', 'gold');
-      this.ui.log('WASD move · mouse mira · <b>clique</b> ataca · <b>1 2 3</b> habilidades', '#cfe8ff');
-      this.ui.log('<b>E</b> conversa · <b>I</b> inventário · <b>C</b> personagem · <b>P</b> spirits · <b>Q</b> poção · <b>H</b> volta à vila', '#cfe8ff');
+      this.ui.log('Arraste à esquerda para andar · botão grande ataca · círculos menores são as habilidades', '#cfe8ff');
+      this.ui.log('💬 conversa com NPCs · 🧪 poção · 🏠 volta à vila · 🎒 mochila · 🧙 personagem · 🔮 spirits · 📖 diário', '#cfe8ff');
       const sp = SPIRITS[char.spirits[0].type];
       this.ui.log(`Um spirit te acompanha: <b style="color:${sp.color}">${sp.name}</b> (${sp.element}).`, sp.color);
     }
@@ -346,7 +348,7 @@ class Game {
       handlers: {
         party: refresh,
         queue: () => { refresh(); },
-        invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (tecla G)`, 'gold'); refresh(); },
+        invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (botão 👥)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
         reject: (m) => { this.zoneBusy = false; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast('Servidor de partidas', noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
@@ -375,6 +377,8 @@ class Game {
   inNetZone() { return this.mode === 'net' && this.netInfo?.mode === 'zone'; }
   // equipamento/atributos/spirits mudam o personagem no cliente; na instância o servidor é o dono do personagem (transações de loja/equipar: P11.4)
   togglePanel(id) {
+    if ((id === 'journal' || id === 'map') && this.mode !== 'explore') return; // diário e mapa só no mundo normal
+    if (id === 'party' && !this.online) return;
     if (this.inNetZone() && ['inventory', 'character', 'spirits'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à vila (H) para mexer no equipamento e nos atributos.', '');
     this.ui.toggle(id);
   }
@@ -423,7 +427,7 @@ class Game {
     if (r.potions) parts.push(`+${r.potions} 🧪`);
     if (parts.length) this.ui.log(parts.join(' · '), '#ffd27a');
     if (r.deaths) this.ui.log('Você caiu: −10% do ouro.', '#ffb4a8');
-    if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos na vila (C).', 'gold');
+    if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos na vila (🧙).', 'gold');
     for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     for (const id of r.achievements ?? []) this.announceAchievements([id]);
     try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char); } } catch { /* tenta no próximo lote */ }
@@ -940,7 +944,7 @@ class Game {
     p.hp = p.maxHp;
     this.world.addFx({ type: 'ring', x: p.x, y: p.y, r: 120, color: '#ffd34d', t: 0, life: 0.8, follow: p });
     this.world.burst(p.x, p.y, '#ffd34d', 40, 260);
-    this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o personagem (C)`, 'gold');
+    this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o personagem (🧙)`, 'gold');
     this.ui.log(`Você alcançou o nível <b>${this.char.level}</b>.`, '#ffd34d');
     this.gameEvent({ type: 'level', level: this.char.level });
     if (this.ui.anyOpen()) this.ui.render();
@@ -996,7 +1000,7 @@ class Game {
     this.gameEvent({ type: 'spirit', count: c.spirits.length });
     const S = SPIRITS[sp.type], R = RARITY[sp.rarity];
     this.ui.toast(`Novo spirit: ${S.name}`, `${R.name} · ${S.element} · ${S.role}`, 'gold');
-    this.ui.log(`Essência despertou <b style="color:${S.color}">${S.name}</b> (${R.name})! Veja em <b>P</b>.`, S.color);
+    this.ui.log(`Essência despertou <b style="color:${S.color}">${S.name}</b> (${R.name})! Veja em 🔮.`, S.color);
     if (!c.activeSpirit) this.setSpirit(sp.id);
     this.save();
     return true;

@@ -29,3 +29,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] Economia: co-op end-game (recompensas além do nível 20) e eventuais outros ralos (taxas, cosméticos).
 - [ ] Teste oscilante sob carga: `iso-poc.spec.js` (laboratório; Bola de Fogo, Aprendiz/Franco) e `mobile` "botões" — passam sozinhos.
 - [x] Fonte local (Cinzel/Nunito em `public/fonts`, OFL).
+
+## Mobile-first (decisão 0016)
+- [ ] Medir toque e desempenho em aparelho real (emulador/celular via adb).
+- [ ] Painéis e loja com alvos de toque maiores e menu superior redesenhado (fase B1).

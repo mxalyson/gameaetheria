@@ -236,6 +236,9 @@ html, body { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: no
 canvas#game { touch-action: none; }
 .touch-only { display: none; }
 body.touch .menu-btns .touch-only { display: inline-block; }
+.online-only { display: none; }
+body.online .online-only { display: inline-block; }
+.menu-btns { flex-wrap: wrap; }
 #hud { z-index: 3; }
 #touch { position: fixed; inset: 0; z-index: 2; pointer-events: none; touch-action: none; }
 #stick-zone { position: absolute; left: 0; top: 24%; bottom: 0; width: 48%; pointer-events: auto; touch-action: none; }

@@ -73,13 +73,15 @@ test('baús: abrem com E, pagam, contam, recarregam em 10 min e o mapa e o diár
   await page.waitForFunction(() => window.game.nearChest === 'forest:1');
   const g0 = await page.evaluate(() => window.game.char.gold);
   await page.keyboard.press('e');
+  await page.waitForFunction(() => window.game.char.stats.chests === 1); // a tecla só vale no próximo quadro: espera o efeito (a máquina carregada atrasava)
   const a = await page.evaluate(() => ({ gold: window.game.char.gold, chests: window.game.char.stats.chests, opened: Object.keys(window.game.char.chests) }));
   expect(a.gold).toBeGreaterThan(g0); expect(a.chests).toBe(1); expect(a.opened).toEqual(['forest:1']);
   await page.keyboard.press('e'); // ainda recarregando
+  await page.waitForTimeout(250);
   expect(await page.evaluate(() => window.game.char.stats.chests)).toBe(1);
   await page.evaluate(() => { window.game.char.chests['forest:1'] -= 11 * 60 * 1000; });
   await page.keyboard.press('e');
-  expect(await page.evaluate(() => window.game.char.stats.chests)).toBe(2);
+  await page.waitForFunction(() => window.game.char.stats.chests === 2);
   await page.screenshot({ path: 'test-results/bau.png' });
   await page.keyboard.press('m');
   await expect(page.locator('.panel')).toContainText('Bosque Verdejante');

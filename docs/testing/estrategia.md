@@ -20,6 +20,7 @@ Snapshots (P9): `tests/snapshot.test.js` (7: codificador/decodificador, partida 
 Operação (P10): `tests/ops.test.js` (4: configuração, logs JSON, healthz/readyz/metrics com token, desligamento limpo, backup→restauração). E2E P10: `texture-budget` (memória real de textura por escala), `pwa` (manifesto/ícones e jogo offline com service worker), `draw-cost` (custo de desenho; CPU headless, pessimista, não é celular). O SW fica bloqueado nos demais e2e (`serviceWorkers: 'block'`).
 Exploração no servidor (P11.1): `tests/zone.test.js` (9: entrada por portal, movimento, recompensa gravada pelo servidor, morte, grupo × solo, portais) e, em `core.test.js`, a prova de que a grade de colisão dá o mesmo resultado da busca linear.
 Exploração online no jogo real (P11.2): `tests/e2e/zona-online.spec.js` (2: portal → instância → abate → XP gravado no servidor → volta à vila; ganhos forjados ignorados).
+Mobile-first (P12): `tests/e2e/mobile-first.spec.js` (3: toque padrão e teclado só por escolha; botões de toque com mouse e menu sem teclado; nenhum texto manda apertar teclas).
 Salvamento: `tests/save.test.js` (migração, validação, trapaça, XSS) e `tests/e2e/save.spec.js` (save antigo, corrompido, backup, importar).
 
 Lacunas (após P1): telégrafo de chefe, colisões em detalhe, ondas, loja, UI e desempenho multiplayer ainda não têm teste automatizado; não há testes de rede, segurança nem carga.

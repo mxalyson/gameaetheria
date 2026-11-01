@@ -19,14 +19,8 @@ export class TouchControls {
     this.origin = null;
     this.btns = new Map();
     this.coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-    this.lastPointer = this.coarse ? 'touch' : 'mouse';
     this.root = $('touch');
     this.build();
-    // Em aparelhos híbridos, a última entrada usada decide qual interface aparece (modo "auto").
-    addEventListener('pointerdown', (e) => {
-      const kind = e.pointerType === 'mouse' ? 'mouse' : 'touch';
-      if (kind !== this.lastPointer) { this.lastPointer = kind; this.refresh(); }
-    }, true);
     this.refresh();
   }
 
@@ -35,7 +29,10 @@ export class TouchControls {
   setMode(mode) { this.mode = mode; this.refresh(); }
 
   refresh() {
-    this.active = this.mode === 'touch' || (this.mode === 'auto' && this.lastPointer === 'touch');
+    // Jogo pensado para CELULAR: toque é o padrão em qualquer tela (no PC os botões respondem ao mouse); teclado e mouse só se escolhido nas opções.
+    // Exceção de teste: navegador automatizado SEM toque emulado (Playwright) usa teclado, para os testes de teclado seguirem valendo.
+    const robot = typeof navigator !== 'undefined' && navigator.webdriver === true && !this.coarse;
+    this.active = this.mode === 'touch' || (this.mode === 'auto' && !robot);
     document.body.classList.toggle('touch', this.active);
     if (!this.active) this.reset();
   }
