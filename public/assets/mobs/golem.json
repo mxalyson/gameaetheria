@@ -1,21 +1,21 @@
 {
- "id": "colossus",
+ "id": "golem",
  "cell": [
-  117,
-  144
+  98,
+  120
  ],
- "cols": 4,
+ "cols": 5,
  "rows": 8,
- "frames": 4,
+ "frames": 5,
  "style": "waddle",
- "ax": 59,
- "ay": 103,
- "ppm": 166.8058069214111,
+ "ax": 49,
+ "ay": 86,
+ "ppm": 139.258110010498,
  "size": [
   0.489,
   0.482,
   0.353
  ],
  "src": "meshy-mobs/guardian.glb",
- "v": 1793573613
+ "v": 1793574108
 }
