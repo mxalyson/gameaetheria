@@ -638,16 +638,7 @@ function drawMob(g, a, t) {
       g.fillStyle = '#ffdd66'; circle(g, 14, -3.2, 1.5); g.fill(); circle(g, 14, 3.2, 1.5); g.fill();
       break;
     }
-    case 'shroom': {
-      g.translate(0, bob * 0.6);
-      g.fillStyle = '#f4ead8'; g.fillRect(-6, -4, 12, 14);
-      eyes(4, 3, 1.5);
-      g.fillStyle = c;
-      g.beginPath(); g.ellipse(0, -4, 17, 12, 0, Math.PI, 0); g.closePath(); g.fill();
-      g.fillStyle = '#fff6f0';
-      circle(g, -7, -9, 3); g.fill(); circle(g, 5, -12, 2.5); g.fill(); circle(g, 9, -6, 2); g.fill();
-      break;
-    }
+    // shroom: só existe pintado (assets/mobs/shroom); o desenho antigo foi removido
     case 'treant': {
       g.fillStyle = '#6e5038';
       g.beginPath(); g.moveTo(-16, 16); g.lineTo(-12, -16); g.lineTo(12, -16); g.lineTo(16, 16); g.quadraticCurveTo(0, 22, -16, 16); g.fill();

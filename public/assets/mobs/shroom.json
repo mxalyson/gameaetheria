@@ -1,0 +1,21 @@
+{
+ "id": "shroom",
+ "cell": [
+  106,
+  128
+ ],
+ "cols": 6,
+ "rows": 8,
+ "frames": 6,
+ "style": "waddle",
+ "ax": 53,
+ "ay": 91,
+ "ppm": 37.619713731566954,
+ "size": [
+  1.667,
+  1.899,
+  1.654
+ ],
+ "src": "meshy-mobs/shroom.glb",
+ "v": 1793572756
+}

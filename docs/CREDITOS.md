@@ -52,3 +52,4 @@ Modelos 3D do Meshy (CC BY 4.0) fotografados em 8 direções por `tools/mob-bake
 
 ## Monstros (Meshy, CC BY 4.0)
 Geleia (`slime`) e Lobo Cinzento (`wolf`): modelos 3D gerados no Meshy a partir de imagens de conceito do proprietário, fotografados em 8 direções por `tools/mob-bake.mjs` (`public/assets/mobs/`). Imagens de conceito: origem/licença a confirmar.
+Cogumelo Esporento (`shroom`): mesma origem (Meshy, CC BY 4.0), animado por deformação `waddle`.
