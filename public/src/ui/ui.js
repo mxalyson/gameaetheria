@@ -40,6 +40,12 @@ export const noticeText = (n) => {
 const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
 const spiritImg = (type, cls = '') => `<img class="sp-img ${cls}" src="${spiritUrl(type)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
+// Emblema no oval do diálogo (provisório até haver retrato pintado de cada NPC): moeda, espada, spirit, escudo, cruz.
+const NPC_EMBLEM = { shop: '<img src="assets/icons/item/res-gold-coin.webp" alt="">', arena: null, sage: null, guard: null, herbalist: null };
+const npcEmblem = (id) => {
+  const html = id === 'merchant' || id === 'shop' ? NPC_EMBLEM.shop : id === 'sage' ? spiritImg('zephyr') : id === 'herbalist' ? attackImg('cleric', '✚') : attackImg('warrior', '⚔');
+  return `<span class="npc-emb">${html}</span>`;
+};
 // moeda e poção pintadas no lugar dos emojis 🪙 🧪 dentro dos painéis
 const COIN = '<img class="coin" src="assets/icons/item/res-gold-coin.webp" alt="🪙" draggable="false">';
 const POT = '<img class="coin" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false">';
@@ -442,7 +448,7 @@ export class UI {
         <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${it.value * PRICES.itemMarkup}</button></div>`).join('') || '<p class="empty-msg">Estoque esgotado. Volte após subir de nível.</p>';
     const potion = PRICES.potion(char.level);
     return this.frame('shop', 'Mercadora Lia', `
-      <p class="npc-line">"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
+      <p class="npc-line">${npcEmblem('shop')}"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
       <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false"></span></div>
         <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>
@@ -470,7 +476,7 @@ export class UI {
     const { char } = this.game;
     const tier = tierFor(char.arena.rating);
     return this.frame('arena', 'Mestre Doran', `
-      <p class="npc-line">"A arena guarda os ecos de todos que lutaram aqui. Prove seu valor!"</p>
+      <p class="npc-line">${npcEmblem('arena')}"A arena guarda os ecos de todos que lutaram aqui. Prove seu valor!"</p>
       <div class="arena-badge" style="--tc:${tier.color}"><div class="tier">${tier.name}</div><div class="rt">${char.arena.rating}</div>
         <div class="wl">${char.arena.wins}V · ${char.arena.losses}D · Melhor onda: ${char.arena.bestWave}</div></div>
       <div class="arena-badge"><div class="wl">⚡ Seu poder: <b>${playerPower(char)}</b></div></div>
@@ -527,7 +533,7 @@ export class UI {
     else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>⏳ ${q.name}</h3>${this.questLines(char, active)}`; }
     const more = (offeredBy(char, npc.id, { server: !!g.online }).length > (offer ? 1 : 0)) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
     const svc = D.service ? `<button class="btn wide" data-action="dialog-service" data-arg="${D.service.panel}">${D.service.label}</button>` : '';
-    return this.frame('dialog', npc.name, `<p class="npc-line">"${esc(text)}"</p>${body}${more}${svc}`);
+    return this.frame('dialog', npc.name, `<p class="npc-line">${npcEmblem(npc.id)}"${esc(text)}"</p>${body}${more}${svc}`);
   }
 
   questLines(char, id) {
@@ -566,7 +572,7 @@ export class UI {
     const { char } = this.game;
     const types = Object.values(SPIRITS).map((S) => `<div class="sage-type" style="--sc:${S.color}">${spiritImg(Object.keys(SPIRITS).find((k) => SPIRITS[k] === S))}<b>${S.name}</b><span>${S.element} · ${S.role}</span></div>`).join('');
     return this.frame('sage', 'Sábia Yun', `
-      <p class="npc-line">"Spirits são ecos da natureza. Escolha bem quem caminha ao seu lado."</p>
+      <p class="npc-line">${npcEmblem('sage')}"Spirits são ecos da natureza. Escolha bem quem caminha ao seu lado."</p>
       <div class="sage-types">${types}</div>
       <div class="shop-item"><div class="cell r-uncommon"><span class="ic">🔮</span></div>
         <div><div class="nm">Essência Selvagem</div><div class="sub">Spirit aleatório</div></div>

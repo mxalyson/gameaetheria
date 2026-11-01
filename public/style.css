@@ -542,3 +542,10 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .sp-img.hud { width: 100%; height: 100%; padding: 4px; box-sizing: border-box; }
 .sp-img.big { width: 58px; height: 58px; flex: none; }
 .sage-type .sp-img { width: 34px; height: 34px; }
+.npc-line { position: relative; }
+.npc-emb { position: absolute; left: 3.2%; top: 50%; width: 15%; aspect-ratio: 3 / 4; transform: translateY(-50%); display: grid; place-items: center; pointer-events: none; }
+.npc-emb img { width: 92%; height: 92%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+.result { --pb: 28px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; padding: 6px 24px 8px; filter: drop-shadow(0 16px 28px rgba(0,0,0,.6)); }
+.result h1 { text-shadow: 0 2px 0 #000b; }
+.result .sub { color: #cdd3ea; }
+@media (max-height: 520px) { .result { --pb: 22px; padding: 0 14px 4px; } }
