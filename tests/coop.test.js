@@ -33,6 +33,9 @@ async function coop(srv, chars) {
 }
 // "Mata" todos os monstros vivos usando o servidor (atalho de teste: o dano passa pela regra normal de dano do mundo).
 function clearMobs(room) { const p = [...room.players.values()].find((x) => !x.left && !x.actor.dead)?.actor; for (const m of room.mobs()) if (!m.dead) room.world.damage(p, m, 9999); }
+// Mobs mais fortes (ver docs/gameplay/dificuldade.md): quem fica parado de propósito nos testes não pode morrer antes do que o teste quer medir.
+function stepAlive(srv, room, n) { for (let i = 0; i < n; i++) { srv.step(1); for (const p of room.players.values()) if (p.actor && !p.left) { p.actor.hp = p.actor.maxHp; p.actor.dead = false; } } }
+
 function playToEnd(srv, room, { max = 60 * 400 } = {}) {
   let g = 0;
   while (room.state !== 'over' && g++ < max) { if (room.state === 'fight' && room.wave.state === 'fight') clearMobs(room); srv.step(1); }
@@ -143,9 +146,9 @@ test('abandono: quem sai não recebe nada, quem fica recebe; ninguém é punido'
   const { db, chars } = world([10, 10]);
   const srv = await start(db, { reconnectSec: 2 });
   const { cs, room } = await coop(srv, chars);
-  srv.step(60 * 8);
+  stepAlive(srv, room, 60 * 8);
   cs[1].ws.terminate(); await new Promise((r) => setTimeout(r, 50));
-  srv.step(60 * 3);
+  stepAlive(srv, room, 60 * 3);
   const left = [...room.players.values()].find((p) => p.charId === chars[1].charId);
   assert.equal(left.left, true);
   assert.equal(room.world.actors.includes(left.actor), false, 'o personagem sai do mundo');

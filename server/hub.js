@@ -18,13 +18,16 @@ export const INVITE_TTL = 60;        // s
 export const BOT_FILL_AFTER = 20;    // s na fila até completar com bots
 export const COOP_WAIT = 6;          // s esperando mais jogadores antes de começar o cooperativo
 const COOP_LEVEL_GAP = 8;
+export const TELEPORT_COOLDOWN = 5;      // s entre pedidos de teletransporte da mesma sessão (vale também para pedidos recusados)
+export const TELEPORT_COMBAT_SEC = 8;    // mesmo critério do cliente offline: sem dano causado/recebido nos últimos 8 s
+const TELEPORT_ENTRY = { x: 110, y: 950 }; // ponto oeste, igual ao de quem entra por portal
 const RATING_WIN = [50, 400], POWER_WIN = [0.15, 0.5], WIDEN_SEC = 40; // a janela abre linearmente com a espera
 
 export class Hub {
   constructor({ db = null, seed = 1, reconnectSec = 30, out }) {
     Object.assign(this, { db, reconnectSec, out });
     this.rng = makeRng(seed);
-    this.clock = 0; this.tick = 0; this.nextRoom = 1; this.nextParty = 1;
+    this.clock = 0; this.tick = 0; this.tpSeq = 0; this.nextRoom = 1; this.nextParty = 1;
     this.sessions = new Map();   // token -> sessão
     this.byName = new Map();     // nome em minúsculas -> sessão (conectada)
     this.byChar = new Map();     // charId -> sessão
@@ -90,6 +93,7 @@ export class Hub {
       case 'queue_cancel': if (s.queued) this.cancelQueue(s); return;
       case 'zone_enter': return this.zoneEnter(s, m.zone, m.from, no);
       case 'zone_leave': return this.zoneLeave(s);
+      case 'zone_teleport': return this.zoneTeleport(s, m.zone, no);
     }
   }
 
@@ -285,20 +289,81 @@ export class Hub {
       if (s.room.mode !== 'zone' || s.room.zoneId !== from) return no(REJECT.IN_MATCH);
       s.room.leave(s.player, 'portal');
     }
+    if (this.zoneRoomFor(s, zoneId).room?.size >= MAX_PARTY) return no(REJECT.ROOM_FULL);
+    this.joinZoneRoom(s, zoneId, at);
+  }
+  // sala existente da instância (grupo/solo + zona) com vaga; null se cheia
+  zoneRoomFor(s, zoneId) {
     const key = `${s.partyId ?? 's' + s.id}:${zoneId}`;
-    let room = this.zoneRooms.get(key);
-    if (room && (room.closed || room.size >= MAX_PARTY)) { if (room.closed) this.zoneRooms.delete(key); else return no(REJECT.ROOM_FULL); room = null; }
+    const room = this.zoneRooms.get(key);
+    if (room?.closed) this.zoneRooms.delete(key);
+    return { key, room: room && !room.closed ? room : null };
+  }
+  joinZoneRoom(s, zoneId, at, extra = null) {
+    const { key } = this.zoneRoomFor(s, zoneId);
+    let { room } = this.zoneRoomFor(s, zoneId);
     if (!room) {
       const id = this.nextRoom++;
       room = new ZoneRoom({ id, key, zoneId, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession, onPortal: (p, pt) => this.zonePortal(room, p, pt) });
       this.rooms.set(id, room); this.zoneRooms.set(key, room);
     }
     room.join(s, at);
-    this.sendZoneJoined(s, room);
+    this.markVisited(s, zoneId);
+    this.sendZoneJoined(s, room, extra);
   }
-  sendZoneJoined(s, room) {
+  // Mapa visitado é gravado pelo servidor (o cliente fica com a nuvem pausada dentro da instância): é o que libera o teletransporte depois.
+  markVisited(s, zoneId) {
+    if (!this.db || !s.charId) return;
+    try {
+      if (this.db.character(s.charId)?.doc.visited?.[zoneId]) return;
+      const out = this.db.applyOperation(`visit:${s.id}:${++this.tpSeq}:${randomBytes(4).toString('hex')}`, s.charId, 'visit', (d) => {
+        const c = structuredClone(d); (c.visited ??= {})[zoneId] = 1;
+        return { doc: c, summary: { zone: zoneId } };
+      });
+      s.char = out.doc;
+    } catch { /* sem o registro o jogador só precisa passar por lá de novo */ }
+  }
+  // Teletransporte: o servidor confere TUDO (o cliente só pede). Vila é grátis; outras zonas custam 1 pergaminho debitado no documento oficial.
+  zoneTeleport(s, zoneId, no) {
+    if (this.clock - (s.tpAt ?? -99) < TELEPORT_COOLDOWN) return no(REJECT.TELEPORT_WAIT);
+    s.tpAt = this.clock;
+    if (!this.db || !s.charId) return no(REJECT.BAD_CHARACTER);
+    if (s.queued) return no(REJECT.ALREADY_QUEUED);
+    const toTown = zoneId === 'town';
+    if (!toTown && !ZONES[zoneId]?.mobs) return no(REJECT.BAD_ZONE);
+    const room = s.room;
+    if (room && room.mode !== 'zone') return no(REJECT.IN_MATCH); // partida em andamento não permite viajar
+    if (room) {
+      if (room.zoneId === zoneId) return no(REJECT.BAD_ZONE);
+      const a = s.player?.actor;
+      if (a && (a.dead || room.world.time - a.lastCombat < TELEPORT_COMBAT_SEC)) return no(REJECT.IN_COMBAT);
+    }
+    // documento oficial FRESCO do banco (o cliente grava a nuvem antes de pedir): visitado e pergaminho valem pelo que está salvo
+    const row = this.db.character(s.charId);
+    if (!row) return no(REJECT.BAD_CHARACTER);
+    const doc = row.doc;
+    if (!toTown && !doc.visited?.[zoneId]) return no(REJECT.NOT_VISITED);
+    if (!toTown && (doc.scrolls ?? 0) < 1) return no(REJECT.NO_SCROLL);
+    if (!toTown && this.zoneRoomFor(s, zoneId).room?.size >= MAX_PARTY) return no(REJECT.ROOM_FULL); // antes de cobrar
+    let scrolls = doc.scrolls ?? 0;
+    if (!toTown) {
+      try {
+        const out = this.db.applyOperation(`tp:${s.id}:${++this.tpSeq}:${randomBytes(4).toString('hex')}`, s.charId, 'teleport', (d) => {
+          if ((d.scrolls ?? 0) < 1) throw new Error('sem pergaminho');
+          const c = structuredClone(d); c.scrolls -= 1;
+          return { doc: c, summary: { zone: zoneId, scrolls: c.scrolls } };
+        });
+        s.char = out.doc; scrolls = out.doc.scrolls;
+        this.db.audit('teleport', { accountId: s.accountId, detail: JSON.stringify({ char: s.charId, zone: zoneId, scrolls }) });
+      } catch { return no(REJECT.NO_SCROLL); }
+    }
+    if (room) room.leave(s.player, 'teleport'); // grava o lote pendente de recompensas antes de trocar de lugar
+    if (toTown) return this.out.send(s, { t: 'zone_exit', to: 'town' });
+    this.joinZoneRoom(s, zoneId, { ...(ZONES[zoneId].spawn ?? TELEPORT_ENTRY) }, { scrolls });
+  }
+  sendZoneJoined(s, room, extra = null) {
     const p = s.player;
-    this.out.send(s, { t: 'zone_joined', room: room.id, zone: room.zoneId, you: p.actor.id, x: p.actor.x, y: p.actor.y, w: room.world.zone.w, h: room.world.zone.h,
+    this.out.send(s, { t: 'zone_joined', room: room.id, zone: room.zoneId, you: p.actor.id, x: p.actor.x, y: p.actor.y, w: room.world.zone.w, h: room.world.zone.h, ...(extra ?? {}),
       players: room.statics([...room.players.values()].filter((q) => !q.left)).map((q) => ({ ...q, team: 1 })) });
     room.sendKeyframe(s);
   }

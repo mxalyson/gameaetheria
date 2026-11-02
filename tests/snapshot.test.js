@@ -58,6 +58,26 @@ test('decodificador: reconstrói jogadores e monstros (novo, atualizado, removid
   assert.equal(s.actors.find((a) => a.id === 2).dead, true);
 });
 
+test('mini-chefe, esbirro e acampamento: marcas, nome, raio e vida chegam ao cliente; mob comum não ganha campos', () => {
+  const dec = new SnapshotDecoder().init({ you: 1, players: [{ id: 1, team: 1, name: 'A', classId: 'mage', level: 10, maxHp: 300 }] });
+  const enc = new DeltaEncoder();
+  const base = { level: 8, boss: false, x: 5, y: 5, hp: 900, facing: 0, dead: false, moving: false, swing: 0 };
+  const mb = { ...base, id: 20, mobId: 'wolf', elite: true, miniboss: true, name: 'Alfa da Matilha', r: 40.4, maxHp: 900 };
+  const su = { ...base, id: 21, mobId: 'wisp', elite: false, summoned: true, maxHp: 50 };
+  const cp = { ...base, id: 22, mobId: 'slime', elite: false, camp: 'c1', maxHp: 60 };
+  const plain = { ...base, id: 23, mobId: 'slime', elite: false, maxHp: 60 };
+  const mobs = [mb, su, cp, plain];
+  const f = enc.frame([actorTuple({ id: 1, x: 0, y: 0, hp: 1, facing: 0, shield: 0 }, true)], mobs.map(mobTuple), new Map(mobs.map((m) => [m.id, mobStatic(m)])));
+  assert.deepEqual(Object.keys(f.n.find((n) => n.id === 23)), Object.keys(mobStatic(plain)));
+  assert.equal('mb' in f.n.find((n) => n.id === 23), false);
+  assert.ok(JSON.stringify(f.n.find((n) => n.id === 20)).length < 130, 'estático do mini-chefe continua pequeno');
+  const s = dec.apply({ ...f, events: [] });
+  const g = (id) => s.mobs.find((m) => m.id === id);
+  assert.deepEqual([g(20).miniboss, g(20).name, g(20).r, g(20).maxHp, g(20).elite], [true, 'Alfa da Matilha', 40, 900, true]);
+  assert.equal(g(21).summoned, true); assert.equal(g(22).camp, 'c1');
+  assert.equal(g(23).miniboss, false); assert.equal(g(23).summoned, false); assert.equal(g(23).camp, undefined);
+});
+
 test('decodificador ignora ids desconhecidos e mensagens vazias sem quebrar (entrada hostil/corrompida)', () => {
   const dec = new SnapshotDecoder().init({ you: 1, players: [{ id: 1, team: 1, name: 'A', classId: 'mage', level: 1, maxHp: 10 }] });
   for (const m of [{}, { a: [[99, 1, 2, 3, 4, 0, 0]] }, { m: [[5, 1, 1, 1, 1, 0]] }, { g: [123] }, { a: [[1]] }, { a: null, m: null }]) assert.doesNotThrow(() => dec.apply({ k: 0, ...m, events: [] }));
@@ -107,6 +127,7 @@ test('sala cooperativa: monstros nascem, se movem e são removidos no cliente; r
   let seenMobs = 0, lastCount = 0;
   for (let t = 0; t < 60 * 20; t++) {
     room.step();
+    s1.player.actor.hp = s1.player.actor.maxHp; // mobs mais fortes: o herói parado do teste não pode morrer antes da sala ser medida
     if (room.state === 'fight' && room.wave.state === 'fight') for (const m of room.mobs()) if (!m.dead && m.id % 3 === 0) room.world.damage(s1.player.actor, m, 9999);
     if (t % 3 === 2 && s1.log.length) {
       const full = dec.apply(s1.log[s1.log.length - 1]); s1.log.length = 0;

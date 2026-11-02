@@ -28,3 +28,6 @@ export const SKILLS = {
   judgement: { name: 'Julgamento', icon: '⚖️', cd: 6, kind: 'projectile', speed: 560, range: 560, mult: 2.4, stun: 1.5, radius: 9, color: '#fff6c2',
     desc: 'Raio sagrado que atordoa por 1s.' },
 };
+
+// Nível em que cada slot de habilidade (s0, s1, s2) é aprendido; o ataque básico existe desde o nível 1. A especialização continua no nível 15 (data/specs.js).
+export const SKILL_UNLOCK = [1, 5, 10];

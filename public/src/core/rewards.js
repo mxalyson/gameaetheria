@@ -71,6 +71,7 @@ export function applyZoneBatch(doc, batch) {
     if (c.spirits.length < MAX_SPIRITS) { c.spirits.push(sp); if (!c.activeSpirit) c.activeSpirit = sp.id; } else c.gold += 100;
   }
   c.potions = Math.min(999, c.potions + (batch.potions ?? 0));
+  if (batch.pity) c.pity = batch.pity; // azar acumulado (validate limita os valores)
   ensureJournal(c);
   const ach = [], quests = [];
   for (const k of batch.kills ?? []) { const r = recordEvent(c, { type: 'kill', mobId: k.mobId, zoneId: batch.zoneId, boss: !!k.boss }); ach.push(...r.achievements); quests.push(...r.quests.filter((q) => q.complete).map((q) => q.id)); }

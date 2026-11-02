@@ -8,10 +8,11 @@ import { spiritPower } from '../core/progression.js';
 import { CLASSES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
 import { skillOf, activeSpec } from '../core/specs.js';
-import { MOBS } from '../data/mobs.js';
+import { MOBS, MOB_CURVE, LEVEL_GAP, BOSS_SPAWN } from '../data/mobs.js';
+import { skillUnlockLevel } from '../core/unlocks.js';
 import { ZONES } from '../data/zones.js';
 import { SPIRITS } from '../data/spirits.js';
-import { buildLayout } from './layout.js';
+import { buildLayout, campSpawns, minibossSpawn } from './layout.js';
 import { mobIntent, rivalIntent } from './ai.js';
 
 const TAU = Math.PI * 2;
@@ -41,14 +42,17 @@ export function makeHeroActor(char, x, y, kind = 'player', team = 1) {
   });
 }
 
-export function makeMobActor(mobId, level, x, y, { elite = false, hostile = true } = {}) {
+export function makeMobActor(mobId, level, x, y, { elite = false, hostile = true, summoned = false } = {}) {
   const m = MOBS[mobId];
-  const hp = Math.round((50 + level * 34) * m.hp * (elite ? 3 : 1));
+  const E = MOB_CURVE.elite;
+  const C = m.boss ? { hp: 1, atk: 1 } : MOB_CURVE.common;
+  const hp = Math.round(MOB_CURVE.hp(level) * m.hp * C.hp * (elite ? E.hp : 1));
+  const power = MOB_CURVE.power(level) * m.atk * C.atk * (elite ? E.atk : 1);
   return baseActor({
-    kind: 'mob', team: 2, mobId, name: (elite ? 'Elite: ' : '') + m.name, level, boss: !!m.boss, elite,
+    kind: 'mob', team: 2, mobId, name: (elite ? 'Elite: ' : '') + m.name, level, boss: !!m.boss, elite, summoned: summoned || undefined,
     x, y, r: m.size * (elite ? 1.3 : 1),
-    stats: { power: (9 + level * 5.6) * m.atk * (elite ? 1.3 : 1), def: level * 3 * (m.def ?? 1), crit: 5, critMult: 1.5, maxHp: hp, moveSpeed: m.speed, atkSpeed: 1, lifesteal: 0 },
-    hp, maxHp: hp, cds: { basic: 0.5, slam: 4 },
+    stats: { power, def: MOB_CURVE.def(level) * (m.def ?? 1) * (elite ? E.def : 1), crit: 5, critMult: 1.5, maxHp: hp, moveSpeed: m.speed, atkSpeed: 1, lifesteal: 0 },
+    hp, maxHp: hp, cds: { basic: 0.5, slam: 4, summon: 8 }, phase: 1, base: { power, moveSpeed: m.speed }, // base: valores da fase 1 (as fases do chefe multiplicam sobre eles)
     home: { x, y }, hostile, ai: { state: 'idle', t: 0, tx: x, ty: y, target: null },
   });
 }
@@ -64,7 +68,9 @@ export function makeSpiritActor(sp, owner) {
 
 export class World {
   // visuals:false (servidor, simulador de balanceamento): nada de partículas/textos/efeitos é criado — só estado de jogo e eventos.
-  constructor(zoneId, { seed, visuals = true } = {}) {
+  // bossState: objeto de quem chama que sobrevive à troca de mundo (contador do ritual e recarga do chefe) — sem ele, cada visita recomeça.
+  constructor(zoneId, { seed, visuals = true, bossState } = {}) {
+    this.bossState = bossState ?? {};
     this.visuals = visuals;
     this.zoneId = zoneId;
     this.zone = ZONES[zoneId];
@@ -108,6 +114,27 @@ export class World {
   populate(playerLevel) {
     if (!this.zone.mobs) return;
     for (let i = 0; i < this.zone.count; i++) this.spawnRandomMob(playerLevel);
+    this.spawnCamps(playerLevel);
+    this.spawnMiniboss();
+  }
+
+  // Acampamentos fixos (zones.js › camps); `only` = refaz um só acampamento.
+  spawnCamps(playerLevel, only = null) {
+    for (const s of campSpawns(this.zoneId, playerLevel)) {
+      if (only && s.camp !== only) continue;
+      const a = this.add(makeMobActor(s.mobId, s.level, s.x, s.y, { elite: s.elite, hostile: s.hostile }));
+      a.camp = s.camp;
+    }
+  }
+
+  // Mini-chefe: mob existente, mais forte e maior (elite já dá vida ×3, dano ×1,3 e raio ×1,3; o resto se ajusta aqui).
+  spawnMiniboss() {
+    const m = minibossSpawn(this.zoneId); if (!m) return;
+    const a = makeMobActor(m.mobId, m.level, m.x, m.y, { elite: true, hostile: true });
+    a.miniboss = true; a.name = m.name; a.r = MOBS[m.mobId].size * m.sizeMul;
+    a.stats.maxHp = a.maxHp = Math.round(a.maxHp * m.hpMul / 3); a.hp = a.maxHp;
+    a.stats.power *= m.powerMul / 1.3;
+    this.add(a);
   }
 
   freePoint(avoid = [], minDist = 0) {
@@ -139,18 +166,65 @@ export class World {
   updateSpawns(dt, player) {
     const z = this.zone;
     if (!z.mobs) return;
-    const alive = this.actors.filter((a) => a.kind === 'mob' && !a.dead && !a.boss).length;
+    const alive = this.actors.filter((a) => a.kind === 'mob' && !a.dead && !a.boss && !a.camp && !a.miniboss && !a.summoned).length;
     this.respawnT -= dt;
     if (alive < z.count && this.respawnT <= 0) {
       this.spawnRandomMob(player.level, [player]);
       this.respawnT = 3;
     }
+    this.campT ??= {};
+    for (const c of z.camps ?? []) { // o acampamento todo volta 150 s depois do último morto
+      if (this.actors.some((a) => a.camp === c.id && !a.dead)) { this.campT[c.id] = 0; continue; }
+      this.campT[c.id] = (this.campT[c.id] ?? 0) + dt;
+      if (this.campT[c.id] > 150) { this.actors = this.actors.filter((a) => a.camp !== c.id); this.spawnCamps(player.level, c.id); this.campT[c.id] = 0; }
+    }
+    if (z.miniboss && !this.actors.some((a) => a.miniboss && !a.dead)) {
+      this.miniT = (this.miniT ?? z.miniboss.respawn) - dt;
+      if (this.miniT <= 0) { this.spawnMiniboss(); this.miniT = z.miniboss.respawn; }
+    }
     if (z.boss && !this.actors.some((a) => a.boss && !a.dead)) {
-      this.bossT -= dt;
-      if (this.bossT <= 0) {
-        this.add(makeMobActor(z.boss.id, z.boss.level, z.boss.x, z.boss.y));
-        this.bossT = 90;
+      const cfg = BOSS_SPAWN[z.boss.id] ?? BOSS_SPAWN.default, st = this.bossState;
+      if (cfg.ritual) {
+        st.cool = Math.max(0, (st.cool ?? 0) - dt);
+        if (st.omenT > 0 && (st.omenT -= dt) <= 0) { st.omenT = 0; this.spawnBoss(true); }
+        else if (!st.omenT && st.cool <= 0 && (st.go || (st.progress ?? 0) >= cfg.ritual.need)) {
+          st.omenT = cfg.ritual.omen; st.go = false; st.progress = 0;
+          this.events.push({ type: 'boss_warn', stage: 'omen', mobId: z.boss.id, name: MOBS[z.boss.id].name, x: z.boss.x, y: z.boss.y, t: this.time });
+          this.events.push({ type: 'telegraph', x: z.boss.x, y: z.boss.y, r: 220, delay: cfg.ritual.omen, color: MOBS[z.boss.id].color });
+        }
+      } else {
+        this.bossT -= dt;
+        if (this.bossT <= 0) { this.spawnBoss(false); this.bossT = cfg.respawn; }
       }
+    }
+  }
+
+  spawnBoss(announce) {
+    const b = this.zone.boss;
+    const m = this.add(makeMobActor(b.id, b.level, b.x, b.y));
+    if (announce) this.events.push({ type: 'boss_warn', stage: 'arrive', mobId: b.id, name: MOBS[b.id].name, x: b.x, y: b.y, t: this.time });
+    return m;
+  }
+
+  // Progresso do ritual do chefe da zona para a interface ("Ritual 23/40"); null se o chefe reaparece por tempo.
+  get bossProgress() {
+    const id = this.zone.boss?.id, cfg = id && BOSS_SPAWN[id];
+    if (!cfg?.ritual) return null;
+    const st = this.bossState;
+    return { have: Math.min(cfg.ritual.need, Math.floor(st.progress ?? 0)), need: cfg.ritual.need, cool: Math.ceil(st.cool ?? 0), omen: (st.omenT ?? 0) > 0, alive: this.actors.some((a) => a.boss && !a.dead) };
+  }
+
+  // Abate de mob comum/elite alimenta o ritual; a morte do chefe inicia a recarga.
+  onMobDeath(t) {
+    const id = this.zone.boss?.id, cfg = id && BOSS_SPAWN[id], st = this.bossState;
+    if (!cfg?.ritual || t.summoned) return;
+    if (t.boss) { st.cool = cfg.cooldown; st.progress = 0; st.elites = 0; return; }
+    if (st.cool > 0 || st.omenT > 0 || this.actors.some((a) => a.boss && !a.dead)) return;
+    const R = cfg.ritual;
+    st.progress = Math.min(R.need, (st.progress ?? 0) + (t.elite ? R.eliteWeight : 1));
+    if (t.elite) {
+      st.elites = (st.elites ?? 0) + 1;
+      if (st.progress >= R.need * R.earlyAt && this.rng.chance(Math.min(0.5, R.earlyChance * st.elites))) st.go = true;
     }
   }
 
@@ -318,6 +392,7 @@ export class World {
   castSkill(a, idx, ax, ay) {
     const key = 's' + idx;
     if (a.cds[key] > 0 || a.dash) return false;
+    if ((a.level ?? 1) < skillUnlockLevel(idx)) return false; // habilidade ainda não aprendida: a intenção é ignorada (vale para cliente, servidor e rival)
     const id = CLASSES[a.classId].skills[idx];
     const s = skillOf(a.classId, a.spec, id); // com os ajustes da especialização
     a.cds[key] = s.cd;
@@ -405,6 +480,15 @@ export class World {
     if (t.kind === 'player' || t.kind === 'rival') {
       if (src.kind === 'player' || src.kind === 'rival' || src.kind === 'spirit') mult *= PVP_DAMAGE;
     }
+    // Diferença de nível contra mobs: herói muito abaixo do mob bate mais fraco e apanha mais.
+    if (t.kind === 'mob' && src.kind !== 'mob') {
+      const sl = src.kind === 'spirit' ? this.byId(src.owner)?.level ?? t.level : src.level ?? t.level;
+      const gap = t.level - sl - LEVEL_GAP.free;
+      if (gap > 0) mult *= Math.max(LEVEL_GAP.minDealt, 1 - LEVEL_GAP.dealt * gap);
+    } else if (src.kind === 'mob' && t.level != null && t.kind !== 'mob') {
+      const gap = src.level - t.level - LEVEL_GAP.free;
+      if (gap > 0) mult *= Math.min(LEVEL_GAP.maxTaken, 1 + LEVEL_GAP.taken * gap);
+    }
     const res = computeHit(this.rng,
       { power: src.stats.power, crit: src.stats.crit, critMult: src.stats.critMult, dmgBonus: this.buffVal(src, 'dmg') },
       { def: t.stats.def, dr: this.buffVal(t, 'dr') }, mult);
@@ -445,6 +529,8 @@ export class World {
       t.dash = null;
       this.burst(t.x, t.y, t.kind === 'mob' ? MOBS[t.mobId].color : '#ffffff', 26, 220);
       this.events.push({ type: 'death', actor: t, killer });
+      if (t.kind === 'mob') this.onMobDeath(t);
+      if (t.boss) for (const a of this.actors) if (a.summonedBy === t.id && !a.dead) { a.hp = 0; a.dead = true; a.deadT = 0; a.dash = null; } // os esbirros morrem com o chefe (sem evento: nada de XP/loot)
     }
     return res.amount;
   }
@@ -534,6 +620,17 @@ export class World {
       }
     }
     if (this.telegraphs.length) this.telegraphs = this.telegraphs.filter((tg) => !tg.done);
+  }
+
+  // Esbirros do chefe: nascem ao redor dele, mais fracos (nível menor), limitados por `max`; não dão XP nem loot e somem quando o chefe morre.
+  summonMinions(boss, tgt, sm) {
+    const alive = this.actors.filter((a) => a.summonedBy === boss.id && !a.dead).length;
+    for (let k = 0; k < sm.count && alive + k < sm.max; k++) {
+      const ang = this.rng.next() * TAU;
+      const e = this.add(makeMobActor(sm.mobId, Math.max(1, boss.level - sm.levelMinus), boss.x + Math.cos(ang) * (boss.r + 40), boss.y + Math.sin(ang) * (boss.r + 40), { hostile: true, summoned: true }));
+      e.summonedBy = boss.id; e.ai.target = tgt.id; e.ai.state = 'chase';
+      this.burst(e.x, e.y, MOBS[boss.mobId].color, 12, 160);
+    }
   }
 
   // ---------- spirits ----------

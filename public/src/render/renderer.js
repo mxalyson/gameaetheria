@@ -3,6 +3,8 @@
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
+import { drawChestSprite } from './prop-sprites.js';
+import { GroundCache } from './ground-tiles.js';
 import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-textures.js';
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
 import { drawNpcSprite, preloadNpcs, npcTop } from './npc-sprites.js';
@@ -31,7 +33,7 @@ export class Renderer {
     this.c = canvas;
     loadNature(); preloadSpirits(); preloadNpcs(); loadGroundTextures(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
     this.g = canvas.getContext('2d');
-    this.grounds = new Map();
+    this.groundCache = new GroundCache((w, ox, oy, tw, th) => buildGround(w, ox, oy, tw, th)); // terreno em blocos (mapas de 4600×2800 não cabem num canvas só no celular)
     this.dprCap = 2;
     this.quality = 2; // 0 baixa, 1 média, 2 alta
     this.resize();
@@ -59,14 +61,6 @@ export class Renderer {
     this.resize();
   }
 
-  groundFor(world) {
-    // o atlas de chão carrega depois do 1º quadro: refaz o terreno uma vez quando ele chega
-    const rdy = (groundReady() ? 1 : 0) + (groundTexReady() ? 2 : 0);
-    if (this.grounds.has(world.zoneId) && (this.groundsNat?.get(world.zoneId) ?? 0) < rdy) this.grounds.delete(world.zoneId);
-    if (!this.grounds.has(world.zoneId)) { this.grounds.set(world.zoneId, buildGround(world)); (this.groundsNat ??= new Map()).set(world.zoneId, rdy); }
-    return this.grounds.get(world.zoneId);
-  }
-
   camera(world, focus) {
     const z = world.zone;
     const clamp = (v, size, view) => (size <= view ? (size - view) / 2 : Math.max(0, Math.min(size - view, v)));
@@ -82,7 +76,8 @@ export class Renderer {
     g.save();
     g.scale(this.zoom, this.zoom);
     g.translate(-Math.round(cam.x), -Math.round(cam.y));
-    g.drawImage(this.groundFor(world), 0, 0);
+    const rdy = (groundReady() ? 1 : 0) + (groundTexReady() ? 2 : 0); // o atlas de chão carrega depois do 1º quadro: refaz os blocos uma vez quando ele chega
+    this.groundCache.draw(g, world, cam.x - 8, cam.y - 8, cam.x + this.ww + 8, cam.y + this.wh + 8, rdy);
 
     const x0 = cam.x - 120, y0 = cam.y - 120, x1 = cam.x + this.ww + 120, y1 = cam.y + this.wh + 200;
     const vis = (x, y) => x > x0 && x < x1 && y > y0 && y < y1;
@@ -184,6 +179,7 @@ export class Renderer {
     if (z.circle) { circle(g, ox + z.w * s / 2, oy + z.h * s / 2, z.radius * s); g.fill(); }
     else g.fillRect(ox, oy, z.w * s, z.h * s);
     g.fillStyle = 'rgba(40,60,50,0.35)';
+    for (const rv of world.layout.rivers ?? []) { g.strokeStyle = z.scenery?.kind === 'ember' ? 'rgba(255,110,40,0.85)' : 'rgba(110,190,235,0.85)'; g.lineWidth = Math.max(2, rv.w * s); g.beginPath(); rv.pts.forEach((p, i) => (i ? g.lineTo(ox + p.x * s, oy + p.y * s) : g.moveTo(ox + p.x * s, oy + p.y * s))); g.stroke(); }
     for (const o of world.layout.obstacles) {
       if (o.w) g.fillRect(ox + o.x * s, oy + o.y * s, o.w * s, o.h * s);
       else { circle(g, ox + o.x * s, oy + o.y * s, Math.max(1, o.r * s)); g.fill(); }
@@ -205,11 +201,12 @@ export class Renderer {
 }
 
 // ---------------- chão ----------------
-function buildGround(world) {
+function buildGround(world, ox = 0, oy = 0, tw = world.zone.w, th = world.zone.h) {
   const z = world.zone, L = world.layout;
   const cv = document.createElement('canvas');
-  cv.width = z.w; cv.height = z.h;
+  cv.width = tw; cv.height = th;
   const g = cv.getContext('2d');
+  if (ox || oy || tw !== z.w || th !== z.h) { g.translate(-ox, -oy); g.beginPath(); g.rect(ox, oy, tw, th); g.clip(); } // bloco: desenha em coordenadas de mundo
   const rng = makeRng(hashString(world.zoneId + ':ground'));
   const P = z.palette;
 
@@ -267,7 +264,7 @@ function buildGround(world) {
     for (const [ax, ay, bx, by] of z.paths ?? []) { g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke(); }
   }
 
-  const stamped = stampGround(g, world, rng); // flores, trevos, pedrinhas e pedras de trilha em sprites (atlas de chão)
+  const stamped = stampGround(g, world, rng, { x0: ox, y0: oy, x1: ox + tw, y1: oy + th }); // flores, trevos, pedrinhas e pedras de trilha em sprites (atlas de chão)
   const tuft = shade(P.ground, -0.12);
   for (const d of stamped ? [] : L.ground) {
     if (d.type === 'flower') {
@@ -847,17 +844,8 @@ function drawBars(g, a, isPlayer) {
   }
 }
 
-// Baú: caixa de madeira com ferragem dourada; brilha quando está pronto para abrir. Prop de cenário desenhado por código (como as árvores).
-function drawChest(g, c, ready, t) {
-  g.save(); g.translate(c.x, c.y);
-  g.fillStyle = 'rgba(30,40,40,0.25)'; g.beginPath(); g.ellipse(0, 12, 20, 7, 0, 0, TAU); g.fill();
-  g.fillStyle = ready ? '#9a6a34' : '#6f5a46'; g.strokeStyle = '#3d2a14'; g.lineWidth = 2;
-  g.beginPath(); g.roundRect(-17, -6, 34, 18, 3); g.fill(); g.stroke();
-  g.fillStyle = ready ? '#b98245' : '#85705b'; g.beginPath(); g.roundRect(-18, -16, 36, 12, [8, 8, 2, 2]); g.fill(); g.stroke();
-  g.fillStyle = ready ? '#ffd34d' : '#a39a82'; g.fillRect(-3, -8, 6, 9); g.fillRect(-18, -5, 36, 3);
-  if (ready) { g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,214,120,' + (0.12 + 0.08 * Math.sin(t * 3 + c.x)) + ')'; g.beginPath(); g.arc(0, -4, 30, 0, TAU); g.fill(); }
-  g.restore();
-}
+// Baú pintado (assets/props/chest.webp): brilha quando está pronto para abrir; saqueado fica escurecido.
+function drawChest(g, c, ready, t) { drawChestSprite(g, c, ready, t); } // baú pintado (render/prop-sprites.js); o desenho por código foi removido
 
 function drawPrompt(g, x, y, txt) {
   g.font = '800 13px Cinzel, Nunito, serif'; g.textAlign = 'center';

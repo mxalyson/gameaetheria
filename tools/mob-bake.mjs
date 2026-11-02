@@ -2,11 +2,19 @@
 // Uso: node tools/mob-bake.mjs <arquivo.glb> <id> [parte|-1=todas] [px-maior-lado=168] [estilo: hop|waddle|trot] [quadros=6] [elevação=40; menor mostra mais o rosto de criaturas de chapéu/capuz]   (com estilo: deforma o modelo em N quadros de ciclo; sem: 8 vistas estáticas)   (GLB em public/labs/iso-poc/art-local/<pasta>/; passe o caminho relativo a essa art-local, ex.: meshy-mobs/slime.glb)
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
+import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 const [file, id, part = '-1', max = '168', style = '', frames = '6', elev = '40'] = process.argv.slice(2); // style (hop|waddle|trot) => atlas ANIMADO: 8 direções x quadros do ciclo
 if (!file || !id) { console.log('uso: node tools/mob-bake.mjs <pasta/arquivo.glb> <id> [parte] [px]'); process.exit(1); }
 const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await b.newPage({ viewport: { width: 400, height: 300 } }); p.on('pageerror', (e) => console.log('pageerror', e.message));
+// serve public/ direto do disco (interceptação do Playwright): não precisa de servidor no ar nem abre porta
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.webp': 'image/webp', '.png': 'image/png', '.wasm': 'application/wasm' };
+await p.route('http://localhost:5174/**', (route) => {
+  const f = path.join('public', decodeURIComponent(new URL(route.request().url()).pathname));
+  if (!f.startsWith('public') || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return route.fulfill({ status: 404, body: '' });
+  route.fulfill({ status: 200, contentType: MIME[path.extname(f)] ?? 'application/octet-stream', body: fs.readFileSync(f) });
+});
 await p.goto('http://localhost:5174/labs/nature/glb.html'); await p.waitForFunction(() => window.glbReady, null, { timeout: 60000 });
 const parts = await p.evaluate((f) => window.loadGlb(f), file); console.log(parts.length, 'peças no arquivo');
 const partArg = part.includes(',') ? part.split(',').map(Number) : Number(part); // "5,1,2" junta várias peças numa criatura

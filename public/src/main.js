@@ -21,6 +21,8 @@ import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
 import { noticeText } from './ui/ui.js';
 import { skillOf } from './core/specs.js';
+import { SKILLS } from './data/skills.js';
+import { newlyUnlocked } from './core/unlocks.js';
 import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
 import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady } from './core/journal.js';
 import { QUESTS } from './data/quests.js';
@@ -30,7 +32,8 @@ import { TouchControls } from './touch.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
 import { CLASSES } from './data/classes.js';
 import { MOBS, NORMAL_MOBS, BOSS_MOBS } from './data/mobs.js';
-import { ZONES, teleportCost } from './data/zones.js';
+import { soloWaveSpec, WAVES } from './core/economy.js';
+import { ZONES, teleportCost, FARM_ENTRY, FARM_MID } from './data/zones.js';
 import { RARITY, INVENTORY_SIZE, SLOTS } from './data/items.js';
 import { SPIRITS, SPIRIT_RARITY_MUL, MAX_SPIRITS } from './data/spirits.js';
 
@@ -39,6 +42,8 @@ const TOWN = ZONES.town.spawn;
 // 60 Hz (e não 30) evita precisar interpolar o desenho no cliente; o servidor pode enviar snapshots a 20 Hz.
 export const FIXED_DT = 1 / 60;
 const MAX_TICKS = 8;
+
+const TELEPORT_REJECT = { not_visited: 'Você ainda não visitou esse mapa.', no_scroll: 'Sem pergaminho de teletransporte.', in_combat: 'Em combate: espere uns segundos para viajar.', teleport_wait: 'Calma: espere alguns segundos entre viagens.' };
 
 class Game {
   constructor() {
@@ -212,7 +217,10 @@ class Game {
   enterZone(zoneId, x, y, mode = 'explore') {
     const prev = this.player;
     const ratio = prev && !prev.dead ? prev.hp / prev.maxHp : 1;
-    this.world = new World(zoneId);
+    this.skillLv = this.char.level;
+    const bs = ((this.bossStates ??= {})[zoneId] ??= {}); // contador do ritual do chefe sobrevive à troca de mapa (só nesta sessão)
+    if (zoneId === 'ember' && this.char.quests?.active?.cavaleiro_rubro && !bs.questShown) { bs.go = true; bs.questShown = true; } // a missão libera a primeira aparição
+    this.world = new World(zoneId, { bossState: bs });
     this.mode = mode;
     if (ZONES[zoneId].mobs || zoneId === 'town') (this.char.visited ??= {})[zoneId] = 1; // desbloqueia o teletransporte para este mapa
     this.player = this.world.add(makeHeroActor(this.char, x, y));
@@ -358,7 +366,7 @@ class Game {
         queue: () => { refresh(); },
         invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (botão 👥)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
-        reject: (m) => { this.zoneBusy = false; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast('Servidor de partidas', noticeText({ ...m, t: 'reject' }), ''); },
+        reject: (m) => { this.zoneBusy = false; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
@@ -399,6 +407,7 @@ class Game {
   }
   enterNetZone(m) {
     this.zoneBusy = false;
+    if (typeof m.scrolls === 'number') this.char.scrolls = m.scrolls; // teletransporte: contagem oficial (o servidor já debitou)
     const info = { ...m, mode: 'zone', team: 1 };
     if (this.mode === 'net' && this.netInfo?.room === m.room) { this.netInfo = info; this.netDec = new SnapshotDecoder().init(m); return; } // reconexão
     this.ui.closePanels(); this.ui.hideScreen();
@@ -516,6 +525,8 @@ class Game {
       }
       case 'death': { const t = this.netEntity(e.actor); if (t) w.burst(t.x, t.y, t.kind === 'mob' ? MOBS[t.mobId]?.color ?? '#fff' : '#ffffff', 26, 220); break; }
       case 'telegraph': w.telegraphs.push({ x: e.x, y: e.y, r: e.r, t: 0, delay: e.delay, color: e.color, done: false, src: { dead: false } }); break;
+      case 'boss_warn': if (e.stage === 'omen') this.ui.toast('O chão estremece…', `${e.name} desperta`, 'gold'); else this.ui.log(`<b>${e.name}</b> surgiu!`, '#ffb4a8'); break;
+      case 'phase': { const m = this.netEntity(e.actor); if (e.phase === 3) this.ui.toast('Enfurecido!', `${m?.name ?? 'O chefe'} entrou em fúria`, 'gold'); else this.ui.log(`${m?.name ?? 'O chefe'} acelera!`, '#ffb4a8'); break; }
       case 'wave': this.ui.toast(e.boss ? 'Onda final: o chefe!' : `Onda ${e.n}`, '', 'gold'); break;
       case 'wave_clear': this.ui.toast(`Onda ${e.n} vencida!`, 'Recuperem o fôlego…', 'gold'); break;
       case 'revive': if (a) w.burst(a.x, a.y, '#ffe9a0', 20, 160); break;
@@ -601,7 +612,13 @@ class Game {
       for (const sm of last.mobs) {
         present.add(sm.id);
         let m = this.netMobs.get(sm.id);
-        if (!m) { m = makeMobActor(sm.mob, sm.level, sm.x, sm.y, { elite: sm.elite }); m.netId = sm.id; w.add(m); this.netMobs.set(sm.id, m); }
+        if (!m) { m = makeMobActor(sm.mob, sm.level, sm.x, sm.y, { elite: sm.elite }); m.netId = sm.id;
+          // mini-chefe/esbirro/acampamento: marcas e tamanho vindos do servidor
+          if (sm.miniboss) { m.miniboss = true; if (sm.name) m.name = sm.name; if (sm.r) m.r = sm.r; }
+          if (sm.summoned) m.summoned = true;
+          if (sm.camp) m.camp = sm.camp;
+          if (sm.maxHp) { m.maxHp = sm.maxHp; if (m.stats) m.stats.maxHp = sm.maxHp; m.hp = sm.maxHp; }
+          w.add(m); this.netMobs.set(sm.id, m); }
         apply(m, sm, true);
       }
       for (const [id, m] of this.netMobs) if (!present.has(id)) { w.actors = w.actors.filter((x) => x !== m); this.netMobs.delete(id); }
@@ -819,6 +836,9 @@ class Game {
     for (const ev of events) {
       if (ev.type === 'cast') { spawnSkillVfx(this.world, ev); continue; } // efeito visual da habilidade (a simulação já decidiu tudo)
       if (ev.type === 'hit' || ev.type === 'heal') { spawnEventVfx(this.world, ev); continue; } // crítico, absorção e cura
+      if (ev.type === 'phase' && ev.phase === 3) { this.ui.toast('Enfurecido!', `${ev.actor.name} entrou em fúria`, 'gold'); continue; }
+      if (ev.type === 'phase') { this.ui.log(`${ev.actor.name} acelera!`, '#ffb4a8'); continue; }
+      if (ev.type === 'boss_warn') { if (ev.stage === 'omen') this.ui.toast('O chão estremece…', `${ev.name} desperta`, 'gold'); else this.ui.log(`<b>${ev.name}</b> surgiu nas Cinzas Ardentes!`, '#ffb4a8'); continue; }
       if (ev.type !== 'death') continue;
       const a = ev.actor;
       if (a.kind === 'mob') this.onMobKilled(a);
@@ -833,13 +853,23 @@ class Game {
     if (this.mode !== 'explore' || !z || !(id === 'town' || c.visited?.[id])) return;
     if (id === this.world.zoneId) return this.ui.toast('Você já está aqui', z.name, '');
     if (this.world.time - this.player.lastCombat < 8) return this.ui.toast('Em combate', 'Espere uns segundos para viajar.', '');
-    if (this.online && this.net?.joined && z.mobs) return this.ui.toast('Teletransporte indisponível online', 'Por enquanto use os portais (o servidor confere cada passagem).', '');
+    if (this.online && this.net?.joined) return this.teleportOnline(id); // o servidor confere visitado, pergaminho e combate, e debita o pergaminho
     const cost = teleportCost(id);
     if (cost > (c.scrolls ?? 0)) return this.ui.toast('Sem pergaminho', 'Compre um Pergaminho de Teletransporte com a Mercadora Lia.', '');
     c.scrolls = (c.scrolls ?? 0) - cost;
     this.ui.closePanels();
-    const at = z.spawn ?? { x: 110, y: 950 };
+    const at = z.spawn ?? { x: FARM_ENTRY, y: FARM_MID };
     this.enterZone(id, at.x, at.y);
+  }
+
+  // Teletransporte online: só pede; o servidor decide e cobra (a contagem nova volta em zone_joined.scrolls). Recusas voltam em 'reject' (toast).
+  async teleportOnline(id) {
+    if (this.zoneBusy) return;
+    if (id !== 'town' && (this.char.scrolls ?? 0) < 1) return this.ui.toast('Sem pergaminho', 'Compre um Pergaminho de Teletransporte com a Mercadora Lia.', '');
+    this.zoneBusy = true;
+    setTimeout(() => { this.zoneBusy = false; }, 6000);
+    await this.cloud?.flush(); // grava o progresso (mapas visitados, pergaminhos) ANTES: o servidor confere pelo documento salvo
+    this.net.send({ t: 'zone_teleport', zone: id });
   }
 
   checkPortals() {
@@ -868,6 +898,7 @@ class Game {
     if (npc.role === 'shop') this.ui.openPanel('shop');
     else if (npc.role === 'arena') this.ui.openPanel('arena');
     else if (npc.role === 'spirit') this.ui.openPanel('sage');
+    else if (npc.role === 'smith') this.ui.openPanel('shop:smith'); // abre a loja já rolada até o Ferreiro (aprimoramento)
   }
 
   // marca sobre o NPC: '!' tem missão, '?' pronta para entregar, 'none' nada (só para quem existe só por missões)
@@ -945,9 +976,16 @@ class Game {
 
   // ---------------- progresso / loot ----------------
   onMobKilled(m) {
+    if (m.summoned) return; // esbirros de chefe não dão XP nem loot
     const M = MOBS[m.mobId];
     this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? 10 : m.elite ? 4 : 1)));
-    for (const l of rollMobLoot(this.rng, m, this.char.classId)) this.dropAt(m.x, m.y, l);
+    for (const l of rollMobLoot(this.rng, m, this.char.classId, (this.char.pity ??= { epic: 0, legendary: 0, opal: 0 }))) {
+      this.dropAt(m.x, m.y, l);
+      if (l.kind === 'item' && (l.item.opal || l.item.rarity === 'epic' || l.item.rarity === 'legendary')) { // aviso e brilho para drop raro
+        this.world.burst(m.x, m.y, l.item.opal ? '#bfe9ff' : l.item.rarity === 'legendary' ? '#ffa53d' : '#b77cff', 30, 260);
+        this.ui.toast(l.item.opal ? 'Item de Ópalo!' : l.item.rarity === 'legendary' ? 'Item lendário!' : 'Item épico!', l.item.name, 'gold');
+      }
+    }
     this.gameEvent({ type: 'kill', mobId: m.mobId, zoneId: this.world.zoneId, boss: !!m.boss });
     if (m.boss) {
       this.ui.toast(`${M.name} derrotado!`, 'Tesouros caíram no chão', 'gold');
@@ -975,6 +1013,11 @@ class Game {
     this.world.burst(p.x, p.y, '#ffd34d', 40, 260);
     this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o personagem (🧙)`, 'gold');
     this.ui.log(`Você alcançou o nível <b>${this.char.level}</b>.`, '#ffd34d');
+    for (const u of newlyUnlocked(this.char.classId, this.skillLv ?? this.char.level - 1, this.char.level)) { // habilidades aprendidas neste nível
+      this.ui.toast('Nova habilidade: ' + SKILLS[u.id].name, SKILLS[u.id].desc, 'gold');
+      this.ui.log(`Nova habilidade: <b>${SKILLS[u.id].name}</b>.`, '#ffd34d');
+    }
+    this.skillLv = this.char.level;
     this.gameEvent({ type: 'level', level: this.char.level });
     if (this.ui.anyOpen()) this.ui.render();
     this.save();
@@ -1336,8 +1379,8 @@ class Game {
       W.state = 'rest';
       W.t = 4;
       this.char.arena.bestWave = Math.max(this.char.arena.bestWave, W.n);
-      this.world.heal(this.player, this.player.maxHp * 0.2);
-      this.ui.toast(`Onda ${W.n} vencida!`, `+${reward} 🪙 · +20% de vida`, 'gold');
+      this.world.heal(this.player, this.player.maxHp * WAVES.solo.restHeal);
+      this.ui.toast(`Onda ${W.n} vencida!`, `+${reward} 🪙 · +${Math.round(WAVES.solo.restHeal * 100)}% de vida`, 'gold');
     } else {
       W.t -= dt;
       this.ui.banner(`Próxima onda em ${Math.max(1, Math.ceil(W.t))}…`);
@@ -1348,17 +1391,15 @@ class Game {
   spawnWave(n) {
     const w = this.world, c = this.char, p = this.player;
     this.waves.state = 'fight';
-    const lvl = Math.min(30, c.level + Math.floor((n - 1) / 3));
-    const spawn = (id, opts) => {
+    // composição das ondas vem de core/economy.js (medida com tools/waves-check.mjs)
+    const spec = soloWaveSpec(n, { level: c.level }, this.rng);
+    for (const f of spec.mobs) {
       const ang = this.rng.next() * Math.PI * 2;
-      const m = w.add(makeMobActor(id, lvl, 550 + Math.cos(ang) * 430, 550 + Math.sin(ang) * 430, opts));
+      const m = w.add(makeMobActor(f.id, f.level, 550 + Math.cos(ang) * 430, 550 + Math.sin(ang) * 430, { elite: f.elite }));
       m.ai.target = p.id;
       m.ai.state = 'chase';
       w.burst(m.x, m.y, '#b48cff', 16, 160);
-    };
-    if (n % 10 === 0) spawn(this.rng.pick(BOSS_MOBS));
-    const count = Math.min(14, 2 + n);
-    for (let i = 0; i < count; i++) spawn(this.rng.pick(NORMAL_MOBS), { elite: n % 5 === 0 && i === 0 });
+    }
   }
 
   onPlayerDeath() {

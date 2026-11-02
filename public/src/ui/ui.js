@@ -1,5 +1,6 @@
 import { CLASSES, STAT_KEYS, STAT_NAMES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
+import { isSkillUnlocked, skillUnlockLevel } from '../core/unlocks.js';
 import { skillOf, specsOf, specInfo, activeSpec, respecCost, SPEC_LEVEL } from '../core/specs.js';
 import { SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
@@ -8,6 +9,7 @@ import { xpToNext, spiritXpToNext, spiritPower, MAX_LEVEL, EVOLVE_LEVEL, evolveC
 import { tierFor } from '../core/combat.js';
 import { MODES, getRating } from '../core/match.js';
 import { MOBS } from '../data/mobs.js';
+import { mobPortrait } from '../render/mob-sprites.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
 import { PRICES } from '../shop.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, preloadSkillIcons, skillCategory, CATEGORIES } from '../render/skill-icons.js';
@@ -40,7 +42,11 @@ export const noticeText = (n) => {
 const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
 const SCROLL = '<img class="coin" src="assets/icons/item/res-scroll.webp" alt="📜" draggable="false">';
-const ZONE_ICON = { town: '🏠', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
+// ícones de zona pintados (recortes dos sprites 3D: tools/ui-icon-from-atlas.py); sem arte (ember: falta brasa) ou com o arquivo ausente, vale o emoji
+const ZONE_EMOJI = { town: '🏠', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
+const ZONE_ART = new Set(['town', 'forest', 'plains', 'ruins', 'glacier']);
+const zoneIcon = (id) => (ZONE_ART.has(id) ? `<img class="zone-ic" src="assets/icons/ui/zone-${id}.webp" alt="${ZONE_EMOJI[id]}" draggable="false" onerror="this.replaceWith(this.alt)">` : ZONE_EMOJI[id] ?? '🗺️');
+const HOME_IMG = '<img class="art" src="assets/icons/ui/home.webp" alt="🏠" draggable="false" onerror="this.replaceWith(this.alt)">';
 const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${spiritUrl(type, stage)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
 // Retratos pintados (busto): classes no cartão do herói, no painel do personagem e na criação; NPCs no oval do diálogo. Sem a imagem, volta ao emblema/emoji.
 const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src="assets/portraits/class-${classId}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
@@ -190,7 +196,7 @@ export class UI {
         <div class="cc-name">${c.name}</div>
         <div class="cc-desc">${c.desc}</div>
         <div class="cc-stat">Atributo principal: <b>${STAT_NAMES[c.primary]}</b></div>
-        <div class="cc-skills">${c.skills.map((s) => `<span title="${esc(SKILLS[s].desc)}">${skillImg(s, SKILLS[s].icon, 'cc-sk')} ${SKILLS[s].name}</span>`).join('')}</div>
+        <div class="cc-skills">${c.skills.map((s) => `<span title="${esc(SKILLS[s].desc)}">${skillImg(s, SKILLS[s].icon, 'cc-sk')} ${SKILLS[s].name} <small>Nv ${skillUnlockLevel(c.skills.indexOf(s))}</small></span>`).join('')}</div>
       </button>`).join('');
     this.screen.innerHTML = `
       <div class="create-wrap">
@@ -233,10 +239,10 @@ export class UI {
       { key: 'LMB', id: 'basic', icon: attackImg(char.classId, '🖱️'), art: true, tip: 'skill:basic' },
       ...cls.skills.map((s, i) => ({ key: String(i + 1), id: 's' + i, icon: skillImg(s, SKILLS[s].icon), art: true, cat: skillCategory(skillOf(char.classId, null, s)), tip: 'skill:' + s })),
       { key: 'Q', id: 'potion', icon: iconImg(POTION_ICON, '🧪'), art: true, tip: 'potion' },
-      { key: 'H', id: 'hearth', icon: '🏠', tip: 'hearth' },
+      { key: 'H', id: 'hearth', icon: HOME_IMG, art: true, medal: true, tip: 'hearth' },
     ];
     $('skillbar').innerHTML = slots.map((s) => `
-      <div class="slot${s.art ? ' art' : ''}" id="slot-${s.id}" data-tip="${s.tip}">
+      <div class="slot${s.art ? ' art' : ''}${s.medal ? ' medal' : ''}" id="slot-${s.id}" data-tip="${s.tip}">
         <span class="icon">${s.icon}</span>${s.cat ? `<i class="cat cat-${s.cat}" title="${CATEGORIES[s.cat]}"></i>` : ''}<span class="key">${s.key}</span>
         <div class="cd"></div><span class="cdt"></span>${s.id === 'potion' ? '<span class="count" id="potion-count"></span>' : ''}
       </div>`).join('') + '<div class="slot spirit" id="slot-spirit" data-tip="spirit-active"><span class="icon" id="spirit-icon"></span><span class="key">P</span></div>';
@@ -259,6 +265,12 @@ export class UI {
   updateHud(game) {
     const { char, player, world } = game;
     if (!player) return;
+    // ritual do chefe final ("Ritual 23/40"): só nas zonas em que o chefe aparece por contador
+    const rp = game.mode === 'explore' ? world.bossProgress : null, rit = $('ritual');
+    if (rit) {
+      const txt = !rp || rp.alive ? '' : rp.omen ? 'O chão estremece…' : rp.cool > 0 ? `Ritual em repouso · ${Math.ceil(rp.cool / 60)} min` : `Ritual ${rp.have}/${rp.need}`;
+      if (rit.dataset.t !== txt) { rit.dataset.t = txt; rit.textContent = txt; rit.classList.toggle('hidden', !txt); }
+    }
     this.set('hud-name', 'text', char.name + (titleText(char) ? ' · ' + titleText(char) : ''));
     this.set('hud-level', 'text', `Nv ${char.level}`);
     this.set('hud-hp', 'width', `${(100 * player.hp) / player.maxHp}%`);
@@ -281,9 +293,10 @@ export class UI {
       const cd = cdOf[id];
       const pct = cd > 0 ? Math.min(1, cd / maxOf[id]) : 0;
       this.set(`slot-${id}`, '--p', pct.toFixed(3));
-      this.set(`slot-${id}`, 'class', 'slot' + (id.startsWith('s') && id !== 'spirit' || id === 'potion' || id === 'basic' ? ' art' : '') + (id.startsWith('s') && (player.stunT > 0 || player.dead || player.dash) ? ' blocked' : '') + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
+      this.set(`slot-${id}`, 'class', 'slot' + (id.startsWith('s') && id !== 'spirit' || id === 'potion' || id === 'basic' ? ' art' : '') + (id.startsWith('s') && id !== 'spirit' && !isSkillUnlocked(char.level, Number(id[1])) ? ' locked' : id.startsWith('s') && (player.stunT > 0 || player.dead || player.dash) ? ' blocked' : '') + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
     }
     for (const id of ['s0', 's1', 's2']) {
+      if (!isSkillUnlocked(char.level, Number(id[1]))) this.set(`slot-${id}`, '--lv', `"${skillUnlockLevel(Number(id[1]))}"`);
       const cd = player.cds[id];
       const node = $(`slot-${id}`)?.querySelector('.cdt');
       const txt = cd > 0 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
@@ -299,6 +312,14 @@ export class UI {
       this.set('boss-bar', 'class', '');
       this.set('boss-name', 'text', `${boss.name} · Nv ${boss.level}`);
       this.set('boss-fill', 'width', `${(100 * boss.hp) / boss.maxHp}%`);
+      // retrato: vista frontal do sprite pintado do monstro (o rival do PvP e criaturas sem arte ficam sem retrato)
+      const pt = boss.mobId ? mobPortrait(boss.mobId) : null;
+      this.set('boss-portrait', 'display', pt ? 'block' : 'none');
+      if (pt) { // célula (0,0) do atlas ampliada 1,7x e centrada no alto (cabeça e tronco)
+        this.set('boss-portrait', 'background-image', `url(${pt.url})`);
+        this.set('boss-portrait', '--cols', String(pt.cols)); this.set('boss-portrait', '--rows', String(pt.rows)); this.set('boss-portrait', '--ratio', pt.ratio.toFixed(3));
+        this.set('boss-portrait', 'filter', pt.filter);
+      }
     } else this.set('boss-bar', 'class', 'hidden');
   }
 
@@ -334,12 +355,15 @@ export class UI {
   isOpen(id) { return this.open.has(id); }
   anyOpen() { return this.open.size > 0; }
   toggle(id) { this.isOpen(id) ? this.close(id) : this.openPanel(id); }
-  openPanel(id) {
+  // 'painel:âncora' (ex.: 'shop:smith') abre o painel e rola até o elemento #<âncora>-section
+  openPanel(spec) {
+    const [id, anchor] = String(spec).split(':');
     if (['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map', 'spirits', 'character', 'options']) this.open.delete(p);
     if (id === 'options') this.open.clear();
     this.open.add(id);
     if (id === 'shop') this.open.add('inventory');
     this.render();
+    if (anchor) { const go = () => this.layer.querySelector(`#${anchor}-section`)?.scrollIntoView({ block: 'start' }); go(); requestAnimationFrame(go); }
   }
   close(id) {
     this.open.delete(id);
@@ -487,7 +511,7 @@ export class UI {
         <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
         ${max ? '<span class="tag">Máximo</span>' : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
     }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
-    return `<h3>Ferreiro · aprimorar equipado</h3>${rows}`;
+    return `<h3 id="smith-section">Ferreiro Brok · aprimorar equipado</h3>${rows}`;
   }
 
   panel_arena() {
@@ -580,10 +604,10 @@ export class UI {
     const g = this.game, here = g.world.zoneId;
     const route = WORLD_ROUTE, canTp = g.mode === 'explore', vis = g.char.visited ?? {};
     const rows = route.map((id, i) => { const z = ZONES[id]; const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura'; const boss = z.boss ? `Chefe: ${esc(MOBS[z.boss.id].name)}` : '';
-      return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : ZONE_ICON[id] ?? '🗺️'}</span></div>
+      return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : zoneIcon(id)}</span></div>
       <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div>${here === id ? '' : id === 'town' || vis[id] ? `<button class="btn small" data-action="teleport" data-arg="${id}" ${canTp ? '' : 'disabled'}>Viajar · ${teleportCost(id) ? SCROLL + ' ' + teleportCost(id) : 'grátis'}</button>` : '<span class="tag dim">🔒 não visitado</span>'}</div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
     const arenas = '<div class="shop-item"><div class="cell"><span class="ic">⚔️</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>';
-    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas ⇄ Cume Gélido ⇄ Cinzas Ardentes. Mapas já visitados têm <b>teletransporte</b>: gasta 1 Pergaminho (você tem ${g.char.scrolls ?? 0}; a Mercadora Lia vende). Ir para a Vila é grátis, e o botão 🏠 também volta à vila.</p>${rows}${arenas}`);
+    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas ⇄ Cume Gélido ⇄ Cinzas Ardentes. Mapas já visitados têm <b>teletransporte</b>: gasta 1 Pergaminho (você tem ${g.char.scrolls ?? 0}; a Mercadora Lia vende). Ir para a Vila é grátis, e o medalhão da casa também volta à vila.</p>${rows}${arenas}`);
   }
 
   panel_sage() {
@@ -655,7 +679,7 @@ export class UI {
         ${s.mult ? `<div class="tt-stat">${Math.round(s.mult * 100)}% do poder${s.ticks ? ` × ${s.ticks}` : ''}</div>` : ''}`;
     }
     if (kind === 'potion') return `<div class="tt-name">${iconImg(POTION_ICON, '🧪', 'tt-ic')} Poção de Vida</div><div>Cura 35% da vida. Recarga 8s.</div><div class="tt-sub">Você tem ${char.potions}. Desativada no duelo PvP.</div>`;
-    if (kind === 'hearth') return `<div class="tt-name">🏠 Retornar à vila</div><div>Teleporta para Vila de Lúmen quando fora de combate.</div>`;
+    if (kind === 'hearth') return `<div class="tt-name">${HOME_IMG.replace('class="art"', 'class="tt-ic"')} Retornar à vila</div><div>Teleporta para Vila de Lúmen quando fora de combate.</div>`;
     if (kind === 'spirit-active') {
       const sp = char.spirits.find((s) => s.id === char.activeSpirit);
       if (!sp) return '<div class="tt-name">Sem spirit ativo</div><div>Abra o painel de spirits (P).</div>';

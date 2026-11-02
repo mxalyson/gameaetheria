@@ -7,13 +7,12 @@ import { makeRng } from '../public/src/core/rng.js';
 import { mobXp } from '../public/src/core/progression.js';
 import { rollMobLoot } from '../public/src/core/loot.js';
 import { applyCoopResult } from '../public/src/core/rewards.js';
-import { coopRewardPlan } from '../public/src/core/economy.js';
-import { NORMAL_MOBS, BOSS_MOBS } from '../public/src/data/mobs.js';
+import { coopRewardPlan, coopWaveSpec, COOP_WAVES, WAVES } from '../public/src/core/economy.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { wire } from './wire.js';
 import { DeltaEncoder, actorTuple, mobTuple, mobStatic } from './snapshot.js';
 
-export const COOP_WAVES = 5;   // a 5ª onda traz o chefe
+export { COOP_WAVES };   // a 5ª onda traz o chefe (definido em core/economy.js)
 const FIRST_REST = 3, REST = 4, RESULT_SHOW = 6;
 const r1 = (n) => Math.round(n * 10) / 10;
 const idle = () => ({ mx: 0, my: 0, aimX: 0, aimY: 0, attack: false, cast: null });
@@ -60,19 +59,14 @@ export class CoopRoom {
   spawnWave(n) {
     const w = this.world, humans = this.alive();
     this.wave.state = 'fight'; this.wave.n = n;
-    const lvl = Math.min(30, this.avgLevel + Math.floor((n - 1) / 3));
-    const crew = this.players.size, hpMul = 1 + 0.4 * (crew - 1);
-    const spawn = (id, opts = {}, bonus = 0) => {
+    const spec = coopWaveSpec(n, { avgLevel: this.avgLevel, crew: this.players.size }, this.rng);
+    for (const f of spec.mobs) {
       const ang = this.rng.next() * Math.PI * 2;
-      const m = w.add(makeMobActor(id, Math.min(30, lvl + bonus), 550 + Math.cos(ang) * 430, 550 + Math.sin(ang) * 430, opts));
-      m.hp = m.maxHp = Math.round(m.maxHp * hpMul);
+      const m = w.add(makeMobActor(f.id, f.level, 550 + Math.cos(ang) * 430, 550 + Math.sin(ang) * 430, { elite: f.elite }));
+      m.hp = m.maxHp = Math.round(m.maxHp * spec.hpMul);
       const t = humans[this.rng.int(0, humans.length - 1)];
       m.ai.target = t?.actor.id ?? null; m.ai.state = 'chase';
-      return m;
-    };
-    const count = Math.min(14, 2 + n + 2 * (crew - 1));
-    if (n === COOP_WAVES) { spawn(BOSS_MOBS[this.rng.int(0, BOSS_MOBS.length - 1)], {}, 2); }
-    for (let i = 0; i < (n === COOP_WAVES ? Math.ceil(count / 2) : count); i++) spawn(NORMAL_MOBS[this.rng.int(0, NORMAL_MOBS.length - 1)], { elite: n === 3 && i === 0 });
+    }
     for (const p of this.players.values()) if (!p.left && p.actor.dead) this.revive(p);
     this.events.push({ e: 'wave', n, boss: n === COOP_WAVES });
   }
@@ -121,7 +115,7 @@ export class CoopRoom {
       this.events.push({ e: 'wave_clear', n: W.n });
       if (W.n >= COOP_WAVES) return this.end('victory', 'boss');
       W.state = 'rest'; W.t = REST;
-      for (const p of this.alive()) this.world.heal(p.actor, p.actor.maxHp * 0.2);
+      for (const p of this.alive()) this.world.heal(p.actor, p.actor.maxHp * WAVES.coop.restHeal);
     }
   }
 

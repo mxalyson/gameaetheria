@@ -27,7 +27,7 @@ export class SnapshotDecoder {
       a.dead = !!(t[5] & F.DEAD); a.moving = !!(t[5] & F.MOVING); a.swing = !!(t[5] & F.SWING); a.stun = !!(t[5] & F.STUN); a.online = !(t[5] & F.OFFLINE);
       a.shield = t[6] ?? 0;
     }
-    for (const n of msg.n ?? []) this.mobs.set(n.id, { id: n.id, mob: n.mob, level: n.level, boss: !!n.boss, elite: !!n.elite, maxHp: n.maxHp, x: 0, y: 0, hp: n.maxHp, facing: 0, dead: false, moving: false, swing: false, _seen: true });
+    for (const n of msg.n ?? []) this.mobs.set(n.id, { id: n.id, mob: n.mob, level: n.level, boss: !!n.boss, elite: !!n.elite, miniboss: !!n.mb, name: n.nm, r: n.r, summoned: !!n.su, camp: n.cp, maxHp: n.maxHp, x: 0, y: 0, hp: n.maxHp, facing: 0, dead: false, moving: false, swing: false, _seen: true });
     for (const t of msg.m ?? []) {
       const m = this.mobs.get(t[0]); if (!m) continue;
       m.x = t[1]; m.y = t[2]; m.hp = t[3]; m.facing = t[4] / 100;

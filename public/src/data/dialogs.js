@@ -4,5 +4,6 @@ export const DIALOGS = {
   arena: { greet: 'A arena guarda os ecos de todos que lutaram aqui. Prove seu valor!', service: { label: 'Entrar na arena', panel: 'arena' } },
   sage: { greet: 'Spirits são ecos da natureza. Escolha bem quem caminha ao seu lado.', service: { label: 'Falar de spirits', panel: 'sage' } },
   guard: { greet: 'A vila está calma por enquanto. Volte quando houver mais perigo à vista. No mapa, os lugares já visitados oferecem teletransporte.', service: null },
+  smith: { greet: 'Metal bom lembra de quem o forjou. Traga o que veste e eu o deixo mais forte, a um preço justo em ouro.', service: { label: 'Aprimorar equipamento', panel: 'shop:smith' } },
   herbalist: { greet: 'As ervas do bosque não colhem sozinhas. Se encontrar baús pelo caminho, abra-os: nunca se sabe o que guardam.', service: null },
 };

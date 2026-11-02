@@ -70,11 +70,40 @@ export const SET = {
     deadtree: { h: 3.3, ref: 11, v: P('DeadTree', 1, 3), behind: true },
   },
 };
+// Cume Gélido: pinheiros e árvores secas, cristais como gelo, pedras claras. Cinzas Ardentes: as peças das Ruínas, com árvores queimadas no lugar das retorcidas.
+SET.glacier = {
+  tree: { h: 3.0, ref: 7.6, v: [...P('Pine', 1, 4), ...P('Pine', 1, 4), 'DeadTree_1'], behind: true },
+  crystal: SET.plains.crystal, geode: SET.plains.geode,
+  rock: SET.forest.rock,
+  rubble: { w: 1.7, ref: 0, v: ['m_slab', 'm_boulder'] },
+  deadtree: SET.ruins.deadtree,
+};
+SET.ember = { ...SET.ruins, pine: { h: 3.2, ref: 11, v: P('DeadTree', 1, 3), behind: true } };
+// postes e guarda-corpos das pontes (layout.js › bridges): lampião e tronco; nas ruínas, braseiro (desenho de código) e laje
+for (const k of ['forest', 'plains', 'glacier']) { SET[k].lantern = { h: 5.6, ref: 0, v: ['m_lamp'] }; SET[k].log = { w: 4.1, ref: 0, v: ['m_log'] }; }
 // vila: casas por canto (cada casa do layout ganha o seu desenho), lanternas e placa
 export const HOUSE_SET = { town: { house: { house: true, v: ['m_house_tile', 'm_house_big', 'm_house_thatch', 'm_house_porch'], pick: (d) => (d.x < 850 ? 0 : 1) + (d.y < 600 ? 0 : 2) }, lantern: { h: 5.6, ref: 0, v: ['m_lamp'] }, signpost: { h: 5, ref: 0, v: ['m_sign'] } } };
 Object.assign(SET, HOUSE_SET);
+// poço (peça 0 do GLB da Vila) e cercas de madeira (peças 10 e 11); as cercas marcam acampamentos e a Vila. Sem GLB de barril/caixa/banco/fonte: esses seguem em código até chegar arte (docs/art-direction/prompts-cenario.md)
+const FENCE = { w: 4.0, ref: 0, v: ['m_fence_1', 'm_fence_2'] };
+for (const k of ['forest', 'plains', 'glacier']) SET[k].fence = FENCE;
+SET.town.well = { h: 5, ref: 0, v: ['m_well'] }; SET.town.fence = FENCE;
 SET.town = { ...SET.town, tree: SET.forest.tree, rock: SET.forest.rock, bush: SET.forest.bush }; // a vila usa as mesmas árvores, pedras e arbustos do Bosque (um único estilo)
 let zoneSet = null;
+// Ponte de madeira pintada no terreno: a peça do Meshy (m_bridge) esticada pela travessia (b.len de largura, ~3,5 × hw de altura); pontes de pedra seguem em scenery.js.
+export const bridgeArtReady = () => !!(atlas && gAtlas && meta?.m_bridge);
+export function drawBridgeSprite(g, b) {
+  const sp = meta.m_bridge, kx = (b.len * 0.92) / sp.w, ky = (b.hw * 3.5) / sp.h;
+  g.fillStyle = 'rgba(8,16,36,0.28)'; g.beginPath(); g.ellipse(b.x + 6, b.y + 14, b.len * 0.46, b.hw * 0.78, 0, 0, Math.PI * 2); g.fill(); // sombra na água
+  g.drawImage(sp.im, sp.x, sp.y, sp.w, sp.h, b.x - sp.ax * kx, b.y + 10 - sp.ay * ky, sp.w * kx, sp.h * ky);
+}
+// os troncos que faziam de guarda-corpo (layout.js) ficam escondidos: a ponte pintada já tem o seu
+export function hideBridgeRails(world) {
+  const bs = world.layout.bridges ?? [];
+  if (!bs.length) return;
+  for (const d of world.layout.decor) if (d.type === 'log' && bs.some((b) => Math.abs(d.x - b.x) <= b.len / 2 && Math.abs(Math.abs(d.y - b.y) - (b.hw + 2)) < 1)) d.hidden = true;
+}
+
 export function setNatureZone(zoneId) { zoneSet = atlas ? SET[zoneId] ?? null : null; }
 
 // Desenha uma peça pelo nome (ex.: 'm_pillar_1') com a base em (x, y) e altura h no mundo; false se o atlas ainda não carregou.
@@ -88,6 +117,7 @@ export function drawNatureNamed(g, name, x, y, h, flip = false) {
 
 // Desenha a decoração `d` como sprite; devolve true se tratou (senão o chamador usa o desenho antigo).
 export function drawNature(g, d, player) {
+  if (d.hidden) return true;
   const cfg = zoneSet?.[d.type];
   if (!cfg) return false;
   const name = cfg.v[cfg.pick ? cfg.pick(d) : Math.min(cfg.v.length - 1, Math.floor((d.v ?? 0) * cfg.v.length))], sp = meta[name];
@@ -122,6 +152,8 @@ const GROUND_SET = {
     { v: G('Petal', 1, 5), n: 12, ppm: 12 }, { v: PEB, n: 10, ppm: 20 },
   ],
   ruins: [{ v: PEB, n: 40, ppm: 22 }, { v: ['Grass_Wispy_Short'], n: 6, ppm: 14 }, { v: ['Plant_7'], n: 4, ppm: 16 }],
+  glacier: [{ v: PEB, n: 34, ppm: 20 }, { v: G('Petal', 1, 5), n: 3, ppm: 12 }], // neve: só seixos e pétalas esparsas (sem trevos nem capim verde)
+  ember: [{ v: PEB, n: 50, ppm: 22 }], // basalto: seixos
 };
 const STONES = [...G('RockPath_Round_Small', 1, 3), ...G('RockPath_Square_Small', 1, 3)];
 const BORDER = STONES; // só as pedras pequenas: as largas/finas pareciam pilhas de entulho
@@ -131,12 +163,19 @@ const segDist = (px, py, ax, ay, bx, by) => {
 };
 
 // Carimba flores, trevos, capim, pedrinhas e as pedras da trilha no terreno. Devolve true quando cobriu o chão (o desenho vetorial de flores/tufos é então dispensado).
-export function stampGround(g, world, rng) {
+// `bounds` ({x0,y0,x1,y1}, opcional): terreno em blocos desenha só a fatia pedida; o sorteio continua completo, então o resultado é idêntico ao do mapa inteiro.
+export function stampGround(g, world, rng, bounds = null) {
   const kind = world.zone.scenery?.kind, rules = GROUND_SET[kind];
   if (!gAtlas || !rules) return false;
-  const z = world.zone, L = world.layout, trail = L.trail ?? [], ponds = L.ponds ?? [], paths = z.paths ?? [];
+  const z = world.zone, L = world.layout, trail = L.trail ?? [], ponds = L.ponds ?? [], paths = z.paths ?? [], rivers = L.rivers ?? [], camps = L.camps ?? [];
   const blocked = (x, y, m) => {
     for (const p of ponds) { const c = Math.cos(-p.rot), s = Math.sin(-p.rot), dx = x - p.x, dy = y - p.y, u = (dx * c - dy * s) / (p.rx + 34), v = (dx * s + dy * c) / (p.ry + 34); if (u * u + v * v < 1) return true; }
+    for (const rv of rivers) {
+      if (Math.abs(x - rv.x) > rv.amp + rv.w / 2 + 60) continue;
+      for (let i = 0; i < rv.pts.length - 1; i++) if (segDist(x, y, rv.pts[i].x, rv.pts[i].y, rv.pts[i + 1].x, rv.pts[i + 1].y) < rv.w / 2 + 26) return true;
+    }
+    for (const c of camps) if (Math.hypot(x - c.x, y - c.y) < c.r * 0.42) return true; // o chão do acampamento é pintado à parte
+    for (const b of L.bridges ?? []) if (Math.abs(x - b.x) < b.len / 2 + 20 && Math.abs(y - b.y) < b.hw + 20) return true;
     for (let i = 0; i < trail.length - 1; i++) if (segDist(x, y, trail[i].x, trail[i].y, trail[i + 1].x, trail[i + 1].y) < m) return true;
     for (const [ax, ay, bx, by] of paths) if (segDist(x, y, ax, ay, bx, by) < m) return true;
     return false;
@@ -157,13 +196,14 @@ export function stampGround(g, world, rng) {
     }
   }
   // pedras da trilha: fileira irregular nas duas bordas (e uma ou outra no meio) ao longo do caminho de terra / lajes
-  const half = kind === 'ruins' ? 52 : 34;
+  const half = kind === 'ruins' || kind === 'ember' ? 52 : 34;
   for (let i = 0; i < trail.length - 1; i++) {
     const a = trail[i], b = trail[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y), nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
     for (let d = rng.range(0, 30); d < len; d += rng.range(44, 90)) {
       const u = d / len, x = a.x + (b.x - a.x) * u, y = a.y + (b.y - a.y) * u, side = rng.chance(0.5) ? 1 : -1, off = side * (half + rng.range(-5, 9));
-      add(BORDER[Math.floor(rng.next() * BORDER.length)], x + nx * off, y + ny * off, 16);
-      if (rng.chance(0.1)) add(STONES[Math.floor(rng.next() * STONES.length)], x + nx * rng.range(-14, 14), y + ny * rng.range(-14, 14), 14);
+      const bn = BORDER[Math.floor(rng.next() * BORDER.length)];
+      if (!blocked(x + nx * off, y + ny * off, 0)) add(bn, x + nx * off, y + ny * off, 16); // nada de pedra de trilha dentro do rio ou sobre a ponte
+      if (rng.chance(0.1)) { const sn = STONES[Math.floor(rng.next() * STONES.length)], ox = nx * rng.range(-14, 14), oy = ny * rng.range(-14, 14); if (!blocked(x + ox, y + oy, 0)) add(sn, x + ox, y + oy, 14); }
     }
   }
   // margem das lagoas: pedrinhas e capim na beira
@@ -177,12 +217,13 @@ export function stampGround(g, world, rng) {
   list.sort((a, b) => a.y - b.y);
   for (const it of list) {
     const { sp, k } = it, w = sp.w * k, h = sp.h * k;
+    if (bounds && (it.x < bounds.x0 - w || it.x > bounds.x1 + w || it.y < bounds.y0 || it.y > bounds.y1 + h)) continue;
     g.save(); g.translate(it.x, it.y); if (it.flip) g.scale(-1, 1);
     g.drawImage(gAtlas, sp.x, sp.y, sp.w, sp.h, -sp.ax * k, -sp.ay * k, w, h);
     g.restore();
   }
   stats.ground = list.length;
-  return kind !== 'ruins'; // nas Ruínas ficam os tufos vetoriais
+  return kind !== 'ruins' && kind !== 'ember'; // nas Ruínas e nas Cinzas ficam os tufos vetoriais
 }
 
 // A decoração `d` desta zona vira sprite? (as sombras de código dos desenhos antigos não servem para sprites)

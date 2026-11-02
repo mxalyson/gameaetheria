@@ -53,24 +53,137 @@ const STYLE = {
     blobs: [['#c9e2a4', 0.34], ['#86c27f', 0.24], ['#e6dca8', 0.20]], glade: '255,248,210',
     trail: [], specks: ['#a79d78', '#efe4c0'], shore: [], water: [],
   },
+  // Cume Gélido: neve, trilha de gelo batido, lagos congelados
+  glacier: {
+    blobs: [['#f4f9fd', 0.40], ['#c9deef', 0.30], ['#b3cfe6', 0.22], ['#ffffff', 0.30]], glade: '235,248,255',
+    trail: [[92, 'rgba(70,100,140,0.18)'], [70, '#a9c3d8'], [54, '#cfe0ee'], [30, '#e8f2f9']], specks: ['#8fb0c8', '#ffffff'],
+    shore: ['rgba(110,150,190,0.30)', '#f4f9fd', '#cfe2f0'], water: ['#b4e4f5', '#7fc4e8'],
+  },
+  // margens dos rios (só as cores de margem/água; o chão dessas zonas é pintado por paintRuinsGround)
+  ruins: { shore: ['rgba(20,14,50,0.38)', '#6f6b8d', '#8d89ab'], water: ['#6a5cb0', '#3d2f7e'] },
+  ember: { shore: ['rgba(10,0,0,0.5)', '#2a1410', '#4a2016'], water: ['#ff7a1e', '#b8381a'] },
 };
 
 // ---------- chão: camadas extras assadas no cache do terreno ----------
 import { trailPattern, waterPattern, groundTexReady } from './ground-textures.js';
+import { bridgeArtReady, drawBridgeSprite, hideBridgeRails } from './nature-sprites.js';
 
 export function paintGroundScenery(g, world, rng) {
   const z = world.zone, L = world.layout, P = z.palette, sc = z.scenery;
-  if (sc.kind === 'ruins') paintRuinsGround(g, world, rng);
+  if (sc.kind === 'ruins' || sc.kind === 'ember') paintRuinsGround(g, world, rng);
   else paintNatureGround(g, world, rng, STYLE[sc.kind] ?? STYLE.forest);
   if (sc.kind === 'plains') paintCrystalDust(g, z, rng);
   if (sc.kind === 'town') paintTownCobbles(g, z, rng);
+  if (sc.kind === 'ember') paintLavaCracks(g, z, rng);
   // Seixos soltos para quebrar áreas lisas.
   for (let i = 0; i < Math.round(z.w * z.h / 40000); i++) {
     const x = rng.range(30, z.w - 30), y = rng.range(30, z.h - 30);
     g.fillStyle = tone(P.ground2, -0.1); ellipse(g, x, y, rng.range(2, 4.5), rng.range(1.5, 3)); g.fill();
     g.fillStyle = tone(P.ground, 0.07); ellipse(g, x - 0.8, y - 0.8, 1.4, 0.9); g.fill();
   }
+  // Rios, marcas de acampamento e, por cima, as pontes (o terreno é desenhado em blocos: tudo aqui é por coordenada de mundo).
+  paintRivers(g, world, rng);
+  paintCamps(g, world);
+  paintBridges(g, world);
   void L;
+}
+
+const riverPath = (g, pts) => { g.beginPath(); g.moveTo(pts[0].x, pts[0].y); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y); };
+
+// Rios: margem em três camadas, água (textura pintada quando carregou), e acabamento por clima — gelo no Cume, lava nas Cinzas, água turva nas Ruínas.
+function paintRivers(g, world, rng) {
+  const rivers = world.layout.rivers, kind = world.zone.scenery.kind;
+  if (!rivers?.length) return;
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const S = STYLE[kind] ?? STYLE.forest;
+  for (const rv of rivers) {
+    const w = rv.w, pts = rv.pts, stroke = (lw, style) => { g.lineWidth = lw; g.strokeStyle = style; riverPath(g, pts); g.stroke(); };
+    if (kind === 'ember') { // lava: crosta escura, brasa, núcleo incandescente
+      stroke(w + 48, 'rgba(10,0,0,0.42)'); stroke(w + 28, '#2a1410'); stroke(w + 12, '#4a2016');
+      stroke(w, '#b8381a'); stroke(w * 0.7, '#ff6a1e'); stroke(w * 0.38, '#ffb347'); stroke(w * 0.12, '#ffe6a0');
+      continue;
+    }
+    stroke(w + 50, S.shore[0]); stroke(w + 30, S.shore[1]); stroke(w + 12, S.shore[2]);
+    const water = waterPattern(g, kind);
+    if (water) stroke(w, water);
+    else { const gr = g.createLinearGradient(rv.x - w / 2, 0, rv.x + w / 2, 0); gr.addColorStop(0, S.water[0]); gr.addColorStop(1, S.water[1]); stroke(w, gr); }
+    if (kind === 'glacier') { stroke(w - 8, 'rgba(236,248,255,0.55)'); stroke(w * 0.5, 'rgba(255,255,255,0.28)'); } // gelo por cima da água
+    else if (kind === 'ruins') stroke(w, 'rgba(48,30,110,0.5)'); // água turva, violeta
+    else stroke(w * 0.5, 'rgba(255,255,255,0.10)');
+    // margem: pedrinhas claras e junco/espuma ao longo das duas bordas (determinístico, mesmo rng do terreno)
+    g.fillStyle = kind === 'glacier' ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.45)';
+    for (let i = 0; i < pts.length; i += 2) {
+      const p = pts[i], side = rng.chance(0.5) ? 1 : -1;
+      ellipse(g, p.x + side * (w / 2 + rng.range(-2, 6)), p.y + rng.range(-8, 8), rng.range(2, 5), rng.range(1.2, 2.6)); g.fill();
+    }
+  }
+}
+
+// Marca no chão: acampamento = terra batida com anel de pedras; clareira de elite = mancha avermelhada com anel rúnico (aviso de perigo).
+function paintCamps(g, world) {
+  const camps = world.layout.camps, kind = world.zone.scenery.kind;
+  if (!camps?.length) return;
+  for (const c of camps) {
+    if (c.glade) {
+      const gr = g.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.r);
+      gr.addColorStop(0, 'rgba(170,40,70,0.30)'); gr.addColorStop(0.75, 'rgba(120,30,60,0.16)'); gr.addColorStop(1, 'rgba(120,30,60,0)');
+      g.fillStyle = gr; g.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
+      g.strokeStyle = 'rgba(220,80,100,0.55)'; g.lineWidth = 2.5; g.setLineDash([14, 10]);
+      g.save(); g.translate(c.x, c.y); g.scale(1, 0.85); circle(g, 0, 0, c.r * 0.82); g.stroke(); g.restore(); g.setLineDash([]);
+    } else {
+      const sand = trailPattern(g, kind);
+      g.fillStyle = 'rgba(40,28,16,0.22)'; ellipse(g, c.x, c.y + 4, c.r * 0.46, c.r * 0.38); g.fill();
+      g.fillStyle = sand ?? '#bfa573'; ellipse(g, c.x, c.y, c.r * 0.42, c.r * 0.34); g.fill();
+      g.strokeStyle = 'rgba(60,40,20,0.35)'; g.lineWidth = 2; ellipse(g, c.x, c.y, c.r * 0.42, c.r * 0.34); g.stroke();
+    }
+  }
+}
+
+// Pontes: sombra na água, tábuas (madeira) ou lajes (ruínas, cinzas) sobre a textura de trilha da zona, vigas nas bordas.
+// Pontes de madeira: sprite do Meshy (nature-sprites.js); o desenho por código abaixo só vale para as de pedra (ainda sem arte) e para ?cenario=original.
+function paintBridges(g, world) {
+  const bridges = world.layout.bridges, kind = world.zone.scenery.kind;
+  if (!bridges?.length) return;
+  const stone = kind === 'ruins' || kind === 'ember', pat = trailPattern(g, kind);
+  const art = !stone && bridgeArtReady();
+  if (art) hideBridgeRails(world);
+  for (const b of bridges) {
+    if (art) { drawBridgeSprite(g, b); continue; }
+    const x0 = b.x - b.len / 2, y0 = b.y - b.hw, h = b.hw * 2;
+    g.fillStyle = 'rgba(8,16,36,0.30)'; g.fillRect(x0 + 8, y0 + 12, b.len, h);
+    g.fillStyle = stone ? '#6f6b8d' : '#8a5f38'; g.fillRect(x0, y0, b.len, h);
+    if (pat) { g.globalAlpha = stone ? 0.8 : 0.4; g.fillStyle = pat; g.fillRect(x0, y0, b.len, h); g.globalAlpha = 1; }
+    g.lineWidth = 1.6;
+    if (stone) {
+      g.strokeStyle = 'rgba(30,24,60,0.45)';
+      for (let x = x0 + 34; x < x0 + b.len - 10; x += 36) { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y0 + h); g.stroke(); }
+      g.beginPath(); g.moveTo(x0, b.y); g.lineTo(x0 + b.len, b.y); g.stroke();
+    } else {
+      for (let x = x0 + 18; x < x0 + b.len - 6; x += 18) {
+        g.strokeStyle = 'rgba(48,26,10,0.55)'; g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y0 + h); g.stroke();
+        g.strokeStyle = 'rgba(255,226,170,0.20)'; g.beginPath(); g.moveTo(x + 1.5, y0); g.lineTo(x + 1.5, y0 + h); g.stroke();
+      }
+    }
+    for (const yy of [y0 - 5, y0 + h - 7]) { // vigas
+      g.fillStyle = stone ? '#55507a' : '#5f4026'; g.fillRect(x0 - 4, yy, b.len + 8, 12);
+      g.fillStyle = stone ? '#8d89ab' : '#8a6038'; g.fillRect(x0 - 4, yy, b.len + 8, 4);
+    }
+  }
+}
+
+// Cinzas Ardentes: rachaduras de lava no basalto.
+function paintLavaCracks(g, z, rng) {
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const cracks = [];
+  for (let i = 0; i < Math.round(z.w * z.h / 90000); i++) {
+    let x = rng.range(0, z.w), y = rng.range(0, z.h); const pts = [[x, y]];
+    for (let k = 0; k < 5; k++) { x += rng.range(-30, 30); y += rng.range(6, 28); pts.push([x, y]); }
+    cracks.push(pts);
+  }
+  for (const [lw, c] of [[7, 'rgba(255,90,20,0.16)'], [3.2, 'rgba(255,120,40,0.55)'], [1.3, 'rgba(255,220,140,0.85)']]) {
+    g.lineWidth = lw; g.strokeStyle = c;
+    for (const pts of cracks) { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let k = 1; k < pts.length; k++) g.lineTo(pts[k][0], pts[k][1]); g.stroke(); }
+  }
 }
 
 function paintNatureGround(g, world, rng, S) {
@@ -184,7 +297,7 @@ function paintRuinsGround(g, world, rng) {
     }
   }
   // Musgo e rachaduras.
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < (world.zone.scenery.kind === 'ember' ? 0 : 40); i++) {
     g.globalAlpha = 0.3; g.fillStyle = '#6f9a84';
     blob(g, rng.range(0, z.w), rng.range(0, z.h), rng.range(25, 70), rng); g.fill();
   }
@@ -230,6 +343,35 @@ export function drawGroundLife(g, world, t, vis) {
       g.globalAlpha = tw; ellipse(g, Math.cos(i * 2.1) * p.rx * 0.6, Math.sin(i * 3.7) * p.ry * 0.55, 3, 1); g.fill();
     }
     g.globalAlpha = 1; g.restore();
+  }
+  // Rios: brilho/ondulação por quadro só nos trechos visíveis (poucos pontos); lava pulsa em aditivo.
+  const kind = world.zone.scenery?.kind;
+  for (const rv of L.rivers ?? []) {
+    for (let i = 0; i < rv.pts.length; i += 3) {
+      const p = rv.pts[i];
+      if (!vis(p.x, p.y)) continue;
+      if (kind === 'ember') {
+        const pulse = 0.5 + 0.5 * Math.sin(t * 1.4 + i * 0.9);
+        g.globalCompositeOperation = 'lighter';
+        const gr = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, rv.w * 0.9);
+        gr.addColorStop(0, `rgba(255,140,50,${0.16 + pulse * 0.14})`); gr.addColorStop(1, 'rgba(255,100,30,0)');
+        g.fillStyle = gr; g.fillRect(p.x - rv.w, p.y - rv.w, rv.w * 2, rv.w * 2);
+        g.fillStyle = `rgba(255,220,140,${0.4 * pulse})`; circle(g, p.x + Math.sin(i * 2.1 + t) * rv.w * 0.25, p.y + Math.cos(i * 1.3) * 10, 2.2); g.fill();
+        g.globalCompositeOperation = 'source-over';
+      } else {
+        const tw = Math.max(0, Math.sin(t * 1.8 + i * 1.7));
+        if (tw < 0.4) continue;
+        g.fillStyle = `rgba(255,255,255,${0.55 * tw})`;
+        ellipse(g, p.x + Math.sin(i * 3.1) * rv.w * 0.3, p.y + Math.cos(i * 2.3 + t * 0.6) * 6, 7 + tw * 4, 1.4); g.fill();
+      }
+    }
+  }
+  // Clareiras de elite: o anel pulsa de leve (aviso).
+  for (const c of L.camps ?? []) {
+    if (!c.glade || !vis(c.x, c.y)) continue;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2 + c.x * 0.01);
+    g.strokeStyle = `rgba(255,90,110,${0.12 + pulse * 0.2})`; g.lineWidth = 3;
+    g.save(); g.translate(c.x, c.y); g.scale(1, 0.85); circle(g, 0, 0, c.r * (0.84 + pulse * 0.05)); g.stroke(); g.restore();
   }
   if (L.runes.length) {
     g.globalCompositeOperation = 'lighter';

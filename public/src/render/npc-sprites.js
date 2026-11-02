@@ -3,7 +3,7 @@
 import { mobSpritesEnabled } from './mob-sprites.js';
 
 // NPCs que têm arte (evita pedir arquivos que não existem)
-export const NPC_ART = new Set(['merchant', 'arena', 'sage', 'guard', 'herbalist']);
+export const NPC_ART = new Set(['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith']);
 const WORLD_PER_PX = 0.4; // altura no mundo = altura da imagem (px) × isto: mantém as proporções entre os NPCs
 const items = new Map();
 export const stats = { drawn: 0 };

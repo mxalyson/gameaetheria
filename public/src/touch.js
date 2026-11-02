@@ -2,6 +2,7 @@
 // Mira automática no inimigo mais próximo; arrastar um botão de skill mira na mão. Usa Pointer Events (multi-toque).
 import { CLASSES } from './data/classes.js';
 import { SKILLS } from './data/skills.js';
+import { isSkillUnlocked, skillUnlockLevel } from './core/unlocks.js';
 import { skillOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { stickVector, pickAim, aimModeFor, dragAim } from './touch-logic.js';
@@ -58,7 +59,7 @@ export class TouchControls {
         <div class="tbtn slot sk sk1" data-t="skill" data-i="1"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot sk sk2" data-t="skill" data-i="2"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot pot" data-t="potion"><span class="icon">🧪</span><span class="count"></span><div class="cd"></div></div>
-        <div class="tbtn slot home" data-t="hearth"><span class="icon">🏠</span></div>
+        <div class="tbtn slot home" data-t="hearth"><span class="icon"><img class="art" src="assets/icons/ui/home.webp" alt="🏠" draggable="false" onerror="this.replaceWith(this.alt)"></span></div>
         <div class="tbtn slot act hidden" data-t="interact"><span class="icon">💬</span></div>
       </div>`;
 
@@ -95,6 +96,7 @@ export class TouchControls {
       const b = e.target.closest('.tbtn');
       if (!b || b.classList.contains('hidden')) return;
       e.preventDefault();
+      if (b.classList.contains('locked')) return; // habilidade ainda não aprendida: o botão não responde
       b.setPointerCapture(e.pointerId);
       b.classList.add('down');
       this.btns.set(e.pointerId, { b, t: b.dataset.t, i: Number(b.dataset.i ?? 0), sx: e.clientX, sy: e.clientY, aim: null });
@@ -170,7 +172,13 @@ export class TouchControls {
       if (t) t.textContent = text && cd > 0 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
     };
     const blocked = p.stunT > 0 || p.dead || !!p.dash;
-    cls.skills.forEach((s, i) => { const b = this.root.querySelector(`.sk${i}`); setCd(b, cdOf[i], skillOf(p.classId, p.spec, s).cd, true); b.classList.toggle('blocked', blocked); });
+    cls.skills.forEach((s, i) => {
+      const b = this.root.querySelector(`.sk${i}`), lk = !isSkillUnlocked(p, i);
+      setCd(b, lk ? 0 : cdOf[i], skillOf(p.classId, p.spec, s).cd, true);
+      b.classList.toggle('blocked', blocked && !lk);
+      b.classList.toggle('locked', lk); // cadeado + "Nv N" (ver style.css)
+      if (lk) b.style.setProperty('--lv', `"${skillUnlockLevel(i)}"`);
+    });
     setCd(this.root.querySelector('.atk'), p.cds.basic, cls.basic.cd / p.stats.atkSpeed, false);
     const pot = this.root.querySelector('.pot');
     setCd(pot, game.potionCd, 8, false);

@@ -318,3 +318,172 @@ test('teletransporte: custo em pergaminhos e só para mapas visitados (save anti
   c.visited = { ruins: 1, arena: 1, naoexiste: 1 };
   assert.deepEqual(validate(c).char.visited, { ruins: 1 }, 'só zonas de farm válidas');
 });
+
+// ---------------- dificuldade, habilidades por nível, chefes, loot (docs/gameplay/dificuldade.md) ----------------
+import { isSkillUnlocked, unlockedSkills, newlyUnlocked, skillUnlockLevel } from '../public/src/core/unlocks.js';
+import { generateOpalItem, rollSourceRarity, newPity, PITY, OPAL_BOSS } from '../public/src/core/loot.js';
+import { MOB_CURVE } from '../public/src/data/mobs.js';
+
+test('habilidades: ataque básico no 1, s0 no 1, s1 no 5, s2 no 10; funções puras', () => {
+  const c = newCharacter('T', 'mage', makeRng(1));
+  assert.deepEqual(unlockedSkills(c), ['fireball']);
+  c.level = 5; assert.deepEqual(unlockedSkills(c), ['fireball', 'frostnova']);
+  c.level = 10; assert.equal(unlockedSkills(c).length, 3);
+  assert.equal(isSkillUnlocked(4, 1), false); assert.equal(isSkillUnlocked(5, 1), true);
+  assert.deepEqual(newlyUnlocked('mage', 4, 10).map((u) => u.id), ['frostnova', 'blink']);
+  assert.equal(skillUnlockLevel(2), 10);
+});
+
+test('simulação ignora a intenção de lançar habilidade bloqueada e aceita a liberada', () => {
+  const w = new World('arena', { seed: 1, visuals: false });
+  const c = newCharacter('T', 'mage', makeRng(1));
+  const p = w.add(makeHeroActor(c, 550, 550));
+  assert.equal(w.castSkill(p, 1, 700, 550), false, 's1 bloqueada no nível 1');
+  assert.equal(p.cds.s1, 0, 'e não gasta recarga');
+  assert.equal(w.castSkill(p, 0, 700, 550), true);
+  p.level = 5;
+  assert.equal(w.castSkill(p, 1, 700, 550), true);
+  assert.equal(w.castSkill(p, 2, 700, 550), false);
+});
+
+test('mobs comuns nunca usam o golpe em área; elites só a partir da Planície; chefes sempre', () => {
+  const run = (zone, spec) => {
+    const w = new World(zone, { seed: 3, visuals: false });
+    const hero = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 500, 500)); hero.stats.def = 1e7; // imortal: o teste só conta golpes telegrafados
+    const m = w.add(makeMobActor(spec.id, spec.level, 560, 500, { elite: !!spec.elite })); m.ai.target = hero.id; m.ai.state = 'chase';
+    let seen = 0;
+    for (let i = 0; i < 60 * 12; i++) { hero.hp = hero.maxHp; w.update(1 / 60); seen += w.events.filter((e) => e.type === 'telegraph').length; w.events.length = 0; }
+    return seen;
+  };
+  assert.equal(run('forest', { id: 'wolf', level: 3 }), 0);
+  assert.equal(run('forest', { id: 'wolf', level: 3, elite: true }), 0, 'elite do Bosque ainda não aprendeu');
+  assert.ok(run('plains', { id: 'crystalwolf', level: 9, elite: true }) > 0);
+  assert.ok(run('forest', { id: 'treant', level: 7 }) > 0);
+});
+
+test('chefe: fases por vida (rápido <60%, fúria <30%) e esbirros só no último chefe', () => {
+  const w = new World('ember', { seed: 5, visuals: false });
+  const hero = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 500, 500)); hero.stats.def = 1e7;
+  const b = w.add(makeMobActor('infernoknight', 31, 600, 500)); b.ai.target = hero.id; b.ai.state = 'chase';
+  const base = b.stats.power;
+  const tick = () => { hero.hp = hero.maxHp; w.update(1 / 60); };
+  tick(); assert.equal(b.phase, 1);
+  b.hp = b.maxHp * 0.5; tick(); assert.equal(b.phase, 2); assert.equal(b.stats.atkSpeed, 1.25);
+  b.hp = b.maxHp * 0.2; tick(); assert.equal(b.phase, 3); assert.ok(b.stats.power > base * 1.15);
+  assert.ok(w.events.some((e) => e.type === 'phase' && e.phase === 3), 'evento de fúria para a interface');
+  for (let i = 0; i < 60 * 40; i++) tick();
+  const minions = w.actors.filter((a) => a.summonedBy === b.id && !a.dead);
+  assert.ok(minions.length > 0 && minions.length <= 4);
+  assert.equal(rollMobLoot(makeRng(1), minions[0], 'warrior').length, 0, 'esbirro não dropa');
+  w.damage(hero, b, 1e9);
+  assert.equal(w.actors.filter((a) => a.summonedBy === b.id && !a.dead).length, 0, 'esbirros somem com o chefe');
+  const t = new World('forest', { seed: 5, visuals: false });
+  const th = t.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 500, 500)); th.stats.def = 1e7;
+  const tb = t.add(makeMobActor('treant', 7, 600, 500)); tb.hp = tb.maxHp * 0.2; tb.ai.target = th.id; tb.ai.state = 'chase';
+  for (let i = 0; i < 60 * 30; i++) { th.hp = th.maxHp; t.update(1 / 60); }
+  assert.equal(t.actors.filter((a) => a.summonedBy).length, 0, 'só o último chefe invoca');
+});
+
+test('curva de mobs: chefe é muito mais forte que mob comum e elite passa o comum', () => {
+  const c = makeMobActor('wolf', 20, 0, 0), e = makeMobActor('wolf', 20, 0, 0, { elite: true }), bo = makeMobActor('guardian', 20, 0, 0);
+  assert.ok(e.maxHp > c.maxHp * 3 && e.stats.power > c.stats.power);
+  assert.ok(bo.maxHp > c.maxHp * 8);
+  assert.ok(makeMobActor('wolf', 25, 0, 0).maxHp > c.maxHp);
+  assert.ok(MOB_CURVE.hp(30) > MOB_CURVE.hp(10) * 2);
+});
+
+test('diferença de nível: herói muito abaixo do mob causa menos dano', () => {
+  const dmg = (heroLevel) => {
+    const w = new World('arena', { seed: 9, visuals: false });
+    const c = newCharacter('T', 'warrior', makeRng(1)); c.level = 20;
+    const h = w.add(makeHeroActor(c, 500, 500)); h.level = heroLevel;
+    const m = w.add(makeMobActor('wolf', 20, 540, 500));
+    let tot = 0; for (let i = 0; i < 40; i++) tot += w.damage(h, m, 1); return tot;
+  };
+  assert.ok(dmg(8) < dmg(20) * 0.6);
+  assert.ok(Math.abs(dmg(18) - dmg(20)) < dmg(20) * 0.2, 'até 2 níveis de diferença não pesa');
+});
+
+test('ritual do último chefe: não aparece sozinho; contador enche com abates, avisa e depois recarrega', () => {
+  const w = new World('ember', { seed: 11, visuals: false });
+  const hero = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 500, 500));
+  for (let i = 0; i < 60 * 130; i++) w.updateSpawns(1 / 60, hero);
+  assert.ok(!w.actors.some((a) => a.boss), 'sem abates, nada de chefe');
+  assert.deepEqual({ have: w.bossProgress.have, need: w.bossProgress.need }, { have: 0, need: 40 });
+  const kill = (id, o) => { const m = w.add(makeMobActor(id, 27, 700, 500, o)); w.damage(hero, m, 1e9); };
+  for (let i = 0; i < 39; i++) kill('emberwolf');
+  assert.equal(w.bossProgress.have, 39);
+  for (let i = 0; i < 60; i++) w.updateSpawns(1 / 60, hero);
+  assert.ok(!w.actors.some((a) => a.boss));
+  kill('emberwolf');
+  w.events.length = 0;
+  for (let i = 0; i < 60 * 5; i++) w.updateSpawns(1 / 60, hero);
+  assert.ok(w.events.some((e) => e.type === 'boss_warn' && e.stage === 'omen') && w.events.some((e) => e.type === 'boss_warn' && e.stage === 'arrive'));
+  const boss = w.actors.find((a) => a.boss);
+  assert.equal(boss.mobId, 'infernoknight');
+  w.damage(hero, boss, 1e9);
+  assert.ok(w.bossProgress.cool > 1000, 'recarga longa depois da morte');
+  kill('emberwolf');
+  assert.equal(w.bossProgress.have, 0, 'durante a recarga o contador não anda');
+  // o estado externo sobrevive à troca de mundo; elite vale mais
+  const st = {};
+  const w2 = new World('ember', { seed: 2, visuals: false, bossState: st });
+  const h2 = w2.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 500, 500));
+  w2.damage(h2, w2.add(makeMobActor('emberwolf', 27, 700, 500, { elite: true })), 1e9);
+  assert.equal(new World('ember', { bossState: st, visuals: false }).bossProgress.have, 4);
+  // chefes iniciais continuam por tempo
+  const f = new World('forest', { seed: 1, visuals: false });
+  f.updateSpawns(0.1, hero); assert.ok(f.actors.some((a) => a.boss));
+  assert.equal(f.bossProgress, null);
+});
+
+test('item de Ópalo: só do último chefe, épico/lendário acima do comum, com pity, e passa na validação do save', () => {
+  const rng = makeRng(77);
+  for (const cls of Object.keys(CLASSES)) {
+    const it = generateOpalItem(makeRng(5), 31, cls, 'weapon');
+    assert.equal(it.weaponType, CLASSES[cls].weapon); assert.ok(/Opalin/.test(it.name) && it.opal);
+  }
+  let leg = 0, w = 0, sumO = 0, sumR = 0;
+  for (let i = 0; i < 400; i++) {
+    const it = generateOpalItem(rng, 31, 'mage');
+    if (it.rarity === 'legendary') leg++; if (it.slot === 'weapon') w++;
+    const ref = generateItem(makeRng(i), 31, { slot: it.slot, weaponType: it.weaponType ?? undefined, rarityId: it.rarity });
+    const key = it.slot === 'weapon' ? 'atk' : 'def';
+    sumO += it.stats[key]; sumR += ref.stats[key]; // cada item varia ±15%: compara a média
+    assert.ok(it.stats.crit || it.stats.vit, 'atributos extras exclusivos');
+  }
+  assert.ok(sumO > sumR * 1.2, 'base claramente acima do item comum da mesma raridade');
+  assert.ok(leg / 400 > 0.15 && leg / 400 < 0.35, `~25% lendário (${leg})`);
+  assert.ok(w / 400 > 0.5 && w / 400 < 0.7, '~60% arma');
+  for (let i = 0; i < 300; i++) assert.ok(!rollMobLoot(makeRng(i), { level: 30, boss: true, mobId: 'guardian' }, 'mage').some((l) => l.item?.opal));
+  const pity = newPity(); let miss = 0, maxMiss = 0, drops = 0;
+  const r2 = makeRng(3);
+  for (let i = 0; i < 400; i++) {
+    const l = rollMobLoot(r2, { level: 31, boss: true, mobId: OPAL_BOSS }, 'mage', pity);
+    const n = l.filter((x) => x.item?.opal).length; assert.ok(n <= 1);
+    if (n) { drops++; miss = 0; } else maxMiss = Math.max(maxMiss, ++miss);
+  }
+  assert.ok(maxMiss <= 4, `pity do exclusivo (${maxMiss})`);
+  assert.ok(drops > 100 && drops < 300, 'não é garantido, mas frequente com pity');
+  const c = newCharacter('T', 'mage', makeRng(1)); c.level = 30;
+  const it = generateOpalItem(makeRng(9), 31, 'mage', 'weapon'); c.inventory.push(it);
+  const v = validate(JSON.parse(JSON.stringify(c)));
+  assert.equal(v.ok, true);
+  const back = v.char.inventory[0];
+  assert.equal(back.opal, true); assert.equal(back.name, it.name); assert.equal(back.rarity, it.rarity); assert.equal(back.stats.atk, it.stats.atk);
+  assert.deepEqual(v.char.pity, { epic: 0, legendary: 0, opal: 0 }, 'save antigo ganha pity zerado');
+  const forged = JSON.parse(JSON.stringify(c)); forged.inventory[0].opal = 'sim';
+  assert.equal(validate(forged).char.inventory[0].opal, undefined);
+});
+
+test('loot: pesos por fonte (elite > mob), pity eleva e garante épico e zera ao obter', () => {
+  const rate = (src, n) => { const r = makeRng(8); let e = 0; for (let i = 0; i < n; i++) if (['epic', 'legendary'].includes(rollSourceRarity(r, src))) e++; return e / n; };
+  assert.ok(rate('elite', 20000) > rate('mob', 20000) * 3);
+  assert.ok(rate('boss', 20000) > rate('elite', 20000));
+  const p = newPity(); p.epic = PITY.epicCap;
+  assert.ok(['epic', 'legendary'].includes(rollSourceRarity(makeRng(2), 'mob', p)));
+  assert.equal(p.epic, 0);
+  const z = newPity(), r = makeRng(5); let worst = 0, run = 0;
+  for (let i = 0; i < 20000; i++) { const x = rollSourceRarity(r, 'mob', z); if (x === 'epic' || x === 'legendary') run = 0; else worst = Math.max(worst, ++run); }
+  assert.ok(worst <= PITY.epicCap, `pior sequência ${worst}`);
+});

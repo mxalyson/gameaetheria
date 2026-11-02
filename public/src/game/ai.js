@@ -2,7 +2,8 @@
 import { CLASSES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
 import { skillOf } from '../core/specs.js';
-import { MOBS } from '../data/mobs.js';
+import { MOBS, BOSS_PHASES } from '../data/mobs.js';
+import { isSkillUnlocked } from '../core/unlocks.js';
 
 const toward = (a, x, y, spd = 1) => ({ mx: x - a.x, my: y - a.y, aimX: x, aimY: y, spd });
 
@@ -38,11 +39,10 @@ export function mobIntent(m, w, dt) {
   }
 
   const d = Math.hypot(tgt.x - m.x, tgt.y - m.y);
-  // Chefes: golpe em área telegrafado sob o alvo.
-  if (m.boss && m.cds.slam <= 0 && d < 450) {
-    w.telegraphs.push({ x: tgt.x, y: tgt.y, r: 115, t: 0, delay: 1.1, src: m, mult: 1.8, color: M.color });
-    w.events.push({ type: 'telegraph', x: tgt.x, y: tgt.y, r: 115, delay: 1.1, color: M.color }); // o cliente desenha o aviso de perigo
-    m.cds.slam = 5.5;
+  if (m.boss) bossTick(m, w, tgt, d, M);
+  else if (m.elite && (w.zone.level?.[0] ?? 0) >= 6 && m.cds.slam <= 0 && d < 380) { // elites aprendem o golpe em área a partir da Planície
+    telegraph(w, m, tgt.x, tgt.y, 90, 1.5, 1.2, M.color);
+    m.cds.slam = 7;
   }
   const it = { aimX: tgt.x, aimY: tgt.y, mx: 0, my: 0, attack: false };
   if (M.kind === 'ranged') {
@@ -55,6 +55,40 @@ export function mobIntent(m, w, dt) {
     if (d <= reach + 4) it.attack = true;
   }
   return it;
+}
+
+// Golpe em área telegrafado: o dano cai quando o aviso (delay) termina; o cliente desenha o aviso de perigo.
+function telegraph(w, m, x, y, r, mult, delay, color) {
+  w.telegraphs.push({ x, y, r, t: 0, delay, src: m, mult, color });
+  w.events.push({ type: 'telegraph', x, y, r, delay, color });
+}
+
+// Mecânica dos chefes: 3 fases por vida (<60% mais rápido, <30% enrage), golpes em área maiores/mais frequentes e, no último chefe, invocações.
+function bossTick(m, w, tgt, d, M) {
+  const P = BOSS_PHASES.default, X = BOSS_PHASES[m.mobId] ?? {};
+  const frac = m.hp / m.maxHp;
+  const ph = frac < P.p3 ? 3 : frac < P.p2 ? 2 : 1;
+  if (ph !== m.phase) {
+    m.phase = ph;
+    m.stats.moveSpeed = m.base.moveSpeed * P.speed[ph - 1];
+    m.stats.atkSpeed = P.atkSpeed[ph - 1];
+    m.stats.power = m.base.power * P.power[ph - 1];
+    w.events.push({ type: 'phase', actor: m, phase: ph, t: w.time });
+  }
+  const i = ph - 1, S = P.slam;
+  if (m.cds.slam <= 0 && d < 450) {
+    telegraph(w, m, tgt.x, tgt.y, S.r[i], S.mult[i], S.delay[i], M.color);
+    if (ph === 3) { // enrage: um segundo golpe cai ao lado, forçando o jogador a se mexer
+      const a = w.rng.next() * Math.PI * 2;
+      telegraph(w, m, tgt.x + Math.cos(a) * S.r[i] * 1.3, tgt.y + Math.sin(a) * S.r[i] * 1.3, S.r[i] * 0.85, S.mult[i], S.delay[i] + 0.25, M.color);
+    }
+    m.cds.slam = S.cd[i];
+  }
+  const sm = X.summon;
+  if (sm && ph >= 2 && m.cds.summon <= 0) {
+    m.cds.summon = sm.every;
+    w.summonMinions(m, tgt, sm);
+  }
 }
 
 // Rival da arena: usa o mesmo kit de classe do jogador.
@@ -121,7 +155,7 @@ function steerAround(r, w, mx, my) {
 function chooseSkill(r, tgt, d, w) {
   const ids = CLASSES[r.classId].skills;
   for (let i = 0; i < ids.length; i++) {
-    if (r.cds['s' + i] > 0) continue;
+    if (r.cds['s' + i] > 0 || !isSkillUnlocked(r.level ?? 30, i)) continue;
     const s = skillOf(r.classId, r.spec, ids[i]);
     switch (s.kind) {
       case 'aoe_self':

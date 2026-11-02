@@ -43,3 +43,6 @@ Validação de esquema e versão · tamanho máximo · limite de taxa por conex�
 
 ## Lobby, grupos e salas (P6)
 Protocolo **v3**: `hello` → `welcome` (lobby) → `queue{mode}` / `party_*` → `match_found` (sala, time, jogadores, objetivo) → `snap` por sala → `reward` e `match_end` (volta ao lobby). Detalhes, regras e medições: decisão 0010. Para testar à mão: `npm run server:poc` e **uma aba por jogador** em `/labs/net-poc/index.html` (convide pelo nome, aceite, enfileire 2×2 com o líder).
+
+## Teletransporte online (`zone_teleport`)
+Cliente → servidor: `{ t: 'zone_teleport', zone }` (`zone` = `'town'` ou zona de farm). O servidor valida (intervalo de 5 s, fora de combate há 8 s, mapa em `char.visited`, ≥1 pergaminho fora a vila, sala com vaga), debita o pergaminho no documento do personagem (operação `teleport`) e responde `zone_joined` (com `scrolls` = contagem oficial nova) ou `zone_exit {to:'town'}`. Recusas: `reject` com `not_visited`, `no_scroll`, `in_combat`, `teleport_wait` (e `bad_zone`, `in_match`, `already_queued`, `room_full`, `bad_character`). Entrar numa zona por qualquer caminho grava `visited` no personagem. Ver decisão 0015.

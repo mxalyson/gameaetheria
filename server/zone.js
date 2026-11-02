@@ -32,7 +32,8 @@ export class ZoneRoom {
     Object.assign(this, { id, key, zoneId, mode: 'zone', db, reconnectSec, send, onPortal });
     this.matchId = randomBytes(9).toString('base64url');
     this.rng = makeRng(seed);
-    this.world = new World(zoneId, { seed, visuals: false });
+    this.bossState = {}; // ritual e recarga do chefe valem para a instância inteira (sobrevivem enquanto houver gente)
+    this.world = new World(zoneId, { seed, visuals: false, bossState: this.bossState });
     this.populated = false;
     this.state = 'fight'; this.countdown = 0; this.winner = 0; this.reason = null; this.closed = false;
     this.clock = 0; this.tick = 0; this.events = []; this.enc = new DeltaEncoder();
@@ -51,7 +52,7 @@ export class ZoneRoom {
     const actor = this.world.add(makeHeroActor(session.char, at.x, at.y, 'player', 1));
     if (!this.populated) { this.world.populate(session.char.level); this.populated = true; }
     const p = { actor, team: 1, session, bot: false, left: false, charId: session.charId ?? null, accountId: session.accountId ?? null,
-      name: session.name, classId: session.char.classId, lastSeq: -1, input: idle(), dropT: null, slot: 1, entry: { ...at }, deadAt: null, portalCd: 1, pend: emptyBatch() };
+      name: session.name, classId: session.char.classId, lastSeq: -1, input: idle(), dropT: null, slot: 1, entry: { ...at }, deadAt: null, portalCd: 1, pend: emptyBatch(), pity: { epic: 0, legendary: 0, opal: 0, ...(session.char.pity ?? {}) } }; // pity: azar acumulado do personagem (loot.js); o servidor grava de volta no lote
     this.players.set(actor.id, p);
     session.room = this; session.player = p;
     this.joined.push(p);
@@ -122,9 +123,9 @@ export class ZoneRoom {
     for (const p of this.alive()) {
       const a = p.actor;
       if (Math.hypot(a.x - m.x, a.y - m.y) > SHARE_RADIUS) continue;
-      p.pend.xp += mobXp(m.level, a.level, mul);
+      if (!m.summoned) p.pend.xp += mobXp(m.level, a.level, mul); // esbirros de chefe não dão XP nem loot
       p.pend.kills.push({ mobId: m.mobId, boss: !!m.boss });
-      for (const d of rollMobLoot(this.rng, m, p.classId)) {
+      for (const d of rollMobLoot(this.rng, m, p.classId, p.pity)) {
         if (d.kind === 'gold') p.pend.gold += d.amount;
         else if (d.kind === 'potion') p.pend.potions += d.amount;
         else if (d.kind === 'item') p.pend.items.push({ ...d.item, id: 'i' + randomBytes(9).toString('base64url') });
@@ -137,7 +138,7 @@ export class ZoneRoom {
   flush(p) {
     const b = p.pend;
     if (!p.charId || !this.db || !(b.xp || b.gold || b.potions || b.items.length || b.essences.length || b.kills.length || b.deaths)) return null;
-    p.pend = emptyBatch();
+    b.pity = { ...p.pity }; p.pend = emptyBatch();
     const opId = `zone:${this.matchId}:${p.charId}:${++this.flushSeq}`;
     try {
       const out = this.db.applyOperation(opId, p.charId, 'zone', (doc) => applyZoneBatch(doc, { ...b, zoneId: this.zoneId }));

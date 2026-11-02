@@ -29,7 +29,7 @@ async function setup(n = 1) {
 }
 
 test('entryPoint: só portais reais levam à zona; vila → bosque cai na entrada do bosque', () => {
-  assert.deepEqual(entryPoint('forest', 'town'), { x: 110, y: 950 });
+  assert.deepEqual(entryPoint('forest', 'town'), { x: 110, y: 1400 });
   assert.equal(entryPoint('ruins', 'town'), null);
   assert.equal(entryPoint('plains', 'forest').x, 110);
 });
@@ -49,11 +49,14 @@ test('entrar na zona: instância criada, zone_joined com o ponto de entrada e sn
   const { c } = players[0];
   c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
   const j = await c.waitFor((m) => m.t === 'zone_joined');
-  assert.equal(j.zone, 'forest'); assert.equal(j.x, 110); assert.equal(j.y, 950); assert.equal(j.players.length, 1);
+  assert.equal(j.zone, 'forest'); assert.equal(j.x, 110); assert.equal(j.y, 1400); assert.equal(j.players.length, 1);
   srv.step(30);
   const snap = await c.waitFor((m) => m.t === 'snap' && m.mode === 'zone');
   assert.ok(snap.mobs.length > 5, 'monstros da zona');
   assert.ok(snap.actors.some((a) => a.id === j.you));
+  const mb = snap.mobs.find((m) => m.miniboss);
+  assert.ok(mb, 'mini-chefe da zona marcado no snapshot'); assert.equal(mb.name, 'Alfa da Matilha'); assert.ok(mb.r > 0); assert.ok(mb.maxHp > 0);
+  assert.ok(snap.mobs.some((m) => m.camp), 'acampamentos marcados');
   c.send({ t: 'zone_enter', zone: 'ruins', from: 'town' });
   await c.waitFor((m) => m.t === 'reject' && m.code === 'in_match' || m.code === 'bad_zone');
   await closeAll(srv, c);
@@ -112,7 +115,7 @@ test('morrer: renasce na entrada depois de 4 s e a morte custa 10% do ouro', asy
   const g0 = db.character(ch).doc.gold;
   me.x = 900; me.y = 900; me.hp = 0; me.dead = true; me.deadT = 0; room.onPlayerDeath(me);
   srv.step(60 * 4 + 5);
-  assert.equal(me.dead, false); assert.ok(Math.hypot(me.x - 110, me.y - 950) < 5, 'voltou à entrada');
+  assert.equal(me.dead, false); assert.ok(Math.hypot(me.x - 110, me.y - 1400) < 5, 'voltou à entrada');
   room.flush(room.players.get(j.you));
   assert.equal(db.character(ch).doc.gold, g0 - Math.floor(g0 * 0.1));
   await closeAll(srv, c);
@@ -147,14 +150,20 @@ test('portais: Bosque → Planície (nova instância) e Planície → Bosque', a
   c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
   const j = await c.waitFor((m) => m.t === 'zone_joined');
   const me = srv.actor(j.you);
-  me.x = 2760; me.y = 950; srv.hub.zoneRooms.values().next().value.players.get(j.you).portalCd = 0;
+  me.x = 4560; me.y = 1400; srv.hub.zoneRooms.values().next().value.players.get(j.you).portalCd = 0;
   srv.step(2);
   const j2 = await c.waitFor((m) => m.t === 'zone_joined' && m.zone === 'plains');
   assert.equal(j2.x, 110);
-  const me2 = srv.actor(j2.you); me2.x = 40; me2.y = 950;
+  const me2 = srv.actor(j2.you); me2.x = 40; me2.y = 1400;
   srv.hub.zoneRooms.get([...srv.hub.zoneRooms.keys()].find((k) => k.endsWith(':plains'))).players.get(j2.you).portalCd = 0;
   srv.step(2);
   const j3 = await c.waitFor((m) => m.t === 'zone_joined' && m.zone === 'forest' && m.room !== j.room);
-  assert.equal(j3.x, 2690);
+  assert.equal(j3.x, 4490);
   await closeAll(srv, c);
+});
+
+test('eventos do chefe (aviso do ritual e fases) chegam ao cliente online', async () => {
+  const { wire } = await import('../server/wire.js');
+  assert.deepEqual(wire({ type: 'boss_warn', stage: 'omen', name: 'Cavaleiro Rubro', x: 100.4, y: 200.6 }), { e: 'boss_warn', stage: 'omen', name: 'Cavaleiro Rubro', x: 100, y: 201 });
+  assert.deepEqual(wire({ type: 'phase', actor: { id: 7 }, phase: 3 }), { e: 'phase', actor: 7, phase: 3 });
 });

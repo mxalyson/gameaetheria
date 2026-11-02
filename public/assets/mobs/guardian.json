@@ -1,21 +1,21 @@
 {
  "id": "guardian",
  "cell": [
-  135,
-  144
+  125,
+  132
  ],
- "cols": 4,
+ "cols": 5,
  "rows": 8,
- "frames": 4,
- "style": "waddle",
- "ax": 68,
- "ay": 97,
- "ppm": 134.6396303709745,
+ "frames": 5,
+ "style": "stomp",
+ "ax": 63,
+ "ay": 89,
+ "ppm": 121.80867534002729,
  "size": [
   0.538,
   0.494,
   0.687
  ],
  "src": "meshy-mobs/guardian.glb",
- "v": 1793573667
+ "v": 1793586044
 }

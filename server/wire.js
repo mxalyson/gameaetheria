@@ -11,6 +11,8 @@ export function wire(ev) {
     case 'status': return { e: 'status', actor: id(ev.actor), kind: ev.kind, dur: r1(ev.dur) };
     case 'death': return { e: 'death', actor: id(ev.actor), killer: id(ev.killer) };
     case 'telegraph': return { e: 'telegraph', x: Math.round(ev.x), y: Math.round(ev.y), r: ev.r, delay: ev.delay, color: ev.color };
+    case 'boss_warn': return { e: 'boss_warn', stage: ev.stage, name: ev.name, x: Math.round(ev.x), y: Math.round(ev.y) };
+    case 'phase': return { e: 'phase', actor: id(ev.actor), phase: ev.phase };
     default: return null;
   }
 }

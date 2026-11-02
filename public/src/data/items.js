@@ -30,6 +30,9 @@ export const BASE_NAMES = {
   ring: ['Anel de Cobre', 'Anel de Prata', 'Anel de Ouro', 'Anel Astral'],
   amulet: ['Pingente', 'Colar de Contas', 'Amuleto de Jade', 'Talismã Antigo'],
 };
+// Itens exclusivos do último chefe (Cavaleiro Rubro): tema ópalo. Ícone = o do tipo (sem arte própria ainda; ver docs/roadmap/pendencias.md).
+export const OPAL_NAMES = { sword: 'Espada Opalina', staff: 'Cajado Opalino', bow: 'Arco Opalino', mace: 'Maça Opalina', armor: 'Couraça de Ópalo' };
+
 export const EPITHETS = ['da Aurora', 'do Lobo', 'das Marés', 'do Crepúsculo', 'da Tempestade', 'do Eco', 'da Brasa', 'do Orvalho', 'dos Ventos', 'da Lua Pálida'];
 
 // per: escala por nível do item. flat: faixa fixa (porcentagens).

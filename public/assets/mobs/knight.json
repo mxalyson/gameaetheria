@@ -1,21 +1,21 @@
 {
  "id": "knight",
  "cell": [
-  99,
-  120
+  92,
+  108
  ],
  "cols": 5,
  "rows": 8,
  "frames": 5,
- "style": "waddle",
- "ax": 50,
- "ay": 86,
- "ppm": 135.20032737826995,
+ "style": "prowl",
+ "ax": 46,
+ "ay": 76,
+ "ppm": 118.90292553684075,
  "size": [
   0.456,
   0.494,
   0.424
  ],
  "src": "meshy-mobs/guardian.glb",
- "v": 1793573558
+ "v": 1793586059
 }

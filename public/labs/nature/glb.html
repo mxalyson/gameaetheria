@@ -97,9 +97,41 @@ window.bakeDirs = async (idx, { el = 40, max = 168, aa = 2, pad = 0.05 } = {}) =
   return { png: sheet.toDataURL('image/png'), cell: [W, H], cols: 4, rows: 2, ax: Math.round((o.x - L) / (R - L) * W), ay: Math.round((T - o.y) / (T - B) * H), ppm, size: sz.toArray().map((v) => +v.toFixed(3)) };
 };
 // Criatura ANIMADA: 8 direções x N quadros de um ciclo (0 S ... 7 SO; linha = direção, coluna = quadro). Deforma os vértices por estilo, sem esqueleto:
-// 'hop' (geleia: agacha e estica), 'waddle' (cogumelo: balança de lado e o chapéu acompanha), 'trot' (lobo: pernas em pares diagonais, cauda abanando).
+// 'hop' (geleia: agacha e estica), 'stomp'/'float'/'prowl' (ver deformHeavy), 'waddle' (cogumelo: balança de lado e o chapéu acompanha), 'trot' (lobo: pernas em pares diagonais, cauda abanando).
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-function deformFor(style, Hm, Dz) {
+// Estilos pesados/flutuantes (sem esqueleto: tudo é deformação dos vértices por altura h = y/Hm e lado x):
+// 'stomp' (golem/colosso/guardião: duas pisadas por ciclo, corpo afunda ao pisar, peso rola de um pé ao outro, ombros torcem contra o quadril, braços balançam),
+// 'float' (espectro/fogo-fátuo: sobe e desce, a parte de baixo ondula como cauda/barra), 'prowl' (gárgula/cavaleiro: passada com inclinação à frente, pernas e braços opostos, asas/capa batendo).
+function deformHeavy(style, Hm, Dz, Dx) {
+  const rotY = (X, Z, a) => [X * Math.cos(a) + Z * Math.sin(a), -X * Math.sin(a) + Z * Math.cos(a)];
+  const rotZ = (X, Y, a) => [X * Math.cos(a) - Y * Math.sin(a), X * Math.sin(a) + Y * Math.cos(a)];
+  return (x, y, z, t) => {
+    const T = 2 * Math.PI * t, s = Math.sin(T), h = y / Hm, side = x >= 0 ? 0 : Math.PI, sp = Math.sin(T + side);
+    const low = clamp01(1 - h / (style === 'stomp' ? 0.3 : 0.4)), arm = clamp01((Math.abs(x) / Dx - 0.4) / 0.4) * clamp01(1 - Math.abs(h - 0.5) / 0.4);
+    if (style === 'stomp') {
+      const land = Math.pow(Math.max(0, Math.cos(2 * T)), 2), sy = 1 - 0.13 * land + 0.04 * Math.max(0, -Math.cos(2 * T)), sxz = 1 + 0.07 * land, swing = Math.sin(T + side + Math.PI);
+      let X = x * sxz, Y = y * sy + low * 0.09 * Hm * Math.max(0, sp) + arm * 0.07 * Hm * Math.max(0, swing), Z = z * sxz + arm * 0.22 * Hm * swing; // braço que avança também sobe
+      [X, Z] = rotY(X, Z, 0.2 * s * h);
+      [X, Y] = rotZ(X, Y, 0.11 * s);
+      return [X, Y, Z];
+    }
+    if (style === 'float') {
+      const tail = Math.pow(clamp01(1 - h / 0.6), 1.2), wob = T - 5 * h;
+      let X = x + tail * 0.15 * Hm * Math.sin(wob) + 0.02 * Hm * h * Math.cos(T), Y = y * (1 + 0.05 * Math.sin(2 * T)) + 0.06 * Hm * (1 + s), Z = z + tail * 0.09 * Hm * Math.sin(wob + 1);
+      [X, Y] = rotZ(X, Y, 0.06 * s);
+      return [X, Y, Z];
+    }
+    // prowl
+    const wing = clamp01((Math.abs(x) / Dx - 0.5) / 0.4) * clamp01((h - 0.3) / 0.3), back = clamp01((-z / Dz - 0.3) / 0.7) * clamp01((h - 0.1) / 0.5);
+    let X = x + back * 0.09 * Hm * Math.sin(2 * T + 1), Y = y * (1 - 0.045 * (0.5 + 0.5 * Math.cos(2 * T))) + low * 0.08 * Hm * Math.max(0, Math.cos(T + side)) + wing * 0.12 * Hm * Math.sin(2 * T + 1) + 0.02 * Hm * Math.sin(2 * T);
+    let Z = z + low * 0.14 * Hm * sp + arm * 0.13 * Hm * Math.sin(T + side + Math.PI);
+    [X, Z] = rotY(X, Z, 0.11 * s * h);
+    const pitch = 0.07 + 0.03 * Math.sin(2 * T), cp = Math.cos(pitch), sn = Math.sin(pitch);
+    return [X, Y * cp - Z * sn, Y * sn + Z * cp];
+  };
+}
+function deformFor(style, Hm, Dz, Dx) {
+  if (style === 'stomp' || style === 'float' || style === 'prowl') return deformHeavy(style, Hm, Dz, Dx);
   return (x, y, z, t) => {
     const T = 2 * Math.PI * t, s = Math.sin(T), c = Math.cos(T), h = y / Hm;
     if (style === 'hop') { const sy = 1 + 0.15 * s, sxz = 1 - 0.09 * s; return [x * sxz + 0.05 * Hm * h * c, y * sy, z * sxz]; }
@@ -119,7 +151,7 @@ window.bakeAnim = async (idx, { style = 'hop', frames = 6, el = 40, max = 128, a
   const geos = list.map((p) => { const g = p.geo.clone(); g.translate(-foot.x, -foot.y, -foot.z); return g; });
   const orig = geos.map((g) => g.attributes.position.array.slice()), root = new THREE.Group(), group = new THREE.Group();
   for (const g of geos) { const m = new THREE.Mesh(g, material); m.frustumCulled = false; group.add(m); } root.add(group); scene.add(root);
-  const fn = deformFor(style, sz.y, sz.z / 2);
+  const fn = deformFor(style, sz.y, sz.z / 2, sz.x / 2);
   const pose = (f) => { geos.forEach((g, i) => { const a = g.attributes.position.array, o = orig[i]; for (let v = 0; v < a.length; v += 3) { const r = fn(o[v], o[v + 1], o[v + 2], f / frames); a[v] = r[0]; a[v + 1] = r[1]; a[v + 2] = r[2]; } g.attributes.position.needsUpdate = true; g.computeBoundingBox(); }); };
   let U = { minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9 }, cam0;
   for (let f = 0; f < frames; f++) { pose(f); for (let k = 0; k < 8; k++) { root.rotation.y = k * Math.PI / 4; root.updateMatrixWorld(true); const c = cameraFor(new THREE.Box3().setFromObject(root), el); cam0 = c.cam; U = { minX: Math.min(U.minX, c.minX), maxX: Math.max(U.maxX, c.maxX), minY: Math.min(U.minY, c.minY), maxY: Math.max(U.maxY, c.maxY) }; } }

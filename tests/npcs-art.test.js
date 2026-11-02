@@ -15,3 +15,18 @@ test('NPCs pintados: ids existem na vila e os arquivos estão íntegros', () => 
     assert.ok(statSync(`public/assets/npcs/${id}.webp`).size < 120_000, id + ' pesado demais');
   }
 });
+
+test('Ferreiro Brok: NPC da vila com arte, fala e painel âncora da loja', async () => {
+  const { DIALOGS } = await import('../public/src/data/dialogs.js');
+  const smith = ZONES.town.npcs.find((n) => n.id === 'smith');
+  assert.ok(smith && smith.name === 'Ferreiro Brok' && smith.role === 'smith');
+  assert.ok(NPC_ART.has('smith'), 'smith sem arte registrada');
+  assert.equal(DIALOGS.smith.service.panel, 'shop:smith');
+  const ui = readFileSync('public/src/ui/ui.js', 'utf8');
+  assert.ok(ui.includes('id="smith-section"'), 'âncora do Ferreiro na loja');
+});
+
+test('ícones de interface pintados existem (casa e zonas); emoji só como reserva', () => {
+  for (const f of ['home', 'zone-town', 'zone-forest', 'zone-plains', 'zone-ruins', 'zone-glacier']) assert.ok(existsSync(`public/assets/icons/ui/${f}.webp`), f);
+  assert.ok(existsSync('public/assets/props/chest.webp'), 'baú pintado');
+});

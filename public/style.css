@@ -277,7 +277,13 @@ body.online .online-only { display: inline-block; }
 .tbtn.pot { width: 48px; height: 48px; right: 190px; bottom: 6px; }
 .tbtn.pot .icon { font-size: 22px; }
 .tbtn.home { width: 44px; height: 44px; right: 183px; bottom: 78px; }
-.tbtn.home .icon { font-size: 20px; }
+.tbtn.home .icon { font-size: 0; }
+/* botão de voltar à vila: medalhão pintado como moldura e a casa 3D recortada dentro (assets/icons/ui/home.webp) */
+.tbtn.home, .slot.medal { background: url(assets/ui/medal-normal.webp) center / 100% 100% no-repeat; border: 0; border-radius: 50%; box-shadow: none; overflow: visible; }
+.tbtn.home:active, .tbtn.home.down, .slot.medal:active { background-image: url(assets/ui/medal-pressed.webp); }
+.tbtn.home .icon, .slot.medal .icon { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; }
+.tbtn.home .icon img, .slot.medal .icon img { width: 70%; height: 70%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); pointer-events: none; }
+.zone-ic { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,.45)); }
 .tbtn.act { width: 56px; height: 56px; right: 172px; bottom: 132px; background: radial-gradient(circle at 35% 30%, #ffe38e, #e0a82e); animation: pulse 1.4s infinite; }
 body.touch #skillbar, body.touch #log { display: none; }
 body.touch .btn.small { padding: 10px 14px; }
@@ -515,6 +521,9 @@ body.touch .btn.small { padding: 0 6px; }
 #boss-name { position: relative; margin: 0 auto 2px; padding: 5px 40px 7px; width: max-content; max-width: 100%; background: url(assets/ui/plaque.webp) center / 100% 100% no-repeat; color: #fff0d6; text-shadow: 0 2px 0 #000b; }
 #boss-bar .bar { height: 14px; border: 2px solid #c9a24a; border-radius: 8px; background: #2a0e12; box-shadow: 0 0 0 1px #4a2a18, 0 4px 10px rgba(0,0,0,.5); }
 #boss-bar .fill { border-radius: 5px; background: linear-gradient(180deg, #ff9a88 0%, #d9473b 55%, #9c2a24 100%); }
+/* retrato do chefe: recorte frontal do sprite pintado, em medalhão dourado à esquerda da barra */
+#boss-portrait { --s: 58px; --cols: 5; --rows: 8; --ratio: 1.2; display: none; position: absolute; left: -34px; top: 6px; width: var(--s); height: var(--s); box-sizing: border-box; border-radius: 50%; border: 3px solid #c9a24a; background-color: #2a0e12; background-repeat: no-repeat; background-size: calc(var(--cols) * 170%) calc(var(--rows) * 170% * var(--ratio)); background-position: calc(var(--s) * -0.35) calc(var(--s) * -0.04); box-shadow: 0 0 0 1px #4a2a18, 0 4px 10px rgba(0,0,0,.55), inset 0 0 8px rgba(0,0,0,.6); z-index: 2; }
+body.touch #boss-portrait { --s: 44px; left: -26px; top: 2px; }
 .npc-line { border: 0; border-image: none; background: url(assets/ui/dialog.webp) center / 100% 100% no-repeat; padding: 16px 18px 16px 21%; color: #f6ebc9; text-shadow: 0 2px 0 #000b; min-height: 74px; display: flex; align-items: center; }
 body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 @media (max-height: 520px) {
@@ -590,3 +599,12 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .create-wrap input { background: linear-gradient(180deg, #14100b, #261b11); border: 2px solid #8a6a38; border-radius: 5px; color: #f6ebc9; font: 700 18px Cinzel, serif; box-shadow: inset 0 3px 8px #000c, 0 1px 0 #e8c46a55; }
 .create-wrap input::placeholder { color: #8d7a58; font-family: Cinzel, serif; }
 .portal-label, .npc-name { font-family: Cinzel, serif; }
+
+/* Habilidade ainda não aprendida: cadeado + nível (--lv é definido por touch.js / ui.js) */
+.slot.locked .icon, .tbtn.sk.locked .icon { filter: grayscale(1) brightness(.4); }
+.slot.locked::after, .tbtn.sk.locked::after { content: '🔒 Nv ' var(--lv); position: absolute; inset: 0; display: grid; place-items: center; text-align: center; white-space: pre-wrap; color: #ffe9a0; font: 900 11px Nunito, sans-serif; text-shadow: 0 1px 4px #000; pointer-events: none; z-index: 3; }
+.tbtn.sk.locked { pointer-events: none; }
+.cc-skills small { opacity: .7; font-size: .8em; }
+
+/* ritual do chefe final: pílula pequena sob o minimapa */
+#ritual { position: absolute; top: 148px; right: 14px; padding: 3px 12px; font: 700 12px Cinzel, serif; color: #ffd9a0; background: rgba(24,16,8,.8); border: 1px solid rgba(255,140,60,.6); border-radius: 12px; text-shadow: 0 1px 0 #000; pointer-events: none; z-index: 5; }

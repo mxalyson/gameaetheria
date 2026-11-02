@@ -1,21 +1,21 @@
 {
  "id": "golem",
  "cell": [
-  90,
+  94,
   120
  ],
- "cols": 5,
+ "cols": 6,
  "rows": 8,
- "frames": 5,
- "style": "waddle",
- "ax": 45,
- "ay": 88,
- "ppm": 38.57864036318996,
+ "frames": 6,
+ "style": "stomp",
+ "ax": 47,
+ "ay": 87,
+ "ppm": 36.87757427084258,
  "size": [
   1.864,
   1.898,
   0.895
  ],
  "src": "meshy-mobs/cg.glb",
- "v": 1793583275
+ "v": 1793585985
 }

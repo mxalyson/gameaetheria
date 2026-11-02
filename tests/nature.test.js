@@ -26,3 +26,8 @@ test('atlas leves (cabem na memória de qualquer celular): arquivos < 200 KB e �
   assert.ok(meshy.size[0] * meshy.size[1] * 4 < 6 * 1048576, 'atlas do Meshy grande demais: ' + meshy.size);
   assert.ok((atlas.size[0] * atlas.size[1] + meshy.size[0] * meshy.size[1]) * 4 < 10 * 1048576);
 });
+test('poço, cercas e ponte do Meshy existem no atlas e a Vila e as zonas vivas os usam', () => {
+  for (const n of ['well', 'fence_1', 'fence_2', 'bridge']) assert.ok(meshy.sprites[n], 'falta m_' + n);
+  assert.ok(SET.town.well && SET.town.fence);
+  for (const z of ['forest', 'plains', 'glacier']) assert.ok(SET[z].fence, 'cerca em ' + z);
+});

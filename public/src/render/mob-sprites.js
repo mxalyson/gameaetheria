@@ -69,10 +69,20 @@ function load(id) {
   });
   return it;
 }
+// Retrato do chefe para a barra de vida: vista frontal (direção 0, quadro 0 = célula do canto do atlas) como fundo CSS; null enquanto o atlas não carregou ou sem arte.
+// Variante recolorida: aproxima a cor com filtro CSS (o recolorido de verdade só existe no canvas).
+export function mobPortrait(id) {
+  if (!mobSpritesEnabled()) return null;
+  const it = load(id); if (it.state !== 'ready') return null;
+  const V = MOBS[id], m = it.meta, t = V?.tint, art = V?.art ?? id;
+  const filter = t ? `hue-rotate(${t.hue ?? 0}deg) saturate(${t.sat ?? 1}) brightness(${t.bri ?? 1})` : 'none';
+  return { url: `assets/mobs/${art}.webp?v=${m.v ?? 0}`, cols: m.cols, rows: m.rows, ratio: m.cell[1] / m.cell[0], filter };
+}
 // carrega de antemão as criaturas da zona (chamado quando a zona muda)
 export function prepareMobs(zone) { if (!mobSpritesEnabled()) return; for (const [id] of zone.mobs ?? []) load(id); if (zone.boss?.id) load(zone.boss.id); }
 
-const lerp = (a, b, k) => a + (b - a) * k;
+// pesados: o golpe é uma pancada (ergue e bate); aéreos: recolhem e arremetem; os demais agacham e dão o bote
+const HEAVY = new Set(['golem', 'colossus', 'guardian', 'treant']), AIRY = new Set(['wisp', 'wraith']);
 // Desenha o monstro `a` como sprite; devolve false se não há arte pronta (o chamador usa o desenho antigo).
 export function drawMobSprite(g, a, t) {
   const it = load(a.mobId);
@@ -86,16 +96,29 @@ export function drawMobSprite(g, a, t) {
   const nf = meta.frames ?? 0; // atlas animado: o ciclo já traz o salto/andar; por código fica só o resto
   const bob = moving && !nf ? Math.abs(Math.sin(ph)) * H * 0.05 : 0;
   const sway = moving ? Math.sin(ph) * 0.045 : Math.sin(t * 1.6 + a.id) * 0.012;
-  const squash = nf ? 1 : moving ? 1 + Math.sin(ph * 2) * 0.035 : 1 + Math.sin(t * 2.2 + a.id) * 0.018;
-  let lunge = 0; if (a.swing > 0 && !a.dead) lunge = Math.sin((1 - Math.min(1, a.swing / 0.25)) * Math.PI) * H * 0.16; // avanço no golpe, na direção que olha
+  const squash = nf ? 1 + Math.sin(t * 2 + a.id) * 0.01 : moving ? 1 + Math.sin(ph * 2) * 0.035 : 1 + Math.sin(t * 2.2 + a.id) * 0.018;
+  // golpe em 3 tempos (swing conta de ~0.3 s até 0): antecipação (recua/agacha ou, nos pesados, ergue), golpe (avanço ou pancada) e recuperação
   const fx = Math.cos(a.facing ?? 0), fy = Math.sin(a.facing ?? 0) * 0.5;
+  let lunge = 0, atkSy = 1, atkSx = 1, lean = 0;
+  if (a.swing > 0 && !a.dead) {
+    const p = 1 - Math.min(1, a.swing / 0.3), heavy = HEAVY.has(a.mobId) || HEAVY.has(MOBS[a.mobId]?.art), air = AIRY.has(a.mobId) || AIRY.has(MOBS[a.mobId]?.art);
+    const wind = p < 0.22 ? p / 0.22 : 0, hit = p < 0.22 ? 0 : p < 0.5 ? (p - 0.22) / 0.28 : 0, rec = p < 0.5 ? 0 : (p - 0.5) / 0.5; // 0..1 em cada fase
+    const out = Math.sin(hit * Math.PI / 2) * (1 - rec); // 0 -> 1 no golpe, volta a 0 na recuperação
+    const sgn = fx >= 0 ? 1 : -1;
+    if (heavy) { atkSy = 1 + 0.13 * wind - 0.2 * out; atkSx = 1 - 0.05 * wind + 0.12 * out; lunge = H * 0.07 * out; lean = sgn * (-0.05 * wind + 0.1 * out); } // ergue e bate no chão
+    else if (air) { atkSy = 1 - 0.08 * wind + 0.1 * out; atkSx = 1 + 0.06 * wind - 0.06 * out; lunge = H * (-0.05 * wind + 0.2 * out); lean = sgn * 0.08 * out; } // recolhe e arremete
+    else { atkSy = 1 - 0.14 * wind + 0.08 * out; atkSx = 1 + 0.08 * wind - 0.06 * out; lunge = H * (-0.07 * wind + 0.2 * out); lean = sgn * (-0.07 * wind + 0.14 * out); } // agacha, recua e bote
+    if (rec > 0) { atkSy = 1 + (atkSy - 1) * (1 - rec); atkSx = 1 + (atkSx - 1) * (1 - rec); }
+  }
   const footY = a.y + a.r * 0.8; // onde o desenho antigo apoiava a sombra
   g.save();
   g.translate(a.x + fx * lunge, footY + fy * lunge - bob);
   if (a.dead) { const P = deathPose(a.deadT ?? 0, view >= 1 && view <= 3 ? -1 : 1); g.rotate(P.rot); g.scale(1, P.squash); g.globalAlpha *= P.alpha; }
-  g.rotate(sway); g.scale(1 / squash, squash);
+  g.rotate(sway + lean); g.scale(atkSx / squash, atkSy * squash);
   // quadro do ciclo: andando, segue a fase do passo; parado, um ciclo lento (a criatura nunca fica congelada)
-  const fr = nf ? Math.floor((((moving ? ph / (2 * Math.PI) : t * 0.8 + a.id * 0.37) % 1) + 1) % 1 * nf) : 0;
+  // o passo da simulação é lento nos pesados (velocidade/28 rad/s): o ciclo é acelerado para o balanço ficar visível; parado, ciclo lento próprio de cada tipo
+  const kind = HEAVY.has(a.mobId) || HEAVY.has(MOBS[a.mobId]?.art) ? 0 : AIRY.has(a.mobId) || AIRY.has(MOBS[a.mobId]?.art) ? 2 : 1, rate = [1.7, 1.3, 1.1][kind], idle = [0.45, 0.7, 0.9][kind];
+  const fr = nf ? Math.floor((((moving ? (ph * rate) / (2 * Math.PI) : t * idle + a.id * 0.37) % 1) + 1) % 1 * nf) : 0;
   const sx = nf ? fr * cw : (view % 4) * cw, sy = nf ? view * ch : Math.floor(view / 4) * ch;
   g.drawImage(img, sx, sy, cw, ch, -meta.ax * k, -meta.ay * k, W, H);
   if (a.hitFlash > 0 && !a.dead) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = Math.min(0.55, a.hitFlash * 5); g.drawImage(img, sx, sy, cw, ch, -meta.ax * k, -meta.ay * k, W, H); }

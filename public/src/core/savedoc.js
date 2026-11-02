@@ -82,6 +82,7 @@ function cleanItem(it) {
   return {
     id, kind: 'gear', name: cleanText(it.name, 60) || 'Item', slot: it.slot, weaponType, rarity: it.rarity,
     level: int(it.level, 1, 60, 1), reqLevel: int(it.reqLevel, 1, 60, 1), stats, value: int(it.value, 0, 1e6, 0),
+    ...(it.opal === true ? { opal: true } : {}), // exclusivo do último chefe
     ...(int(it.plus, 0, MAX_PLUS, 0) > 0 ? { plus: int(it.plus, 0, MAX_PLUS, 0) } : {}),
   };
 }
@@ -173,6 +174,7 @@ export function validate(doc) {
     gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0), scrolls: int(doc.scrolls, 0, 99, 0),
     equipment, inventory, spirits, activeSpirit, spec,
     arena: { rating: int(a.rating, 0, 5000, 1000), wins: int(a.wins, 0, 1e6, 0), losses: int(a.losses, 0, 1e6, 0), bestWave: int(a.bestWave, 0, 1e4, 0), ratings },
+    pity: { epic: int(doc.pity?.epic, 0, 9999, 0), legendary: int(doc.pity?.legendary, 0, 9999, 0), opal: int(doc.pity?.opal, 0, 99, 0) }, // proteção de azar do loot
     created: int(doc.created, 0, 4e12, Date.now()),
   };
   if (char.name !== doc.name) warnings.push('nome ajustado');

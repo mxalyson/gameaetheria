@@ -39,7 +39,7 @@ export function newCharacter(name, classId, rng) {
     gold: 60, potions: 3, scrolls: 2, equipment: {}, inventory: [],
     spirits: [], activeSpirit: null,
     arena: { rating: 1000, wins: 0, losses: 0, bestWave: 0, ratings: {} },
-    quests: { active: {}, done: {} }, stats: { kills: 0, bossKills: 0, chests: 0, quests: 0, pvpWins: 0, pvpGames: 0, coopClears: 0 }, achievements: {}, title: null, chests: {},
+    quests: { active: {}, done: {} }, stats: { kills: 0, bossKills: 0, chests: 0, quests: 0, pvpWins: 0, pvpGames: 0, coopClears: 0 }, achievements: {}, title: null, chests: {}, pity: { epic: 0, legendary: 0, opal: 0 },
     created: Date.now(),
   };
   char.equipment.weapon = generateItem(rng, 1, { slot: 'weapon', rarityId: 'common', weaponType: CLASSES[classId].weapon });

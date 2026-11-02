@@ -6,7 +6,14 @@ const r1 = (n) => Math.round(n * 10) / 10;
 export const actorTuple = (a, online, extra = 0) => [a.id, r1(a.x), r1(a.y), Math.round(a.hp), Math.round(a.facing * 100),
   (a.dead ? F.DEAD : 0) | (a.moving ? F.MOVING : 0) | (a.swing > 0 ? F.SWING : 0) | (a.stunT > 0 ? F.STUN : 0) | (online ? 0 : F.OFFLINE) | extra, Math.round(a.shield)];
 export const mobTuple = (m) => [m.id, r1(m.x), r1(m.y), Math.round(m.hp), Math.round(m.facing * 100), (m.dead ? F.DEAD : 0) | (m.moving ? F.MOVING : 0) | (m.swing > 0 ? F.SWING : 0)];
-export const mobStatic = (m) => ({ id: m.id, mob: m.mobId, level: m.level, boss: !!m.boss, elite: !!m.elite, maxHp: m.maxHp });
+// Marcas extras (mini-chefe, esbirro, acampamento) só entram quando existem; o nome vai uma vez só, no estático.
+export const mobStatic = (m) => {
+  const s = { id: m.id, mob: m.mobId, level: m.level, boss: !!m.boss, elite: !!m.elite, maxHp: m.maxHp };
+  if (m.miniboss) { s.mb = 1; s.nm = m.name; s.r = Math.round(m.r); }
+  if (m.summoned) s.su = 1;
+  if (m.camp) s.cp = m.camp;
+  return s;
+};
 
 export class DeltaEncoder {
   constructor() { this.prevA = new Map(); this.prevM = new Map(); this.known = new Set(); this.count = 0; }
