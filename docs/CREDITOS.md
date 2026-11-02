@@ -55,3 +55,6 @@ Geleia (`slime`) e Lobo Cinzento (`wolf`): modelos 3D gerados no Meshy a partir 
 Cogumelo Esporento (`shroom`): mesma origem (Meshy, CC BY 4.0), animado por deformação `waddle`.
 Carvalho Ancestral (`treant`, chefe do Bosque): mesma origem (Meshy, CC BY 4.0).
 Lobo de Cristal, Fogo-fátuo, Colosso de Cristal, Espectro, Cavaleiro Caído, Gárgula e Guardião das Ruínas: mesma origem (Meshy, CC BY 4.0); os seis últimos vieram num só GLB (`Chibi_Fantasy_Guardia`), separados por peças em `tools/mob-bake.mjs`.
+
+## NPCs (arte gerada por IA, vista 3D de frente)
+Guarda Ren, Sábia Yun, Mercadora Lia e Mestre Doran (+ ferreiro e golem recortados e guardados em `public/assets/npcs/`), recortados de `docs/art-direction/fontes-icones/npcs-folha.png` por `tools/npc-from-sheet.py`. A folha tem marca d'água do gerador ("Render a House"), fora da área dos personagens; **origem/licença a confirmar** (termos do gerador) antes de publicar.

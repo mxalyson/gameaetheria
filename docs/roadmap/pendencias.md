@@ -134,4 +134,6 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [x] Farm: curva de XP 150·n^1,9 (≈6× o total até o nível 20), mobs +20% de vida e +12% de dano, elite 7% (XP ×4). **Falta calibrar com jogadores** (meta: nível 20 em ~2 h).
 - [x] Teletransporte (painel do mapa; mapas visitados; Vila grátis, outros 20 × nível mínimo; fora de combate). **Online ainda não** (o servidor confere cada portal: precisa de mensagem nova validada).
 - [x] Dois mapas novos, Cume Gélido (Nv 20-25) e Cinzas Ardentes (Nv 25-30), com as criaturas pintadas recoloridas (`MOBS_EXTRA`, recolor ao carregar). Os dois bosses são o Carvalho e o Guardião recoloridos. Cenário reaproveitado (`look`) e névoa/tom de cor próprios; **sem arte própria de chão/árvores**.
-- [ ] História, fontes/retângulos restantes, Místico, mapas novos com cenário próprio.
+- [x] História: arco "Os Ecos Partidos" (5 missões: Cume Gélido, Ancião Gélido, Cinzas Ardentes, Cavaleiro Rubro, Ecos Unidos).
+- [x] NPCs pintados (Lia, Doran, Yun, Ren) a partir da folha 3D de frente; o **ferreiro** e o **golem** já estão recortados (golem com resíduo de sombra) mas ainda sem uso; **herbalista sem arte 3D** (segue o herói recolorido). Folha de 8 direções do golem/NPCs enviada pelo proprietário **não chegou como arquivo**.
+- [ ] Golem de Quartzo (monstro) com as 8 direções; arte própria de cenário para os mapas novos; Místico; melhorar o gráfico dos personagens.

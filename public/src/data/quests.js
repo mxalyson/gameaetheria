@@ -75,6 +75,37 @@ export const QUESTS = {
     objectives: [{ type: 'level', count: 20, label: 'Alcance o nível 20' }],
     reward: { gold: 800, xp: 0, items: [{ rarity: 'epic' }] },
   },
+  // ---- Arco final: "Os Ecos Partidos" (Cume Gélido e Cinzas Ardentes) ----
+  cume_gelido: {
+    id: 'cume_gelido', name: 'O Silêncio da Geada', giver: 'guard', level: 20, after: 'guardiao_das_ruinas',
+    text: { offer: 'Com o Guardião caído, a passagem a leste das Ruínas se abriu: o Cume Gélido. Viajantes dizem que as criaturas de lá são cópias geladas das que conhecemos. Abata vinte.', progress: 'O Cume Gélido fica a leste das Ruínas Sombrias. Leve poções.', done: 'Cópias, eco de ecos... A Sábia Yun vai querer saber disso.' },
+    objectives: [{ type: 'kill', mob: 'any', zone: 'glacier', count: 20, label: 'Derrote 20 criaturas do Cume Gélido' }],
+    reward: { gold: 1500, xp: 14000, potions: 3 },
+  },
+  anciao_gelido: {
+    id: 'anciao_gelido', name: 'O Ancião Gélido', giver: 'sage', level: 22, after: 'cume_gelido',
+    text: { offer: 'Os spirits me sussurram: um Ancião de gelo prende os ecos do Cume. É o Carvalho Ancestral, partido e congelado. Libere-o, derrotando-o.', progress: 'O Ancião fica no fundo do Cume Gélido, a nordeste.', done: 'Eu senti o eco se soltar. Mas o frio vinha de algo mais ao leste…' },
+    objectives: [{ type: 'boss', mob: 'frostlord', count: 1, label: 'Derrote o Ancião Gélido' }],
+    reward: { gold: 2200, xp: 20000, items: [{ rarity: 'epic' }] },
+  },
+  cinzas_ardentes: {
+    id: 'cinzas_ardentes', name: 'Cinzas que Ainda Queimam', giver: 'guard', level: 25, after: 'anciao_gelido',
+    text: { offer: 'Além do Cume, o chão arde: as Cinzas Ardentes. Criaturas de brasa cercam o lugar. Abata vinte e cinco antes que desçam à vila.', progress: 'As Cinzas Ardentes ficam a leste do Cume Gélido.', done: 'Você voltou chamuscado, mas inteiro. Isso basta.' },
+    objectives: [{ type: 'kill', mob: 'any', zone: 'ember', count: 25, label: 'Derrote 25 criaturas das Cinzas Ardentes' }],
+    reward: { gold: 3000, xp: 26000, potions: 5 },
+  },
+  cavaleiro_rubro: {
+    id: 'cavaleiro_rubro', name: 'O Cavaleiro Rubro', giver: 'arena', level: 28, after: 'cinzas_ardentes',
+    text: { offer: 'Há um cavaleiro nas Cinzas que luta como o Guardião lutava, mas em brasa. Se o derrubar, a arena inteira vai cantar seu nome.', progress: 'O Cavaleiro Rubro guarda o centro das Cinzas Ardentes.', done: 'Eu vi de longe. Esse foi um duelo digno de ser contado por gerações!' },
+    objectives: [{ type: 'boss', mob: 'infernoknight', count: 1, label: 'Derrote o Cavaleiro Rubro' }],
+    reward: { gold: 4500, xp: 38000, items: [{ rarity: 'legendary' }] },
+  },
+  ecos_unidos: {
+    id: 'ecos_unidos', name: 'Os Ecos Unidos', giver: 'sage', level: 30, after: 'cavaleiro_rubro',
+    text: { offer: 'Os três guardiões, do bosque, das ruínas e das cinzas, eram um só eco, partido há muito tempo. Agora ele repousa. Alcance o nível máximo e volte: quero lhe mostrar o que sobrou.', progress: 'Continue crescendo: faltam níveis para o topo.', done: 'Você uniu os ecos de Aetheria. Que cada spirit ao seu lado carregue um pouco dessa história.' },
+    objectives: [{ type: 'level', count: 30, label: 'Alcance o nível 30' }],
+    reward: { gold: 8000, xp: 0, potions: 10, items: [{ rarity: 'legendary' }] },
+  },
 };
 
 export const QUEST_IDS = Object.keys(QUESTS);

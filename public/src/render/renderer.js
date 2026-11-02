@@ -5,6 +5,7 @@ import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
 import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-textures.js';
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
+import { drawNpcSprite, preloadNpcs, npcTop } from './npc-sprites.js';
 import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
@@ -28,7 +29,7 @@ const circle = (g, x, y, r) => { g.beginPath(); g.arc(x, y, Math.max(0.1, r), 0,
 export class Renderer {
   constructor(canvas) {
     this.c = canvas;
-    loadNature(); preloadSpirits(); loadGroundTextures(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
+    loadNature(); preloadSpirits(); preloadNpcs(); loadGroundTextures(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
     this.g = canvas.getContext('2d');
     this.grounds = new Map();
     this.dprCap = 2;
@@ -107,7 +108,7 @@ export class Renderer {
     for (const it of items) {
       const o = it.o;
       if (it.k === 'decor') drawDecor(g, o, t, z, player);
-      else if (it.k === 'npc') drawHero(g, { ...o, facing: Math.PI / 2, walk: 0, id: o.x }, NPC_LOOK[o.id] ?? NPC_LOOK[o.role], t, o.color, o.accent);
+      else if (it.k === 'npc') { if (!drawNpcSprite(g, o, t)) drawHero(g, { ...o, facing: Math.PI / 2, walk: 0, id: o.x }, NPC_LOOK[o.id] ?? NPC_LOOK[o.role], t, o.color, o.accent); }
       else if (it.k === 'chest') drawChest(g, o, !view.chestsOpen?.has(o.id), t);
       else if (it.k === 'drop') drawDrop(g, o, t);
       else if (o.kind === 'mob') drawMob(g, o, t);
@@ -865,10 +866,11 @@ function drawNpcTag(g, n, near, t, mark) {
   g.font = '800 12px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
-  g.strokeText(n.name, n.x, n.y - 44);
+  const top = mobSpritesEnabled() ? npcTop(n.id) : null, ny = top != null ? n.y + top - 6 : n.y - 44; // pintado: o nome fica logo acima da cabeça
+  g.strokeText(n.name, n.x, ny);
   g.fillStyle = '#fff3c4';
-  g.fillText(n.name, n.x, n.y - 44);
-  const by = n.y - 66 + Math.sin(t * 3) * 3;
+  g.fillText(n.name, n.x, ny);
+  const by = ny - 22 + Math.sin(t * 3) * 3;
   // marca de missão: '!' = tem missão para você, '?' = pronta para entregar, 'none' = nada a fazer (esconde); sem informação = '!' de serviço
   if (mark !== 'none') {
     g.fillStyle = mark === 'ready' ? '#7dffb0' : '#ffd34d'; circle(g, n.x, by, 9); g.fill();
