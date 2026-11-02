@@ -9,7 +9,8 @@ const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftsha
 const p = await b.newPage({ viewport: { width: 400, height: 300 } }); p.on('pageerror', (e) => console.log('pageerror', e.message));
 await p.goto('http://localhost:5174/labs/nature/glb.html'); await p.waitForFunction(() => window.glbReady, null, { timeout: 60000 });
 const parts = await p.evaluate((f) => window.loadGlb(f), file); console.log(parts.length, 'peças no arquivo');
-const r = style ? await p.evaluate(([i, m, st, n, e]) => window.bakeAnim(i, { max: m, style: st, frames: n, el: Number(e) }), [Number(part), Number(max), style, Number(frames), elev]) : await p.evaluate(([i, m]) => window.bakeDirs(i, { max: m }), [Number(part), Number(max)]);
+const partArg = part.includes(',') ? part.split(',').map(Number) : Number(part); // "5,1,2" junta várias peças numa criatura
+const r = style ? await p.evaluate(([i, m, st, n, e]) => window.bakeAnim(i, { max: m, style: st, frames: n, el: Number(e) }), [partArg, Number(max), style, Number(frames), elev]) : await p.evaluate(([i, m, e]) => window.bakeDirs(i, { max: m, el: e }), [partArg, Number(max), Number(elev)]);
 fs.mkdirSync('test-results/mob-bake', { recursive: true }); fs.writeFileSync(`test-results/mob-bake/${id}.png`, Buffer.from(r.png.split(',')[1], 'base64'));
 const { png, ...meta } = r; fs.mkdirSync('public/assets/mobs', { recursive: true });
 fs.writeFileSync(`public/assets/mobs/${id}.json`, JSON.stringify({ id, ...meta, src: file, v: Math.floor(Date.now() / 1000) }, null, 1));

@@ -3,7 +3,7 @@
 import { mobSpritesEnabled } from './mob-sprites.js';
 
 // NPCs que têm arte (evita pedir arquivos que não existem)
-export const NPC_ART = new Set(['merchant', 'arena', 'sage', 'guard']);
+export const NPC_ART = new Set(['merchant', 'arena', 'sage', 'guard', 'herbalist']);
 const WORLD_PER_PX = 0.4; // altura no mundo = altura da imagem (px) × isto: mantém as proporções entre os NPCs
 const items = new Map();
 export const stats = { drawn: 0 };
@@ -25,7 +25,7 @@ function load(id) {
 export const preloadNpcs = () => { if (mobSpritesEnabled()) for (const id of NPC_ART) load(id); };
 
 // Y (relativo aos pés do NPC) do topo do sprite pronto; null se ainda não há arte (o nome e a marca usam o ponto antigo).
-export function npcTop(id) { const it = items.get(id); return it?.state === 'ready' ? 14 - it.meta.h * WORLD_PER_PX : null; }
+export function npcTop(id) { const it = items.get(id); return it?.state === 'ready' ? 14 - it.meta.ay * WORLD_PER_PX : null; }
 
 // Desenha o NPC `o` (com x, y nos pés); devolve false se não há arte pronta.
 export function drawNpcSprite(g, o, t) {

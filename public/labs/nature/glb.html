@@ -82,7 +82,7 @@ window.previewAll = async ({ el = 40, w = 1400 } = {}) => {
 // 8 vistas de uma criatura (0 S, 1 SE, 2 L, 3 NE, 4 N, 5 NO, 6 O, 7 SO = para onde ELA olha; a frente do modelo é +Z, voltada para a câmera) numa grade 4x2,
 // com a MESMA janela, escala e âncora em todas (senão a criatura "pula" ao virar). idx = -1 junta todas as peças do arquivo numa criatura só.
 window.bakeDirs = async (idx, { el = 40, max = 168, aa = 2, pad = 0.05 } = {}) => {
-  const list = idx < 0 ? parts : [parts[idx]], group = new THREE.Group(), root = new THREE.Group(); const bb = new THREE.Box3();
+  const list = idx < 0 ? parts : Array.isArray(idx) ? idx.map((i) => parts[i]) : [parts[idx]], group = new THREE.Group(), root = new THREE.Group(); const bb = new THREE.Box3();
   for (const p of list) { const m = new THREE.Mesh(p.geo, material); group.add(m); bb.union(p.bb); }
   const foot = new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.min.y, (bb.min.z + bb.max.z) / 2); group.position.sub(foot); root.add(group); scene.add(root);
   let U = { minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9 }, cam0;
@@ -114,7 +114,7 @@ function deformFor(style, Hm, Dz) {
   };
 }
 window.bakeAnim = async (idx, { style = 'hop', frames = 6, el = 40, max = 128, aa = 2, pad = 0.05 } = {}) => {
-  const list = idx < 0 ? parts : [parts[idx]], bb = new THREE.Box3(); for (const p of list) bb.union(p.bb);
+  const list = idx < 0 ? parts : Array.isArray(idx) ? idx.map((i) => parts[i]) : [parts[idx]], bb = new THREE.Box3(); for (const p of list) bb.union(p.bb);
   const foot = new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.min.y, (bb.min.z + bb.max.z) / 2), sz = bb.getSize(new THREE.Vector3());
   const geos = list.map((p) => { const g = p.geo.clone(); g.translate(-foot.x, -foot.y, -foot.z); return g; });
   const orig = geos.map((g) => g.attributes.position.array.slice()), root = new THREE.Group(), group = new THREE.Group();
