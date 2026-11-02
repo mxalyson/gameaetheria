@@ -1,6 +1,11 @@
 # Pendências para revisão do proprietário
 Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizada ao fim da P10 (2026-10-31). Marque `[x]` quando resolver.
 
+## Estado em 2026-11-02 (resumo)
+**Feito hoje:** monstros (12) e NPCs (5) pintados e animados; evolução e regras do spirit; atributos em lote; mobs passivos/hostis; XP mais lento; teletransporte por pergaminho; mapas Cume Gélido e Cinzas Ardentes; história "Os Ecos Partidos"; portais com pilares e redemoinho.
+**Próximo (sem o Místico):** cenário próprio dos mapas novos; ferreiro como NPC; retrato do chefe na barra; teletransporte online; calibrar XP/farm com jogadores; sobras de fonte/retângulo (mandar capturas).
+**Depende de você:** servidor HTTPS/domínio, Google Client ID, conta Google Play + aparelho Android, medir em celular real, confirmar licença das imagens de IA e da folha com marca d'água.
+
 ## Depende de você (eu não consigo fazer sozinho)
 - [ ] Publicar um servidor com **HTTPS/WSS** e domínio (hoje o GitHub Pages fica offline: não há servidor).
 - [ ] **Google Client ID** do Google Cloud para o domínio do jogo (login Google nunca foi testado com o Google real).
@@ -84,12 +89,12 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 
 ## Spirits pintados (2026-11-02)
 - [x] Forma 1 dos 4 spirits no painel, na lista do sábio, no HUD e no mundo (companheiro flutuante, com balanço leve); sem a imagem vale o desenho antigo. `render/spirit-sprites.js`.
-- [ ] **Evolução de spirits (ideia do proprietário, não aprovada):** forma 2 já recortada (`spirit-*-2.webp`) e o ovo (`spirit-egg.webp`), sem mecânica. Proposta a escrever antes de mexer em `core/`: nível mínimo, custo em essência/ouro, bônus de poder, versão do documento do personagem e do servidor, teste em `tests/core.test.js`, nota em `docs/gameplay/economia.md`.
+- [x] **Evolução de spirits (ideia do proprietário, não aprovada):** forma 2 já recortada (`spirit-*-2.webp`) e o ovo (`spirit-egg.webp`), sem mecânica. Proposta a escrever antes de mexer em `core/`: nível mínimo, custo em essência/ouro, bônus de poder, versão do documento do personagem e do servidor, teste em `tests/core.test.js`, nota em `docs/gameplay/economia.md`.  ✔ feito em 2026-11-02: evolução no nível 10 por ouro, forma 2 (+50% de poder)
 - [ ] Ovo na loja do sábio ao comprar essência; halo amarelo-esverdeado da Fagulha evoluída (limpar se for usar).
 
 ## Adiados por decisão do proprietário (2026-11-02) — "deixe salvo para depois"
 - [ ] **Criação do Místico** (5º herói: conceito, 3D, atlas, kit de habilidades, ícones).
-- [ ] **Evolução de spirits** (forma 2 já recortada; falta a mecânica e a proposta de regras).
+- [x] **Evolução de spirits** (forma 2 já recortada; falta a mecânica e a proposta de regras).  ✔ idem
 - [ ] **Rodada de balanceamento e progressão** (o jogo "acaba" em ~20 min: nível 20 e fim do conteúdo): balanço entre classes, evoluções, dificuldade, **melhorar e dificultar o farm** (XP/ouro/drop por zona, curva de nível até 30, chefes e dificuldade escalável). Ferramentas já existentes: `npm run balance`, `npm run economy`, `docs/gameplay/economia.md`. Medir o tempo até o nível 20/30 antes e depois.
 
 ## Retratos pintados (2026-11-02)
@@ -101,7 +106,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [ ] Vila de Lúmen (a textura gerada repete em padrão visível: pedir outra com pedras espalhadas sem aglomerado), margem de lago com a faixa `shore`, água animada por cima, arenas, peças 3D que faltam (cerejeira rosa, cristais, ruínas, casas), medir no celular real.
 
 ## Adiados: o que ficou de fora do chão (2026-11-02) — "guarde para depois"
-- [ ] **Vila de Lúmen:** textura de chão nova (a gerada repete em padrão visível); pedir com pedrinhas espalhadas, sem aglomerados.
+- [x] **Vila de Lúmen:** textura de chão nova (a gerada repete em padrão visível); pedir com pedrinhas espalhadas, sem aglomerados.  ✔ a Vila agora usa o chão de grama do Bosque; a textura de pedras fica guardada
 - [ ] **Margem de lago:** usar a faixa `docs/art-direction/fontes-cenario/chao-shore.jpg` (guardada, sem uso).
 - [ ] **Água animada** por cima da textura dos lagos.
 - [x] **Peças 3D do Meshy** (casas, ruínas, estátuas, cristais, cerejeiras) fotografadas e ligadas na Vila, Planície, Ruínas e Bosque. Poço, ponte, cercas e arcos inteiros ficaram FORA do atlas (sem uso) para poupar memória de textura; refazer com `node tools/glb-bake.mjs 170 && python tools/meshy-pack.py` (editar a lista KEEP).
@@ -115,8 +120,8 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 
 ## B2 — monstros e NPCs (2026-11-02)
 - [x] Pipeline pronto e validado com uma criatura de teste: `tools/mob-bake.mjs` (8 direções, grade 4×2, janela e âncora iguais), `render/mob-sprites.js` (vista pela direção, animação por código, carga por zona, `?monstros=original`), índice `assets/mobs/index.json`, testes unitários e e2e (fixture em `tests/fixtures`). **Nenhum monstro pintado está no jogo ainda** (índice vazio): os monstros seguem no desenho antigo até chegar a arte.
-- [ ] **Você gerar os GLB** pela ordem de `docs/art-direction/b2-monstros-npcs.md` (1º `slime`, 2º `treant`; depois o resto e os 6 NPCs). Com eles: bake, ajuste de tamanho (`ART` em `mob-sprites.js`), captura no jogo, créditos.
-- [ ] NPCs pintados: falta o módulo `npc-sprites` (1 vista de frente + espelho) no lugar dos heróis recoloridos; retrato do chefe na barra do chefe.
+- [x] **Você gerar os GLB** pela ordem de `docs/art-direction/b2-monstros-npcs.md` (1º `slime`, 2º `treant`; depois o resto e os 6 NPCs). Com eles: bake, ajuste de tamanho (`ART` em `mob-sprites.js`), captura no jogo, créditos.  ✔ GLB de 12 monstros + 5 NPCs entregues e no jogo
+- [x] NPCs pintados: falta o módulo `npc-sprites` (1 vista de frente + espelho) no lugar dos heróis recoloridos; retrato do chefe na barra do chefe.  ✔ módulo `npc-sprites` feito; retrato do chefe na barra segue pendente
 - [ ] Decidir se lobos, cavaleiros e gárgula merecem esqueleto (como os heróis) quando o método sem esqueleto se mostrar fraco neles.
 
 ## Ajustes de visual (2026-11-02, feedback do proprietário)
@@ -125,7 +130,7 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [x] Estátuas do Meshy (cavaleiro e coruja) maiores e mais numerosas nas Ruínas: 4 fixas guardando a entrada e a subida ao Guardião + 5 espalhadas (o baú ruins:2 andou 60 px para não encostar numa estátua).
 - [x] Retratos dos NPCs enquadrados no oval do diálogo.
 - [ ] Ainda pode haver sobras antigas que não identifiquei sem captura (log do PvP, textos sobre o chão: nomes, números de dano; painéis de rede/grupo); o proprietário vai apontar com capturas.
-- [ ] **NPCs no mundo ainda são os heróis em miniatura recoloridos** (`NPC_LOOK` em `renderer.js`), não os personagens dos retratos. Para ficarem fiéis aos retratos: gerar corpo inteiro a partir de cada retrato (prompts em `b2-monstros-npcs.md` §2.2), GLB no Meshy e módulo `npc-sprites`.
+- [x] **NPCs no mundo ainda são os heróis em miniatura recoloridos** (`NPC_LOOK` em `renderer.js`), não os personagens dos retratos. Para ficarem fiéis aos retratos: gerar corpo inteiro a partir de cada retrato (prompts em `b2-monstros-npcs.md` §2.2), GLB no Meshy e módulo `npc-sprites`.  ✔ NPCs pintados no mundo (Lia, Doran, Yun, Ren, Mel)
 
 ## Rodada de jogabilidade (2026-11-02)
 - [x] Atributos em lote (+1/+5/Máx e "Distribuir automático"); janela não pisca mais ao clicar (rolagem preservada, animação só ao abrir).
@@ -136,4 +141,4 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [x] Dois mapas novos, Cume Gélido (Nv 20-25) e Cinzas Ardentes (Nv 25-30), com as criaturas pintadas recoloridas (`MOBS_EXTRA`, recolor ao carregar). Os dois bosses são o Carvalho e o Guardião recoloridos. Cenário reaproveitado (`look`) e névoa/tom de cor próprios; **sem arte própria de chão/árvores**.
 - [x] História: arco "Os Ecos Partidos" (5 missões: Cume Gélido, Ancião Gélido, Cinzas Ardentes, Cavaleiro Rubro, Ecos Unidos).
 - [x] NPCs pintados (Lia, Doran, Yun, Ren) a partir da folha 3D de frente; o **ferreiro** e o **golem** já estão recortados (golem com resíduo de sombra) mas ainda sem uso; **herbalista sem arte 3D** (segue o herói recolorido). Folha de 8 direções do golem/NPCs enviada pelo proprietário **não chegou como arquivo**.
-- [ ] Golem de Quartzo (monstro) com as 8 direções; arte própria de cenário para os mapas novos; Místico; melhorar o gráfico dos personagens.
+- [x] Golem de Quartzo (monstro) com as 8 direções; arte própria de cenário para os mapas novos; Místico; melhorar o gráfico dos personagens.  ✔ Golem feito; falta cenário próprio dos mapas novos, Místico e gráfico dos personagens

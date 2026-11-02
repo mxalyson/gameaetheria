@@ -39,6 +39,7 @@ export const noticeText = (n) => {
 // Ícone do equipamento: arte pintada por tipo (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto); se a imagem faltar, volta ao emoji.
 const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
+const SCROLL = '<img class="coin" src="assets/icons/item/res-scroll.webp" alt="📜" draggable="false">';
 const ZONE_ICON = { town: '🏠', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
 const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${spiritUrl(type, stage)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
 // Retratos pintados (busto): classes no cartão do herói, no painel do personagem e na criação; NPCs no oval do diálogo. Sem a imagem, volta ao emblema/emoji.
@@ -382,7 +383,7 @@ export class UI {
     const hint = this.isOpen('shop') ? 'Toque em um item para <b>vender</b>.' : 'Toque para equipar · Atributos no 🧙.';
     return this.frame('inventory', `Inventário <small>${char.inventory.length}/${INVENTORY_SIZE}</small>`, `
       <div class="inv-grid">${cells.join('')}</div>
-      <div class="inv-foot"><span>${COIN} ${char.gold}</span><span>${POT} ${char.potions}</span><span class="hint">${hint}</span></div>
+      <div class="inv-foot"><span>${COIN} ${char.gold}</span><span>${POT} ${char.potions}</span><span>${SCROLL} ${char.scrolls ?? 0}</span><span class="hint">${hint}</span></div>
       <div class="row-btns"><button class="btn small" data-action="sort-inv">Ordenar</button></div>`);
   }
 
@@ -466,6 +467,10 @@ export class UI {
         <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>
         <button class="btn small" data-action="buy-potion" data-arg="5">5 · ${COIN} ${potion * 5}</button></div></div>
+      <div class="shop-item"><div class="cell r-uncommon"><span class="ic"><img class="it-img" src="assets/icons/item/res-scroll.webp" alt="📜" draggable="false"></span></div>
+        <div><div class="nm">Pergaminho de Teletransporte</div><div class="sub">Viaja a um mapa já visitado (painel do mapa) · você tem ${char.scrolls ?? 0}</div></div>
+        <div class="btn-col"><button class="btn small" data-action="buy-scroll" data-arg="1">1 · ${COIN} ${PRICES.scroll(char.level)}</button>
+        <button class="btn small" data-action="buy-scroll" data-arg="3">3 · ${COIN} ${PRICES.scroll(char.level) * 3}</button></div></div>
       <h3>Equipamentos</h3>${stock}
       ${this.smithSection()}
       <h3>Vender em lote</h3>
@@ -576,9 +581,9 @@ export class UI {
     const route = WORLD_ROUTE, canTp = g.mode === 'explore', vis = g.char.visited ?? {};
     const rows = route.map((id, i) => { const z = ZONES[id]; const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura'; const boss = z.boss ? `Chefe: ${esc(MOBS[z.boss.id].name)}` : '';
       return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : ZONE_ICON[id] ?? '🗺️'}</span></div>
-      <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div>${here === id ? '' : id === 'town' || vis[id] ? `<button class="btn small" data-action="teleport" data-arg="${id}" ${canTp ? '' : 'disabled'}>Viajar · ${teleportCost(id) ? COIN + ' ' + teleportCost(id) : 'grátis'}</button>` : '<span class="tag dim">🔒 não visitado</span>'}</div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
+      <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div>${here === id ? '' : id === 'town' || vis[id] ? `<button class="btn small" data-action="teleport" data-arg="${id}" ${canTp ? '' : 'disabled'}>Viajar · ${teleportCost(id) ? SCROLL + ' ' + teleportCost(id) : 'grátis'}</button>` : '<span class="tag dim">🔒 não visitado</span>'}</div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
     const arenas = '<div class="shop-item"><div class="cell"><span class="ic">⚔️</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>';
-    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas ⇄ Cume Gélido ⇄ Cinzas Ardentes. Mapas já visitados têm <b>teletransporte</b> (fora de combate; a Vila é grátis). O botão 🏠 também volta à vila.</p>${rows}${arenas}`);
+    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas ⇄ Cume Gélido ⇄ Cinzas Ardentes. Mapas já visitados têm <b>teletransporte</b>: gasta 1 Pergaminho (você tem ${g.char.scrolls ?? 0}; a Mercadora Lia vende). Ir para a Vila é grátis, e o botão 🏠 também volta à vila.</p>${rows}${arenas}`);
   }
 
   panel_sage() {

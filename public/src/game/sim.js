@@ -311,7 +311,7 @@ export class World {
       vx: Math.cos(ang) * spec.speed, vy: Math.sin(ang) * spec.speed, ang,
       team: a.team, src: a, mult: spec.mult, radius: spec.radius ?? 6, color: spec.color ?? '#fff',
       range: spec.range ?? 500, traveled: 0, pierce: !!spec.pierce, explode: spec.explode ?? 0,
-      stun: spec.stun ?? 0, hit: new Set(), dead: false,
+      stun: spec.stun ?? 0, hit: new Set(), dead: false, only: spec.only ?? null, // only: acerta só este alvo (tiro de spirit não machuca quem está no caminho)
     });
   }
 
@@ -415,7 +415,8 @@ export class World {
     t.lastDamaged = this.time;
     t.lastCombat = this.time;
     src.lastCombat = this.time;
-    if (src.kind === 'player' || src.kind === 'rival') src.lastDealt = this.time; // o spirit só ataca se o dono atacou ou foi atacado (não conta o dano do próprio spirit)
+    if (src.kind === 'player' || src.kind === 'rival') { src.lastDealt = this.time; src.lastTarget = t.id; } // o spirit só ataca se o dono atacou ou foi atacado (não conta o dano do próprio spirit)
+    if (t.kind === 'player' || t.kind === 'rival') t.lastAttacker = src.id;
     if (src.stats.lifesteal > 0 && !src.dead) this.heal(src, res.amount * src.stats.lifesteal, true);
     if (opts.stun) t.stunT = Math.max(t.stunT, t.boss ? opts.stun * 0.3 : opts.stun);
     if (opts.slow) { t.slowT = opts.slowDur; t.slowAmt = t.boss ? opts.slow * 0.5 : opts.slow; }
@@ -435,7 +436,8 @@ export class World {
     this.burst(t.x, t.y, hurtsPlayer ? '#ff8080' : '#ffffff', res.crit ? 10 : 5, 140);
 
     const killer = src.kind === 'spirit' ? this.byId(src.owner) ?? src : src;
-    if (t.ai && killer && !killer.dead) { t.ai.target = killer.id; if (t.ai.state !== 'return') t.ai.state = 'chase'; }
+    // o tiro do spirit não puxa o mob para cima do dono
+    if (t.ai && killer && !killer.dead && src.kind !== 'spirit') { t.ai.target = killer.id; if (t.ai.state !== 'return') t.ai.state = 'chase'; }
     if (t.hp <= 0) {
       t.hp = 0;
       t.dead = true;
@@ -466,7 +468,7 @@ export class World {
       }
       let done = p.traveled >= p.range;
       for (const e of this.actors) {
-        if (done || e.dead || e.untargetable || e.team === p.team || p.hit.has(e.id)) continue;
+        if (done || e.dead || e.untargetable || e.team === p.team || p.hit.has(e.id) || (p.only != null && e.id !== p.only)) continue;
         if (Math.hypot(e.x - p.x, e.y - p.y) < e.r + p.radius) {
           p.hit.add(e.id);
           if (p.explode) { done = true; break; }
@@ -549,10 +551,14 @@ export class World {
     s.x += (tx - s.x) * k;
     s.y += (ty - s.y) * k;
     const color = SPIRITS[s.spiritType].color;
+    // Alvos do spirit: só quem o dono acertou por último, quem está batendo no dono ou quem o persegue (nunca os mobs que estão só passando).
+    const foes = (range, from = s) => this.enemiesOf(s).filter((e) => Math.hypot(e.x - from.x, e.y - from.y) <= range + e.r && (e.id === o.lastTarget || e.id === o.lastAttacker || e.ai?.target === o.id || (!e.ai && this.spiritEngaged(o))));
     const shoot = (mult, cd, range = 380) => {
-      const e = this.nearestEnemy(s, range);
-      if (!e || !this.spiritEngaged(o)) return;
-      this.spawnProjectile(s, Math.atan2(e.y - s.y, e.x - s.x), { speed: 460, mult, radius: 5, color, range: range + 40 });
+      if (!this.spiritEngaged(o)) return;
+      let e = null, bd = Infinity;
+      for (const f of foes(range)) { const d = Math.hypot(f.x - s.x, f.y - s.y); if (d < bd) { bd = d; e = f; } }
+      if (!e) return;
+      this.spawnProjectile(s, Math.atan2(e.y - s.y, e.x - s.x), { speed: 460, mult, radius: 5, color, range: range + 40, only: e.id });
       s.cds.s0 = cd;
     };
     switch (s.spiritType) {
@@ -575,7 +581,7 @@ export class World {
           s.cds.basic = 9;
         }
         if (s.cds.s0 <= 0) {
-          const near = this.enemiesOf(s).filter((e) => Math.hypot(e.x - o.x, e.y - o.y) < 95 + e.r);
+          const near = this.spiritEngaged(o) ? foes(95, o) : [];
           if (near.length) {
             this.addFx({ type: 'ring', x: o.x, y: o.y, r: 95, color, t: 0, life: 0.35 });
             for (const e of near) this.damage(s, e, 1);

@@ -158,6 +158,7 @@ class Game {
       case 'pref': this.setPref(arg); break;
       case 'fullscreen': this.toggleFullscreen(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'buy-potion': this.buyPotion(Number(arg)); break;
+      case 'buy-scroll': this.buyScroll(Number(arg)); break;
       case 'buy-item': this.buyItem(Number(arg)); break;
       case 'sell-bulk': this.sellBulk(Number(arg)); break;
       case 'buy-essence': this.buyEssence(arg); break;
@@ -834,7 +835,8 @@ class Game {
     if (this.world.time - this.player.lastCombat < 8) return this.ui.toast('Em combate', 'Espere uns segundos para viajar.', '');
     if (this.online && this.net?.joined && z.mobs) return this.ui.toast('Teletransporte indisponível online', 'Por enquanto use os portais (o servidor confere cada passagem).', '');
     const cost = teleportCost(id);
-    if (cost && !this.spend(cost)) return;
+    if (cost > (c.scrolls ?? 0)) return this.ui.toast('Sem pergaminho', 'Compre um Pergaminho de Teletransporte com a Mercadora Lia.', '');
+    c.scrolls = (c.scrolls ?? 0) - cost;
     this.ui.closePanels();
     const at = z.spawn ?? { x: 110, y: 950 };
     this.enterZone(id, at.x, at.y);
@@ -1159,6 +1161,12 @@ class Game {
     if (this.char.gold < cost) { this.ui.log('Ouro insuficiente.', '#ffb4a8'); return false; }
     this.char.gold -= cost;
     return true;
+  }
+
+  buyScroll(n) {
+    if (!this.spend(PRICES.scroll(this.char.level) * n)) return;
+    this.char.scrolls = (this.char.scrolls ?? 0) + n;
+    this.ui.render(); this.save();
   }
 
   buyPotion(n) {

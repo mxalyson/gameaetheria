@@ -29,7 +29,7 @@ function pattern(g, name, scale) {
   const i = imgs.get(name); if (!ready || !i) return null;
   const p = g.createPattern(i, 'repeat'); p.setTransform(new DOMMatrix([scale, 0, 0, scale, 0, 0])); return p;
 }
-const BASE = { forest: ['forest', 1.4], plains: ['plains', 1.4], ruins: ['ruins', 0.85] };
+const BASE = { forest: ['forest', 1.4], plains: ['plains', 1.4], ruins: ['ruins', 0.85], town: ['forest', 1.4] };
 const SAND = { forest: ['sand-dirt', 1], plains: ['sand-plains', 1], ruins: ['slabs', 1] };
 const WATER = { forest: ['water-lake', 1.3], plains: ['water-crystal', 1.3] };
 

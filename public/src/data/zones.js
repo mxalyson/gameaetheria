@@ -10,8 +10,8 @@ const ARENA = {
 
 // Ordem do mapa-múndi (painel do mapa e teletransporte).
 export const WORLD_ROUTE = ['town', 'forest', 'plains', 'ruins', 'glacier', 'ember'];
-// Custo de viagem: a Vila é de graça; o resto cresce com o nível da zona.
-export const teleportCost = (id) => (id === 'town' ? 0 : 20 * (ZONES[id]?.level?.[0] ?? 1));
+// Custo de viagem em pergaminhos de teletransporte (comprados da Mercadora Lia): a Vila é de graça, as outras zonas custam 1.
+export const teleportCost = (id) => (id === 'town' ? 0 : 1);
 
 export const ZONES = {
   town: {

@@ -77,6 +77,15 @@ SET.town = { ...SET.town, tree: SET.forest.tree, rock: SET.forest.rock, bush: SE
 let zoneSet = null;
 export function setNatureZone(zoneId) { zoneSet = atlas ? SET[zoneId] ?? null : null; }
 
+// Desenha uma peça pelo nome (ex.: 'm_pillar_1') com a base em (x, y) e altura h no mundo; false se o atlas ainda não carregou.
+export function drawNatureNamed(g, name, x, y, h, flip = false) {
+  const sp = atlas && meta[name]; if (!sp) return false;
+  const k = h / sp.h, w = sp.w * k;
+  g.save(); g.translate(x, y); if (flip) g.scale(-1, 1);
+  g.drawImage(sp.im ?? atlas, sp.x, sp.y, sp.w, sp.h, -sp.ax * k, -sp.ay * k, w, h); g.restore();
+  return true;
+}
+
 // Desenha a decoração `d` como sprite; devolve true se tratou (senão o chamador usa o desenho antigo).
 export function drawNature(g, d, player) {
   const cfg = zoneSet?.[d.type];

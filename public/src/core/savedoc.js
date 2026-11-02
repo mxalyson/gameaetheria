@@ -170,7 +170,7 @@ export function validate(doc) {
   const char = {
     version: SAVE_VERSION, visited, name: cleanName(doc.name), quests, stats, achievements, title, chests, classId: doc.classId, level,
     xp: int(doc.xp, 0, 1e9, 0), statPoints, alloc,
-    gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0),
+    gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0), scrolls: int(doc.scrolls, 0, 99, 0),
     equipment, inventory, spirits, activeSpirit, spec,
     arena: { rating: int(a.rating, 0, 5000, 1000), wins: int(a.wins, 0, 1e6, 0), losses: int(a.losses, 0, 1e6, 0), bestWave: int(a.bestWave, 0, 1e4, 0), ratings },
     created: int(doc.created, 0, 4e12, Date.now()),

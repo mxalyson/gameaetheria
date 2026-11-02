@@ -271,19 +271,26 @@ test('spirit evolui só no nível 10, paga ouro e fica 50% mais forte', async ()
   assert.equal(evolveSpirit(c, sp.id).ok, false, 'não evolui duas vezes');
 });
 
-test('spirit só ataca quando o dono atacou ou foi atacado', () => {
+test('spirit só ataca o alvo do dono: não puxa o mob, não atira em quem passa e para quando o combate acaba', () => {
   const w = new World('arena', { seed: 3 });
   const c = newCharacter('T', 'warrior', makeRng(1));
-  const p = w.add(makeHeroActor(c, 550, 550));
-  const sp = createSpirit(makeRng(2), { type: 'ember', level: 5 });
-  w.add(makeSpiritActor(sp, p));
-  const m = w.add(makeMobActor('slime', 1, 700, 550, { hostile: false })); // passivo e parado: ninguém apanha
-  let shots = 0;
-  for (let i = 0; i < 240; i++) { w.update(1 / 60, {}); shots += w.projectiles.filter((q) => q.src.kind === 'spirit').length; }
-  assert.equal(shots, 0, 'sem combate o spirit não dispara');
-  w.damage(m, p, 1); // o dono apanha
-  let after = 0; for (let i = 0; i < 120; i++) { w.update(1 / 60, {}); after += w.projectiles.filter((q) => q.src.kind === 'spirit').length; }
-  assert.ok(after > 0, 'depois de o dono apanhar o spirit dispara');
+  const p = w.add(makeHeroActor(c, 550, 550)); p.hp = p.maxHp = 1e9;
+  w.add(makeSpiritActor(createSpirit(makeRng(2), { type: 'ember', level: 5 }), p));
+  const alvo = w.add(makeMobActor('slime', 1, 700, 550, { hostile: false }));
+  const passante = w.add(makeMobActor('slime', 1, 640, 600, { hostile: false }));
+  const tiros = () => w.projectiles.filter((q) => q.src.kind === 'spirit');
+  let n = 0;
+  for (let i = 0; i < 240; i++) { w.update(1 / 60, {}); n += tiros().length; }
+  assert.equal(n, 0, 'sem combate o spirit não dispara');
+  w.damage(p, alvo, 1); // o dono bate no alvo
+  n = 0; for (let i = 0; i < 90; i++) { w.update(1 / 60, {}); n += tiros().length; }
+  assert.ok(n > 0, 'depois de o dono atacar o spirit dispara');
+  assert.equal(alvo.ai.target, p.id, 'o alvo revida contra o dono (não contra o spirit)');
+  assert.equal(passante.hp, passante.maxHp, 'quem só passa não apanha do spirit');
+  alvo.hp = alvo.maxHp = 1e9; alvo.ai.target = null; alvo.hostile = false; alvo.x = 900; // o dono para de atacar e o alvo fica longe e parado
+  p.lastDealt = -99; p.lastDamaged = -99; p.lastAttacker = null; p.lastTarget = null; w.time += 10;
+  n = 0; for (let i = 0; i < 240; i++) { w.update(1 / 60, {}); n += tiros().length; }
+  assert.equal(n, 0, 'passados 3 s sem combate o spirit para (não fica atacando os mobs do caminho)');
 });
 
 test('mob passivo não ataca de longe, mas revida quando apanha', () => {
@@ -299,11 +306,12 @@ test('mob passivo não ataca de longe, mas revida quando apanha', () => {
   assert.equal(passivo.ai.target, p.id, 'passivo revida depois de apanhar');
 });
 
-test('teletransporte: custo por zona e só para mapas visitados (save antigo libera pelo nível)', async () => {
+test('teletransporte: custo em pergaminhos e só para mapas visitados (save antigo libera pelo nível)', async () => {
   const { teleportCost, WORLD_ROUTE, ZONES } = await import('../public/src/data/zones.js');
   const { validate } = await import('../public/src/core/savedoc.js');
   assert.equal(teleportCost('town'), 0);
-  assert.ok(teleportCost('ruins') > teleportCost('forest') && WORLD_ROUTE.every((id) => ZONES[id]));
+  assert.equal(teleportCost('ruins'), 1, 'uma viagem = 1 pergaminho'); assert.ok(WORLD_ROUTE.every((id) => ZONES[id]));
+  assert.equal(newCharacter('T', 'mage', makeRng(8)).scrolls, 2, 'personagem novo começa com 2 pergaminhos');
   const c = newCharacter('T', 'mage', makeRng(8)); c.level = 8; delete c.visited;
   const v = validate(c).char.visited;
   assert.ok(v.forest && v.plains && !v.ruins, 'nível 8 já alcança Bosque e Planície, não Ruínas');

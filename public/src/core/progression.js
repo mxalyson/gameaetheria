@@ -36,7 +36,7 @@ export function newCharacter(name, classId, rng) {
   const char = {
     version: SAVE_VERSION, name, classId, level: 1, xp: 0, statPoints: 0,
     alloc: { str: 0, agi: 0, int: 0, vit: 0 },
-    gold: 60, potions: 3, equipment: {}, inventory: [],
+    gold: 60, potions: 3, scrolls: 2, equipment: {}, inventory: [],
     spirits: [], activeSpirit: null,
     arena: { rating: 1000, wins: 0, losses: 0, bestWave: 0, ratings: {} },
     quests: { active: {}, done: {} }, stats: { kills: 0, bossKills: 0, chests: 0, quests: 0, pvpWins: 0, pvpGames: 0, coopClears: 0 }, achievements: {}, title: null, chests: {},

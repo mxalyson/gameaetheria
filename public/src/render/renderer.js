@@ -6,7 +6,7 @@ import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js'
 import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-textures.js';
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
 import { drawNpcSprite, preloadNpcs, npcTop } from './npc-sprites.js';
-import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite } from './nature-sprites.js';
+import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite, drawNatureNamed } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -756,27 +756,46 @@ function drawTelegraph(g, tg) {
   circle(g, tg.x, tg.y, tg.r); g.stroke();
 }
 
+// Cor do portal pelo destino (borda clara, miolo, brilho).
+const PORTAL_COL = { town: ['255,236,170', '255,200,90'], forest: ['190,255,190', '90,200,110'], plains: ['255,200,235', '190,140,255'], ruins: ['225,205,255', '140,100,255'], glacier: ['215,240,255', '110,180,255'], ember: ['255,220,170', '255,110,50'] };
+// Portal: círculo de runas no chão, dois pilares de pedra e um redemoinho vertical de luz que sobe em fagulhas.
 function drawPortal(g, p, t) {
-  g.save();
-  g.translate(p.x, p.y);
+  const [hi, mid] = PORTAL_COL[p.to] ?? PORTAL_COL.ruins, pulse = 0.85 + Math.sin(t * 2.2) * 0.15;
+  g.save(); g.translate(p.x, p.y);
+  // runas no chão
   g.globalCompositeOperation = 'lighter';
-  const grd = g.createRadialGradient(0, 0, 4, 0, 0, 60);
-  grd.addColorStop(0, 'rgba(210,190,255,0.9)'); grd.addColorStop(0.5, 'rgba(150,110,255,0.35)'); grd.addColorStop(1, 'rgba(120,80,255,0)');
-  g.fillStyle = grd; ellipse(g, 0, 0, 60, 38); g.fill();
-  g.strokeStyle = 'rgba(230,215,255,0.8)'; g.lineWidth = 2.5;
-  for (let i = 0; i < 3; i++) {
-    const a = t * 1.6 + (i * TAU) / 3;
-    g.beginPath(); g.ellipse(0, 0, 34, 20, 0, a, a + 1.4); g.stroke();
-  }
+  g.strokeStyle = `rgba(${mid},${0.35 * pulse})`; g.lineWidth = 2;
+  g.beginPath(); g.ellipse(0, 6, 62, 24, 0, 0, TAU); g.stroke();
+  g.beginPath(); g.ellipse(0, 6, 48, 18, 0, 0, TAU); g.stroke();
+  g.fillStyle = `rgba(${hi},${0.6 * pulse})`;
+  for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU + t * 0.25; g.fillRect(Math.cos(a) * 55 - 1.5, 6 + Math.sin(a) * 21 - 1.5, 3, 3); }
+  const gd = g.createRadialGradient(0, 4, 4, 0, 4, 66); gd.addColorStop(0, `rgba(${mid},0.45)`); gd.addColorStop(1, `rgba(${mid},0)`);
+  g.fillStyle = gd; ellipse(g, 0, 6, 66, 26); g.fill();
   g.globalCompositeOperation = 'source-over';
+  // pilar de trás-esquerda, redemoinho e pilar da frente-direita (o herói passa entre eles)
+  drawNatureNamed(g, 'm_pillar_1', -40, 14, 84);
+  g.globalCompositeOperation = 'lighter';
+  const vg = g.createRadialGradient(0, -34, 4, 0, -34, 52); vg.addColorStop(0, `rgba(${hi},0.95)`); vg.addColorStop(0.45, `rgba(${mid},0.55)`); vg.addColorStop(1, `rgba(${mid},0)`);
+  g.fillStyle = vg; ellipse(g, 0, -34, 30 * pulse, 50 * pulse); g.fill();
+  g.lineWidth = 2.5;
+  for (let i = 0; i < 5; i++) {
+    const a = t * (1.2 + i * 0.35) + i * 1.3, rx = 8 + i * 4.5, ry = 18 + i * 7;
+    g.strokeStyle = `rgba(${i % 2 ? hi : mid},${0.75 - i * 0.1})`;
+    g.beginPath(); g.ellipse(0, -34, rx, ry, 0, a, a + 1.6); g.stroke();
+  }
+  // fagulhas subindo
+  g.fillStyle = `rgba(${hi},0.9)`;
+  for (let i = 0; i < 12; i++) { const u = (t * 0.35 + i / 12) % 1, x = Math.sin(i * 7.3 + t * 0.9) * (18 + u * 6); g.globalAlpha = 1 - u; g.fillRect(x - 1.5, 6 - u * 96, 3, 3); }
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  drawNatureNamed(g, 'm_pillar_2', 42, 18, 78, true);
   g.restore();
   g.font = '700 13px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   const w = g.measureText(p.label).width + 18;
   g.fillStyle = 'rgba(24,16,8,0.78)';
-  g.beginPath(); g.roundRect(p.x - w / 2, p.y - 64, w, 22, 11); g.fill();
+  g.beginPath(); g.roundRect(p.x - w / 2, p.y - 118, w, 22, 11); g.fill();
   g.fillStyle = '#efe6ff';
-  g.fillText(p.label, p.x, p.y - 48);
+  g.fillText(p.label, p.x, p.y - 102);
 }
 
 // ---------------- barras / nomes ----------------
