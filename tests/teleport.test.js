@@ -120,3 +120,42 @@ test('entrar por portal grava o mapa como visitado no personagem oficial', async
   assert.equal(db.character(ch).doc.visited.forest, 1);
   await closeAll(srv, c);
 });
+
+// ---------- B1: zone_enter não confia no `from` do cliente ----------
+test('B1: nível 1 na vila não entra nas Cinzas com `from` falso e nada é marcado como visitado', async () => {
+  const { db, srv, c, ch } = await setup({ visited: { town: 1 }, scrolls: 0 });
+  for (const [zone, from] of [['ember', 'glacier'], ['glacier', 'ruins'], ['plains', 'forest'], ['ruins', 'plains']]) c.send({ t: 'zone_enter', zone, from });
+  await c.sync();
+  assert.equal(c.all('zone_joined').length, 0, 'nenhuma entrada');
+  assert.equal(c.all('reject').filter((m) => m.code === 'bad_zone').length, 4);
+  assert.deepEqual(db.character(ch).doc.visited, { town: 1 });
+  assert.equal(srv.hub.rooms.size, 0);
+  await closeAll(srv, c);
+});
+
+test('B1: da vila só o Bosque; o `from` mentiroso é ignorado (entra no ponto do portal real)', async () => {
+  const { db, srv, c, ch } = await setup({ visited: { town: 1 }, scrolls: 0 });
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'ruins' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  assert.equal(j.zone, 'forest'); assert.equal(j.x, 110); assert.equal(j.y, 1400);
+  assert.equal(db.character(ch).doc.visited.forest, 1);
+  await closeAll(srv, c);
+});
+
+test('B1: dentro da sala só atravessa o portal quem está perto dele (≤ 80 px) e só para a zona vizinha', async () => {
+  const { db, srv, c, ch } = await setup({ visited: { town: 1 }, scrolls: 0 });
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  const actor = srv.actor(j.you);
+  c.send({ t: 'zone_enter', zone: 'plains', from: 'forest' }); // longe do portal leste
+  await c.waitFor((m) => m.t === 'reject' && m.code === 'not_at_portal');
+  c.send({ t: 'zone_enter', zone: 'ruins', from: 'plains' }); // não é vizinha da zona atual
+  await c.waitFor((m) => m.t === 'reject' && m.code === 'bad_zone');
+  assert.equal(db.character(ch).doc.visited.plains, undefined);
+  Object.assign(actor, { x: 4560 - 60, y: 1400 }); // ao lado do portal
+  c.send({ t: 'zone_enter', zone: 'plains', from: 'town' }); // `from` falso de novo: ignorado
+  const j2 = await c.waitFor((m) => m.t === 'zone_joined' && m.zone === 'plains');
+  assert.equal(j2.x, 110);
+  assert.equal(db.character(ch).doc.visited.plains, 1, 'entrada legítima marca visitado');
+  await closeAll(srv, c);
+});

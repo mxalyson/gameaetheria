@@ -6,10 +6,29 @@ import { validate } from './savedoc.js';
 import { INVENTORY_SIZE } from '../data/items.js';
 import { MAX_SPIRITS } from '../data/spirits.js';
 import { ensureJournal, recordEvent } from './journal.js';
+import { hashString } from './rng.js';
 
 // Aplica o resultado de uma partida (1×1, 2×2 ou 4×4) a UM personagem. `result`: 'win' | 'loss' | 'draw'.
 // Rating separado por modo; times maiores pagam um pouco mais (mesma regra do cliente). Devolve { doc, summary } sem alterar o original.
-export function applyMatchResult(doc, { mode, result, foeRating }) {
+// XP de PvP (G3): vitória 6% / derrota 2% de um nível (×mul do modo); 10 partidas por hora a 100%, depois 25%; 0 se o MESMO adversário
+// aparece pela 3ª vez seguida em 30 min. Contadores em `stats` (minutos desde 1970 para caber no limite de 1e8 do savedoc).
+export const PVP_XP = { win: 0.06, loss: 0.02, fullPerHour: 10, afterFull: 0.25, windowMin: 60, foeMax: 2, foeWindowMin: 30 };
+export function pvpXpFactor(stats, foeId, now) {
+  const min = Math.floor(now / 60000);
+  if (!(stats.pvpHour > 0) || min - stats.pvpHour >= PVP_XP.windowMin) { stats.pvpHour = min; stats.pvpHourN = 0; }
+  let f = stats.pvpHourN >= PVP_XP.fullPerHour ? PVP_XP.afterFull : 1;
+  stats.pvpHourN++;
+  if (foeId != null) {
+    const h = (hashString(String(foeId)) % 99999989) + 1;
+    if (stats.pvpFoe === h && min - stats.pvpFoeMin <= PVP_XP.foeWindowMin) stats.pvpFoeN++;
+    else { stats.pvpFoe = h; stats.pvpFoeN = 1; stats.pvpFoeMin = min; }
+    if (stats.pvpFoeN > PVP_XP.foeMax) f = 0;
+  }
+  return f;
+}
+
+// `foeId` (opcional): identificação estável do adversário/time adversário, para o limite de repetição; `now` injetável (testes).
+export function applyMatchResult(doc, { mode, result, foeRating, foeId = null, now = Date.now() }) {
   if (!MODES[mode]) throw new Error('modo inválido: ' + mode);
   const c = structuredClone(doc);
   const won = result === 'win', draw = result === 'draw';
@@ -20,9 +39,10 @@ export function applyMatchResult(doc, { mode, result, foeRating }) {
   const mul = 1 + (MODES[mode].size - 1) * 0.2;
   const gold = Math.round((won ? 40 + c.level * 8 : draw ? 20 + c.level * 4 : 10 + c.level * 2) * mul);
   c.gold += gold;
-  const xp = Math.round(xpToNext(c.level) * (won ? 0.12 : 0.04) * mul);
-  const levels = addXp(c, xp);
   ensureJournal(c);
+  const xpFactor = pvpXpFactor(c.stats, foeId, now);
+  const xp = Math.round(xpToNext(c.level) * (won ? PVP_XP.win : PVP_XP.loss) * mul * xpFactor);
+  const levels = addXp(c, xp);
   const prog = recordEvent(c, { type: 'pvp', mode, won }); // contador de PvP, missão de arena e conquistas: só o servidor registra
   recordEvent(c, { type: 'level', level: c.level });
   const v = validate(c);

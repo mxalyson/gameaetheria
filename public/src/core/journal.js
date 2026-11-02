@@ -130,8 +130,9 @@ export function openChest(doc, chest, zoneId, rng, now = Date.now()) {
   const gold = Math.round(rng.int(lvl * 6, lvl * 12) * tier);
   doc.gold += gold;
   let item = null;
-  if (rng.chance(0.3 * tier)) {
-    item = generateItem(rng, lvl, { classId: doc.classId, luck: 1.2 * tier });
+  // G1: o baú era a maior fonte de épicos (18/h nas Cinzas); agora ~1–3 épico+/h nas zonas finais (tools/chest-check.mjs)
+  if (rng.chance(Math.min(0.8, 0.15 * tier))) {
+    item = generateItem(rng, lvl, { classId: doc.classId, luck: 0.25 * tier });
     if (doc.inventory.length < INVENTORY_SIZE) doc.inventory.push(item); else { doc.gold += item.value; item = { ...item, converted: true }; }
   }
   const out = recordEvent(doc, { type: 'chest', zoneId }, now);

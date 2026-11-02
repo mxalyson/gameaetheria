@@ -5,7 +5,7 @@ import { SKILLS } from './data/skills.js';
 import { isSkillUnlocked, skillUnlockLevel } from './core/unlocks.js';
 import { skillOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
-import { stickVector, pickAim, aimModeFor, dragAim } from './touch-logic.js';
+import { stickVector, pickAim, aimModeFor, dragAim, interactTarget } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -60,7 +60,7 @@ export class TouchControls {
         <div class="tbtn slot sk sk2" data-t="skill" data-i="2"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot pot" data-t="potion"><span class="icon">🧪</span><span class="count"></span><div class="cd"></div></div>
         <div class="tbtn slot home" data-t="hearth"><span class="icon"><img class="art" src="assets/icons/ui/home.webp" alt="🏠" draggable="false" onerror="this.replaceWith(this.alt)"></span></div>
-        <div class="tbtn slot act hidden" data-t="interact"><span class="icon">💬</span></div>
+        <div class="tbtn slot act hidden" data-t="interact"><span class="icon"></span></div>
       </div>`;
 
     const zone = $('stick-zone'), knob = $('stick-knob');
@@ -126,7 +126,7 @@ export class TouchControls {
       if (st.t === 'skill') this.castQueue.push({ i: st.i, aim: st.aim });
       else if (st.t === 'potion') g.usePotion();
       else if (st.t === 'hearth') g.hearth();
-      else if (st.t === 'interact' && g.nearNpc) g.talk(g.nearNpc);
+      else if (st.t === 'interact') g.interact();
     };
     tb.addEventListener('pointerup', (e) => release(e, true));
     tb.addEventListener('pointercancel', (e) => release(e, false));
@@ -184,7 +184,16 @@ export class TouchControls {
     setCd(pot, game.potionCd, 8, false);
     pot.querySelector('.count').textContent = String(game.char.potions);
     pot.classList.toggle('empty', !game.char.potions || game.mode === 'pvp');
-    this.root.querySelector('.home').classList.toggle('hidden', game.mode !== 'explore' || game.world.zoneId === 'town');
-    this.root.querySelector('.act').classList.toggle('hidden', !game.nearNpc);
+    // 🏠 também na instância online (zone_leave); nas partidas fica escondido
+    this.root.querySelector('.home').classList.toggle('hidden', !((game.mode === 'explore' && game.world.zoneId !== 'town') || game.inNetZone?.()));
+    // botão contextual: balão pintado para NPC, baú pintado para baú
+    const tg = game.mode === 'explore' ? interactTarget(p, game.world) : null, act = this.root.querySelector('.act');
+    act.classList.toggle('hidden', !tg);
+    if (tg && act.dataset.kind !== tg.kind) {
+      act.dataset.kind = tg.kind;
+      act.querySelector('.icon').innerHTML = tg.kind === 'chest'
+        ? '<img class="art" src="assets/icons/item/res-chest.webp" alt="🧰" draggable="false" onerror="this.replaceWith(this.alt)">'
+        : '<span class="bubble" aria-label="Conversar">💬</span>';
+    }
   }
 }

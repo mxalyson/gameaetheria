@@ -60,7 +60,7 @@ const STYLE = {
     shore: ['rgba(110,150,190,0.30)', '#f4f9fd', '#cfe2f0'], water: ['#b4e4f5', '#7fc4e8'],
   },
   // margens dos rios (só as cores de margem/água; o chão dessas zonas é pintado por paintRuinsGround)
-  ruins: { shore: ['rgba(20,14,50,0.38)', '#6f6b8d', '#8d89ab'], water: ['#6a5cb0', '#3d2f7e'] },
+  ruins: { shore: ['#14102a', '#4a4666', '#6f6b8d'], water: ['#2a2458', '#1b1838'] }, // margem de pedra opaca
   ember: { shore: ['rgba(10,0,0,0.5)', '#2a1410', '#4a2016'], water: ['#ff7a1e', '#b8381a'] },
 };
 
@@ -99,8 +99,10 @@ function paintRivers(g, world, rng) {
   for (const rv of rivers) {
     const w = rv.w, pts = rv.pts, stroke = (lw, style) => { g.lineWidth = lw; g.strokeStyle = style; riverPath(g, pts); g.stroke(); };
     if (kind === 'ember') { // lava: crosta escura, brasa, núcleo incandescente
-      stroke(w + 48, 'rgba(10,0,0,0.42)'); stroke(w + 28, '#2a1410'); stroke(w + 12, '#4a2016');
-      stroke(w, '#b8381a'); stroke(w * 0.7, '#ff6a1e'); stroke(w * 0.38, '#ffb347'); stroke(w * 0.12, '#ffe6a0');
+      // margem de basalto escura e OPACA (nada de faixa translúcida), depois brasa -> núcleo incandescente
+      stroke(w + 54, '#140806'); stroke(w + 34, '#241210'); stroke(w + 16, '#3a1a12');
+      stroke(w + 4, '#7a2412'); stroke(w, '#c8421a'); stroke(w * 0.74, '#ff6a1e'); stroke(w * 0.46, '#ff9a30'); stroke(w * 0.2, '#ffd27a'); stroke(w * 0.07, '#fff0c0');
+      g.globalAlpha = 0.55; g.strokeStyle = '#ffb347'; g.lineWidth = 3; g.setLineDash([26, 40]); riverPath(g, pts); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; // rachaduras de brasa na correnteza
       continue;
     }
     stroke(w + 50, S.shore[0]); stroke(w + 30, S.shore[1]); stroke(w + 12, S.shore[2]);
@@ -108,7 +110,7 @@ function paintRivers(g, world, rng) {
     if (water) stroke(w, water);
     else { const gr = g.createLinearGradient(rv.x - w / 2, 0, rv.x + w / 2, 0); gr.addColorStop(0, S.water[0]); gr.addColorStop(1, S.water[1]); stroke(w, gr); }
     if (kind === 'glacier') { stroke(w - 8, 'rgba(236,248,255,0.55)'); stroke(w * 0.5, 'rgba(255,255,255,0.28)'); } // gelo por cima da água
-    else if (kind === 'ruins') stroke(w, 'rgba(48,30,110,0.5)'); // água turva, violeta
+    else if (kind === 'ruins') { stroke(w, '#1b1838'); stroke(w * 0.78, '#262150'); stroke(w * 0.36, 'rgba(120,150,210,0.22)'); } // água escura e opaca, com um brilho frio no meio
     else stroke(w * 0.5, 'rgba(255,255,255,0.10)');
     // margem: pedrinhas claras e junco/espuma ao longo das duas bordas (determinístico, mesmo rng do terreno)
     g.fillStyle = kind === 'glacier' ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.45)';

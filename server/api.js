@@ -3,7 +3,7 @@
 import http from 'node:http';
 import { createAuth, AuthError, publicAccount } from './auth.js';
 import { MAX_CHARACTERS, newToken } from './db.js';
-import { checkSave } from './plausible.js';
+import { checkSave, sanitizeImport } from './plausible.js';
 import { RateLimiter } from '../public/src/core/protocol.js';
 import { cleanName, migrate, validate, parseSave } from '../public/src/core/savedoc.js';
 import { newCharacter, createSpirit } from '../public/src/core/progression.js';
@@ -102,7 +102,7 @@ export function createApi(db, { googleClientId = null, origins = [], trustProxy 
         if (db.countCharacters(acc.id) >= MAX_CHARACTERS) return err(res, 409, 'slots_full', `Limite de ${MAX_CHARACTERS} personagens.`, cors), true;
         const r = parseSave(typeof b.save === 'string' ? b.save : JSON.stringify(b.save ?? null));
         if (!r.ok) return err(res, 422, 'bad_save', r.reason, cors), true;
-        const doc = reId(r.char);
+        const doc = sanitizeImport(reId(r.char), newOfficialCharacter('x', r.char.classId)); // itens forjados, pergaminhos e mapas do arquivo local não valem
         // o histórico de arena do save local não é confiável: recomeça no padrão do servidor
         doc.arena = { rating: 1000, wins: 0, losses: 0, bestWave: Math.min(doc.arena.bestWave, 10), ratings: {} };
         let base = doc.name, n = 1, id = null;

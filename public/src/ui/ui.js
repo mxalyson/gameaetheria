@@ -11,7 +11,7 @@ import { MODES, getRating } from '../core/match.js';
 import { MOBS } from '../data/mobs.js';
 import { mobPortrait } from '../render/mob-sprites.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
-import { PRICES } from '../shop.js';
+import { PRICES, sellValue } from '../shop.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, preloadSkillIcons, skillCategory, CATEGORIES } from '../render/skill-icons.js';
 import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
 import { QUESTS } from '../data/quests.js';
@@ -307,7 +307,7 @@ export class UI {
     this.set('spirit-icon', 'html', sp ? spiritImg(sp.type, 'hud') : '·');
 
     // Barra de chefe / rival.
-    const boss = game.mode === 'pvp' ? game.rival : world.actors.find((a) => (a.boss || a.elite) && !a.dead && Math.hypot(a.x - player.x, a.y - player.y) < 650);
+    const boss = game.mode === 'pvp' ? game.rival : this.barTarget(world, player);
     if (boss && !boss.dead) {
       this.set('boss-bar', 'class', '');
       this.set('boss-name', 'text', `${boss.name} · Nv ${boss.level}`);
@@ -315,12 +315,18 @@ export class UI {
       // retrato: vista frontal do sprite pintado do monstro (o rival do PvP e criaturas sem arte ficam sem retrato)
       const pt = boss.mobId ? mobPortrait(boss.mobId) : null;
       this.set('boss-portrait', 'display', pt ? 'block' : 'none');
-      if (pt) { // célula (0,0) do atlas ampliada 1,7x e centrada no alto (cabeça e tronco)
-        this.set('boss-portrait', 'background-image', `url(${pt.url})`);
-        this.set('boss-portrait', '--cols', String(pt.cols)); this.set('boss-portrait', '--rows', String(pt.rows)); this.set('boss-portrait', '--ratio', pt.ratio.toFixed(3));
-        this.set('boss-portrait', 'filter', pt.filter);
-      }
+      if (pt) this.set('boss-portrait', 'background-image', `url(${pt.url})`); // recorte do rosto/torso já tingido (ver mobPortrait)
     } else this.set('boss-bar', 'class', 'hidden');
+  }
+
+  // Alvo da barra de chefe: o chefe tem prioridade sobre elites próximos (senão o retrato mostrava um elite qualquer ao lado do chefe).
+  barTarget(world, player) {
+    let best = null;
+    for (const a of world.actors) {
+      if (!(a.boss || a.elite) || a.dead || Math.hypot(a.x - player.x, a.y - player.y) >= 650) continue;
+      if (!best || (a.boss && !best.boss)) best = a;
+    }
+    return best;
   }
 
   log(msg, color = '#e8e6f0') {
@@ -361,7 +367,7 @@ export class UI {
     if (['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map', 'spirits', 'character', 'options']) this.open.delete(p);
     if (id === 'options') this.open.clear();
     this.open.add(id);
-    if (id === 'shop') this.open.add('inventory');
+    if (id === 'shop') { this.open.add('inventory'); this.shopAnchor = anchor ?? null; } // título: Ferreiro Brok quando aberto pelo NPC dele
     this.render();
     if (anchor) { const go = () => this.layer.querySelector(`#${anchor}-section`)?.scrollIntoView({ block: 'start' }); go(); requestAnimationFrame(go); }
   }
@@ -421,7 +427,7 @@ export class UI {
         ${char.equipment[s] ? this.itemCell(char.equipment[s], 'unequip', s) : `<div class="cell empty ghost">${ghostIcon(s, cls)}</div>`}
       </div>`).join('');
     const stats = STAT_KEYS.map((k) => `
-      <div class="stat-row ${k === cls.primary ? 'prim' : ''}"><span>${STAT_NAMES[k]}</span><b>${st[k]}</b>
+      <div class="stat-row ${k === cls.primary ? 'prim' : ''}"><span class="sn">${STAT_NAMES[k]}</span><b>${st[k]}</b>
         ${char.statPoints ? `<span class="plus-grp"><button class="plus" data-action="alloc" data-arg="${k}:1">+1</button><button class="plus" data-action="alloc" data-arg="${k}:5">+5</button><button class="plus" data-action="alloc" data-arg="${k}:max">Máx</button></span>` : '<i></i>'}</div>`).join('');
     const d = [
       ['Vida', st.maxHp], ['Poder', st.power], ['Defesa', st.def], ['Crítico', st.crit.toFixed(1) + '%'],
@@ -449,7 +455,7 @@ export class UI {
     const cards = Object.entries(list).map(([id, sp]) => `
       <div class="shop-item ${char.spec === id ? 'sel' : ''}"><div class="cell r-epic"><span class="ic">${sp.icon}</span></div>
         <div><div class="nm">${sp.name}${char.spec === id ? ' ✔' : ''}</div><div class="sub">${sp.desc}</div></div>
-        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}">${cost ? '${COIN} ' + cost : 'Escolher'}</button>`}</div>`).join('');
+        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}">${cost ? COIN + ' ' + cost : 'Escolher'}</button>`}</div>`).join('');
     return `<h3>Especialização ${char.spec ? `<span class="pts">${specInfo(char.classId, char.spec).name}</span>` : '<span class="pts">escolha uma</span>'}</h3>${cards}`;
   }
 
@@ -485,7 +491,7 @@ export class UI {
         <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level}</div></div>
         <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${it.value * PRICES.itemMarkup}</button></div>`).join('') || '<p class="empty-msg">Estoque esgotado. Volte após subir de nível.</p>';
     const potion = PRICES.potion(char.level);
-    return this.frame('shop', 'Mercadora Lia', `
+    return this.frame('shop', this.shopAnchor === 'smith' ? 'Ferreiro Brok' : 'Mercadora Lia', `
       <p class="npc-line">${npcEmblem('merchant')}"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
       <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false"></span></div>
         <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
@@ -712,11 +718,11 @@ export class UI {
     const again = this.game.touch?.active ? 'Toque de novo' : 'Clique';
     if (inShop) action = `Preço: ${COIN} ${it.value * PRICES.itemMarkup}`;
     else if (equipped) action = `${again} para desequipar`;
-    else if (this.isOpen('shop')) action = `${again} para vender por ${COIN} ${it.value}`;
+    else if (this.isOpen('shop')) action = `${again} para vender por ${COIN} ${sellValue(it)}`;
     else if (ok.ok) action = `${again} para equipar`;
     return `<div class="tt-name" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}
       ${ok.ok ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
-      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? ` · vale ${COIN} ${it.value}` : ''}</div>`;
+      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? ` · vale ${COIN} ${sellValue(it)}` : ''}</div>`;
   }
 }
 

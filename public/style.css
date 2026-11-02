@@ -134,7 +134,7 @@ img.cc-sk { width: 20px; height: 20px; vertical-align: -5px; }
 .eq-slot { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .eq-slot label { font-size: 11px; color: var(--muted); }
 .stat-row { display: grid; grid-template-columns: 1fr 50px 30px; align-items: center; padding: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.04); margin-bottom: 4px; font-size: 14px; }
-.stat-row.prim span::after { content: ' ★'; color: var(--gold); }
+.stat-row.prim .sn::after { content: ' ★'; color: var(--gold); }
 .stat-row b { text-align: right; }
 .plus { width: 24px; height: 24px; border-radius: 8px; border: none; background: var(--gold); color: #3a2e00; font-weight: 900; cursor: pointer; justify-self: end; }
 .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
@@ -522,7 +522,7 @@ body.touch .btn.small { padding: 0 6px; }
 #boss-bar .bar { height: 14px; border: 2px solid #c9a24a; border-radius: 8px; background: #2a0e12; box-shadow: 0 0 0 1px #4a2a18, 0 4px 10px rgba(0,0,0,.5); }
 #boss-bar .fill { border-radius: 5px; background: linear-gradient(180deg, #ff9a88 0%, #d9473b 55%, #9c2a24 100%); }
 /* retrato do chefe: recorte frontal do sprite pintado, em medalhão dourado à esquerda da barra */
-#boss-portrait { --s: 58px; --cols: 5; --rows: 8; --ratio: 1.2; display: none; position: absolute; left: -34px; top: 6px; width: var(--s); height: var(--s); box-sizing: border-box; border-radius: 50%; border: 3px solid #c9a24a; background-color: #2a0e12; background-repeat: no-repeat; background-size: calc(var(--cols) * 170%) calc(var(--rows) * 170% * var(--ratio)); background-position: calc(var(--s) * -0.35) calc(var(--s) * -0.04); box-shadow: 0 0 0 1px #4a2a18, 0 4px 10px rgba(0,0,0,.55), inset 0 0 8px rgba(0,0,0,.6); z-index: 2; }
+#boss-portrait { --s: 58px; --cols: 5; --rows: 8; --ratio: 1.2; display: none; position: absolute; left: -34px; top: 6px; width: var(--s); height: var(--s); box-sizing: border-box; border-radius: 50%; border: 3px solid #c9a24a; background-color: #2a0e12; background-repeat: no-repeat; background-size: cover; background-position: center top; box-shadow: 0 0 0 1px #4a2a18, 0 4px 10px rgba(0,0,0,.55), inset 0 0 8px rgba(0,0,0,.6); z-index: 2; }
 body.touch #boss-portrait { --s: 44px; left: -26px; top: 2px; }
 .npc-line { border: 0; border-image: none; background: url(assets/ui/dialog.webp) center / 100% 100% no-repeat; padding: 16px 18px 16px 21%; color: #f6ebc9; text-shadow: 0 2px 0 #000b; min-height: 74px; display: flex; align-items: center; }
 body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
@@ -608,3 +608,28 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 
 /* ritual do chefe final: pílula pequena sob o minimapa */
 #ritual { position: absolute; top: 148px; right: 14px; padding: 3px 12px; font: 700 12px Cinzel, serif; color: #ffd9a0; background: rgba(24,16,8,.8); border: 1px solid rgba(255,140,60,.6); border-radius: 12px; text-shadow: 0 1px 0 #000; pointer-events: none; z-index: 5; }
+
+/* ---- Auditoria V1/V2/V3/V7: alvos de toque >= 44 px, atributos em duas linhas, spirits com botões em linha própria, barra do chefe fora do HUD ---- */
+/* V1: nome+valor em cima; +1 +5 Máx embaixo (cada botão com área de toque de 44x44) */
+.stat-row { grid-template-columns: 1fr auto; row-gap: 2px; }
+.stat-row .plus-grp { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+.stat-row .plus-grp .plus, body.touch .plus { min-width: 44px; width: auto; height: 44px; padding: 0 12px; border-radius: 10px; }
+.stat-row > i { display: none; }
+/* V2: menu superior 44 px (8 botões cabem em 844x390: 8x44 + 7x4 = 380 px, ao lado do minimapa e abaixo da barra do chefe) */
+.menu-btns button, body.touch .menu-btns button { width: 44px; height: 44px; }
+@media (max-height: 420px) { .menu-btns button, body.touch .menu-btns button { width: 44px; height: 44px; } }
+@media (max-height: 320px) { .menu-btns button, body.touch .menu-btns button { width: 44px; height: 44px; } }
+/* V7: texto do spirit usa a largura toda; botões numa linha própria sob o texto */
+.sp-card { flex-wrap: wrap; }
+.sp-info { flex: 1 1 150px; }
+.sp-btns { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+.sp-btns .btn, .sp-btns .tag { flex: 1 1 0; min-width: 96px; min-height: 44px; display: grid; place-items: center; }
+/* V3: barra do chefe abaixo da faixa do HUD (cartão do herói e frascos ocupam x<220, y<84; menu e minimapa à direita, y<56/84) */
+@media (max-height: 520px) {
+  #boss-bar, body.touch #boss-bar { top: 84px; width: min(340px, 46vw); }
+  #boss-portrait, body.touch #boss-portrait { --s: 44px; left: -22px; top: 4px; }
+}
+/* Celular estreito (667 px): o retrato do chefe batia no botão "+N PONTOS" (x<220, y<130); desloca a barra para a direita, longe do minimapa (x>580) */
+@media (max-height: 520px) and (max-width: 740px) {
+  #boss-bar, body.touch #boss-bar { left: calc(50% + 46px); width: min(290px, 42vw); }
+}

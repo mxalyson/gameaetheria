@@ -225,3 +225,84 @@ test('varredura de segredos: nada nos arquivos versionados, e o detector acha o 
   assert.ok(scanText('x.js', "password = 'umaSenhaLongaDemais123'").length === 1);
   assert.ok(scanText('x.js', "const ok = 'sem segredos aqui'").length === 0);
 });
+
+// ---------- B2: save forjado (checkSave) ----------
+import { checkSave, itemCeiling, sanitizeImport, LIMITS as PLAUS } from '../server/plausible.js';
+import { newOfficialCharacter } from '../server/api.js';
+import { generateItem, generateOpalItem } from '../public/src/core/loot.js';
+import { RARITIES, SLOTS } from '../public/src/data/items.js';
+import { ZONES } from '../public/src/data/zones.js';
+import { PRICES } from '../public/src/shop.js';
+import { xpToNext } from '../public/src/core/progression.js';
+
+const baseDoc = () => { const d = newOfficialCharacter('Forja', 'warrior'); d.gold = 2000; d.scrolls = 1; d.visited = { town: 1, forest: 1 }; d.pity = { epic: 3, legendary: 2, opal: 1 }; return d; };
+const edit = (f, base = baseDoc()) => { const n = structuredClone(base); f(n); return checkSave(base, n); };
+const gear = (over) => ({ ...structuredClone(baseDoc().equipment.weapon), id: 'forjado1', ...over });
+
+test('B2: scrolls, visited e pity forjados são desfeitos (só o servidor aumenta)', () => {
+  const r = edit((n) => { n.scrolls = 99; n.visited = Object.fromEntries(Object.keys(ZONES).map((z) => [z, 1])); n.pity = { epic: 9999, legendary: 9999, opal: 99 }; });
+  assert.equal(r.ok, true);
+  assert.equal(r.doc.scrolls, 1); assert.deepEqual(r.doc.visited, { town: 1, forest: 1 }); assert.deepEqual(r.doc.pity, { epic: 3, legendary: 2, opal: 1 });
+  assert.equal(edit((n) => { n.pity = { epic: 0, legendary: 0, opal: 0 }; }).doc.pity.epic, 0, 'zerar azar (item épico caiu) vale');
+});
+
+test('B2: pergaminho só sobe se o ouro caiu o preço; comprar de verdade passa', () => {
+  const base = baseDoc(), price = PRICES.scroll(base.level);
+  const buy2 = edit((n) => { n.gold -= price * 2; n.scrolls += 2; }, base);
+  assert.equal(buy2.ok, true); assert.equal(buy2.doc.scrolls, 3);
+  const cheat = edit((n) => { n.gold -= price; n.scrolls += 5; }, base);
+  assert.equal(cheat.doc.scrolls, 2, 'só 1 pago');
+  assert.equal(edit((n) => { n.scrolls = 0; }, base).doc.scrolls, 0, 'gastar vale');
+});
+
+test('B2: itens novos respeitam o teto por raridade e nível; opalino não nasce no cliente', () => {
+  assert.equal(edit((n) => { n.inventory.push(gear({ rarity: 'common', level: 1, reqLevel: 1, stats: { atk: 2000 } })); }).reason, 'item_forged');
+  const arm = { ...gear({ slot: 'armor', weaponType: null, rarity: 'common', level: 1, reqLevel: 1, stats: { def: 2000, hp: 20000, vit: 400 } }) };
+  assert.equal(edit((n) => { n.inventory.push(arm); }).reason, 'item_forged');
+  assert.equal(edit((n) => { n.inventory.push(gear({ stats: { atk: 8, crit: 100, atkSpeed: 100, lifesteal: 100 } })); }).reason, 'item_forged', 'afixos acima do teto/da quantidade');
+  assert.equal(edit((n) => { n.inventory.push(gear({ opal: true })); }).reason, 'opal_forged');
+  assert.equal(edit((n) => { n.inventory.push(gear({ level: 40, reqLevel: 38 })); }).reason, 'item_forged', 'nível do item muito acima do herói');
+  assert.equal(edit((n) => { n.inventory.push(gear({ level: 20, reqLevel: 1 })); }).reason, 'item_forged', 'reqLevel baixo demais');
+  assert.equal(edit((n) => { n.inventory.push(gear({ value: 99999 })); }).reason, 'item_forged', 'valor de venda');
+  assert.equal(edit((n) => { n.inventory.push(gear({})); }).ok, true, 'item legítimo');
+});
+
+test('B2: itens que o banco já tinha não mudam; opalino emitido pelo servidor continua valendo', () => {
+  const base = baseDoc(); const opal = generateOpalItem(makeRng(5), 10, 'warrior'); opal.id = 'opalSrv'; base.inventory.push(opal);
+  assert.equal(edit((n) => { n.equipment.weapon.stats.atk = 999; }, base).reason, 'item_tampered');
+  assert.equal(edit((n) => { n.equipment.weapon.rarity = 'legendary'; }, base).reason, 'item_tampered');
+  assert.equal(edit((n) => { n.inventory.find((i) => i.id === 'opalSrv').opal = false; }, base).reason, 'item_tampered');
+  const r = edit((n) => { n.equipment.weapon.plus = 2; }, base);
+  assert.equal(r.ok, true); assert.equal(r.doc.inventory.find((i) => i.id === 'opalSrv').opal, true);
+});
+
+test('B2: teto de itens cobre tudo que generateItem/generateOpalItem realmente sorteiam (milhares de itens)', () => {
+  const rng = makeRng(77);
+  for (let i = 0; i < 6000; i++) {
+    const level = rng.int(1, 40), rarityId = RARITIES[rng.int(0, 4)].id, slot = SLOTS[rng.int(0, SLOTS.length - 1)];
+    const it = generateItem(rng, level, { classId: 'mage', rarityId, slot });
+    const cap = itemCeiling(it.slot, it.rarity, it.level);
+    assert.ok(Object.keys(it.stats).length <= cap.maxKeys, `chaves ${JSON.stringify(it)}`);
+    for (const [k, v] of Object.entries(it.stats)) assert.ok(v <= (cap.stats[k] ?? 0), `${k} ${v} > ${cap.stats[k]} em ${JSON.stringify(it)}`);
+    assert.ok(it.value <= cap.value);
+  }
+});
+
+test('B2: nível ↔ XP — +2 níveis por gravação sem abates é recusado; progresso jogado passa', () => {
+  const base = baseDoc(); base.level = 5; base.xp = 0; base.statPoints = 20;
+  const lvl = (n, levels) => { n.level += levels; n.statPoints += 5 * levels; };
+  assert.equal(edit((n) => lvl(n, 2), base).reason, 'xp_jump');
+  assert.equal(edit((n) => lvl(n, 1), base).ok, true, 'um nível de folga (baús/ondas/missão)');
+  const played = edit((n) => { lvl(n, 2); n.stats.kills += 300; }, base);
+  assert.equal(played.ok, true, 'abates plausíveis justificam');
+  assert.equal(edit((n) => { n.xp = xpToNext(5) - 1; }, base).ok, true);
+});
+
+test('B2: save importado de arquivo perde pergaminhos, mapas, azar e itens forjados', () => {
+  const d = baseDoc(); d.scrolls = 50; d.pity = { epic: 900, legendary: 500, opal: 90 };
+  d.inventory.push(gear({ stats: { atk: 5000 } }), gear({ id: 'opalx', opal: true }), gear({ id: 'okx' }));
+  const out = sanitizeImport(d, newOfficialCharacter('x', 'warrior'));
+  assert.equal(out.scrolls, 0); assert.deepEqual(out.pity, { epic: 0, legendary: 0, opal: 0 });
+  assert.deepEqual(out.inventory.map((i) => i.id), ['okx']);
+  void PLAUS;
+});

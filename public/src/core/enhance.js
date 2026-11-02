@@ -4,13 +4,16 @@ import { RARITY, SLOTS } from '../data/items.js';
 
 export const MAX_PLUS = 8;
 export const PLUS_BONUS = 0.06;
+export const LATE_FROM = 6, LATE_MUL = 0.6;
 
 export const plusMul = (item) => 1 + PLUS_BONUS * (item?.plus ?? 0);
 
 // Custo do próximo nível (de +n para +n+1).
 export function enhanceCost(item) {
   const n = (item.plus ?? 0) + 1;
-  return Math.round(60 + item.level * 15 * (1 + RARITY[item.rarity].index * 0.25) * n ** 1.6);
+  // G10: +6..+8 custam 60% do que a curva daria (6 lendários +8: 543 mil → ≈ 396 mil; carreira ≈ 440 mil de ouro)
+  const late = n >= LATE_FROM ? LATE_MUL : 1;
+  return Math.round((60 + item.level * 15 * (1 + RARITY[item.rarity].index * 0.25) * n ** 1.6) * late);
 }
 
 export function findGear(char, id) {

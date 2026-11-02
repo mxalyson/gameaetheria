@@ -79,15 +79,15 @@ export function rollSourceRarity(rng, source, pity = null) {
 
 // ---------- item exclusivo do último chefe (tema ópalo) ----------
 export const OPAL_BOSS = 'infernoknight';
-export const OPAL = { base: 0.3, perMiss: 0.2, legendary: 0.25, weaponShare: 0.6, statMul: 1.3 };
+export const OPAL = { base: 0.3, perMiss: 0.2, legendary: 0.25, weaponShare: 0.6, statMul: 1.5 };
 export function generateOpalItem(rng, level, classId, forceSlot = null) {
   const weapon = forceSlot ? forceSlot === 'weapon' : rng.chance(OPAL.weaponShare);
   const rarityId = rng.chance(OPAL.legendary) ? 'legendary' : 'epic';
   const cls = CLASSES[classId] ?? CLASSES.warrior;
   const it = generateItem(rng, level, weapon ? { slot: 'weapon', weaponType: cls.weapon, rarityId } : { slot: 'armor', rarityId });
   for (const k of Object.keys(it.stats)) it.stats[k] = Math.round(it.stats[k] * OPAL.statMul);
-  if (weapon) { it.stats.crit = (it.stats.crit ?? 0) + 6; it.stats.atkSpeed = (it.stats.atkSpeed ?? 0) + 6; }
-  else { it.stats.vit = (it.stats.vit ?? 0) + Math.round(level * 0.6); it.stats.moveSpeed = (it.stats.moveSpeed ?? 0) + 5; }
+  if (weapon) { it.stats.crit = (it.stats.crit ?? 0) + 6; it.stats.atkSpeed = (it.stats.atkSpeed ?? 0) + 6; it.stats.lifesteal = (it.stats.lifesteal ?? 0) + 4; }
+  else { it.stats.vit = (it.stats.vit ?? 0) + Math.round(level * 0.6); it.stats.moveSpeed = (it.stats.moveSpeed ?? 0) + 5; it.stats.lifesteal = (it.stats.lifesteal ?? 0) + 3; }
   it.name = (weapon ? OPAL_NAMES[it.weaponType] : OPAL_NAMES.armor) + (rarityId === 'legendary' ? ' Radiante' : '');
   it.opal = true;
   it.value = Math.round(it.value * 2);

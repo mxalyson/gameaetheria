@@ -9,6 +9,7 @@ import { totalEnhanceCost, enhanceCost, MAX_PLUS } from '../public/src/core/enha
 import { PRICES } from '../public/src/shop.js';
 import { COOP_WAVES } from '../server/coop.js';
 import { coopRewardPlan } from '../public/src/core/economy.js';
+import { PVP_XP } from '../public/src/core/rewards.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const N = 4000;
@@ -39,7 +40,12 @@ for (const lvl of [8, 12, 20]) for (const crew of [1, 4]) {
   const plan = coopRewardPlan({ level: lvl, crew, wavesCleared: COOP_WAVES, bossDown: true });
   console.log(`  coop nv ${String(lvl).padStart(2)} × ${crew} jogador(es): ouro ${plan.gold} · XP ${plan.xp} (${((plan.xp / xpToNext(lvl)) * 100).toFixed(0)}% de um nível) · poções ${plan.potions}`);
 }
-for (const lvl of [10, 20]) console.log(`  PvP 1×1 nv ${lvl}: vitória ${40 + lvl * 8} ouro, derrota ${10 + lvl * 2}; XP ${Math.round(xpToNext(lvl) * 0.12)} / ${Math.round(xpToNext(lvl) * 0.04)}`);
+for (const lvl of [10, 20]) {
+  // premissa: partida de 3 min (20/h), metade de vitórias, adversários variados; as 10 primeiras da hora a 100%, as demais a 25%
+  const win = Math.round(xpToNext(lvl) * PVP_XP.win), loss = Math.round(xpToNext(lvl) * PVP_XP.loss), avg = (win + loss) / 2;
+  const perHour = avg * PVP_XP.fullPerHour + avg * (20 - PVP_XP.fullPerHour) * PVP_XP.afterFull;
+  console.log(`  PvP 1×1 nv ${lvl}: vitória ${40 + lvl * 8} ouro, derrota ${10 + lvl * 2}; XP ${win} / ${loss}; ≈ ${Math.round(perHour)} XP/h (${(perHour / xpToNext(lvl)).toFixed(2)} nível/h); antes (12%/4% sem teto): ${Math.round(((xpToNext(lvl) * 0.16) / 2) * 20)} XP/h`);
+}
 
 console.log('\nDESTINOS (ralos de ouro)');
 for (const lvl of [5, 15, 25]) console.log(`  nv ${String(lvl).padStart(2)}: poção ${PRICES.potion(lvl)} · essência ${PRICES.essence(lvl)} · prismática ${PRICES.prism(lvl)} · item na loja ≈ ${(generateItem(rng, lvl, { rarityId: 'rare' }).value * PRICES.itemMarkup)} (raro) · trocar de especialização ${150 + lvl * 25} · morte no PvE: -10% do ouro`);

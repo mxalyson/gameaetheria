@@ -90,3 +90,10 @@ Depois (mobs = 1 + floor(0.3·n), +1 nível a cada 3 ondas, elite a cada 5 ondas
 - Coop (5 ondas + chefe; +1 mob por jogador extra, vida dos mobs +35% por jogador extra, chefe sem bônus de nível, elite só com 3+ jogadores, 1 jogador enfrenta o chefe da faixa anterior): vitória 4 jogadores Nv12 75% · Nv20 69% · Nv30 94%; 2 jogadores 44% · 25% · 38%; 1 jogador 13% · 19% · 0% (o 1 jogador vence quase só com Mago/Arqueiro).
 - Recompensas (`COOP`): XP bruto da vitória agora vem das ondas reais (`estimatePoolXp`) + 6% do nível pelo chefe: ≈ 12% de um nível no Nv8, 10% no Nv12, 8% no Nv20 (≈ 4 min por partida); o farm normal rende mais XP por hora, o coop paga loot de chefe, poções e ouro (266 no Nv12). Antes a estimativa dava 25–30% de um nível por vitória (exploitável contra o farm desacelerado).
 - Pendência: melhorar o robô corpo a corpo (ai.js) ou o Guerreiro/Clérigo contra grupos mistos; o Nv20+ solo sem equipamento melhor que "normal" não derruba o chefe da onda 10.
+
+## Rodada G4/G9 (2026-11-02)
+- Vida do Guardião das Ruínas 12→9 e do Ancião Gélido 11→8,5 (`data/mobs.js`); missões `guardiao_das_ruinas` Nv 16→22 e `anciao_gelido` Nv 22→27.
+- Medido com `node tools/boss-check.mjs --n 4 --only boss`: Guardião, good no Nv 21: 100% em 47→36 s; best 34→24 s; normal Nv ≤15 segue 0%. Ancião, good no Nv 26: 100% em 40→31 s; best 30→23 s; normal Nv ≤19 segue 0%. Cavaleiro Rubro inalterado (good Nv 30: 44% em 95 s; best Nv 30: 81%).
+- Item opalino: atributos ×1,5 (era ×1,3) e roubo de vida (+4% arma, +3% armadura): pontuação +29–31% sobre o lendário comum (era +10–12%).
+- Baús: chance de item `min(0,8; 0,15×tier)` e sorte `0,25×tier` (ver `economia.md`).
+

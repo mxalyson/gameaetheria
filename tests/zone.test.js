@@ -167,3 +167,64 @@ test('eventos do chefe (aviso do ritual e fases) chegam ao cliente online', asyn
   assert.deepEqual(wire({ type: 'boss_warn', stage: 'omen', name: 'Cavaleiro Rubro', x: 100.4, y: 200.6 }), { e: 'boss_warn', stage: 'omen', name: 'Cavaleiro Rubro', x: 100, y: 201 });
   assert.deepEqual(wire({ type: 'phase', actor: { id: 7 }, phase: 3 }), { e: 'phase', actor: 7, phase: 3 });
 });
+
+// ---------- B4 / B8 / B9 ----------
+import { computeStats } from '../public/src/core/stats.js';
+
+test('B4: a sala usa o documento ATUAL do banco (equipamento gravado depois do login), não o do hello', async () => {
+  const { db, srv, players } = await setup(1);
+  const { c, ch } = players[0];
+  const row = db.character(ch), doc = structuredClone(row.doc);
+  doc.equipment.armor.stats.hp = (doc.equipment.armor.stats.hp ?? 0) + 777;
+  assert.ok(db.saveCharacter(ch, doc, row.rev));
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  assert.equal(srv.actor(j.you).maxHp, computeStats(doc).maxHp);
+  assert.ok(computeStats(doc).maxHp > computeStats(row.doc).maxHp);
+  await closeAll(srv, c);
+});
+
+test('B8: hub.flushAll grava as recompensas pendentes das instâncias (desligamento limpo)', async () => {
+  const { db, srv, players } = await setup(1);
+  const { c, ch } = players[0];
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  const room = srv.hub.rooms.values().next().value, p = room.players.get(j.you);
+  const gold0 = db.character(ch).doc.gold;
+  p.pend.gold += 321;
+  srv.hub.flushAll();
+  assert.equal(db.character(ch).doc.gold, gold0 + 321);
+  assert.equal(p.pend.gold, 0);
+  await closeAll(srv, c);
+});
+
+test('B8: flush que falha devolve o lote ao pendente (a recompensa não some)', async () => {
+  const { db, srv, players } = await setup(1);
+  const { c } = players[0];
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  const room = srv.hub.rooms.values().next().value, p = room.players.get(j.you);
+  p.pend.gold = 50; p.pend.xp = 10;
+  const real = db.applyOperation; db.applyOperation = () => { throw new Error('disco cheio'); };
+  assert.equal(room.flush(p), null);
+  db.applyOperation = real;
+  assert.equal(p.pend.gold, 50); assert.equal(p.pend.xp, 10);
+  await closeAll(srv, c);
+});
+
+test('B9: exceção numa sala fecha só essa sala; o servidor segue e a outra sala continua', async () => {
+  const { srv, players } = await setup(2);
+  const [a, b] = players;
+  a.c.send({ t: 'zone_enter', zone: 'forest', from: 'town' }); b.c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  await a.c.waitFor((m) => m.t === 'zone_joined'); await b.c.waitFor((m) => m.t === 'zone_joined');
+  const [ra, rb] = [...srv.hub.rooms.values()];
+  assert.notEqual(ra, rb);
+  const logs = []; srv.hub.log = (msg, extra) => logs.push([msg, extra]);
+  ra.step = () => { throw new Error('mob com id desconhecido'); };
+  assert.doesNotThrow(() => srv.step(5));
+  assert.ok(ra.closed); assert.ok(!srv.hub.rooms.has(ra.id)); assert.ok(srv.hub.rooms.has(rb.id));
+  assert.equal(logs[0][0], 'room_step'); assert.equal(srv.hub.stats.roomErrors, 1);
+  await a.c.waitFor((m) => m.t === 'match_end' && m.reason === 'error');
+  const tick0 = rb.tick; srv.step(3); assert.equal(rb.tick, tick0 + 3, 'a outra sala segue');
+  await closeAll(srv, a.c, b.c);
+});

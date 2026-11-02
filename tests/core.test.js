@@ -510,3 +510,79 @@ test('economia do coop: vitória paga mais que derrota e o XP fica abaixo do tet
   assert.ok(win.xp > lose.xp && win.gold > lose.gold);
   assert.ok(win.xp < xpToNext(12) * 0.3 * 1.3);
 });
+
+// ---------- rodada de balanceamento (G1–G13) ----------
+import { blankJournal, openChest } from '../public/src/core/journal.js';
+import { PRICES, buildShopStock, sellValue } from '../public/src/shop.js';
+import { applyMatchResult, PVP_XP } from '../public/src/core/rewards.js';
+import { MOBS } from '../public/src/data/mobs.js';
+import { QUESTS } from '../public/src/data/quests.js';
+import { itemScore } from '../public/src/core/stats.js';
+
+test('G1: baú dá poucos épicos (tier 1 ≈ 1%, tier 3,8 < 12%) e lendário raro', () => {
+  const rate = (tier) => {
+    const rng = makeRng(77); let epicPlus = 0, leg = 0; const N = 6000;
+    for (let i = 0; i < N; i++) {
+      const doc = { ...blankJournal(), level: 15, classId: 'mage', gold: 0, inventory: [] };
+      const it = openChest(doc, { id: 'x:' + i, tier }, 'forest', rng, 1e12).item;
+      if (it && (it.rarity === 'epic' || it.rarity === 'legendary')) epicPlus++;
+      if (it?.rarity === 'legendary') leg++;
+    }
+    return { epicPlus: epicPlus / N, leg: leg / N };
+  };
+  const t1 = rate(1), t38 = rate(3.8);
+  assert.ok(t1.epicPlus < 0.025, 'tier 1: ' + t1.epicPlus);
+  assert.ok(t38.epicPlus > 0.05 && t38.epicPlus < 0.14, 'tier 3,8: ' + t38.epicPlus);
+  assert.ok(t38.leg < 0.04, 'lendário: ' + t38.leg);
+});
+
+test('G2/G13: loja só vende até raro + 1 épico de destaque, estoque estável entre recargas, venda a 50%', () => {
+  const c = newCharacter('Lojista', 'mage', makeRng(3)); c.level = 14; c.created = 1700000000000;
+  const a = buildShopStock(c), b = buildShopStock(structuredClone(c));
+  assert.deepEqual(a.map((i) => [i.id, i.name, i.rarity, i.value]), b.map((i) => [i.id, i.name, i.rarity, i.value]));
+  assert.equal(a.filter((i) => i.rarity === 'epic').length, 1);
+  assert.ok(a.every((i) => i.rarity !== 'legendary'));
+  const feat = a.find((i) => i.rarity === 'epic');
+  assert.ok(Math.abs(feat.value * PRICES.itemMarkup - feat.baseValue * PRICES.featuredMarkup) <= PRICES.itemMarkup, 'destaque custa valor·25');
+  c.level = 15; assert.notEqual(buildShopStock(c)[0].id, a[0].id, 'outro nível = outro estoque');
+  c.level = 14; c.inventory.push({ ...a[0], value: a[0].value }); // já comprado sai do estoque
+  assert.equal(buildShopStock(c).length, a.length - 1);
+  assert.equal(sellValue({ value: 101 }), 50); assert.equal(sellValue({ value: 1 }), 1);
+});
+
+test('G3: XP de PvP — vitória 6%, derrota 2%, 10 partidas/hora a 100% depois 25%, 3º duelo seguido contra o mesmo adversário = 0', () => {
+  const base = () => { const d = newCharacter('Duelista', 'warrior', makeRng(5)); d.level = 10; return validate(d).char; };
+  const T0 = 1.8e12, need = xpToNext(10);
+  const w = applyMatchResult(base(), { mode: '1v1', result: 'win', foeRating: 1000, now: T0 });
+  assert.equal(w.summary.xp, Math.round(need * PVP_XP.win));
+  const l = applyMatchResult(base(), { mode: '1v1', result: 'loss', foeRating: 1000, now: T0 });
+  assert.equal(l.summary.xp, Math.round(need * PVP_XP.loss));
+  assert.equal(applyMatchResult(base(), { mode: '4v4', result: 'win', foeRating: 1000, now: T0 }).summary.xp, Math.round(need * 0.06 * 1.6));
+  let d = base(); const xps = [];
+  for (let i = 0; i < 12; i++) { const r = applyMatchResult(d, { mode: '1v1', result: 'loss', foeRating: 1000, now: T0 + i * 60000, foeId: 'rival' + i }); d = r.doc; d.level = 10; d.xp = 0; xps.push(r.summary.xp); }
+  assert.ok(xps.slice(0, 10).every((x) => x === xps[0]) && xps[10] === Math.round(xps[0] * 0.25), 'depois de 10/hora paga 25%: ' + xps);
+  d = base(); const rep = [];
+  for (let i = 0; i < 4; i++) { const r = applyMatchResult(d, { mode: '1v1', result: 'win', foeRating: 1000, now: T0 + i * 60000, foeId: 'mesmo' }); d = r.doc; d.level = 10; d.xp = 0; rep.push(r.summary.xp); }
+  assert.ok(rep[0] > 0 && rep[1] > 0 && rep[2] === 0 && rep[3] === 0, 'repetição: ' + rep);
+  const later = applyMatchResult(d, { mode: '1v1', result: 'win', foeRating: 1000, now: T0 + 40 * 60000, foeId: 'mesmo' });
+  assert.ok(later.summary.xp > 0, 'passada a janela de 30 min volta a pagar');
+});
+
+test('G4: Guardião e Ancião com vida menor, missões em níveis mais altos; Cavaleiro Rubro intocado', () => {
+  assert.equal(MOBS.guardian.hp, 9); assert.equal(MOBS.frostlord.hp, 8.5); assert.equal(MOBS.infernoknight.hp, 16);
+  assert.equal(QUESTS.guardiao_das_ruinas.level, 22); assert.equal(QUESTS.anciao_gelido.level, 27);
+});
+
+test('G9/G10: opalino rende ≥ 25% a mais que lendário comum e Ferreiro +6..+8 custa 60%', () => {
+  const rng = makeRng(9); let o = 0, l = 0;
+  for (let i = 0; i < 400; i++) {
+    o += itemScore(generateOpalItem(rng, 30, 'mage', 'weapon'));
+    l += itemScore(generateItem(rng, 30, { slot: 'weapon', weaponType: 'staff', rarityId: 'legendary' }));
+  }
+  assert.ok(o / l >= 1.25, 'razão ' + (o / l));
+  const it = { level: 30, rarity: 'legendary' };
+  const raw = (n) => Math.round(60 + 30 * 15 * 2 * n ** 1.6);
+  assert.equal(enhanceCost({ ...it, plus: 4 }), raw(5));
+  assert.equal(enhanceCost({ ...it, plus: 5 }), Math.round(raw(6) * 0.6));
+  assert.ok(totalEnhanceCost(it) * 6 < 420000 && totalEnhanceCost(it) * 6 > 340000, 'seis lendários +8: ' + totalEnhanceCost(it) * 6);
+});

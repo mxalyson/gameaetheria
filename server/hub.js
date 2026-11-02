@@ -21,11 +21,13 @@ const COOP_LEVEL_GAP = 8;
 export const TELEPORT_COOLDOWN = 5;      // s entre pedidos de teletransporte da mesma sessão (vale também para pedidos recusados)
 export const TELEPORT_COMBAT_SEC = 8;    // mesmo critério do cliente offline: sem dano causado/recebido nos últimos 8 s
 const TELEPORT_ENTRY = { x: 110, y: 950 }; // ponto oeste, igual ao de quem entra por portal
+export const PORTAL_REACH = 80;          // px: distância máxima do ator ao portal para atravessá-lo (o servidor usa a posição do ator, nunca a do cliente)
 const RATING_WIN = [50, 400], POWER_WIN = [0.15, 0.5], WIDEN_SEC = 40; // a janela abre linearmente com a espera
 
 export class Hub {
-  constructor({ db = null, seed = 1, reconnectSec = 30, out }) {
+  constructor({ db = null, seed = 1, reconnectSec = 30, out, log = null }) {
     Object.assign(this, { db, reconnectSec, out });
+    this.log = log ?? ((msg, extra) => console.error(JSON.stringify({ level: 'error', msg, ...extra })));
     this.rng = makeRng(seed);
     this.clock = 0; this.tick = 0; this.tpSeq = 0; this.nextRoom = 1; this.nextParty = 1;
     this.sessions = new Map();   // token -> sessão
@@ -35,7 +37,7 @@ export class Hub {
     this.queue = [];             // entradas { id, mode, members:[sessão], since, rating, power }
     this.rooms = new Map();
     this.zoneRooms = new Map();  // chave (grupo ou jogador + zona) -> sala de exploração
-    this.stats = { staleInputs: 0, matches: 0, botFills: 0 };
+    this.stats = { staleInputs: 0, matches: 0, botFills: 0, roomErrors: 0 };
     this.toSession = { stats: this.stats, to: (s, m) => this.out.send(s, m), raw: (s, text) => this.out.raw(s, text) };
   }
 
@@ -51,6 +53,11 @@ export class Hub {
     this.byName.set(name.toLowerCase(), s);
     if (s.charId) this.byChar.set(s.charId, s);
     return s;
+  }
+  // Documento oficial FRESCO: o que foi gravado pela API depois do login (equipar, pontos, spec) vale na sala; sem banco (convidado) fica o do hello.
+  refreshChar(s) {
+    if (!this.db || !s.charId) return;
+    try { const row = this.db.character(s.charId); if (row) s.char = row.doc; } catch { /* mantém o documento que já tinha */ }
   }
   sessionByToken(t) { return this.sessions.get(t) ?? null; }
   charOnline(charId) { const s = this.byChar.get(charId); return !!(s && s.ws); }
@@ -209,6 +216,7 @@ export class Hub {
   }
   startCoop(groups) {
     for (const g of groups) { this.queue = this.queue.filter((x) => x !== g); for (const m of g.members) m.queued = null; }
+    for (const g of groups) for (const s of g.members) this.refreshChar(s);
     const entries = groups.flatMap((g) => g.members.map((s) => ({ session: s, doc: s.char, charId: s.charId, accountId: s.accountId })));
     const id = this.nextRoom++;
     const room = new CoopRoom({ id, entries, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession });
@@ -247,6 +255,7 @@ export class Hub {
     const humans = teams.flatMap((t) => t.groups.flatMap((g) => g.members));
     for (const e of teams.flatMap((t) => t.groups)) this.queue = this.queue.filter((x) => x !== e);
     for (const h of humans) h.queued = null;
+    for (const h of humans) this.refreshChar(h);
     const entries = [];
     teams.forEach((t, i) => t.groups.forEach((g) => g.members.forEach((s) => entries.push({ team: i + 1, session: s, doc: s.char, charId: s.charId, accountId: s.accountId, rating: this.rating(s, mode) }))));
     const ratingAvg = avg(humans.map((s) => this.rating(s, mode))), powerAvg = avg(humans.map((s) => this.power(s)));
@@ -281,15 +290,20 @@ export class Hub {
 
   // ---------- exploração no servidor (P11) ----------
   // Instância por grupo (ou por jogador, se solo) e por zona: quem do mesmo grupo entra depois cai na mesma sala (até MAX_PARTY).
-  zoneEnter(s, zoneId, from, no) {
+  // O servidor sabe onde o jogador está: na sala de zona, a zona dela; fora de sala, a vila. O `from` do cliente é IGNORADO.
+  // Só vale o portal real (zona atual → destino) e, dentro da sala, só com o ator a ≤ PORTAL_REACH do portal.
+  zoneEnter(s, zoneId, _from, no) {
     if (s.queued) return no(REJECT.ALREADY_QUEUED);
-    const at = entryPoint(zoneId, from);
+    if (s.room && s.room.mode !== 'zone') return no(REJECT.IN_MATCH);
+    const cur = s.room ? s.room.zoneId : 'town';
+    const at = entryPoint(zoneId, cur);
     if (!at || !ZONES[zoneId].mobs) return no(REJECT.BAD_ZONE);
-    if (s.room) { // atravessando um portal dentro da exploração: sai da sala atual primeiro (só vale de onde ele realmente está)
-      if (s.room.mode !== 'zone' || s.room.zoneId !== from) return no(REJECT.IN_MATCH);
-      s.room.leave(s.player, 'portal');
+    if (s.room) {
+      const portal = ZONES[cur].portals.find((q) => q.to === zoneId), a = s.player?.actor;
+      if (!a || Math.hypot(a.x - portal.x, a.y - portal.y) > PORTAL_REACH) return no(REJECT.NOT_AT_PORTAL);
     }
     if (this.zoneRoomFor(s, zoneId).room?.size >= MAX_PARTY) return no(REJECT.ROOM_FULL);
+    if (s.room) s.room.leave(s.player, 'portal'); // só sai depois de conferir tudo (grava o lote pendente)
     this.joinZoneRoom(s, zoneId, at);
   }
   // sala existente da instância (grupo/solo + zona) com vaga; null se cheia
@@ -307,6 +321,7 @@ export class Hub {
       room = new ZoneRoom({ id, key, zoneId, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession, onPortal: (p, pt) => this.zonePortal(room, p, pt) });
       this.rooms.set(id, room); this.zoneRooms.set(key, room);
     }
+    this.refreshChar(s);
     room.join(s, at);
     this.markVisited(s, zoneId);
     this.sendZoneJoined(s, room, extra);
@@ -380,17 +395,29 @@ export class Hub {
     this.zoneEnter(s, pt.to, room.zoneId, (code) => this.out.send(s, { t: 'reject', code }));
   }
 
+  fail(what, e, extra = {}) { this.stats.roomErrors++; try { this.log(what, { erro: String(e?.stack ?? e), ...extra }); } catch { /* log nunca derruba */ } }
+  // Desligamento limpo: grava o lote pendente de cada sala de exploração (XP/ouro/itens/azar de até FLUSH_EVERY s)
+  flushAll() { for (const room of this.rooms.values()) { try { room.flushAll?.(); } catch (e) { this.fail('flush_all', e, { room: room.id }); } } }
+
   // ---------- relógio ----------
   step() {
     this.tick++; this.clock += TICK_DT;
     if (this.tick % 60 === 0) for (const e of this.queue) for (const m of e.members) this.out.send(m, { t: 'queue', mode: e.mode, state: 'searching', waited: Math.floor(this.clock - e.since) });
-    if (this.tick % 30 === 0) this.matchmake();
+    if (this.tick % 30 === 0) { try { this.matchmake(); } catch (e) { this.fail('matchmake', e); } }
     for (const room of [...this.rooms.values()]) {
-      room.step();
+      // uma exceção numa sala fecha SÓ essa sala (grava o que der) e o servidor segue com as outras
+      try { room.step(); } catch (e) {
+        this.fail('room_step', e, { room: room.id, mode: room.mode });
+        try { room.flushAll?.(); } catch { /* já registrado acima */ }
+        room.closed = true; room.reason = 'error'; room.winner = 0;
+      }
       if (room.closed) {
         this.rooms.delete(room.id);
         if (room.key && this.zoneRooms.get(room.key) === room) this.zoneRooms.delete(room.key);
-        for (const p of room.humans()) { if (p.session.room === room) { p.session.room = null; p.session.player = null; this.out.send(p.session, { t: 'match_end', room: room.id, winner: room.winner, reason: room.reason }); } }
+        try {
+          for (const p of room.humans()) { if (p.session.room === room) { p.session.room = null; p.session.player = null; this.out.send(p.session, { t: 'match_end', room: room.id, winner: room.winner, reason: room.reason }); } }
+        } catch (e) { this.fail('room_close', e, { room: room.id }); }
+        for (const s of this.sessions.values()) if (s.room === room) { s.room = null; s.player = null; } // sessão nunca fica presa a sala morta
       }
     }
     for (const [id, p] of this.parties) for (const [t, exp] of p.invites) if (exp < this.clock) { p.invites.delete(t); void id; }

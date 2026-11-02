@@ -5,8 +5,54 @@
 import { QUESTS } from '../public/src/data/quests.js';
 import { SERVER_STATS, STAT_KEYS_PROGRESS } from '../public/src/data/achievements.js';
 import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, MAX_ACTIVE, isComplete } from '../public/src/core/journal.js';
+import { RARITY, AFFIXES } from '../public/src/data/items.js';
+import { xpToNext } from '../public/src/core/progression.js';
+import { PRICES } from '../public/src/shop.js';
 
-export const LIMITS = { levelJump: 2, goldBase: 5000, goldPerLevel: 800, newItems: 12, potions: 25, spirits: 3, waves: 6, statJump: 400, newQuests: 3, doneQuests: 3, newChests: 6, plusJump: 10 };
+// itemSlack: folga sobre o máximo que o gerador (core/loot.js) consegue sortear; itemLevelAhead: quantos níveis acima do herói um drop pode vir (chefes/zonas mais fortes).
+export const LIMITS = { levelJump: 2, goldBase: 5000, goldPerLevel: 800, newItems: 12, potions: 25, spirits: 3, waves: 6, statJump: 400, newQuests: 3, doneQuests: 3, newChests: 6, plusJump: 10, itemSlack: 1.15, itemLevelAhead: 10, xpPerKillMul: 3, xpFreeLevels: 1.5 };
+
+// Teto plausível de cada atributo de um item NOVO: espelha as fórmulas de generateItem (base × maior rolagem 1,15 + maior afixo), com folga.
+// Quem muda o gerador precisa mudar aqui (o teste 'teto de itens' sorteia milhares de itens reais e confere).
+export function itemCeiling(slot, rarityId, level) {
+  const r = RARITY[rarityId], mul = r.mul, c = {};
+  const add = (k, v) => { c[k] = (c[k] ?? 0) + v; };
+  if (slot === 'weapon') add('atk', Math.round((6 + level * 2.4) * mul * 1.15));
+  else if (slot === 'armor') { add('def', Math.round((3 + level * 1.6) * mul * 1.15)); add('hp', Math.round((10 + level * 5) * mul * 1.15)); }
+  else if (slot === 'helm' || slot === 'boots') add('def', Math.round((2 + level * 0.9) * mul * 1.15));
+  const baseKeys = Object.keys(c).length;
+  for (const a of AFFIXES) {
+    const v = a.flat ? Math.round(a.flat[1] * mul) : Math.max(1, Math.round(level * a.per * 1.2 * mul + (a.per >= 1 ? a.per * 2 : 1)));
+    if (a.stat === 'hp' || a.stat === 'def') add(a.stat, v); else c[a.stat] = v;
+  }
+  for (const k of Object.keys(c)) c[k] = Math.ceil(c[k] * LIMITS.itemSlack) + 1;
+  const maxKeys = baseKeys + r.affixes + (slot === 'ring' || slot === 'amulet' ? 1 : 0);
+  return { stats: c, maxKeys, value: Math.ceil((6 + level * 3) * mul * mul * LIMITS.itemSlack) + 1 };
+}
+// Item NOVO (id que o banco não conhecia) é plausível? Devolve o motivo ou null. Opalino nunca nasce no cliente (só o servidor emite).
+function newItemProblem(it, heroLevel) {
+  if (it.opal) return 'opal_forged';
+  if (it.level > heroLevel + LIMITS.itemLevelAhead || it.reqLevel < Math.max(1, it.level - 2)) return 'item_forged';
+  const cap = itemCeiling(it.slot, it.rarity, it.level);
+  const keys = Object.keys(it.stats);
+  if (keys.length > cap.maxKeys || it.value > cap.value) return 'item_forged';
+  for (const k of keys) if (!(it.stats[k] <= (cap.stats[k] ?? 0))) return 'item_forged';
+  return null;
+}
+// Save importado de arquivo (nada é confiável): remove itens fora do teto/opalinos e zera o que é do servidor (pergaminhos, mapas visitados, azar acumulado).
+export function sanitizeImport(doc, fresh) {
+  const ok = (it) => !newItemProblem(it, doc.level);
+  for (const k of Object.keys(doc.equipment)) if (!ok(doc.equipment[k])) delete doc.equipment[k];
+  doc.inventory = doc.inventory.filter(ok);
+  doc.scrolls = 0; doc.pity = { epic: 0, legendary: 0, opal: 0 }; doc.visited = { ...fresh.visited };
+  return doc;
+}
+const SAME_ITEM = ['slot', 'weaponType', 'rarity', 'level', 'reqLevel', 'value'];
+const gearList = (c) => [...Object.values(c.equipment ?? {}), ...(c.inventory ?? [])];
+
+// XP total acumulado (níveis anteriores + XP do nível atual)
+const totalXp = (c) => { let t = c.xp; for (let l = 1; l < c.level; l++) t += xpToNext(l); return t; };
+const MAX_QUEST_XP = Math.max(0, ...Object.values(QUESTS).map((q) => q.reward?.xp ?? 0));
 
 const itemIds = (c) => new Set([...Object.values(c.equipment ?? {}), ...(c.inventory ?? [])].map((i) => i.id));
 const plusById = (c) => new Map([...Object.values(c.equipment ?? {}), ...(c.inventory ?? [])].map((i) => [i.id, i.plus ?? 0]));
@@ -33,6 +79,17 @@ export function checkSave(oldDoc, neuDoc, now = Date.now()) {
     if (p > plusOld.get(id)) plusGain += p - plusOld.get(id);
   }
   if (plusGain > LIMITS.plusJump) return { ok: false, reason: 'plus_jump' };
+  // itens: os que o banco já conhecia não mudam de atributos/raridade/nível/opal; os novos respeitam o teto do gerador por nível e raridade
+  const oldItems = new Map(gearList(old).map((i) => [i.id, i]));
+  for (const it of gearList(neu)) {
+    const was = oldItems.get(it.id);
+    if (was) {
+      if (SAME_ITEM.some((k) => it[k] !== was[k]) || !!it.opal !== !!was.opal || JSON.stringify(it.stats) !== JSON.stringify(was.stats)) return { ok: false, reason: 'item_tampered' };
+      continue;
+    }
+    const bad = newItemProblem(it, neu.level);
+    if (bad) return { ok: false, reason: bad };
+  }
   const sb = spiritIds(old);
   let newSp = 0;
   for (const id of spiritIds(neu)) if (!sb.has(id)) newSp++;
@@ -46,6 +103,14 @@ export function checkSave(oldDoc, neuDoc, now = Date.now()) {
     if (neu.stats[k] - old.stats[k] > LIMITS.statJump) return { ok: false, reason: `stat_jump_${k}` };
     stats[k] = Math.max(old.stats[k], neu.stats[k]);
   }
+
+  // ---- nível ↔ XP: o XP ganho entre duas gravações precisa caber no que foi jogado ----
+  // Orçamento: 1,5 nível de folga (xpFreeLevels) (baús/ondas/recompensas que o servidor não separa) + XP máximo por abate × abates novos (chefe ×10) + XP máximo de missão × missões concluídas.
+  const dKills = Math.max(0, neu.stats.kills - old.stats.kills), dBoss = Math.max(0, neu.stats.bossKills - old.stats.bossKills);
+  const dQuests = Object.keys(neu.quests.done).filter((id) => old.quests.done[id] == null).length;
+  const perKill = (12 + 6 * (neu.level + 6)) * 1.5 * LIMITS.xpPerKillMul;
+  const xpBudget = Math.round(xpToNext(old.level) * LIMITS.xpFreeLevels) + (dKills + dBoss * 10) * perKill + dQuests * MAX_QUEST_XP;
+  if (totalXp(neu) - totalXp(old) > xpBudget) return { ok: false, reason: 'xp_jump' };
 
   // ---- missões ----
   const quests = { active: {}, done: { ...old.quests.done } };
@@ -80,7 +145,11 @@ export function checkSave(oldDoc, neuDoc, now = Date.now()) {
 
   // ---- campos do servidor ----
   const arena = { ...neu.arena, rating: old.arena.rating, wins: old.arena.wins, losses: old.arena.losses, ratings: old.arena.ratings ?? {} };
-  const out = { ...neu, arena, stats, quests, chests, achievements: { ...old.achievements } };
+  // scrolls/visited/pity são do servidor: scrolls só sobem se o ouro caiu o preço (compra na loja, que é do cliente); visited vem do banco; pity só desce
+  const paid = Math.max(0, Math.floor((old.gold - neu.gold) / PRICES.scroll(old.level)));
+  const scrolls = Math.max(0, Math.min(neu.scrolls ?? 0, (old.scrolls ?? 0) + paid));
+  const pity = {}; for (const k of ['epic', 'legendary', 'opal']) pity[k] = Math.min(neu.pity?.[k] ?? 0, old.pity?.[k] ?? 0);
+  const out = { ...neu, arena, stats, quests, chests, scrolls, visited: { ...(old.visited ?? {}) }, pity, achievements: { ...old.achievements } };
   checkAchievements(out, now); // as conquistas são recalculadas aqui: o cliente não "se concede" nenhuma
   out.title = out.title && out.achievements[out.title] != null ? out.title : null;
   return { ok: true, doc: out };

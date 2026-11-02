@@ -87,6 +87,7 @@ export async function gracefulShutdown({ ops, game, httpServer, db, log, graceMs
   log.info('desligando', { conexoes: game.wss.clients.size, salas: game.hub.rooms.size });
   for (const c of game.wss.clients) { try { if (c.readyState === 1) c.send(JSON.stringify({ v: 4, t: 'notice', code: 'server_closing', retryMs: 5000 })); } catch { /* conexão já caiu */ } }
   await new Promise((r) => setTimeout(r, graceMs));
+  try { game.hub.flushAll(); } catch (e) { log.error('falha ao gravar salas', { erro: String(e) }); } // recompensas pendentes das instâncias
   await game.close();
   await new Promise((r) => httpServer.close(r));
   try { db.close?.(); } catch { /* ok */ }

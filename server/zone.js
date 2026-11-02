@@ -144,19 +144,24 @@ export class ZoneRoom {
       const out = this.db.applyOperation(opId, p.charId, 'zone', (doc) => applyZoneBatch(doc, { ...b, zoneId: this.zoneId }));
       if (out.duplicate) return null;
       if (p.session) p.session.char = out.doc;
-      p.actor.level !== out.doc.level && this.syncLevel(p, out.doc);
+      this.syncLevel(p, out.doc); // equipamento/atributos gravados pela API desde a entrada valem a partir daqui
       this.db.audit('zone_reward', { accountId: p.accountId, detail: JSON.stringify({ room: this.matchId, char: p.charId, zone: this.zoneId, ...out.summary }) });
       if (p.session?.ws && p.session.player === p) this.send.to(p.session, { t: 'zone_reward', ...out.summary, gold_total: out.doc.gold, xp_total: out.doc.xp });
       return out.summary;
     } catch (e) {
-      this.db.audit('zone_reward_error', { accountId: p.accountId, detail: e.message });
+      // a operação reverteu (nada foi gravado): devolve o lote ao pendente para a próxima tentativa, em vez de perder a recompensa
+      const n = p.pend;
+      n.xp += b.xp; n.gold += b.gold; n.potions += b.potions; n.deaths += b.deaths;
+      n.items.unshift(...b.items); n.essences.unshift(...b.essences); n.kills.unshift(...b.kills);
+      try { this.db.audit('zone_reward_error', { accountId: p.accountId, detail: e.message }); } catch { /* sem auditoria */ }
       return null;
     }
   }
   // subiu de nível no servidor: o ator recalcula atributos e recupera a vida (como onLevelUp do jogo)
   syncLevel(p, doc) {
     const fresh = makeHeroActor(doc, p.actor.x, p.actor.y, 'player', 1);
-    Object.assign(p.actor, { level: fresh.level, stats: fresh.stats, maxHp: fresh.maxHp, hp: fresh.maxHp });
+    const levelUp = fresh.level !== p.actor.level;
+    Object.assign(p.actor, { level: fresh.level, stats: fresh.stats, maxHp: fresh.maxHp, hp: levelUp ? fresh.maxHp : Math.min(p.actor.hp, fresh.maxHp) });
   }
 
   leave(p, reason = 'left') {

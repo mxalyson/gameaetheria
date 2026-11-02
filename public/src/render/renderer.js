@@ -128,8 +128,8 @@ export class Renderer {
 
     // Barras e nomes por cima de tudo.
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y)) drawBars(g, a, a === player);
-    for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id]);
-    for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : '[E] Abrir baú');
+    for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id], view.keys);
+    for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : view.keys ? '[E] Abrir baú' : 'Toque para abrir');
     for (const tx of world.texts) {
       const a = 1 - Math.max(0, (tx.t - tx.life * 0.6) / (tx.life * 0.4));
       g.globalAlpha = a;
@@ -854,7 +854,7 @@ function drawPrompt(g, x, y, txt) {
   g.fillStyle = '#ffffff'; g.fillText(txt, x, y + 16);
 }
 
-function drawNpcTag(g, n, near, t, mark) {
+function drawNpcTag(g, n, near, t, mark, keys) {
   g.font = '800 12px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
@@ -871,7 +871,7 @@ function drawNpcTag(g, n, near, t, mark) {
   }
   if (near) {
     g.font = '800 13px Cinzel, Nunito, serif';
-    const txt = '[E] Conversar';
+    const txt = keys ? '[E] Conversar' : 'Toque para conversar';
     const w = g.measureText(txt).width + 16;
     g.fillStyle = 'rgba(24,16,8,0.82)';
     g.beginPath(); g.roundRect(n.x - w / 2, n.y + 22, w, 22, 11); g.fill();

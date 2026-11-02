@@ -27,8 +27,9 @@ import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
 import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady } from './core/journal.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
-import { PRICES } from './shop.js';
+import { PRICES, buildShopStock, sellValue } from './shop.js';
 import { TouchControls } from './touch.js';
+import { interactTarget } from './touch-logic.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
 import { CLASSES } from './data/classes.js';
 import { MOBS, NORMAL_MOBS, BOSS_MOBS } from './data/mobs.js';
@@ -102,7 +103,7 @@ class Game {
       const p = this.player;
       if (this.mode === 'explore' && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
       const exploring = this.mode === 'explore';
-      this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: exploring ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, chestsOpen: exploring ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25 });
+      this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: exploring ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, chestsOpen: exploring ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
       if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
       this.ui.updateHud(this);
       this.touch.update(this);
@@ -395,7 +396,7 @@ class Game {
   togglePanel(id) {
     if ((id === 'journal' || id === 'map') && this.mode !== 'explore') return; // diário e mapa só no mundo normal
     if (id === 'party' && !this.online) return;
-    if (this.inNetZone() && ['inventory', 'character', 'spirits'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à vila (H) para mexer no equipamento e nos atributos.', '');
+    if (this.inNetZone() && ['inventory', 'character', 'spirits'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à vila (botão 🏠) para mexer no equipamento e nos atributos.', '');
     this.ui.toggle(id);
   }
   async enterZoneOnline(zone, from) {
@@ -425,7 +426,7 @@ class Game {
     this.cam = this.renderer.camera(w, this.player);
     this.ui.banner(null);
     const z = w.zone;
-    this.ui.toast(z.name, `Nível ${z.level[0]}–${z.level[1]} · instância ${this.net?.party ? 'do grupo' : 'solo'} (H volta à vila)`);
+    this.ui.toast(z.name, `Nível ${z.level[0]}–${z.level[1]} · instância ${this.net?.party ? 'do grupo' : 'solo'} (botão 🏠 volta à vila)`);
   }
   netAddHero(p, you) {
     const doc = newCharacter(p.name, p.classId, makeRng(p.id)); doc.level = p.level ?? 1;
@@ -779,7 +780,7 @@ class Game {
     if (inp.hit('q')) this.usePotion();
     if (inp.hit('h')) this.hearth();
     if (inp.hit('g') && this.online) this.ui.toggle('party');
-    if (inp.hit('e')) { if (this.nearNpc) this.talk(this.nearNpc); else if (this.nearChest) this.useChest(this.nearChest); }
+    if (inp.hit('e')) this.interact();
     if (inp.hit('j') && this.mode === 'explore') this.ui.toggle('journal');
     if (inp.hit('m') && this.mode === 'explore') this.ui.toggle('map');
 
@@ -939,6 +940,16 @@ class Game {
     this.announceAchievements(r.achievements);
     this.save(); this.ui.render();
   }
+
+  // Botão de interagir (toque) e tecla E: NPC por perto conversa; senão abre o baú.
+  interact() {
+    const t = interactTarget(this.player, this.world);
+    if (t?.kind === 'npc') this.talk(t.ref);
+    else if (t?.kind === 'chest') this.useChest(t.ref.id);
+  }
+
+  // Dicas mostram a tecla só no modo teclado; no toque, dizem "Toque".
+  get keyHints() { return this.prefs?.controls === 'keyboard' || (!this.touch?.active); }
 
   useChest(id) {
     const chest = (this.world.zone.chests ?? []).find((c) => c.id === id);
@@ -1120,9 +1131,9 @@ class Game {
   sell(id) {
     const c = this.char, idx = c.inventory.findIndex((i) => i.id === id);
     if (idx < 0) return;
-    const it = c.inventory.splice(idx, 1)[0];
-    c.gold += it.value;
-    this.ui.log(`Vendido: ${it.name} (+${it.value} 🪙)`, '#ffd34d');
+    const it = c.inventory.splice(idx, 1)[0], pay = sellValue(it); // G13: 50% do valor
+    c.gold += pay;
+    this.ui.log(`Vendido: ${it.name} (+${pay} 🪙)`, '#ffd34d');
     this.ui.render();
     this.save();
   }
@@ -1131,7 +1142,7 @@ class Game {
     const c = this.char;
     const sold = c.inventory.filter((i) => RARITY[i.rarity].index <= maxRarity);
     if (!sold.length) return;
-    const gold = sold.reduce((s, i) => s + i.value, 0);
+    const gold = sold.reduce((s, i) => s + sellValue(i), 0);
     c.inventory = c.inventory.filter((i) => RARITY[i.rarity].index > maxRarity);
     c.gold += gold;
     this.ui.log(`${sold.length} itens vendidos (+${gold} 🪙)`, '#ffd34d');
@@ -1192,12 +1203,8 @@ class Game {
     const c = this.char;
     if (this.shopLevel === c.level && this.shopStock.length) return;
     this.shopLevel = c.level;
-    const cls = CLASSES[c.classId];
-    const rar = () => { const r = rollRarity(this.rng, 0.8); return r === 'common' ? 'uncommon' : r; };
-    this.shopStock = [
-      generateItem(this.rng, c.level, { slot: 'weapon', weaponType: cls.weapon, rarityId: rar() }),
-      ...[0, 1, 2].map(() => generateItem(this.rng, c.level, { slot: this.rng.pick(SLOTS.slice(1)), rarityId: rar() })),
-    ];
+    // G2: estoque derivado de (personagem, nível, criação): recarregar a página não o refaz (core/../shop.js)
+    this.shopStock = buildShopStock(c);
   }
 
   spend(cost) {
@@ -1225,6 +1232,7 @@ class Game {
     if (this.char.inventory.length >= INVENTORY_SIZE) return this.ui.log('Inventário cheio.', '#ffb4a8');
     if (!this.spend(it.value * PRICES.itemMarkup)) return;
     this.shopStock.splice(i, 1);
+    if (it.baseValue != null) { it.value = it.baseValue; delete it.baseValue; } // destaque: volta ao valor real (venda/ceiling)
     this.char.inventory.push(it);
     this.ui.log(`Comprado: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
     this.ui.render();

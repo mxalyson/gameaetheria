@@ -112,12 +112,14 @@ export class MatchRoom {
     this.events.push({ e: 'result', winner, reason });
     if (!this.db) return;
     const teamRating = (team) => { const t = this.teamOf(team); return t.length ? Math.round(t.reduce((s, p) => s + p.rating, 0) / t.length) : 1000; };
+    const foeId = (team) => [...this.players.values()].filter((q) => q.team !== team && q.charId).map((q) => q.charId).sort((x, y) => x - y)[0] ?? 0; // id estável do adversário (humano de menor id): anti-troca de vitórias do PvP
+    this.foeIdOf = foeId;
     const foe = { 1: teamRating(2), 2: teamRating(1) }; // ratings de ANTES: o pagamento não depende da ordem
     for (const p of this.players.values()) {
       if (!p.charId || (p.bot && !p.left)) continue;
       const result = p.left ? 'loss' : winner === 3 ? 'draw' : winner === p.team ? 'win' : 'loss';
       try {
-        const out = this.db.applyOperation(`match:${this.matchId}:${p.charId}`, p.charId, this.mode, (doc) => applyMatchResult(doc, { mode: this.mode, result, foeRating: foe[p.team] }));
+        const out = this.db.applyOperation(`match:${this.matchId}:${p.charId}`, p.charId, this.mode, (doc) => applyMatchResult(doc, { mode: this.mode, result, foeRating: foe[p.team], foeId: this.foeIdOf(p.team) }));
         if (!out.duplicate) {
           this.db.audit('match_reward', { accountId: p.accountId, detail: JSON.stringify({ match: this.matchId, mode: this.mode, char: p.charId, ...out.summary }) });
           if (p.session?.ws && p.session.player === p) this.send.to(p.session, { t: 'reward', ...out.summary });

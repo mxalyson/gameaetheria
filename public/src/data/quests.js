@@ -17,7 +17,7 @@ export const QUESTS = {
   },
   ervas_do_bosque: {
     id: 'ervas_do_bosque', name: 'Ervas do Bosque', giver: 'herbalist', level: 2, after: null,
-    text: { offer: 'Preciso de ervas raras, mas elas crescem junto de baús abandonados no Bosque. Abra dois deles para mim (tecla E perto do baú).', progress: 'Procure os baús no Bosque Verdejante: eles brilham entre as árvores.', done: 'Exatamente o que eu precisava! Leve estas poções.' },
+    text: { offer: 'Preciso de ervas raras, mas elas crescem junto de baús abandonados no Bosque. Abra dois deles para mim (chegue perto e toque no botão de interagir).', progress: 'Procure os baús no Bosque Verdejante: eles brilham entre as árvores.', done: 'Exatamente o que eu precisava! Leve estas poções.' },
     objectives: [{ type: 'chest', zone: 'forest', count: 2, label: 'Abra 2 baús no Bosque Verdejante' }],
     reward: { gold: 80, xp: 300, potions: 3 },
   },
@@ -64,7 +64,7 @@ export const QUESTS = {
     reward: { gold: 600, xp: 3500 },
   },
   guardiao_das_ruinas: {
-    id: 'guardiao_das_ruinas', name: 'O Guardião Esquecido', giver: 'guard', level: 16, after: 'ruinas_sombrias',
+    id: 'guardiao_das_ruinas', name: 'O Guardião Esquecido', giver: 'guard', level: 22, after: 'ruinas_sombrias',
     text: { offer: 'O Guardião das Ruínas protege algo que não devia existir. Derrube-o.', progress: 'O Guardião fica no coração das ruínas.', done: 'Inacreditável. Que seu nome seja lembrado.' },
     objectives: [{ type: 'boss', mob: 'guardian', count: 1, label: 'Derrote o Guardião das Ruínas' }],
     reward: { gold: 1200, xp: 6250, items: [{ rarity: 'epic' }] },
@@ -77,25 +77,25 @@ export const QUESTS = {
   },
   // ---- Arco final: "Os Ecos Partidos" (Cume Gélido e Cinzas Ardentes) ----
   cume_gelido: {
-    id: 'cume_gelido', name: 'O Silêncio da Geada', giver: 'guard', level: 20, after: 'guardiao_das_ruinas',
+    id: 'cume_gelido', name: 'O Silêncio da Geada', giver: 'guard', level: 23, after: 'guardiao_das_ruinas',
     text: { offer: 'Com o Guardião caído, a passagem a leste das Ruínas se abriu: o Cume Gélido. Viajantes dizem que as criaturas de lá são cópias geladas das que conhecemos. Abata vinte.', progress: 'O Cume Gélido fica a leste das Ruínas Sombrias. Leve poções.', done: 'Cópias, eco de ecos... A Sábia Yun vai querer saber disso.' },
     objectives: [{ type: 'kill', mob: 'any', zone: 'glacier', count: 20, label: 'Derrote 20 criaturas do Cume Gélido' }],
     reward: { gold: 1500, xp: 14000, potions: 3 },
   },
   anciao_gelido: {
-    id: 'anciao_gelido', name: 'O Ancião Gélido', giver: 'sage', level: 22, after: 'cume_gelido',
+    id: 'anciao_gelido', name: 'O Ancião Gélido', giver: 'sage', level: 27, after: 'cume_gelido',
     text: { offer: 'Os spirits me sussurram: um Ancião de gelo prende os ecos do Cume. É o Carvalho Ancestral, partido e congelado. Libere-o, derrotando-o.', progress: 'O Ancião fica no fundo do Cume Gélido, a nordeste.', done: 'Eu senti o eco se soltar. Mas o frio vinha de algo mais ao leste…' },
     objectives: [{ type: 'boss', mob: 'frostlord', count: 1, label: 'Derrote o Ancião Gélido' }],
     reward: { gold: 2200, xp: 20000, items: [{ rarity: 'epic' }] },
   },
   cinzas_ardentes: {
-    id: 'cinzas_ardentes', name: 'Cinzas que Ainda Queimam', giver: 'guard', level: 25, after: 'anciao_gelido',
+    id: 'cinzas_ardentes', name: 'Cinzas que Ainda Queimam', giver: 'guard', level: 28, after: 'anciao_gelido',
     text: { offer: 'Além do Cume, o chão arde: as Cinzas Ardentes. Criaturas de brasa cercam o lugar. Abata vinte e cinco antes que desçam à vila.', progress: 'As Cinzas Ardentes ficam a leste do Cume Gélido.', done: 'Você voltou chamuscado, mas inteiro. Isso basta.' },
     objectives: [{ type: 'kill', mob: 'any', zone: 'ember', count: 25, label: 'Derrote 25 criaturas das Cinzas Ardentes' }],
     reward: { gold: 3000, xp: 26000, potions: 5 },
   },
   cavaleiro_rubro: {
-    id: 'cavaleiro_rubro', name: 'O Cavaleiro Rubro', giver: 'arena', level: 28, after: 'cinzas_ardentes',
+    id: 'cavaleiro_rubro', name: 'O Cavaleiro Rubro', giver: 'arena', level: 29, after: 'cinzas_ardentes',
     text: { offer: 'Há um cavaleiro nas Cinzas que luta como o Guardião lutava, mas em brasa. Se o derrubar, a arena inteira vai cantar seu nome.', progress: 'O Cavaleiro Rubro guarda o centro das Cinzas Ardentes.', done: 'Eu vi de longe. Esse foi um duelo digno de ser contado por gerações!' },
     objectives: [{ type: 'boss', mob: 'infernoknight', count: 1, label: 'Derrote o Cavaleiro Rubro' }],
     reward: { gold: 4500, xp: 38000, items: [{ rarity: 'legendary' }] },

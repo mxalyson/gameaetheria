@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stickVector, nearestTarget, pickAim, aimModeFor, dragAim, STICK_RADIUS, DEADZONE } from '../public/src/touch-logic.js';
+import { stickVector, nearestTarget, pickAim, aimModeFor, dragAim, interactTarget, STICK_RADIUS, DEADZONE } from '../public/src/touch-logic.js';
 import { loadPrefs, changePref, resolveQuality, SCALE_MIN, SCALE_MAX } from '../public/src/prefs.js';
 import { SKILLS } from '../public/src/data/skills.js';
 
@@ -66,4 +66,17 @@ test('preferências: limites, valores inválidos e qualidade automática', () =>
   assert.equal(resolveQuality({ quality: 'auto' }, false), 'high');
   assert.equal(resolveQuality({ quality: 'low' }, false), 'low');
   assert.equal(loadPrefs().scale, 100, 'sem localStorage usa o padrão');
+});
+
+test('interagir: NPC tem prioridade, depois baú; longe devolve null', () => {
+  const world = { zone: { npcs: [{ id: 'lia', x: 100, y: 100 }], chests: [{ id: 'c1', x: 400, y: 400 }, { id: 'c2', x: 110, y: 100 }] } };
+  const at = (x, y) => ({ x, y });
+  assert.equal(interactTarget(at(100, 150), world).kind, 'npc');
+  assert.equal(interactTarget(at(100, 150), world).ref.id, 'lia');
+  assert.equal(interactTarget(at(400, 440), world).kind, 'chest');
+  assert.equal(interactTarget(at(400, 440), world).ref.id, 'c1');
+  assert.equal(interactTarget(at(110, 100), world).kind, 'npc', 'NPC e baú juntos: conversa primeiro');
+  assert.equal(interactTarget(at(900, 900), world), null);
+  assert.equal(interactTarget(at(0, 0), { zone: {} }), null);
+  assert.equal(interactTarget(null, world), null);
 });
