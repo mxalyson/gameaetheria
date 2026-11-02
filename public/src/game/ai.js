@@ -16,7 +16,7 @@ export function mobIntent(m, w, dt) {
     if (homeD < 30) ai.state = 'idle';
     else return toward(m, m.home.x, m.home.y, 1.3);
   }
-  if (!tgt && !w.zone.safe) {
+  if (!tgt && !w.zone.safe && m.hostile !== false) { // passivo: só reage depois de apanhar (ver World.damage)
     const e = w.nearestEnemy(m, M.aggro);
     if (e) { ai.target = e.id; tgt = e; ai.state = 'chase'; }
   }

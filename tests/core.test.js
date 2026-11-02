@@ -8,7 +8,7 @@ import { addXp, xpToNext, newCharacter, createSpirit, addSpiritXp, MAX_LEVEL } f
 import { generateRival } from '../public/src/core/rival.js';
 import { CLASSES } from '../public/src/data/classes.js';
 import { SLOTS } from '../public/src/data/items.js';
-import { World, makeHeroActor, makeMobActor } from '../public/src/game/sim.js';
+import { World, makeHeroActor, makeMobActor, makeSpiritActor } from '../public/src/game/sim.js';
 
 test('rng é determinístico pela semente', () => {
   const a = makeRng(42), b = makeRng(42);
@@ -248,4 +248,53 @@ test('colisão com grade espacial dá exatamente o mesmo resultado da busca line
       }
     }
   }
+});
+
+// ---- Rodada de jogabilidade: curva de XP, evolução do spirit, spirit sem ataque espontâneo e mobs passivos ----
+test('XP: nível 20 leva ≥ 5× o XP total da curva antiga (farm mais longo)', () => {
+  let novo = 0, antigo = 0;
+  for (let L = 1; L < 20; L++) { novo += xpToNext(L); antigo += Math.round(60 * L ** 1.55); }
+  assert.ok(novo >= antigo * 5, `novo ${novo} vs antigo ${antigo}`);
+});
+
+test('spirit evolui só no nível 10, paga ouro e fica 50% mais forte', async () => {
+  const { evolveSpirit, evolveCost, spiritPower, EVOLVE_LEVEL } = await import('../public/src/core/progression.js');
+  const c = newCharacter('T', 'mage', makeRng(5));
+  const sp = createSpirit(makeRng(2), { level: EVOLVE_LEVEL - 1, rarity: 'rare' }); c.spirits.push(sp); c.gold = 1e6;
+  assert.equal(evolveSpirit(c, sp.id).ok, false);
+  sp.level = EVOLVE_LEVEL;
+  const p0 = spiritPower(sp), cost = evolveCost(sp);
+  c.gold = cost - 1; assert.equal(evolveSpirit(c, sp.id).ok, false);
+  c.gold = cost; assert.equal(evolveSpirit(c, sp.id).ok, true);
+  assert.equal(c.gold, 0); assert.equal(sp.stage, 2);
+  assert.equal(spiritPower(sp), Math.round(p0 * 1.5));
+  assert.equal(evolveSpirit(c, sp.id).ok, false, 'não evolui duas vezes');
+});
+
+test('spirit só ataca quando o dono atacou ou foi atacado', () => {
+  const w = new World('arena', { seed: 3 });
+  const c = newCharacter('T', 'warrior', makeRng(1));
+  const p = w.add(makeHeroActor(c, 550, 550));
+  const sp = createSpirit(makeRng(2), { type: 'ember', level: 5 });
+  w.add(makeSpiritActor(sp, p));
+  const m = w.add(makeMobActor('slime', 1, 700, 550, { hostile: false })); // passivo e parado: ninguém apanha
+  let shots = 0;
+  for (let i = 0; i < 240; i++) { w.update(1 / 60, {}); shots += w.projectiles.filter((q) => q.src.kind === 'spirit').length; }
+  assert.equal(shots, 0, 'sem combate o spirit não dispara');
+  w.damage(m, p, 1); // o dono apanha
+  let after = 0; for (let i = 0; i < 120; i++) { w.update(1 / 60, {}); after += w.projectiles.filter((q) => q.src.kind === 'spirit').length; }
+  assert.ok(after > 0, 'depois de o dono apanhar o spirit dispara');
+});
+
+test('mob passivo não ataca de longe, mas revida quando apanha', () => {
+  const w = new World('arena', { seed: 4 });
+  const c = newCharacter('T', 'warrior', makeRng(1));
+  const p = w.add(makeHeroActor(c, 550, 550)); p.hp = p.maxHp = 1e6;
+  const passivo = w.add(makeMobActor('slime', 1, 640, 550, { hostile: false }));
+  const hostil = w.add(makeMobActor('wolf', 1, 560, 700, { hostile: true }));
+  for (let i = 0; i < 120; i++) w.update(1 / 60, {});
+  assert.equal(passivo.ai.target, null, 'passivo ignora o jogador');
+  assert.equal(hostil.ai.target, p.id, 'hostil persegue');
+  w.damage(p, passivo, 1);
+  assert.equal(passivo.ai.target, p.id, 'passivo revida depois de apanhar');
 });

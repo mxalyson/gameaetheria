@@ -7,7 +7,8 @@ export const POINTS_PER_LEVEL = 5;
 // Versão do documento do personagem (migrações em core/savedoc.js). v2: ratings por modo de arena e especialização. v3: missões, contadores, conquistas, título e baús.
 export const SAVE_VERSION = 3;
 
-export const xpToNext = (level) => Math.round(60 * level ** 1.55);
+// Curva mais lenta (antes 60·n^1,55: nível 20 em ~20 min de farm). Agora ≈ 6× o XP total até o 20 (algumas horas), nível 30 como meta longa.
+export const xpToNext = (level) => Math.round(150 * level ** 1.9);
 
 // Retorna quantos níveis foram ganhos.
 export function addXp(char, amount) {
@@ -55,7 +56,22 @@ export function createSpirit(rng, { type, rarity, luck = 0, level = 1 } = {}) {
 export const spiritXpToNext = (level) => Math.round(45 * level ** 1.5);
 
 export function spiritPower(sp) {
-  return Math.round((6 + sp.level * 3.2) * SPIRIT_RARITY_MUL[sp.rarity]);
+  return Math.round((6 + sp.level * 3.2) * SPIRIT_RARITY_MUL[sp.rarity] * (sp.stage === 2 ? EVOLVED_MUL : 1));
+}
+
+// Evolução (forma 2): nível mínimo e ouro; o spirit evoluído tem 50% mais poder e a arte da forma evoluída.
+export const EVOLVE_LEVEL = 10;
+export const EVOLVED_MUL = 1.5;
+export const evolveCost = (sp) => Math.round(80 * sp.level * SPIRIT_RARITY_MUL[sp.rarity]);
+export function evolveSpirit(char, id) {
+  const sp = char.spirits.find((s) => s.id === id);
+  if (!sp) return { ok: false, reason: 'Spirit não encontrado.' };
+  if (sp.stage === 2) return { ok: false, reason: 'Já está na forma evoluída.' };
+  if (sp.level < EVOLVE_LEVEL) return { ok: false, reason: `Precisa do nível ${EVOLVE_LEVEL} (está no ${sp.level}).` };
+  const cost = evolveCost(sp);
+  if (char.gold < cost) return { ok: false, reason: `Faltam ${cost - char.gold} de ouro.` };
+  char.gold -= cost; sp.stage = 2;
+  return { ok: true, cost };
 }
 
 // O spirit não ultrapassa o nível do dono.

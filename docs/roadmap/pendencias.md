@@ -126,3 +126,10 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [x] Retratos dos NPCs enquadrados no oval do diálogo.
 - [ ] Ainda pode haver sobras antigas que não identifiquei sem captura (log do PvP, textos sobre o chão: nomes, números de dano; painéis de rede/grupo); o proprietário vai apontar com capturas.
 - [ ] **NPCs no mundo ainda são os heróis em miniatura recoloridos** (`NPC_LOOK` em `renderer.js`), não os personagens dos retratos. Para ficarem fiéis aos retratos: gerar corpo inteiro a partir de cada retrato (prompts em `b2-monstros-npcs.md` §2.2), GLB no Meshy e módulo `npc-sprites`.
+
+## Rodada de jogabilidade (2026-11-02)
+- [x] Atributos em lote (+1/+5/Máx e "Distribuir automático"); janela não pisca mais ao clicar (rolagem preservada, animação só ao abrir).
+- [x] Spirit só ataca se o dono atacou ou apanhou (últimos 3 s). Evolução do spirit: nível 10 + ouro, forma 2 (+50% poder).
+- [x] Agressividade por zona (`zone.hostile`) e por espécie (`MOBS.temper`): Bosque ~metade passiva, Planície 80%, Ruínas todos; passivo revida ao apanhar.
+- [x] Farm: curva de XP 150·n^1,9 (≈6× o total até o nível 20), mobs +20% de vida e +12% de dano, elite 7% (XP ×4). **Falta calibrar com jogadores** (meta: nível 20 em ~2 h).
+- [ ] Teletransporte entre mapas, novos mapas com mobs recoloridos, história, fontes/retângulos restantes, Místico (ver conversa).

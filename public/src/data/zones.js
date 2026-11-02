@@ -48,7 +48,7 @@ export const ZONES = {
 
   forest: {
     name: 'Bosque Verdejante', w: 2800, h: 1900, border: true, level: [1, 6],
-    mobs: [['slime', 5], ['wolf', 3], ['shroom', 3]], count: 24,
+    mobs: [['slime', 5], ['wolf', 3], ['shroom', 3]], count: 24, hostile: 0.5, // zona de nível baixo: boa parte dos mobs só revida
     boss: { id: 'treant', level: 7, x: 2250, y: 420 },
     // Baús: abrem com E, recarregam em 10 min (ver core/journal.js). Posições conferidas contra o layout (tests/journal.test.js).
     chests: [{ id: 'forest:1', x: 700, y: 500, tier: 1 }, { id: 'forest:2', x: 1500, y: 600, tier: 1 }, { id: 'forest:3', x: 2000, y: 1300, tier: 1 }, { id: 'forest:4', x: 1800, y: 900, tier: 1.3 }],
@@ -74,7 +74,7 @@ export const ZONES = {
 
   plains: {
     name: 'Planície de Cristal', w: 2800, h: 1900, border: true, level: [6, 12],
-    mobs: [['crystalwolf', 4], ['golem', 3], ['wisp', 3]], count: 26,
+    mobs: [['crystalwolf', 4], ['golem', 3], ['wisp', 3]], count: 26, hostile: 0.8,
     boss: { id: 'colossus', level: 13, x: 2300, y: 1500 },
     chests: [{ id: 'plains:1', x: 800, y: 500, tier: 1.2 }, { id: 'plains:2', x: 1900, y: 700, tier: 1.2 }, { id: 'plains:3', x: 1100, y: 900, tier: 1.2 }, { id: 'plains:4', x: 1700, y: 1500, tier: 1.5 }],
     palette: { ground: '#cfe2b2', ground2: '#c2d8a2', outside: '#6f7f5a' },
@@ -99,7 +99,7 @@ export const ZONES = {
 
   ruins: {
     name: 'Ruínas Sombrias', w: 2800, h: 1900, border: true, level: [12, 20], scale: true,
-    mobs: [['wraith', 3], ['knight', 3], ['gargoyle', 3]], count: 28,
+    mobs: [['wraith', 3], ['knight', 3], ['gargoyle', 3]], count: 28, hostile: 1,
     boss: { id: 'guardian', level: 21, x: 2350, y: 950 },
     chests: [{ id: 'ruins:1', x: 700, y: 600, tier: 1.5 }, { id: 'ruins:2', x: 1360, y: 1480, tier: 1.5 }, { id: 'ruins:3', x: 1800, y: 700, tier: 1.5 }, { id: 'ruins:4', x: 1600, y: 1100, tier: 2 }],
     palette: { ground: '#8d89ac', ground2: '#837fa4', outside: '#2b2840' },

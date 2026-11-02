@@ -571,3 +571,11 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 /* retrato de NPC enquadrado no oval da faixa pintada (o oval é mais alto que largo): preenche toda a abertura, cabeça no topo */
 .npc-emb.por { left: 4.4%; top: 50%; width: 14.4%; height: 76%; aspect-ratio: auto; transform: translateY(-50%); border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 30%, #3d5078, #141a2e); }
 .npc-emb.por img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 6%; transform: scale(1.12); transform-origin: 50% 14%; }
+
+/* janela só anima ao abrir (render() refaz o HTML a cada ação e antes isso "piscava") */
+.panel { animation: none; }
+.panel.fresh { animation: pop .2s ease; }
+.plus-grp { display: inline-flex; gap: 4px; }
+.plus-grp .plus { width: auto; min-width: 38px; height: 34px; padding: 0 8px; font-size: 13px; }
+.sp-card .evo { font-size: 11px; color: #ffe08a; border: 1px solid #ffe08a88; border-radius: 8px; padding: 0 6px; margin: 0 6px; }
+.tag.dim { opacity: .65; font-size: 11px; }

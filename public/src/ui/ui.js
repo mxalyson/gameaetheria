@@ -4,7 +4,7 @@ import { skillOf, specsOf, specInfo, activeSpec, respecCost, SPEC_LEVEL } from '
 import { SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
 import { computeStats, canEquip, itemScore } from '../core/stats.js';
-import { xpToNext, spiritXpToNext, spiritPower, MAX_LEVEL } from '../core/progression.js';
+import { xpToNext, spiritXpToNext, spiritPower, MAX_LEVEL, EVOLVE_LEVEL, evolveCost } from '../core/progression.js';
 import { tierFor } from '../core/combat.js';
 import { MODES, getRating } from '../core/match.js';
 import { MOBS } from '../data/mobs.js';
@@ -39,7 +39,7 @@ export const noticeText = (n) => {
 // Ícone do equipamento: arte pintada por tipo (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto); se a imagem faltar, volta ao emoji.
 const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
-const spiritImg = (type, cls = '') => `<img class="sp-img ${cls}" src="${spiritUrl(type)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
+const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${spiritUrl(type, stage)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
 // Retratos pintados (busto): classes no cartão do herói, no painel do personagem e na criação; NPCs no oval do diálogo. Sem a imagem, volta ao emblema/emoji.
 const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src="assets/portraits/class-${classId}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 const npcPortrait = (id) => `<img class="por" src="assets/portraits/npc-${id === 'merchant' ? 'merchant' : id}.webp" alt="" draggable="false">`;
@@ -349,7 +349,14 @@ export class UI {
   render() {
     this.hideTooltip();
     const order = ['character', 'arena', 'party', 'dialog', 'journal', 'map', 'sage', 'shop', 'spirits', 'inventory', 'options'];
+    // Refazer o HTML a cada +1 ponto/ação fazia a janela "piscar" (a animação de abrir tocava de novo) e voltar ao topo: guardamos a rolagem e só animamos o que acabou de abrir.
+    const pid = (el) => [...el.classList].find((c) => c.startsWith('p-'));
+    const prev = new Map([...this.layer.querySelectorAll('.panel')].map((el) => [pid(el), el.querySelector('.body')?.scrollTop ?? 0]));
     this.layer.innerHTML = order.filter((p) => this.open.has(p)).map((p) => this['panel_' + p]()).join('');
+    for (const el of this.layer.querySelectorAll('.panel')) {
+      const id = pid(el), b = el.querySelector('.body');
+      if (!prev.has(id)) el.classList.add('fresh'); else if (b) b.scrollTop = prev.get(id);
+    }
   }
 
   frame(id, title, body, extra = '') {
@@ -389,7 +396,7 @@ export class UI {
       </div>`).join('');
     const stats = STAT_KEYS.map((k) => `
       <div class="stat-row ${k === cls.primary ? 'prim' : ''}"><span>${STAT_NAMES[k]}</span><b>${st[k]}</b>
-        ${char.statPoints ? `<button class="plus" data-action="alloc" data-arg="${k}">+</button>` : '<i></i>'}</div>`).join('');
+        ${char.statPoints ? `<span class="plus-grp"><button class="plus" data-action="alloc" data-arg="${k}:1">+1</button><button class="plus" data-action="alloc" data-arg="${k}:5">+5</button><button class="plus" data-action="alloc" data-arg="${k}:max">Máx</button></span>` : '<i></i>'}</div>`).join('');
     const d = [
       ['Vida', st.maxHp], ['Poder', st.power], ['Defesa', st.def], ['Crítico', st.crit.toFixed(1) + '%'],
       ['Vel. de Ataque', Math.round(st.atkSpeed * 100) + '%'], ['Vel. de Movimento', Math.round(st.moveSpeed)], ['Roubo de Vida', Math.round(st.lifesteal * 100) + '%'],
@@ -402,6 +409,7 @@ export class UI {
       </div>
       <div class="equip-grid">${equip}</div>
       <h3>Atributos ${char.statPoints ? `<span class="pts">${char.statPoints} pontos livres</span>` : ''}</h3>
+      ${char.statPoints ? '<div class="row-btns"><button class="btn small" data-action="alloc-auto">Distribuir automático</button></div>' : ''}
       ${stats}
       ${this.specBlock(char)}
       <h3>Combate</h3><div class="kv-grid">${d}</div>`);
@@ -426,15 +434,16 @@ export class UI {
       const active = char.activeSpirit === sp.id;
       const need = spiritXpToNext(sp.level);
       return `<div class="sp-card ${active ? 'active' : ''}" style="--sc:${S.color};--rc:${R.color}">
-        ${spiritImg(sp.type, 'big')}
+        ${spiritImg(sp.type, 'big', sp.stage ?? 1)}
         <div class="sp-info">
-          <div class="nm">${S.name} <span class="rar">${R.name}</span></div>
+          <div class="nm">${S.name} ${sp.stage === 2 ? '<span class="evo">Evoluído</span>' : ''}<span class="rar">${R.name}</span></div>
           <div class="sub">${S.element} · ${S.role} · Nv ${sp.level} · Poder ${spiritPower(sp)}</div>
           <div class="mini-bar"><div style="width:${sp.level >= char.level ? 100 : (100 * sp.xp) / need}%"></div></div>
           <div class="desc">${S.desc}</div>
         </div>
         <div class="sp-btns">
           ${active ? '<span class="tag">Ativo</span>' : `<button class="btn small" data-action="spirit-on" data-arg="${sp.id}">Ativar</button>`}
+          ${sp.stage === 2 ? '' : sp.level >= EVOLVE_LEVEL ? `<button class="btn small" data-action="spirit-evolve" data-arg="${sp.id}">Evoluir · ${COIN} ${evolveCost(sp)}</button>` : `<span class="tag dim">Evolui no Nv ${EVOLVE_LEVEL}</span>`}
           <button class="btn small ghost" data-action="spirit-free" data-arg="${sp.id}">Libertar</button>
         </div></div>`;
     }).join('') : '<p class="empty-msg">Você ainda não tem spirits. Derrote monstros para achar <b>Essências</b> ou visite a Sábia Yun na vila.</p>';

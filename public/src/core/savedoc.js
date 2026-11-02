@@ -89,7 +89,8 @@ function cleanSpirit(sp) {
   if (!isObj(sp) || !SPIRITS[sp.type] || !(sp.rarity in SPIRIT_RARITY_MUL)) return null;
   const id = str(sp.id, 48).replace(/[^\w-]/g, '');
   if (!id) return null;
-  return { id, type: sp.type, rarity: sp.rarity, level: int(sp.level, 1, MAX_LEVEL, 1), xp: int(sp.xp, 0, 1e7, 0) };
+  const level = int(sp.level, 1, MAX_LEVEL, 1);
+  return { id, type: sp.type, rarity: sp.rarity, level, xp: int(sp.xp, 0, 1e7, 0), ...(sp.stage === 2 && level >= 10 ? { stage: 2 } : {}) };
 }
 
 // Valida e normaliza um documento JÁ migrado. Devolve { ok, char, warnings } (nunca lança).

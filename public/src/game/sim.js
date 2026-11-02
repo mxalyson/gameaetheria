@@ -41,21 +41,21 @@ export function makeHeroActor(char, x, y, kind = 'player', team = 1) {
   });
 }
 
-export function makeMobActor(mobId, level, x, y, { elite = false } = {}) {
+export function makeMobActor(mobId, level, x, y, { elite = false, hostile = true } = {}) {
   const m = MOBS[mobId];
-  const hp = Math.round((40 + level * 28) * m.hp * (elite ? 3 : 1));
+  const hp = Math.round((50 + level * 34) * m.hp * (elite ? 3 : 1));
   return baseActor({
     kind: 'mob', team: 2, mobId, name: (elite ? 'Elite: ' : '') + m.name, level, boss: !!m.boss, elite,
     x, y, r: m.size * (elite ? 1.3 : 1),
-    stats: { power: (8 + level * 5) * m.atk * (elite ? 1.3 : 1), def: level * 3 * (m.def ?? 1), crit: 5, critMult: 1.5, maxHp: hp, moveSpeed: m.speed, atkSpeed: 1, lifesteal: 0 },
+    stats: { power: (9 + level * 5.6) * m.atk * (elite ? 1.3 : 1), def: level * 3 * (m.def ?? 1), crit: 5, critMult: 1.5, maxHp: hp, moveSpeed: m.speed, atkSpeed: 1, lifesteal: 0 },
     hp, maxHp: hp, cds: { basic: 0.5, slam: 4 },
-    home: { x, y }, ai: { state: 'idle', t: 0, tx: x, ty: y, target: null },
+    home: { x, y }, hostile, ai: { state: 'idle', t: 0, tx: x, ty: y, target: null },
   });
 }
 
 export function makeSpiritActor(sp, owner) {
   return baseActor({
-    kind: 'spirit', team: owner.team, owner: owner.id, spiritType: sp.type, rarity: sp.rarity, level: sp.level,
+    kind: 'spirit', team: owner.team, owner: owner.id, spiritType: sp.type, rarity: sp.rarity, level: sp.level, stage: sp.stage ?? 1,
     name: SPIRITS[sp.type].name, untargetable: true, x: owner.x - 20, y: owner.y - 10, r: 8, hp: 1, maxHp: 1,
     stats: { power: spiritPower(sp), crit: 5, critMult: 1.5, lifesteal: 0, def: 0 },
     cds: { basic: 1, s0: 1.5 }, bob: 0,
@@ -130,7 +130,10 @@ export class World {
     const hi = z.scale ? Math.max(z.level[1], Math.min(30, playerLevel)) : z.level[1];
     // Mais forte quanto mais a leste.
     const lvl = Math.round(z.level[0] + (hi - z.level[0]) * (pt.x / z.w) + this.rng.range(-0.6, 0.6));
-    return this.add(makeMobActor(id, Math.max(1, lvl), pt.x, pt.y, { elite: this.rng.chance(0.04) }));
+    // Agressividade: cada mob nasce hostil (ataca ao ver o jogador) ou passivo (só revida) conforme a zona e a índole da espécie; sorteio por posição, sem gastar o RNG.
+    const roll = (Math.abs(Math.round(pt.x * 7 + pt.y * 13)) % 100) / 100;
+    const hostile = roll < (z.hostile ?? 1) * (MOBS[id].temper ?? 1);
+    return this.add(makeMobActor(id, Math.max(1, lvl), pt.x, pt.y, { elite: this.rng.chance(0.07), hostile }));
   }
 
   updateSpawns(dt, player) {
@@ -412,6 +415,7 @@ export class World {
     t.lastDamaged = this.time;
     t.lastCombat = this.time;
     src.lastCombat = this.time;
+    if (src.kind === 'player' || src.kind === 'rival') src.lastDealt = this.time; // o spirit só ataca se o dono atacou ou foi atacado (não conta o dano do próprio spirit)
     if (src.stats.lifesteal > 0 && !src.dead) this.heal(src, res.amount * src.stats.lifesteal, true);
     if (opts.stun) t.stunT = Math.max(t.stunT, t.boss ? opts.stun * 0.3 : opts.stun);
     if (opts.slow) { t.slowT = opts.slowDur; t.slowAmt = t.boss ? opts.slow * 0.5 : opts.slow; }
@@ -531,6 +535,8 @@ export class World {
   }
 
   // ---------- spirits ----------
+  // O spirit não ataca sozinho: só quando o dono bateu em alguém ou apanhou nos últimos 3 s.
+  spiritEngaged(o) { return (o.lastDealt ?? -99) > this.time - 3 || (o.lastDamaged ?? -99) > this.time - 3; }
   updateSpirit(s, dt) {
     const o = this.byId(s.owner);
     if (!o || o.dead) { s.hidden = true; return; }
@@ -545,7 +551,7 @@ export class World {
     const color = SPIRITS[s.spiritType].color;
     const shoot = (mult, cd, range = 380) => {
       const e = this.nearestEnemy(s, range);
-      if (!e || o.lastCombat < this.time - 6) return;
+      if (!e || !this.spiritEngaged(o)) return;
       this.spawnProjectile(s, Math.atan2(e.y - s.y, e.x - s.x), { speed: 460, mult, radius: 5, color, range: range + 40 });
       s.cds.s0 = cd;
     };

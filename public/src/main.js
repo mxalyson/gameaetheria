@@ -7,7 +7,7 @@ import { UI, esc } from './ui/ui.js';
 import { World, makeHeroActor, makeMobActor, makeSpiritActor } from './game/sim.js';
 import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore } from './core/stats.js';
-import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext } from './core/progression.js';
+import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit } from './core/progression.js';
 import { generateItem, rollMobLoot, rollRarity } from './core/loot.js';
 import { generateRivalForPower } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
@@ -163,6 +163,8 @@ class Game {
       case 'buy-essence': this.buyEssence(arg); break;
       case 'spirit-on': this.setSpirit(arg); break;
       case 'spirit-free': this.freeSpirit(arg); break;
+      case 'spirit-evolve': this.evolveSpirit(arg); break;
+      case 'alloc-auto': this.allocAuto(); break;
       case 'duel': this.startMatch('1v1'); break;
       case 'match': this.startMatch(arg); break;
       case 'waves': this.startWaves(); break;
@@ -925,7 +927,7 @@ class Game {
   // ---------------- progresso / loot ----------------
   onMobKilled(m) {
     const M = MOBS[m.mobId];
-    this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? 10 : m.elite ? 3 : 1)));
+    this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? 10 : m.elite ? 4 : 1)));
     for (const l of rollMobLoot(this.rng, m, this.char.classId)) this.dropAt(m.x, m.y, l);
     this.gameEvent({ type: 'kill', mobId: m.mobId, zoneId: this.world.zoneId, boss: !!m.boss });
     if (m.boss) {
@@ -1090,15 +1092,37 @@ class Game {
     this.save();
   }
 
-  alloc(stat) {
-    const c = this.char;
-    if (c.statPoints <= 0) return;
-    const n = this.input.held('shift') ? Math.min(5, c.statPoints) : 1;
+  // arg: 'str', ou 'str:5' / 'str:max' (toque: botões +1, +5 e Máx; o Shift do teclado ainda dá +5)
+  alloc(arg) {
+    const c = this.char, [stat, q] = String(arg).split(':');
+    if (c.statPoints <= 0 || !(stat in c.alloc)) return;
+    const n = Math.min(c.statPoints, q === 'max' ? c.statPoints : q ? Number(q) || 1 : this.input.held('shift') ? 5 : 1);
     c.alloc[stat] += n;
     c.statPoints -= n;
     this.refreshStats();
     this.ui.render();
     this.save();
+  }
+
+  // Distribui todos os pontos livres: 70% no atributo principal da classe e o resto em Vitalidade.
+  allocAuto() {
+    const c = this.char, prim = CLASSES[c.classId].primary, pts = c.statPoints;
+    if (pts <= 0) return;
+    const main = Math.ceil(pts * 0.7);
+    c.alloc[prim] += main; c.alloc.vit += pts - main; c.statPoints = 0;
+    this.refreshStats(); this.ui.render(); this.save();
+    this.ui.log(`Pontos distribuídos: +${main} em ${prim === 'int' ? 'Inteligência' : prim === 'str' ? 'Força' : 'Agilidade'}, +${pts - main} em Vitalidade.`, '#cfe8ff');
+  }
+
+  evolveSpirit(id) {
+    const r = evolveSpirit(this.char, id);
+    if (!r.ok) return this.ui.toast('Não dá para evoluir', r.reason, '');
+    const sp = this.char.spirits.find((s) => s.id === id), S = SPIRITS[sp.type];
+    const actor = this.world.actors.find((a) => a.kind === 'spirit' && a.owner === this.player.id && a.spiritType === sp.type);
+    if (actor && this.char.activeSpirit === id) { actor.stats.power = spiritPower(sp); actor.stage = 2; }
+    this.ui.toast(`${S.name} evoluiu!`, `Forma evoluída · poder ${spiritPower(sp)}`, 'gold');
+    this.ui.log(`${S.name} evoluiu para a forma 2 (−${r.cost} 🪙).`, S.color);
+    this.ui.render(); this.save();
   }
 
   // ---------------- lojas ----------------
