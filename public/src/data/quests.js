@@ -13,7 +13,7 @@ export const QUESTS = {
   },
   caca_aos_lobos: {
     id: 'caca_aos_lobos', name: 'Caça aos Lobos', giver: 'guard', level: 2, after: 'primeiros_passos',
-    text: { offer: 'Lobos cinzentos atacam viajantes. Reduza o bando: seis lobos.', progress: 'Os lobos ainda rondam. Não os enfrente cercado.', done: 'O bando se dispersou. Fugiam de algo no fundo do bosque, não de nós. Fique atento.' },
+    text: { offer: 'Lobos cinzentos atacam viajantes. Reduza o bando: seis lobos. Dois juntos já são perigo: beba uma poção (🧪) e use suas habilidades.', progress: 'Os lobos ainda rondam. Não os enfrente cercado: poção na mão e habilidade pronta.', done: 'O bando se dispersou. Fugiam de algo no fundo do bosque, não de nós. Fique atento.' },
     objectives: [{ type: 'kill', mob: 'wolf', zone: 'any', count: 6, label: 'Derrote 6 Lobos Cinzentos' }],
     reward: { gold: 90, xp: 380 },
   },
