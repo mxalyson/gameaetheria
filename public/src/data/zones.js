@@ -8,6 +8,11 @@ const ARENA = {
   atmosphere: { tint: 'rgba(255,214,150,0.04)', edge: 'rgba(18,10,36,0.50)', motes: { n: 18, color: '255,226,150', drift: 3, rise: 8 } },
 };
 
+// Ordem do mapa-múndi (painel do mapa e teletransporte).
+export const WORLD_ROUTE = ['town', 'forest', 'plains', 'ruins', 'glacier', 'ember'];
+// Custo de viagem: a Vila é de graça; o resto cresce com o nível da zona.
+export const teleportCost = (id) => (id === 'town' ? 0 : 20 * (ZONES[id]?.level?.[0] ?? 1));
+
 export const ZONES = {
   town: {
     name: 'Vila de Lúmen', w: 1700, h: 1300, safe: true, border: true, spawn: { x: 850, y: 720 },
@@ -109,7 +114,7 @@ export const ZONES = {
     decor: { trees: 26, rocks: 40, bushes: 10, flowers: 90 },
     // Cenário rico: estrada de lajes até o Guardião, círculos rúnicos, braseiros, estátuas e névoa.
     scenery: {
-      kind: 'ruins', runes: 3, trailAmp: 200,
+      kind: 'ruins', runes: 3, trailAmp: 200, trailToBoss: true, // a estrada vai até o Guardião (o portal leste fica atrás dele)
       // estátuas guardando a entrada e a subida ao Guardião (aparecem logo, em vez de só 5 espalhadas numa zona enorme)
       fixed: [['statue', 330, 790, 28, 0.9], ['statue', 330, 1110, 28, 0.9], ['statue', 2130, 760, 30, 0.9], ['statue', 2130, 1140, 30, 0.9]],
       extras: [['rubble', 30, 16, 26, 0], ['brazier', 9, 14, 16, 0.9], ['statue', 5, 22, 28, 0.9], ['deadtree', 8, 26, 34, 0.5], ['runestone', 6, 22, 28, 0.6]],
@@ -119,7 +124,10 @@ export const ZONES = {
       fog: { n: 8, color: '205,200,238', alpha: 0.09 },
       motes: { n: 28, color: '170,150,255', drift: 4, rise: 9 },
     },
-    portals: [{ x: 40, y: 950, to: 'plains', tx: 2690, ty: 950, label: 'Planície de Cristal' }],
+    portals: [
+      { x: 40, y: 950, to: 'plains', tx: 2690, ty: 950, label: 'Planície de Cristal' },
+      { x: 2760, y: 950, to: 'glacier', tx: 110, ty: 950, label: 'Cume Gélido · Nv 20-25' },
+    ],
   },
 
   arena: { ...ARENA, name: 'Arena de Lúmen — Duelo' },
@@ -135,4 +143,37 @@ export const ZONES = {
     palette: { ...ARENA.palette, ground: '#e3d3ad', ground2: '#d8c79d', ring: '#a98f63' },
   },
   waves: { ...ARENA, name: 'Arena das Ondas', palette: { ...ARENA.palette, ground: '#d9cfe8', ground2: '#cdc1df', ring: '#9d8fbf' } },
+};
+
+// ---- Mapas de fim de jogo: mesmas criaturas pintadas, recoloridas (data/mobs.js › MOBS_EXTRA). `look` = qual cenário em sprites usar.
+ZONES.glacier = {
+  name: 'Cume Gélido', w: 2800, h: 1900, border: true, level: [20, 25], look: 'forest',
+  mobs: [['frostslime', 4], ['frostwolf', 3], ['icewisp', 3]], count: 26, hostile: 0.85,
+  boss: { id: 'frostlord', level: 26, x: 2300, y: 520 },
+  chests: [{ id: 'glacier:1', x: 760, y: 560, tier: 1.8 }, { id: 'glacier:2', x: 1400, y: 1400, tier: 1.8 }, { id: 'glacier:3', x: 1900, y: 800, tier: 1.8 }, { id: 'glacier:4', x: 1700, y: 1500, tier: 2.2 }],
+  palette: { ground: '#dfeaf2', ground2: '#d2e0ea', outside: '#4c6178' },
+  treeColors: ['#5b8a9a', '#7fb0bf', '#a9d3df'], rockType: 'crystal',
+  flowerColors: ['#ffffff', '#cfe9ff', '#b8d8ff'],
+  decor: { trees: 40, rocks: 34, bushes: 14, flowers: 120 },
+  scenery: { kind: 'plains', ponds: 3, trailAmp: 230, accent: ['#9fd0ff', '#c4e3ff', '#e6f3ff'], extras: [['glowflower', 50, 8, 12, 0], ['tallgrass', 40, 14, 22, 0], ['geode', 16, 16, 24, 0.7]] },
+  atmosphere: { tint: 'rgba(150,200,255,0.20)', edge: 'rgba(14,34,64,0.38)', rays: 0.03, motes: { n: 46, color: '225,242,255', drift: 5, rise: -5 } },
+  portals: [
+    { x: 40, y: 950, to: 'ruins', tx: 2690, ty: 950, label: 'Ruínas Sombrias' },
+    { x: 2760, y: 950, to: 'ember', tx: 110, ty: 950, label: 'Cinzas Ardentes · Nv 25-30' },
+  ],
+};
+ZONES.ember = {
+  name: 'Cinzas Ardentes', w: 2800, h: 1900, border: true, level: [25, 30], look: 'ruins',
+  mobs: [['magmaslime', 4], ['emberwolf', 3], ['cinderwraith', 3]], count: 28, hostile: 1,
+  boss: { id: 'infernoknight', level: 31, x: 2350, y: 950 },
+  chests: [{ id: 'ember:1', x: 740, y: 620, tier: 2.2 }, { id: 'ember:2', x: 1380, y: 1420, tier: 2.2 }, { id: 'ember:3', x: 1820, y: 720, tier: 2.2 }, { id: 'ember:4', x: 1620, y: 1120, tier: 2.8 }],
+  palette: { ground: '#8a6a60', ground2: '#7e6056', outside: '#2a1612' },
+  treeColors: ['#5a4038', '#6e4e44', '#86645a'], treeType: 'pine', rockType: 'pillar',
+  flowerColors: ['#ffb070', '#ff8a4a', '#ffd9a0'],
+  decor: { trees: 22, rocks: 40, bushes: 8, flowers: 70 },
+  scenery: { kind: 'ruins', runes: 4, trailAmp: 200,
+    fixed: [['statue', 330, 790, 28, 0.9], ['statue', 330, 1110, 28, 0.9], ['statue', 2130, 760, 30, 0.9], ['statue', 2130, 1140, 30, 0.9]],
+    extras: [['rubble', 30, 16, 26, 0], ['brazier', 14, 14, 16, 0.9], ['deadtree', 8, 26, 34, 0.5], ['runestone', 6, 22, 28, 0.6]] },
+  atmosphere: { tint: 'rgba(255,110,50,0.20)', edge: 'rgba(40,6,2,0.62)', fog: { n: 8, color: '255,170,130', alpha: 0.08 }, motes: { n: 40, color: '255,170,90', drift: 4, rise: 14 } },
+  portals: [{ x: 40, y: 950, to: 'glacier', tx: 2690, ty: 950, label: 'Cume Gélido' }],
 };

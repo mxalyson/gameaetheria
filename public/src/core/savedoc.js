@@ -8,6 +8,7 @@ import { MAX_PLUS } from './enhance.js';
 import { MAX_LEVEL, POINTS_PER_LEVEL, SAVE_VERSION } from './progression.js';
 import { SPECS, SPEC_LEVEL } from '../data/specs.js';
 import { QUESTS } from '../data/quests.js';
+import { ZONES } from '../data/zones.js';
 import { ACH, STAT_KEYS_PROGRESS } from '../data/achievements.js';
 
 export { SAVE_VERSION };
@@ -162,8 +163,12 @@ export function validate(doc) {
   const chests = {};
   for (const [id, v] of Object.entries(isObj(doc.chests) ? doc.chests : {}).slice(0, 200)) if (/^[a-z0-9_:-]{1,40}$/.test(id)) chests[id] = int(v, 0, 4e12, 0);
 
+  const visited = {};
+  for (const id of Object.keys(isObj(doc.visited) ? doc.visited : {})) if (ZONES[id] && (id === 'town' || ZONES[id].mobs)) visited[id] = 1;
+  if (!isObj(doc.visited)) for (const [id, z] of Object.entries(ZONES)) if (z.mobs && z.level[0] <= level) visited[id] = 1; // saves antigos: libera o que o nível já alcança
+
   const char = {
-    version: SAVE_VERSION, name: cleanName(doc.name), quests, stats, achievements, title, chests, classId: doc.classId, level,
+    version: SAVE_VERSION, visited, name: cleanName(doc.name), quests, stats, achievements, title, chests, classId: doc.classId, level,
     xp: int(doc.xp, 0, 1e9, 0), statPoints, alloc,
     gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0),
     equipment, inventory, spirits, activeSpirit, spec,

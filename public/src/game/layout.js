@@ -50,7 +50,7 @@ export function buildLayout(zoneId) {
   if (sc) {
     const [pa, pb] = z.portals ?? [];
     const a = pa ? { x: pa.x + 70, y: pa.y } : null;
-    const b = pb ? { x: pb.x - 70, y: pb.y } : z.boss ? { x: z.boss.x - 130, y: z.boss.y } : null;
+    const b = pb && !sc.trailToBoss ? { x: pb.x - 70, y: pb.y } : z.boss ? { x: z.boss.x - 130, y: z.boss.y } : null;
     if (a && b) {
       const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 110), ph = srng.range(0, 6.28), amp = sc.trailAmp ?? 230;
       for (let i = 0; i <= n; i++) {

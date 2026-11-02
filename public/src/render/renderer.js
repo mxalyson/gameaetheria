@@ -74,7 +74,7 @@ export class Renderer {
 
   draw(world, cam, view = {}) {
     const g = this.g, z = world.zone, t = world.time;
-    setNatureZone(world.zoneId); if (this.mobZone !== world.zoneId) { this.mobZone = world.zoneId; prepareMobs(world.zone); };
+    setNatureZone(world.zone.look ?? world.zoneId); if (this.mobZone !== world.zoneId) { this.mobZone = world.zoneId; prepareMobs(world.zone); };
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.fillStyle = z.palette.outside;
     g.fillRect(0, 0, this.vw, this.vh);

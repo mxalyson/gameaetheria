@@ -3,6 +3,7 @@
 // Só desenho: nada aqui altera a simulação. Sem o arquivo da criatura (ou com ?monstros=original, que fica salvo) vale o desenho antigo do renderer.
 import { viewFromFacing } from './hero-sprites.js';
 import { deathPose } from './hero-death.js';
+import { MOBS } from '../data/mobs.js';
 
 const KEY = 'aetheria_monstros';
 let on = null, index = null, indexLoading = null;
@@ -29,18 +30,41 @@ function loadIndex() {
 // Quanto o desenho da célula (com margem) é mais alto que o raio de colisão da criatura; ajustável por criatura.
 const ART = { default: { h: 3.4 }, slime: { h: 3.0 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
 
+// Recolore uma vez ao carregar (hue em graus, sat/bri multiplicadores, mul = multiplicador por canal): as variantes de cor reaproveitam a arte da criatura de base.
+function tint(img, t) {
+  const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height), p = d.data, a = ((t.hue ?? 0) * Math.PI) / 180, cs = Math.cos(a), sn = Math.sin(a);
+  const m = [0.213 + cs * 0.787 - sn * 0.213, 0.715 - cs * 0.715 - sn * 0.715, 0.072 - cs * 0.072 + sn * 0.928,
+    0.213 - cs * 0.213 + sn * 0.143, 0.715 + cs * 0.285 + sn * 0.14, 0.072 - cs * 0.072 - sn * 0.283,
+    0.213 - cs * 0.213 - sn * 0.787, 0.715 - cs * 0.715 + sn * 0.715, 0.072 + cs * 0.928 + sn * 0.072];
+  const sat = t.sat ?? 1, bri = t.bri ?? 1, [mr, mg, mb] = t.mul ?? [1, 1, 1];
+  for (let i = 0; i < p.length; i += 4) {
+    if (!p[i + 3]) continue;
+    let r = p[i], gg = p[i + 1], b = p[i + 2];
+    const r2 = m[0] * r + m[1] * gg + m[2] * b, g2 = m[3] * r + m[4] * gg + m[5] * b, b2 = m[6] * r + m[7] * gg + m[8] * b;
+    const l = 0.299 * r2 + 0.587 * g2 + 0.114 * b2;
+    p[i] = Math.max(0, Math.min(255, (l + (r2 - l) * sat) * mr * bri));
+    p[i + 1] = Math.max(0, Math.min(255, (l + (g2 - l) * sat) * mg * bri));
+    p[i + 2] = Math.max(0, Math.min(255, (l + (b2 - l) * sat) * mb * bri));
+  }
+  g.putImageData(d, 0, 0);
+  return createImageBitmap ? createImageBitmap(c) : c; // bitmap (GPU) em vez de canvas de CPU
+}
+
 function load(id) {
   let it = items.get(id);
   if (it) return it;
   it = { state: 'loading', img: null, meta: null }; items.set(id, it);
+  const V = MOBS[id], art = V?.art ?? id; // variante recolorida usa a arte de `art`
   loadIndex().then(async () => {
-    if (!index.has(id)) { it.state = 'none'; return; }
+    if (!index.has(art)) { it.state = 'none'; return; }
     try {
       // o json vem primeiro: seu `v` (muda a cada bake) vai na URL da imagem, senão o service worker (cache primeiro p/ .webp) serve a imagem velha com o json novo
-      const meta = await fetch(`assets/mobs/${id}.json`).then((r) => r.json());
-      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/mobs/${id}.webp?v=${meta.v ?? 0}`; });
+      const meta = await fetch(`assets/mobs/${art}.json`).then((r) => r.json());
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/mobs/${art}.webp?v=${meta.v ?? 0}`; });
       if (img.naturalWidth !== meta.cell[0] * meta.cols || img.naturalHeight !== meta.cell[1] * meta.rows) { it.state = 'none'; return; } // imagem e medidas não combinam: desenho antigo em vez de sprite quebrado
-      await img.decode?.(); it.meta = meta; it.img = img; it.state = 'ready'; stats.loaded++;
+      await img.decode?.(); it.meta = meta; it.img = V?.tint ? await tint(img, V.tint) : img; it.state = 'ready'; stats.loaded++;
     } catch { it.state = 'none'; }
   });
   return it;
@@ -54,7 +78,7 @@ export function drawMobSprite(g, a, t) {
   const it = load(a.mobId);
   if (it.state === 'loading') return true; // carregando: não desenha (senão o desenho antigo piscava antes do pintado)
   if (it.state !== 'ready') return false;
-  const { meta, img } = it, [cw, ch] = meta.cell, art = ART[a.mobId] ?? ART.default;
+  const { meta, img } = it, [cw, ch] = meta.cell, art = ART[a.mobId] ?? ART[MOBS[a.mobId]?.art] ?? ART.default;
   const view = viewFromFacing(a.facing ?? Math.PI / 2);
   const H = a.r * art.h, k = H / ch, W = cw * k;
   const ph = a.walk ?? 0;

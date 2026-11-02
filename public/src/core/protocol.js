@@ -1,6 +1,7 @@
 // Protocolo de rede (cliente ↔ servidor autoritativo). Sem DOM e sem dependências: o mesmo arquivo valida no servidor e é lido pelo cliente.
 // Regras: toda mensagem é JSON { v, t, ... }; `v` é a versão do protocolo; o cliente só envia INTENÇÕES (nunca dano, posição final, loot).
 import { CLASSES } from '../data/classes.js';
+import { ZONES } from '../data/zones.js';
 
 export const PROTOCOL_VERSION = 4; // v2: hello autenticado e reward · v3: lobby, fila, grupos e salas por modo · v4: snapshots compactos por delta (core/snapshot.js)
 export const MAX_PARTY = 4;
@@ -64,7 +65,7 @@ export function parseClientMessage(data) {
     case 'queue':
       return QUEUE_MODES.includes(data.mode) ? { ok: true, msg: { t: 'queue', mode: data.mode } } : { ok: false, code: REJECT.BAD_MODE };
     case 'zone_enter': // exploração no servidor: `zone` = zona de destino, `from` = zona de onde vem (o servidor confere o portal e decide o ponto de entrada)
-      return ['forest', 'plains', 'ruins'].includes(data.zone) && ['town', 'forest', 'plains', 'ruins'].includes(data.from) ? { ok: true, msg: { t: 'zone_enter', zone: data.zone, from: data.from } } : { ok: false, code: REJECT.BAD_MESSAGE };
+      return ZONES[data.zone]?.mobs && (data.from === 'town' || ZONES[data.from]?.mobs) ? { ok: true, msg: { t: 'zone_enter', zone: data.zone, from: data.from } } : { ok: false, code: REJECT.BAD_MESSAGE };
     case 'queue_cancel': case 'party_create': case 'party_leave': case 'zone_leave':
       return { ok: true, msg: { t: data.t } };
     case 'party_invite': case 'party_kick':

@@ -15,7 +15,7 @@ import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
 import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { DIALOGS } from '../data/dialogs.js';
-import { ZONES } from '../data/zones.js';
+import { ZONES, WORLD_ROUTE, teleportCost } from '../data/zones.js';
 import { offeredBy, readyFor, activeFor, titleText, achievementProgress, ensureJournal } from '../core/journal.js';
 import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
 
@@ -39,6 +39,7 @@ export const noticeText = (n) => {
 // Ícone do equipamento: arte pintada por tipo (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto); se a imagem faltar, volta ao emoji.
 const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
+const ZONE_ICON = { town: '🏠', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
 const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${spiritUrl(type, stage)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
 // Retratos pintados (busto): classes no cartão do herói, no painel do personagem e na criação; NPCs no oval do diálogo. Sem a imagem, volta ao emblema/emoji.
 const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src="assets/portraits/class-${classId}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
@@ -572,12 +573,12 @@ export class UI {
   // ---- mapa-múndi ----
   panel_map() {
     const g = this.game, here = g.world.zoneId;
-    const route = ['town', 'forest', 'plains', 'ruins'];
+    const route = WORLD_ROUTE, canTp = g.mode === 'explore', vis = g.char.visited ?? {};
     const rows = route.map((id, i) => { const z = ZONES[id]; const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura'; const boss = z.boss ? `Chefe: ${esc(MOBS[z.boss.id].name)}` : '';
-      return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : ['🏠', '🌲', '💎', '🏚️'][i]}</span></div>
-      <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div></div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
+      return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : ZONE_ICON[id] ?? '🗺️'}</span></div>
+      <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div>${here === id ? '' : id === 'town' || vis[id] ? `<button class="btn small" data-action="teleport" data-arg="${id}" ${canTp ? '' : 'disabled'}>Viajar · ${teleportCost(id) ? COIN + ' ' + teleportCost(id) : 'grátis'}</button>` : '<span class="tag dim">🔒 não visitado</span>'}</div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
     const arenas = '<div class="shop-item"><div class="cell"><span class="ic">⚔️</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>';
-    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas. O botão 🏠 volta à vila fora de combate.</p>${rows}${arenas}`);
+    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas. Mapas já visitados têm <b>teletransporte</b> (fora de combate; a Vila é grátis). O botão 🏠 também volta à vila.</p>${rows}${arenas}`);
   }
 
   panel_sage() {

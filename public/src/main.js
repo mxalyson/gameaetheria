@@ -30,7 +30,7 @@ import { TouchControls } from './touch.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
 import { CLASSES } from './data/classes.js';
 import { MOBS, NORMAL_MOBS, BOSS_MOBS } from './data/mobs.js';
-import { ZONES } from './data/zones.js';
+import { ZONES, teleportCost } from './data/zones.js';
 import { RARITY, INVENTORY_SIZE, SLOTS } from './data/items.js';
 import { SPIRITS, SPIRIT_RARITY_MUL, MAX_SPIRITS } from './data/spirits.js';
 
@@ -164,6 +164,7 @@ class Game {
       case 'spirit-on': this.setSpirit(arg); break;
       case 'spirit-free': this.freeSpirit(arg); break;
       case 'spirit-evolve': this.evolveSpirit(arg); break;
+      case 'teleport': this.teleport(arg); break;
       case 'alloc-auto': this.allocAuto(); break;
       case 'duel': this.startMatch('1v1'); break;
       case 'match': this.startMatch(arg); break;
@@ -212,6 +213,7 @@ class Game {
     const ratio = prev && !prev.dead ? prev.hp / prev.maxHp : 1;
     this.world = new World(zoneId);
     this.mode = mode;
+    if (ZONES[zoneId].mobs || zoneId === 'town') (this.char.visited ??= {})[zoneId] = 1; // desbloqueia o teletransporte para este mapa
     this.player = this.world.add(makeHeroActor(this.char, x, y));
     if (!this.world.zone.safe && mode === 'explore') this.player.hp = Math.max(1, Math.round(this.player.maxHp * ratio));
     this.spawnSpirit(this.player, this.char);
@@ -399,6 +401,7 @@ class Game {
     const info = { ...m, mode: 'zone', team: 1 };
     if (this.mode === 'net' && this.netInfo?.room === m.room) { this.netInfo = info; this.netDec = new SnapshotDecoder().init(m); return; } // reconexão
     this.ui.closePanels(); this.ui.hideScreen();
+    (this.char.visited ??= {})[m.zone] = 1;
     this.netDec = new SnapshotDecoder().init(m);
     if (this.cloud) this.cloud.paused = true; // na instância o servidor altera o personagem
     const w = new World(m.zone, { visuals: true });
@@ -821,6 +824,20 @@ class Game {
       else if (a === this.player) this.onPlayerDeath();
       // rival/aliado caindo não encerra nada: updateMatch conta os vivos de cada time
     }
+  }
+
+  // Teletransporte para um mapa já visitado (pelo painel do mapa): a Vila é de graça; os outros custam ouro e exigem estar fora de combate.
+  teleport(id) {
+    const c = this.char, z = ZONES[id];
+    if (this.mode !== 'explore' || !z || !(id === 'town' || c.visited?.[id])) return;
+    if (id === this.world.zoneId) return this.ui.toast('Você já está aqui', z.name, '');
+    if (this.world.time - this.player.lastCombat < 8) return this.ui.toast('Em combate', 'Espere uns segundos para viajar.', '');
+    if (this.online && this.net?.joined && z.mobs) return this.ui.toast('Teletransporte indisponível online', 'Por enquanto use os portais (o servidor confere cada passagem).', '');
+    const cost = teleportCost(id);
+    if (cost && !this.spend(cost)) return;
+    this.ui.closePanels();
+    const at = z.spawn ?? { x: 110, y: 950 };
+    this.enterZone(id, at.x, at.y);
   }
 
   checkPortals() {

@@ -298,3 +298,15 @@ test('mob passivo não ataca de longe, mas revida quando apanha', () => {
   w.damage(p, passivo, 1);
   assert.equal(passivo.ai.target, p.id, 'passivo revida depois de apanhar');
 });
+
+test('teletransporte: custo por zona e só para mapas visitados (save antigo libera pelo nível)', async () => {
+  const { teleportCost, WORLD_ROUTE, ZONES } = await import('../public/src/data/zones.js');
+  const { validate } = await import('../public/src/core/savedoc.js');
+  assert.equal(teleportCost('town'), 0);
+  assert.ok(teleportCost('ruins') > teleportCost('forest') && WORLD_ROUTE.every((id) => ZONES[id]));
+  const c = newCharacter('T', 'mage', makeRng(8)); c.level = 8; delete c.visited;
+  const v = validate(c).char.visited;
+  assert.ok(v.forest && v.plains && !v.ruins, 'nível 8 já alcança Bosque e Planície, não Ruínas');
+  c.visited = { ruins: 1, arena: 1, naoexiste: 1 };
+  assert.deepEqual(validate(c).char.visited, { ruins: 1 }, 'só zonas de farm válidas');
+});

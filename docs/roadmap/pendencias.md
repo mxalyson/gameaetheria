@@ -132,4 +132,6 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 - [x] Spirit só ataca se o dono atacou ou apanhou (últimos 3 s). Evolução do spirit: nível 10 + ouro, forma 2 (+50% poder).
 - [x] Agressividade por zona (`zone.hostile`) e por espécie (`MOBS.temper`): Bosque ~metade passiva, Planície 80%, Ruínas todos; passivo revida ao apanhar.
 - [x] Farm: curva de XP 150·n^1,9 (≈6× o total até o nível 20), mobs +20% de vida e +12% de dano, elite 7% (XP ×4). **Falta calibrar com jogadores** (meta: nível 20 em ~2 h).
-- [ ] Teletransporte entre mapas, novos mapas com mobs recoloridos, história, fontes/retângulos restantes, Místico (ver conversa).
+- [x] Teletransporte (painel do mapa; mapas visitados; Vila grátis, outros 20 × nível mínimo; fora de combate). **Online ainda não** (o servidor confere cada portal: precisa de mensagem nova validada).
+- [x] Dois mapas novos, Cume Gélido (Nv 20-25) e Cinzas Ardentes (Nv 25-30), com as criaturas pintadas recoloridas (`MOBS_EXTRA`, recolor ao carregar). Os dois bosses são o Carvalho e o Guardião recoloridos. Cenário reaproveitado (`look`) e névoa/tom de cor próprios; **sem arte própria de chão/árvores**.
+- [ ] História, fontes/retângulos restantes, Místico, mapas novos com cenário próprio.
