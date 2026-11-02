@@ -623,21 +623,6 @@ function drawMob(g, a, t) {
   // Pintados (assets/mobs, sem desenho por código): slime, wolf, shroom, treant, crystalwolf, wisp, wraith, knight, guardian. Sobra o golem (também gargoyle/colossus no código) até ter arte.
   switch (M.shape) {
     // slime: só existe pintado (assets/mobs/slime); o desenho antigo foi removido
-    case 'golem': {
-      g.translate(0, bob * 0.4);
-      const sw = a.swing > 0 ? 5 : 0;
-      g.fillStyle = shade(c, -0.15);
-      g.fillRect(-21, -6 + sw, 8, 14); g.fillRect(13, -6 - sw, 8, 14);
-      g.fillStyle = c;
-      g.beginPath(); g.roundRect(-14, -12, 28, 24, 6); g.fill();
-      g.fillStyle = shade(c, 0.12);
-      g.beginPath(); g.roundRect(-9, -22, 18, 13, 4); g.fill();
-      g.fillStyle = shade(c, 0.28);
-      g.beginPath(); g.moveTo(-14, -12); g.lineTo(-10, -24); g.lineTo(-6, -12); g.fill();
-      g.beginPath(); g.moveTo(8, -12); g.lineTo(13, -22); g.lineTo(15, -10); g.fill();
-      g.fillStyle = '#9ff5ff'; g.fillRect(-6 + fx * 2, -17, 4, 2.5); g.fillRect(2 + fx * 2, -17, 4, 2.5);
-      break;
-    }
   }
   if (a.hitFlash > 0) {
     g.globalAlpha = Math.min(0.65, a.hitFlash * 6);

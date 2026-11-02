@@ -6,12 +6,13 @@ import numpy as np
 from PIL import Image
 root = os.path.join(os.path.dirname(__file__), '..')
 out = os.path.join(root, 'public/assets/npcs'); os.makedirs(out, exist_ok=True)
-for id_ in sys.argv[1:]:
+for spec in sys.argv[1:]:
+    id_, _, hpx = spec.partition(':')  # id ou id:altura-em-px (para GLBs separados, cada um normalizado pelo próprio tamanho)
     meta = json.load(open(os.path.join(root, f'public/assets/mobs/zz-{id_}.json')))
     sheet = Image.open(os.path.join(root, f'test-results/mob-bake/zz-{id_}.png')).convert('RGBA')
     cw, ch = meta['cell']; cell = sheet.crop((0, 0, cw, ch))
     bb = cell.getchannel('A').point(lambda v: 255 if v > 8 else 0).getbbox(); x0, y0, x1, y1 = bb
-    c = cell.crop(bb); k = 200 / meta['ppm']
+    c = cell.crop(bb); k = (int(hpx) / c.height) if hpx else 200 / meta['ppm']
     r = c.resize((max(1, round(c.width * k)), max(1, round(c.height * k))), Image.LANCZOS)
     ax = round((meta['ax'] - x0) * k); ay = round((meta['ay'] - y0) * k)
     r.save(os.path.join(out, id_ + '.webp'), 'WEBP', quality=90, method=6)
