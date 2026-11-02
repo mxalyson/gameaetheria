@@ -6,9 +6,8 @@ import { computeHit } from '../core/combat.js';
 import { computeStats } from '../core/stats.js';
 import { spiritPower } from '../core/progression.js';
 import { CLASSES } from '../data/classes.js';
-import { SKILLS } from '../data/skills.js';
 import { skillOf, activeSpec } from '../core/specs.js';
-import { MOBS, MOB_CURVE, LEVEL_GAP, BOSS_SPAWN, BOSS_REPEAT } from '../data/mobs.js';
+import { MOBS, MOB_CURVE, LEVEL_GAP, BOSS_SPAWN, BOSS_REPEAT, CAMP_RESPAWN } from '../data/mobs.js';
 import { skillUnlockLevel } from '../core/unlocks.js';
 import { ZONES } from '../data/zones.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -176,10 +175,10 @@ export class World {
       this.respawnT = 3;
     }
     this.campT ??= {};
-    for (const c of z.camps ?? []) { // o acampamento todo volta 150 s depois do último morto
+    for (const c of z.camps ?? []) { // o acampamento todo volta CAMP_RESPAWN s depois do último morto
       if (this.actors.some((a) => a.camp === c.id && !a.dead)) { this.campT[c.id] = 0; continue; }
       this.campT[c.id] = (this.campT[c.id] ?? 0) + dt;
-      if (this.campT[c.id] > 150) { this.actors = this.actors.filter((a) => a.camp !== c.id); this.spawnCamps(player.level, c.id); this.campT[c.id] = 0; }
+      if (this.campT[c.id] > CAMP_RESPAWN) { this.actors = this.actors.filter((a) => a.camp !== c.id); this.spawnCamps(player.level, c.id); this.campT[c.id] = 0; }
     }
     if (z.miniboss && !this.actors.some((a) => a.miniboss && !a.dead)) {
       this.miniT = (this.miniT ?? z.miniboss.respawn) - dt;
@@ -344,7 +343,8 @@ export class World {
     const cx0 = Math.max(0, Math.floor((a.x - m) / g.C)), cx1 = Math.min(g.cols - 1, Math.floor((a.x + m) / g.C));
     const cy0 = Math.max(0, Math.floor((a.y - m) / g.C)), cy1 = Math.min(g.rows - 1, Math.floor((a.y + m) / g.C));
     const ids = (g.ids ??= []); ids.length = 0;
-    const st = ++g.stamp;
+    let st = ++g.stamp;
+    if (st > 0x7ffffff0) { g.seen.fill(0); g.stamp = st = 1; } // B30: Int32Array não pode estourar; recomeça com a lista limpa
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) for (const i of g.cells[cy * g.cols + cx]) if (g.seen[i] !== st) { g.seen[i] = st; ids.push(i); }
     ids.sort((p, q) => p - q);
     const out = g.out; out.length = 0;

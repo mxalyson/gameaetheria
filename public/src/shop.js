@@ -3,6 +3,8 @@ import { makeRng, hashString } from './core/rng.js';
 import { CLASSES } from './data/classes.js';
 import { SLOTS } from './data/items.js';
 
+export const SCROLL_MAX = 99; // igual ao teto de `scrolls` em core/savedoc.js (B25)
+
 export const PRICES = {
   potion: (level) => 15 + level * 3,
   scroll: (level) => 60 + level * 8, // pergaminho de teletransporte (uma viagem)

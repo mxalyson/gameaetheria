@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import WebSocket from 'ws';
 import { openDb } from '../server/db.js';
 import { createApi } from '../server/api.js';
 import { createGameServer } from '../server/game-server.js';

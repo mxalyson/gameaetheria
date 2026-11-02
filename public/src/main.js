@@ -8,7 +8,7 @@ import { World, makeHeroActor, makeMobActor, makeSpiritActor } from './game/sim.
 import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore } from './core/stats.js';
 import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit } from './core/progression.js';
-import { generateItem, rollMobLoot, rollRarity } from './core/loot.js';
+import { generateItem, rollMobLoot } from './core/loot.js';
 import { generateRivalForPower } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
 import { MODES, newMatch, controlTick, matchWinner, getRating, setRating, spawnSlots } from './core/match.js';
@@ -24,16 +24,16 @@ import { skillOf } from './core/specs.js';
 import { SKILLS } from './data/skills.js';
 import { newlyUnlocked } from './core/unlocks.js';
 import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
-import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, evolvedSpirits } from './core/journal.js';
+import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, evolvedSpirits, readLore } from './core/journal.js';
 import { TIPS } from './data/dialogs.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
-import { PRICES, buildShopStock, sellValue } from './shop.js';
+import { PRICES, SCROLL_MAX, buildShopStock, sellValue } from './shop.js';
 import { TouchControls } from './touch.js';
 import { interactTarget } from './touch-logic.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
 import { CLASSES } from './data/classes.js';
-import { MOBS, NORMAL_MOBS, BOSS_MOBS } from './data/mobs.js';
+import { MOBS, XP_MULT } from './data/mobs.js';
 import { soloWaveSpec, WAVES } from './core/economy.js';
 import { ZONES, teleportCost, FARM_ENTRY, FARM_MID } from './data/zones.js';
 import { RARITY, INVENTORY_SIZE, SLOTS } from './data/items.js';
@@ -127,7 +127,7 @@ class Game {
         const p = this.player;
         if (this.mode === 'explore' && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
         const exploring = this.mode === 'explore';
-        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: exploring ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, chestsOpen: exploring ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
+        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: exploring ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: exploring ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
         if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
         this.ui.updateHud(this);
         this.touch.update(this);
@@ -416,7 +416,7 @@ class Game {
         queue: () => { refresh(); },
         invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (botão 👥)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
-        reject: (m) => { this.zoneBusy = false; this.portalCd = 0; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
+        reject: (m) => { this.zoneBusy = false; this.teleportPending = false; this.portalCd = 0; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
@@ -465,6 +465,7 @@ class Game {
   enterNetZone(m) {
     this.zoneBusy = false;
     if (typeof m.scrolls === 'number') this.char.scrolls = m.scrolls; // teletransporte: contagem oficial (o servidor já debitou)
+    this.fireTeleportEvent(); // depois da contagem oficial de pergaminhos (o save não pode devolver o pergaminho); conta uma vez, o offline conta em teleport()
     const info = { ...m, mode: 'zone', team: 1 };
     if (this.mode === 'net' && this.netInfo?.room === m.room) { this.netInfo = info; this.netDec = new SnapshotDecoder().init(m); return; } // reconexão
     this.ui.closePanels(); this.ui.hideScreen();
@@ -669,6 +670,10 @@ class Game {
       for (const sm of last.mobs) {
         present.add(sm.id);
         let m = this.netMobs.get(sm.id);
+        if (!m && !MOBS[sm.mob]) { // mob desconhecido (servidor mais novo que o cliente): ignora com um único aviso
+          if (!(this.netBadMobs ??= new Set()).has(sm.mob)) { this.netBadMobs.add(sm.mob); console.warn('mob desconhecido vindo do servidor:', sm.mob); }
+          continue;
+        }
         if (!m) { m = makeMobActor(sm.mob, sm.level, sm.x, sm.y, { elite: sm.elite }); m.netId = sm.id;
           // mini-chefe/esbirro/acampamento: marcas e tamanho vindos do servidor
           if (sm.miniboss) { m.miniboss = true; if (sm.name) m.name = sm.name; if (sm.r) m.r = sm.r; }
@@ -735,6 +740,7 @@ class Game {
     if (this.cloud) this.cloud.paused = false;
     this.zoneBusy = false;
     this.enterZone('town', exit?.x ?? TOWN.x, exit?.y ?? TOWN.y);
+    this.fireTeleportEvent();
   }
 
   // Avisa o jogador quando o save foi migrado, corrigido ou recuperado do backup.
@@ -920,12 +926,19 @@ class Game {
     this.gameEvent({ type: 'teleport' });
   }
 
+  // Emite o evento 'teleport' uma única vez por pedido online (zone_joined ou zone_exit para a vila).
+  fireTeleportEvent() {
+    if (!this.teleportPending) return;
+    this.teleportPending = false;
+    this.gameEvent({ type: 'teleport' });
+  }
+
   // Teletransporte online: só pede; o servidor decide e cobra (a contagem nova volta em zone_joined.scrolls). Recusas voltam em 'reject' (toast).
   async teleportOnline(id) {
     if (this.zoneBusy) return;
     if (id !== 'town' && (this.char.scrolls ?? 0) < 1) return this.ui.toast('Sem pergaminho', 'Compre um Pergaminho de Teletransporte com a Mercadora Lia.', '');
-    this.zoneBusy = true;
-    setTimeout(() => { this.zoneBusy = false; }, 6000);
+    this.zoneBusy = true; this.teleportPending = true;
+    setTimeout(() => { this.zoneBusy = false; this.teleportPending = false; }, 6000);
     await this.cloud?.flush(); // grava o progresso (mapas visitados, pergaminhos) ANTES: o servidor confere pelo documento salvo
     this.net.send({ t: 'zone_teleport', zone: id });
   }
@@ -1006,6 +1019,15 @@ class Game {
     const t = interactTarget(this.player, this.world);
     if (t?.kind === 'npc') this.talk(t.ref);
     else if (t?.kind === 'chest') this.useChest(t.ref.id);
+    else if (t?.kind === 'lore') this.readLore(t.ref);
+  }
+
+  // Placa/estátua de lore: mostra o texto; a 1ª leitura de cada zona fica no diário (bit em char.stats.lore) e pode dar conquista.
+  readLore(l) {
+    if (this.mode !== 'explore' || !l) return;
+    const r = readLore(this.char, l.id);
+    this.ui.toast(l.name, l.text, r.first ? 'gold' : '', 4200);
+    if (r.first) { this.announceAchievements(r.achievements); this.save(); if (this.ui.anyOpen()) this.ui.render(); }
   }
 
   // Dicas mostram a tecla só no modo teclado; no toque, dizem "Toque".
@@ -1050,7 +1072,7 @@ class Game {
   onMobKilled(m) {
     if (m.summoned) return; // esbirros de chefe não dão XP nem loot
     const M = MOBS[m.mobId];
-    this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? 10 : m.elite ? 4 : 1)));
+    this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1)));
     for (const l of rollMobLoot(this.rng, m, this.char.classId, (this.char.pity ??= { epic: 0, legendary: 0, opal: 0 }))) {
       this.dropAt(m.x, m.y, l);
       if (l.kind === 'item' && (l.item.opal || l.item.rarity === 'epic' || l.item.rarity === 'legendary')) { // aviso e brilho para drop raro
@@ -1280,6 +1302,7 @@ class Game {
   }
 
   buyScroll(n) {
+    if ((this.char.scrolls ?? 0) + n > SCROLL_MAX) return this.ui.toast('Pergaminhos', `Você já carrega o máximo (${SCROLL_MAX}).`, ''); // B25: recusa antes de gastar
     if (!this.spend(PRICES.scroll(this.char.level) * n)) return;
     this.char.scrolls = (this.char.scrolls ?? 0) + n;
     this.ui.render(); this.save();

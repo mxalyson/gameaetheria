@@ -89,7 +89,7 @@ SET.glacier = {
 };
 SET.ember = { ...SET.ruins, pine: { h: 3.2, ref: 11, v: P('DeadTree', 1, 3), behind: true } };
 // postes e guarda-corpos das pontes (layout.js › bridges): lampião e tronco; nas ruínas, braseiro (desenho de código) e laje
-for (const k of ['forest', 'plains', 'glacier']) { SET[k].lantern = { h: 5.6, ref: 0, v: ['m_lamp'] }; SET[k].log = { w: 4.1, ref: 0, v: ['m_log'] }; }
+for (const k of ['forest', 'plains', 'glacier']) { SET[k].lantern = { h: 5.6, ref: 0, v: ['m_lamp'] }; SET[k].log = { w: 4.1, ref: 0, v: ['m_log'] }; SET[k].signpost = { h: 5, ref: 0, v: ['m_sign'] }; } // placa de lore (data/zones.js lore)
 // vila: casas por canto (cada casa do layout ganha o seu desenho), lanternas e placa
 export const HOUSE_SET = { town: { house: { house: true, v: ['m_house_tile', 'm_house_big', 'm_house_thatch', 'm_house_porch'], pick: (d) => (d.x < 850 ? 0 : 1) + (d.y < 600 ? 0 : 2) }, lantern: { h: 5.6, ref: 0, v: ['m_lamp'] }, signpost: { h: 5, ref: 0, v: ['m_sign'] } } };
 Object.assign(SET, HOUSE_SET);
@@ -169,27 +169,27 @@ const GROUND_SET = {
 };
 const STONES = [...G('RockPath_Round_Small', 1, 3), ...G('RockPath_Square_Small', 1, 3)];
 const BORDER = STONES; // só as pedras pequenas: as largas/finas pareciam pilhas de entulho
-const segDist = (px, py, ax, ay, bx, by) => {
-  const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy, u = l ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l)) : 0;
-  return Math.hypot(px - (ax + dx * u), py - (ay + dy * u));
+// distância ponto-segmento < r? Rejeita primeiro pela caixa do segmento (quase todos os 20 mil sorteios ficam longe de quase todos os segmentos) e compara quadrados
+const segNear = (px, py, ax, ay, bx, by, r) => {
+  if (px + r < Math.min(ax, bx) || px - r > Math.max(ax, bx) || py + r < Math.min(ay, by) || py - r > Math.max(ay, by)) return false;
+  const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy, u = l ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l)) : 0, ex = px - (ax + dx * u), ey = py - (ay + dy * u);
+  return ex * ex + ey * ey < r * r;
 };
 
-// Carimba flores, trevos, capim, pedrinhas e as pedras da trilha no terreno. Devolve true quando cobriu o chão (o desenho vetorial de flores/tufos é então dispensado).
-// `bounds` ({x0,y0,x1,y1}, opcional): terreno em blocos desenha só a fatia pedida; o sorteio continua completo, então o resultado é idêntico ao do mapa inteiro.
-export function stampGround(g, world, rng, bounds = null) {
-  const kind = world.zone.scenery?.kind, rules = GROUND_SET[kind];
-  if (!gAtlas || !rules) return false;
+// Gera (uma vez por zona) a lista ordenada por y de todos os carimbos do chão. O sorteio é completo e igual para todos os blocos, então a lista é a mesma:
+// guardada em cache, cada bloco novo só filtra uma faixa dela (antes cada bloco refazia ~20 mil testes de colisão: ~100 ms por bloco no Bosque).
+function genStamps(world, rng, rules, kind) {
   const z = world.zone, L = world.layout, trail = L.trail ?? [], ponds = L.ponds ?? [], paths = z.paths ?? [], rivers = L.rivers ?? [], camps = L.camps ?? [];
   const blocked = (x, y, m) => {
     for (const p of ponds) { const c = Math.cos(-p.rot), s = Math.sin(-p.rot), dx = x - p.x, dy = y - p.y, u = (dx * c - dy * s) / (p.rx + 34), v = (dx * s + dy * c) / (p.ry + 34); if (u * u + v * v < 1) return true; }
     for (const rv of rivers) {
       if (Math.abs(x - rv.x) > rv.amp + rv.w / 2 + 60) continue;
-      for (let i = 0; i < rv.pts.length - 1; i++) if (segDist(x, y, rv.pts[i].x, rv.pts[i].y, rv.pts[i + 1].x, rv.pts[i + 1].y) < rv.w / 2 + 26) return true;
+      for (let i = 0; i < rv.pts.length - 1; i++) if (segNear(x, y, rv.pts[i].x, rv.pts[i].y, rv.pts[i + 1].x, rv.pts[i + 1].y, rv.w / 2 + 26)) return true;
     }
     for (const c of camps) if (Math.hypot(x - c.x, y - c.y) < c.r * 0.42) return true; // o chão do acampamento é pintado à parte
     for (const b of L.bridges ?? []) if (Math.abs(x - b.x) < b.len / 2 + 20 && Math.abs(y - b.y) < b.hw + 20) return true;
-    for (let i = 0; i < trail.length - 1; i++) if (segDist(x, y, trail[i].x, trail[i].y, trail[i + 1].x, trail[i + 1].y) < m) return true;
-    for (const [ax, ay, bx, by] of paths) if (segDist(x, y, ax, ay, bx, by) < m) return true;
+    for (let i = 0; i < trail.length - 1; i++) if (segNear(x, y, trail[i].x, trail[i].y, trail[i + 1].x, trail[i + 1].y, m)) return true;
+    for (const [ax, ay, bx, by] of paths) if (segNear(x, y, ax, ay, bx, by, m)) return true;
     return false;
   };
   const list = [];
@@ -227,8 +227,33 @@ export function stampGround(g, world, rng, bounds = null) {
     }
   }
   list.sort((a, b) => a.y - b.y);
-  for (const it of list) {
-    const { sp, k } = it, w = sp.w * k, h = sp.h * k;
+  let maxH = 0, maxW = 0;
+  for (const it of list) { maxH = Math.max(maxH, it.sp.h * it.k); maxW = Math.max(maxW, it.sp.w * it.k); }
+  list.maxH = maxH; list.maxW = maxW;
+  return list;
+}
+const STAMPS = new WeakMap(); // layout (um por zona, em cache) -> lista de carimbos
+// Faixa [lo, hi) da lista (ordenada por y) que pode tocar `bounds`: busca binária no y em vez de varrer o mapa inteiro
+export function stampSlice(list, bounds) {
+  if (!bounds) return [0, list.length];
+  let a = 0, b = list.length;
+  while (a < b) { const m = (a + b) >> 1; if (list[m].y < bounds.y0) a = m + 1; else b = m; }
+  const lo = a, ymax = bounds.y1 + (list.maxH ?? 0);
+  a = lo; b = list.length;
+  while (a < b) { const m = (a + b) >> 1; if (list[m].y <= ymax) a = m + 1; else b = m; }
+  return [lo, a];
+}
+
+// Carimba flores, trevos, capim, pedrinhas e as pedras da trilha no terreno. Devolve true quando cobriu o chão (o desenho vetorial de flores/tufos é então dispensado).
+// `bounds` ({x0,y0,x1,y1}, opcional): terreno em blocos desenha só a fatia pedida; o sorteio continua completo, então o resultado é idêntico ao do mapa inteiro.
+export function stampGround(g, world, rng, bounds = null) {
+  const kind = world.zone.scenery?.kind, rules = GROUND_SET[kind];
+  if (!gAtlas || !rules) return false;
+  let list = STAMPS.get(world.layout);
+  if (!list || list.atlas !== gAtlas) { const t0 = performance.now(); list = genStamps(world, rng, rules, kind); if (/[?&]perf=1/.test(globalThis.location?.search ?? '')) console.log(`[perf] carimbos do chão ${world.zoneId}: ${list.length} em ${(performance.now() - t0).toFixed(1)} ms`); list.atlas = gAtlas; STAMPS.set(world.layout, list); }
+  const [lo, hi] = stampSlice(list, bounds);
+  for (let n = lo; n < hi; n++) {
+    const it = list[n], { sp, k } = it, w = sp.w * k, h = sp.h * k;
     if (bounds && (it.x < bounds.x0 - w || it.x > bounds.x1 + w || it.y < bounds.y0 || it.y > bounds.y1 + h)) continue;
     g.save(); g.translate(it.x, it.y); if (it.flip) g.scale(-1, 1);
     g.drawImage(gAtlas, sp.x, sp.y, sp.w, sp.h, -sp.ax * k, -sp.ay * k, w, h);

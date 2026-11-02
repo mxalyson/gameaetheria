@@ -112,7 +112,8 @@ export function turnInQuest(doc, id, rng, now = Date.now()) {
 // ---------- conquistas ----------
 export function statValue(doc, stat) { return stat === 'level' ? doc.level : doc.stats?.[stat] ?? 0; }
 // Conquista da história (`quest`) vale 1 quando a missão foi concluída; as outras leem o contador.
-export const achievementValue = (doc, a) => (a.quest ? (doc.quests?.done?.[a.quest] != null ? 1 : 0) : statValue(doc, a.stat));
+const bitCount = (n) => { let c = 0; for (let v = n >>> 0; v; v &= v - 1) c++; return c; };
+export const achievementValue = (doc, a) => (a.quest ? (doc.quests?.done?.[a.quest] != null ? 1 : 0) : a.mask ? bitCount(statValue(doc, a.stat) & LORE_MASK) : statValue(doc, a.stat));
 export const achievementProgress = (doc, a) => ({ value: Math.min(a.min, achievementValue(doc, a)), min: a.min, earned: doc.achievements?.[a.id] != null });
 // Concede as conquistas cujo contador já foi atingido (o servidor repete este cálculo; o cliente não escolhe).
 export function checkAchievements(doc, now = Date.now()) {
@@ -137,6 +138,19 @@ export function takeTip(doc, key) { // true se for a primeira vez (e marca como 
   ensureJournal(doc);
   doc.stats.tips = (doc.stats.tips | (1 << TIP_BITS[key])) >>> 0;
   return true;
+}
+
+// ---------- lore coletável (placa/estátua por zona de farm; bit = posição em LORE_ZONES, em stats.lore) ----------
+export const LORE_ZONES = ['forest', 'plains', 'ruins', 'glacier', 'ember'];
+export const LORE_MASK = (1 << LORE_ZONES.length) - 1;
+export const loreSeen = (doc, zoneId) => { const b = LORE_ZONES.indexOf(zoneId); return b >= 0 && ((doc.stats?.lore ?? 0) & (1 << b)) !== 0; };
+export const loreCount = (doc) => LORE_ZONES.filter((z) => loreSeen(doc, z)).length;
+export function readLore(doc, zoneId) { // true se for a primeira leitura (marca como lida e checa a conquista)
+  const b = LORE_ZONES.indexOf(zoneId);
+  if (b < 0 || loreSeen(doc, zoneId)) return { first: false, achievements: [] };
+  ensureJournal(doc);
+  doc.stats.lore = (doc.stats.lore | (1 << b)) >>> 0;
+  return { first: true, achievements: checkAchievements(doc) };
 }
 
 // ---------- falas condicionais dos NPCs ----------

@@ -294,3 +294,56 @@ test('diário: a lista de NPCs vem dos givers das missões (todos existem na Vil
   assert.ok(givers.includes('merchant') && givers.includes('smith'));
   for (const g of givers) assert.ok(ZONES.town.npcs.some((n) => n.id === g), g);
 });
+
+// ---------- lore coletável (S17) ----------
+import { interactTarget } from '../public/src/touch-logic.js';
+import { LORE_ZONES, readLore, loreSeen, loreCount, achievementValue } from '../public/src/core/journal.js';
+import { buildLayout, segDist } from '../public/src/game/layout.js';
+
+test('lore: um objeto tocável por zona de farm, texto curto, perto da trilha e longe de obstáculos', () => {
+  for (const id of LORE_ZONES) {
+    const z = ZONES[id], l = z.lore?.[0], lay = buildLayout(id);
+    assert.ok(l && l.id === id && l.text && l.name && ['signpost', 'statue'].includes(l.kind), `${id}: lore`);
+    assert.ok(l.text.length <= 160 && !/tecla/i.test(l.text), `${id}: ${l.text.length} caracteres`);
+    assert.ok(l.x > 60 && l.y > 60 && l.x < z.w - 60 && l.y < z.h - 60);
+    for (const o of lay.obstacles) {
+      if (o.x === l.x && o.y === l.y) continue; // o próprio objeto
+      const d = o.w ? Math.hypot(Math.max(o.x - l.x, 0, l.x - (o.x + o.w)), Math.max(o.y - l.y, 0, l.y - (o.y + o.h))) : Math.hypot(o.x - l.x, o.y - l.y) - o.r;
+      assert.ok(d > 40, `${id}: lore encostado em obstáculo (${Math.round(d)})`);
+    }
+    const trail = Math.min(...lay.trail.slice(1).map((p, i) => segDist(l.x, l.y, lay.trail[i].x, lay.trail[i].y, p.x, p.y)));
+    assert.ok(trail > 60 && trail < 220, `${id}: distância da trilha ${Math.round(trail)}`);
+    for (const p of [...z.chests, ...z.portals, ...(z.camps ?? [])]) assert.ok(Math.hypot(p.x - l.x, p.y - l.y) > 150, `${id}: lore perto de ${p.id ?? p.to}`);
+    assert.ok(lay.decor.some((d) => d.type === l.kind && d.x === l.x && d.y === l.y), `${id}: peça desenhada`);
+  }
+});
+
+test('lore: interactTarget prioriza NPC > baú > lore', () => {
+  const lore = { id: 'forest', x: 100, y: 100 }, chest = { id: 'c', x: 150, y: 100 }, npc = { id: 'n', x: 100, y: 150 };
+  const world = (z) => ({ zone: { npcs: [], chests: [], lore: [], ...z } });
+  assert.deepEqual(interactTarget({ x: 100, y: 100 }, world({ lore: [lore] })), { kind: 'lore', ref: lore });
+  assert.equal(interactTarget({ x: 100, y: 300 }, world({ lore: [lore] })), null, 'longe não interage');
+  assert.equal(interactTarget({ x: 120, y: 100 }, world({ lore: [lore], chests: [chest] })).kind, 'chest');
+  assert.equal(interactTarget({ x: 110, y: 120 }, world({ lore: [lore], chests: [chest], npcs: [npc] })).kind, 'npc');
+  assert.equal(interactTarget({ x: 100, y: 100 }, { zone: { npcs: [], chests: [] } }), null, 'zona sem lore');
+});
+
+test('lore: cada leitura conta uma vez; as 5 dão "Leitor de Ecos"; o servidor mantém os bits', () => {
+  const d = ensureJournal(hero(10));
+  assert.equal(readLore(d, 'forest').first, true); assert.equal(readLore(d, 'forest').first, false);
+  assert.equal(loreSeen(d, 'forest'), true); assert.equal(loreSeen(d, 'ember'), false); assert.equal(loreCount(d), 1);
+  assert.equal(readLore(d, 'inexistente').first, false);
+  const a = ACHIEVEMENTS.find((x) => x.id === 'leitor_de_ecos');
+  assert.equal(achievementValue(d, a), 1); assert.equal(d.achievements.leitor_de_ecos, undefined);
+  for (const z of LORE_ZONES.slice(1, 4)) assert.deepEqual(readLore(d, z).achievements, []);
+  assert.deepEqual(readLore(d, 'ember').achievements, ['leitor_de_ecos']);
+  assert.equal(loreCount(d), 5); assert.equal(titleText({ ...d, title: 'leitor_de_ecos' }), 'Leitor de Ecos');
+  // plausibilidade: bits só se ganham (sem limite de salto) e nunca se perdem
+  const base = ensureJournal(hero(5)); base.stats.lore = 0b1;
+  const n = structuredClone(base); n.stats.lore = 0b11111;
+  const r = checkSave(base, n); assert.equal(r.ok, true); assert.equal(r.doc.stats.lore, 0b11111);
+  n.stats.lore = 0; assert.equal(checkSave(base, n).doc.stats.lore, 0b1, 'bits nunca somem');
+  assert.ok(validate({ ...hero(5), stats: { lore: 1e12 } }).char.stats.lore <= 1e8);
+  // bits fora das 5 zonas não contam para a conquista
+  const f = ensureJournal(hero(5)); f.stats.lore = 0xffffffe0; assert.equal(achievementValue(f, a), 0);
+});

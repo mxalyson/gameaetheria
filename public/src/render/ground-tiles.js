@@ -4,8 +4,9 @@
 // Só memória e ordem de desenho: o conteúdo de cada bloco vem de `build`, que desenha a MESMA coisa que o canvas inteiro (mesma semente), recortada.
 export const TILE = 1024;
 const PAD = 2; // sobreposição entre blocos: evita fresta de 1 px na costura quando o zoom não é inteiro
-export const BUDGET_MIB = 36; // teto do cache de terreno (≈ 9 blocos); a vista nunca precisa de mais de 6–9
+export const BUDGET_MIB = 36; // teto "mole" (B29): ≈ 9 blocos para expulsar e pré-aquecer; a vista atual nunca é expulsa, então telas ultrawide (≥ 12 blocos visíveis) passam de 36 MiB (~50-60), sem thrash
 const MIB = 1048576;
+const PERF = typeof location !== 'undefined' && /[?&]perf=1/.test(location.search); // ?perf=1: registra no console o custo de cada bloco de terreno
 const WHOLE_MAX = 14 * MIB; // abaixo disto o mapa inteiro vale um canvas só (Vila 8,4 MiB, arena grande 13 MiB)
 
 // Memória do terreno de uma zona: mapa inteiro (zonas pequenas) ou o pior caso de blocos visíveis. Usado pelos testes e pelo relatório.
@@ -37,6 +38,7 @@ export class GroundCache {
       if (soft && !this.canBuild()) { this.stats.deferred++; return null; }
       const a = performance.now(); e = { cv: mk(), bytes, rdy, used: 0 }; this.map.set(key, e); this.bytes += bytes;
       this.built++; this.stats.built++; this.stats.maxMs = Math.max(this.stats.maxMs, performance.now() - a);
+      if (PERF) console.log(`[perf] bloco ${key}: ${(performance.now() - a).toFixed(1)} ms`);
     }
     e.used = hint; return e;
   }

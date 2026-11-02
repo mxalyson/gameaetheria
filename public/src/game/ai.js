@@ -1,6 +1,5 @@
 // IA produz as mesmas "intenções" que o input do jogador.
 import { CLASSES } from '../data/classes.js';
-import { SKILLS } from '../data/skills.js';
 import { skillOf } from '../core/specs.js';
 import { MOBS, BOSS_PHASES } from '../data/mobs.js';
 import { isSkillUnlocked } from '../core/unlocks.js';

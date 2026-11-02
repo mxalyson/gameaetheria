@@ -51,8 +51,6 @@ export function applyMatchResult(doc, { mode, result, foeRating, foeId = null, n
   return { doc: v.char, summary: { mode, result, won, gold, xp, levels, level: v.char.level, ratingDelta: delta, rating, tier: tierFor(rating).name, was: before, achievements: prog.achievements, quests: prog.quests.filter((q) => q.complete).map((q) => q.id) } };
 }
 
-// Compatibilidade: duelo 1×1 (usado pelos testes e pela primeira versão do servidor).
-export const applyDuelResult = (doc, { won, foeRating }) => applyMatchResult(doc, { mode: '1v1', result: won ? 'win' : 'loss', foeRating });
 
 // Recompensa de uma partida COOPERATIVA (PvE no servidor): ouro, XP e itens já rolados pelo servidor (com ids do servidor).
 // Inventário cheio: o item vira ouro (valor de venda), como no jogo. Devolve { doc, summary } sem alterar o original.

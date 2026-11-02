@@ -1,5 +1,6 @@
 // Tudo é desenhado proceduralmente (sem imagens), num estilo pastel limpo.
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
+import { safeBoxScreen } from './safe-box.js';
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
@@ -134,9 +135,10 @@ export class Renderer {
     // Barras e nomes por cima de tudo.
     this.labels.length = 0;
     const hud = this.hud, zm = this.zoom;
+    PROMPTS.length = 0; SAFE.cx = cam.x; SAFE.cy = cam.y; SAFE.zm = zm; SAFE.vw = this.vw; SAFE.vh = this.vh; SAFE.hud = hud;
     const covered = (a) => { const sx = (a.x - cam.x) * zm, sy = (a.y - cam.y) * zm - 40 * zm; for (const [x0, y0, x1, y1] of hud) if (sx > x0 && sx < x1 && sy > y0 && sy < y1) return true; return false; };
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y) && (a === player || a.kind !== 'mob' || a.boss || !covered(a))) drawBars(g, a, a === player, this.labels);
-    for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id], view.keys);
+    for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id], view.guideNpc === n.id);
     for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : 'Toque para abrir');
     for (const tx of world.texts) {
       const a = 1 - Math.max(0, (tx.t - tx.life * 0.6) / (tx.life * 0.4));
@@ -865,23 +867,44 @@ function drawBars(g, a, isPlayer, placed) {
       for (let n = 0; n < 3 && placed.some((q) => Math.abs(q.x - a.x) < q.hw + hw && Math.abs(q.y - ly) < 12); n++) ly -= 12;
       placed.push({ x: a.x, y: ly, hw });
     }
-    g.strokeText(label, a.x, ly);
+    const sp = safeBox(a.x, ly - 11, g.measureText(label).width + 6, 14); // etiqueta presa à tela e fora do menu
+    const lx = sp.x; ly = sp.y + 11;
+    g.strokeText(label, lx, ly);
     g.fillStyle = a.boss ? '#ffb4a8' : a.elite ? '#ffd27a' : a.kind === 'rival' && a.team === 1 ? '#bfe0ff' : '#ffffff';
-    g.fillText(label, a.x, ly);
+    g.fillText(label, lx, ly);
   }
 }
 
 // Baú pintado (assets/props/chest.webp): brilha quando está pronto para abrir; saqueado fica escurecido.
 function drawChest(g, c, ready, t) { drawChestSprite(g, c, ready, t); } // baú pintado (render/prop-sprites.js); o desenho por código foi removido
 
+// Quadro atual da vista (câmera, zoom e áreas da interface) para prender etiquetas à área livre da tela
+const SAFE = { cx: 0, cy: 0, zm: 1, vw: 0, vh: 0, hud: null, x: 0, y: 0 };
+// Prende uma caixa (x = centro, y = topo, em unidades do mundo) dentro da tela e fora das áreas da interface; resultado em SAFE.x/SAFE.y
+function safeBox(x, y, w, h) {
+  const s = SAFE;
+  if (!s.hud) { s.x = x; s.y = y; return s; }
+  safeBoxScreen((x - s.cx) * s.zm, (y - s.cy) * s.zm, w * s.zm, h * s.zm, s.vw, s.vh, s.hud, s);
+  s.x = s.cx + s.x / s.zm; s.y = s.cy + s.y / s.zm;
+  return s;
+}
+
+const PROMPTS = [], PROMPT_OFF = [0, -24, 24, -48, 48]; // rótulos "Toque para…" já postos neste quadro (zerado em draw)
 function drawPrompt(g, x, y, txt) {
   g.font = '800 13px Cinzel, Nunito, serif'; g.textAlign = 'center';
   const w = g.measureText(txt).width + 16;
+  // nunca sob botões de toque nem fora da tela; dois rótulos (NPC e baú juntos) não se sobrepõem: tenta ao lado em degraus de 24 px
+  const x0 = x, y0 = y;
+  for (let n = 0; n < 5; n++) {
+    const p = safeBox(x0, y0 + PROMPT_OFF[n], w, 22); x = p.x; y = p.y;
+    if (!PROMPTS.some((q) => Math.abs(q.x - x) < (q.w + w) / 2 && Math.abs(q.y - y) < 24)) break;
+  }
+  PROMPTS.push({ x, y, w });
   g.fillStyle = 'rgba(24,16,8,0.82)'; g.beginPath(); g.roundRect(x - w / 2, y, w, 22, 11); g.fill();
   g.fillStyle = '#ffffff'; g.fillText(txt, x, y + 16);
 }
 
-function drawNpcTag(g, n, near, t, mark, keys) {
+function drawNpcTag(g, n, near, t, mark, guide) {
   g.font = '800 12px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
@@ -896,13 +919,14 @@ function drawNpcTag(g, n, near, t, mark, keys) {
     g.fillStyle = '#5a3d00'; g.font = '900 13px Nunito, system-ui, sans-serif';
     g.fillText(mark === 'ready' ? '?' : '!', n.x, by + 5);
   }
-  if (near) {
-    g.font = '800 13px Cinzel, Nunito, serif';
-    const txt = 'Toque para conversar'; // sem tecla no texto (decisão 0016, V5)
-    const w = g.measureText(txt).width + 16;
-    g.fillStyle = 'rgba(24,16,8,0.82)';
-    g.beginPath(); g.roundRect(n.x - w / 2, n.y + 22, w, 22, 11); g.fill();
-    g.fillStyle = '#ffffff';
-    g.fillText(txt, n.x, n.y + 38);
+  // Onboarding: pulso e seta sobre o guia enquanto a primeira missão não foi aceita
+  if (guide && mark === 'offer') {
+    const k = (t * 1.2) % 1;
+    g.strokeStyle = `rgba(255,211,77,${0.8 * (1 - k)})`; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(n.x, n.y + 6, 22 + k * 30, 9 + k * 12, 0, 0, Math.PI * 2); g.stroke();
+    const ay = by - 16 + Math.sin(t * 5) * 4;
+    g.fillStyle = '#ffd34d'; g.strokeStyle = 'rgba(60,35,0,0.9)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(n.x, ay + 9); g.lineTo(n.x - 8, ay - 3); g.lineTo(n.x + 8, ay - 3); g.closePath(); g.stroke(); g.fill();
   }
+  if (near) drawPrompt(g, n.x, n.y + 22, 'Toque para conversar'); // sem tecla no texto (decisão 0016, V5); presa à área livre
 }

@@ -8,8 +8,8 @@ export const DIALOGS = {
   ], service: { label: 'Abrir a loja', panel: 'shop' } },
   arena: { greet: [
     { when: { done: 'cavaleiro_rubro' }, text: 'Dizem que o Rubro esperou a gente. Arena é isso, esperar. E você, herói, não faz ninguém esperar.' },
-    { when: { offline: true }, text: 'Sem rede, as filas da Grande Arena dormem. As Ondas continuam de pé: treine lá, e volte quando houver adversários de verdade!' },
-    { text: 'A arena guarda os ecos de todos que lutaram aqui. Prove seu valor!' },
+    { when: { offline: true }, text: 'Sem rede, o palco da Grande Arena fica às escuras! As Ondas continuam de pé: treine lá, e volte quando houver adversários de verdade!' },
+    { text: 'Ah, a arena! Ela guarda os ecos de todos que lutaram aqui. Suba ao palco e prove seu valor!' },
   ], service: { label: 'Entrar na arena', panel: 'arena' } },
   sage: { greet: [
     { when: { done: 'ecos_unidos' }, text: 'Os ecos repousam, mas eu ainda os ouço, bem baixinho. Escolha bem quem caminha ao seu lado.' },
@@ -25,7 +25,7 @@ export const DIALOGS = {
   ], service: null },
   smith: { greet: [
     { when: { level: 25 }, text: 'Seu aço está cansado. O meu fogo, não. Traga.' },
-    { text: 'Metal bom lembra de quem o forjou. Traga o que veste e eu o deixo mais forte, a um preço justo em ouro.' },
+    { text: 'Metal bom lembra de quem o forjou. Traga o que veste. Eu deixo mais forte. Ouro, preço justo.' },
   ], service: { label: 'Aprimorar equipamento', panel: 'shop:smith' } },
   herbalist: { greet: [
     { when: { done: 'coracao_de_cristal' }, text: 'Ainda cheiro cristal nas suas botas. Sente-se, querido, tenho chá. E se achar baús pelo caminho, abra-os.' },

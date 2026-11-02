@@ -36,6 +36,8 @@ export const BOSS_MOBS = Object.keys(MOBS).filter((id) => MOBS[id].boss);
 // ---- Curva de dificuldade (medida com tools/boss-check.mjs; números em docs/gameplay/dificuldade.md) ----
 // Base por nível do mob; hp/atk/def de cada MOBS são multiplicadores sobre ela. Calibrada contra a curva de poder do herói
 // (core/stats.js + itens + Ferreiro): um mob comum do seu nível custa vida, 2+ juntos ameaçam, chefes pedem nível + equipamento aprimorado.
+// B20: multiplicador de XP de elite/chefe, único para o jogo offline e o servidor.
+export const XP_MULT = { elite: 3, boss: 10 };
 export const MOB_CURVE = {
   hp: (lv) => 60 + 120 * lv ** 1.15,
   power: (lv) => 6 + 4.2 * lv ** 1.42,
@@ -44,8 +46,8 @@ export const MOB_CURVE = {
   // Mobs comuns só têm o ataque básico (sem golpe em área): compensam com mais dano base. Chefes usam a curva pura + mecânica.
   common: { hp: 1.15, atk: 3.1 },
   // Rampa de início (G6/G7): mobs não-chefe de nível baixo têm menos dano e vida, para o kit inicial das 4 classes vencer o mob do mesmo nível sem poção (sobe até 1 no nível 6).
-  early: (lv) => Math.min(1, 0.6 + 0.08 * (lv - 1)),
-  earlyHp: (lv) => Math.min(1, 0.8 + 0.05 * (lv - 1)),
+  early: (lv) => Math.min(1, 0.95 + 0.01 * (lv - 1)),
+  earlyHp: () => 1,
 };
 
 // Diferença de nível (mob - herói) acima de `free` níveis: o herói causa menos dano ao mob e leva mais dano dele. Impede pular zonas só com equipamento.
@@ -67,6 +69,8 @@ export const BOSS_PHASES = {
 // ritual: o chefe NÃO aparece sozinho; um contador enche com os abates da zona (elite vale `eliteWeight`) e, ao chegar em `need`, ele surge
 // (antes disso, cada elite abatida depois de metade do contador tem chance crescente de adiantar). Depois de morrer, `cooldown` s de jogo antes de um novo ciclo.
 export const BOSS_REPEAT = { window: 1800, mul: 0.5, floor: 0.25 };
+// Acampamentos (elite + grupo) voltam depois do último morto; 150 s dava ~1,3 épico/h só de elites parado num acampamento (o farm normal rende ~1/h).
+export const CAMP_RESPAWN = 300;
 export const BOSS_SPAWN = {
   // G5: reaparição longa (7–15 min) + abates repetidos do mesmo chefe em `repeatWindow` s valem `repeatMul` da chance de item a cada vez (World.onMobDeath).
   default: { respawn: 420 },

@@ -31,7 +31,7 @@ export const CLASSES = {
     id: 'cleric', name: 'Clérigo', icon: '✨', color: '#e8c25a', accent: '#fff4cf',
     desc: 'Guerreiro sagrado: cura, escudos e controle. Difícil de derrubar.',
     primary: 'int', base: { str: 5, agi: 3, int: 7, vit: 9 }, growth: { str: 1, agi: 0, int: 3.4, vit: 2.8 },
-    hpBase: 150, weapon: 'mace',
+    hpBase: 150, weapon: 'mace', rookie: 3, // reforço de iniciante (core/stats.js): ataque lento e sem escudo antes do nível 5; some até o nível 10
     basic: { kind: 'melee', range: 68, arc: 1.5, cd: 0.65, mult: 1.1, color: '#fff3b0' },
     skills: ['holylight', 'divineshield', 'judgement'],
   },

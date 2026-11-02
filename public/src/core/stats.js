@@ -22,10 +22,12 @@ export function primaryStats(char) {
   return out;
 }
 
-// Bônus de iniciante (vida e poder): some até o nível 9 (o PvP só abre no 10). Mantém o kit inicial vivo contra 2 mobs do mesmo nível sem mexer no balanço de duelos.
-const rookieFade = (level) => Math.max(0, 1 - (level - 1) / 8);
-export const rookieHp = (level) => Math.round(240 * rookieFade(level));
-export const rookiePower = (level) => Math.round(36 * rookieFade(level));
+// Bônus de iniciante (vida e poder): some até o nível 10 (o PvP só abre no 10). Mantém o kit inicial vivo contra 2 mobs do mesmo nível sem mexer no balanço de duelos.
+export const ROOKIE = { hp: 360, power: 12, fadeLevels: 9 };
+const rookieFade = (level) => Math.max(0, 1 - (level - 1) / ROOKIE.fadeLevels);
+// mul: reforço por classe (`rookie` em data/classes.js); some junto com o bônus, antes do PvP (nível 10)
+export const rookieHp = (level, mul = 1) => Math.round(ROOKIE.hp * mul * rookieFade(level));
+export const rookiePower = (level, mul = 1) => Math.round(ROOKIE.power * mul * rookieFade(level));
 
 // Atributos derivados usados em combate. Mesma função para jogador e rivais da arena.
 export function computeStats(char) {
@@ -34,8 +36,8 @@ export function computeStats(char) {
   const p = primaryStats(char);
   return {
     ...p,
-    maxHp: Math.round(cls.hpBase + p.vit * 12 + (char.level - 1) * 8 + rookieHp(char.level) + (g.hp ?? 0)),
-    power: Math.round((g.atk ?? 4) + p[cls.primary] * 2.2 + char.level * 1.5 + rookiePower(char.level)),
+    maxHp: Math.round(cls.hpBase + p.vit * 12 + (char.level - 1) * 8 + rookieHp(char.level, cls.rookie) + (g.hp ?? 0)),
+    power: Math.round((g.atk ?? 4) + p[cls.primary] * 2.2 + char.level * 1.5 + rookiePower(char.level, cls.rookie)),
     def: Math.round((g.def ?? 0) + p.vit * 0.4 + p.agi * 0.2),
     crit: Math.min(60, 5 + p.agi * 0.25 + (g.crit ?? 0)),
     critMult: 1.6,

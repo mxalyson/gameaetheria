@@ -33,7 +33,7 @@ test('teleporte válido: entra no ponto oeste, debita 1 pergaminho no banco e in
   const { db, srv, c, ch } = await setup();
   c.send({ t: 'zone_teleport', zone: 'plains' });
   const j = await c.waitFor((m) => m.t === 'zone_joined');
-  assert.equal(j.zone, 'plains'); assert.equal(j.x, 110); assert.equal(j.y, 950); assert.equal(j.scrolls, 1);
+  assert.equal(j.zone, 'plains'); assert.equal(j.x, 110); assert.equal(j.y, 1400); // B22: ponto oeste = FARM_ENTRY, FARM_MID assert.equal(j.scrolls, 1);
   assert.equal(db.character(ch).doc.scrolls, 1);
   assert.equal(srv.hub.sessions.values().next().value.char.scrolls, 1);
   // de dentro de uma instância para outra (sai da sala atual)
@@ -158,4 +158,40 @@ test('B1: dentro da sala só atravessa o portal quem está perto dele (≤ 80 px
   assert.equal(j2.x, 110);
   assert.equal(db.character(ch).doc.visited.plains, 1, 'entrada legítima marca visitado');
   await closeAll(srv, c);
+});
+
+test('B15: zone_leave (voltar para a vila) é recusado em combate ou morto; livre depois de 8 s', async () => {
+  const { srv, c } = await setup();
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  const room = srv.hub.zoneRooms.values().next().value, me = srv.actor(j.you);
+  me.lastCombat = room.world.time;
+  c.send({ t: 'zone_leave' });
+  await rejected(c, 'in_combat');
+  assert.ok(srv.hub.sessions.values().next().value.room, 'continua na instância');
+  me.lastCombat = -99; me.dead = true;
+  c.send({ t: 'zone_leave' });
+  await c.sync();
+  assert.ok(srv.hub.sessions.values().next().value.room, 'morto também não sai');
+  assert.equal(c.all('zone_exit').length, 0);
+  me.dead = false; me.lastCombat = room.world.time - 20;
+  c.send({ t: 'zone_leave' });
+  assert.equal((await c.waitFor((m) => m.t === 'zone_exit')).to, 'town');
+  await closeAll(srv, c);
+});
+
+test('B19: reconectar do zero com a sessão antiga ainda na sala encerra a antiga (um personagem, uma sala)', async () => {
+  const { db, srv, c, ch } = await setup();
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  await c.waitFor((m) => m.t === 'zone_joined');
+  const sess = srv.hub.sessions.values().next().value;
+  const accountId = sess.accountId;
+  c.ws.terminate(); await new Promise((r) => setTimeout(r, 80));
+  assert.equal(srv.hub.sessions.size, 1, 'sessão antiga ainda na janela de reconexão');
+  const c2 = await connect(srv);
+  c2.send({ t: 'hello', session: db.createSession(accountId), characterId: ch });
+  await c2.waitFor((m) => m.t === 'welcome');
+  assert.equal(srv.hub.sessions.size, 1, 'só a sessão nova sobrou');
+  assert.equal([...srv.hub.zoneRooms.values()].reduce((n, r) => n + r.size, 0), 0, 'a antiga saiu da instância');
+  await closeAll(srv, c2);
 });

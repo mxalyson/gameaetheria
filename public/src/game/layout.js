@@ -198,6 +198,13 @@ export function buildLayout(zoneId) {
     decor.push({ type, x, y, s, v: srng.next() });
     if (collR) obstacles.push({ x, y, r: s * collR, block: true });
   }
+  // Lore coletável (placa ou estátua tocável, ver touch-logic.js interactTarget): pequeno obstáculo, com área livre em volta antes da vegetação.
+  for (const l of z.lore ?? []) {
+    const s = l.kind === 'statue' ? 28 : 16, collR = l.kind === 'statue' ? 0.9 : 0.5;
+    keepOut.push({ x: l.x, y: l.y, r: 55 });
+    decor.push({ type: l.kind, x: l.x, y: l.y, s, v: srng.next() });
+    obstacles.push({ x: l.x, y: l.y, r: s * collR, block: true });
+  }
   if (sc?.beds) for (const h of z.houses ?? []) for (const bx of [h.x + 38, h.x + h.w - 38]) { decor.push({ type: 'flowerbed', x: bx, y: h.y + h.h + 30, s: 20, v: srng.next() }); obstacles.push({ x: bx, y: h.y + h.h + 30, r: 20 }); }
 
   place(z.treeType ?? 'tree', z.decor.trees, 28, 42, 0.45);

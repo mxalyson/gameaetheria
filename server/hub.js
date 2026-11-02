@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { MatchRoom } from './room.js';
 import { CoopRoom } from './coop.js';
 import { ZoneRoom, entryPoint } from './zone.js';
-import { ZONES } from '../public/src/data/zones.js';
+import { ZONES, FARM_ENTRY, FARM_MID } from '../public/src/data/zones.js';
 import { MODES } from '../public/src/core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../public/src/core/power.js';
 import { getRating } from '../public/src/core/match.js';
@@ -20,7 +20,7 @@ export const COOP_WAIT = 6;          // s esperando mais jogadores antes de come
 const COOP_LEVEL_GAP = 8;
 export const TELEPORT_COOLDOWN = 5;      // s entre pedidos de teletransporte da mesma sessão (vale também para pedidos recusados)
 export const TELEPORT_COMBAT_SEC = 8;    // mesmo critério do cliente offline: sem dano causado/recebido nos últimos 8 s
-const TELEPORT_ENTRY = { x: 110, y: 950 }; // ponto oeste, igual ao de quem entra por portal
+const TELEPORT_ENTRY = { x: FARM_ENTRY, y: FARM_MID }; // ponto oeste, igual ao de quem entra por portal (B22)
 export const PORTAL_REACH = 80;          // px: distância máxima do ator ao portal para atravessá-lo (o servidor usa a posição do ator, nunca a do cliente)
 const RATING_WIN = [50, 400], POWER_WIN = [0.15, 0.5], WIDEN_SEC = 40; // a janela abre linearmente com a espera
 
@@ -47,6 +47,12 @@ export class Hub {
     const doc = identity.doc;
     let name = doc.name, n = 1;
     while (this.byName.has(name.toLowerCase())) name = `${doc.name.slice(0, 11)}#${++n}`; // convidados com o mesmo nome
+    // B19: recarregar a página enquanto a sessão antiga ainda espera reconexão: encerra a antiga (grava o lote da instância) para o personagem não ficar em duas salas
+    const old = identity.charId ? this.byChar.get(identity.charId) : null;
+    if (old && !old.ws && (!old.room || old.room.mode === 'zone')) {
+      try { if (old.room && old.player) old.room.leave(old.player, 'replaced'); } catch (e) { this.fail('replace_session', e); }
+      this.drop(old);
+    }
     const s = { id: randomBytes(4).toString('hex'), token: randomBytes(18).toString('base64url'), ws, name, charId: identity.charId ?? null, accountId: identity.accountId ?? null,
       char: doc, partyId: null, queued: null, room: null, player: null, dropT: null };
     this.sessions.set(s.token, s);
@@ -385,6 +391,9 @@ export class Hub {
   zoneLeave(s) {
     const room = s.room;
     if (!room || room.mode !== 'zone') return;
+    const a = s.player?.actor;
+    // B15: sair da instância em luta (ou morto) devolveria o herói com vida cheia; mesmo critério do teletransporte
+    if (a && (a.dead || room.world.time - a.lastCombat < TELEPORT_COMBAT_SEC)) return this.out.send(s, { t: 'reject', code: REJECT.IN_COMBAT });
     room.leave(s.player, 'left');
     this.out.send(s, { t: 'zone_exit', to: 'town' });
   }

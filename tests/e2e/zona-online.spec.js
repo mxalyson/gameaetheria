@@ -66,6 +66,11 @@ test('portal da vila → instância do servidor; abater monstro paga XP/ouro gra
   await page.keyboard.press('i');
   expect(await page.evaluate(() => window.game.ui.isOpen('inventory'))).toBe(false);
   await page.screenshot({ path: 'test-results/zona-online.png' });
+  // B15: logo depois do combate o servidor recusa a saída (continua na instância)
+  await page.evaluate(() => window.game.hearth());
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => window.game.mode)).toBe('net');
+  me.actor.lastCombat = -999; // passou o tempo sem combate
   await page.evaluate(() => window.game.hearth());
   await page.waitForFunction(() => window.game.mode === 'explore' && window.game.world.zoneId === 'town', null, { timeout: 10000 });
   expect(game.hub.zoneRooms.size).toBe(0);

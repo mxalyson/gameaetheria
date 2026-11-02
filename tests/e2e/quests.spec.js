@@ -116,3 +116,13 @@ test('NPC sem missão abre o serviço direto (como antes); missões de arena rea
   await expect(page.locator('.panel').first()).toContainText('Mercadora Lia');
   expect(errors).toEqual([]);
 });
+
+test('mapa: zonas não visitadas mostram o cadeado (sem "${...}" literal)', async ({ page }) => {
+  const errors = await criar(page);
+  await page.evaluate(() => window.game.ui.openPanel('map'));
+  const txt = await page.locator('.panel').first().innerText();
+  expect(txt).toContain('não visitado');
+  expect(txt).not.toContain('${');
+  await page.evaluate(() => window.game.ui.closeAll?.());
+  expect(errors).toEqual([]);
+});

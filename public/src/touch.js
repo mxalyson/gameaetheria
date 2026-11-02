@@ -5,6 +5,7 @@ import { SKILLS } from './data/skills.js';
 import { isSkillUnlocked, skillUnlockLevel } from './core/unlocks.js';
 import { skillOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
+import { asset } from './assets-version.js';
 import { stickVector, pickAim, aimModeFor, dragAim, interactTarget } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
@@ -59,7 +60,7 @@ export class TouchControls {
         <div class="tbtn slot sk sk1" data-t="skill" data-i="1"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot sk sk2" data-t="skill" data-i="2"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot pot" data-t="potion"><span class="icon">🧪</span><span class="count"></span><div class="cd"></div></div>
-        <div class="tbtn slot home" data-t="hearth"><span class="icon"><img class="art" src="assets/icons/ui/home.webp" alt="🏠" draggable="false" onerror="this.replaceWith(this.alt)"></span></div>
+        <div class="tbtn slot home" data-t="hearth"><span class="icon"><img class="art" src="${asset('assets/icons/ui/home.webp')}" alt="🏠" draggable="false" onerror="this.replaceWith(this.alt)"></span></div>
         <div class="tbtn slot act hidden" data-t="interact"><span class="icon"></span></div>
       </div>`;
 
@@ -192,8 +193,10 @@ export class TouchControls {
     if (tg && act.dataset.kind !== tg.kind) {
       act.dataset.kind = tg.kind;
       act.querySelector('.icon').innerHTML = tg.kind === 'chest'
-        ? '<img class="art" src="assets/icons/item/res-chest.webp" alt="🧰" draggable="false" onerror="this.replaceWith(this.alt)">'
-        : '<img class="art" src="assets/icons/menu/menu-journal.webp" alt="Conversar" draggable="false">'; // pergaminho pintado (V6): sem emoji nem disco chapado
+        ? `<img class="art" src="${asset('assets/icons/item/res-chest.webp')}" alt="🧰" draggable="false" onerror="this.replaceWith(this.alt)">`
+        : tg.kind === 'lore'
+          ? `<img class="art" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false" onerror="this.replaceWith(this.alt)">`
+          :`<img class="art" src="${asset('assets/icons/menu/menu-journal.webp')}" alt="Conversar" draggable="false">`; // pergaminho pintado (V6): sem emoji nem disco chapado
     }
   }
 }

@@ -48,3 +48,32 @@ test('terreno em blocos: no máximo ~um bloco novo por quadro, sem buracos depoi
   assert.equal(flat, 0, 'todos os blocos visíveis prontos após alguns quadros');
   assert.equal(imgs, 6);
 });
+
+// Carimbos do chão: a faixa por bloco vem de busca binária no y (não varre o mapa inteiro) e é equivalente ao filtro completo
+import { stampSlice } from '../public/src/render/nature-sprites.js';
+test('stampSlice devolve exatamente os carimbos que podem tocar o bloco', () => {
+  const list = Array.from({ length: 2000 }, (_, i) => ({ x: (i * 37) % 4600, y: (i * 1.4) % 2800 })).sort((a, b) => a.y - b.y);
+  list.maxH = 60;
+  for (const b of [{ x0: 0, y0: 0, x1: 1030, y1: 1030 }, { x0: 1022, y0: 1022, x1: 2052, y1: 2052 }, { x0: 0, y0: 2040, x1: 1030, y1: 2800 }]) {
+    const [lo, hi] = stampSlice(list, b);
+    const want = list.filter((it) => it.y >= b.y0 && it.y <= b.y1 + 60);
+    assert.deepEqual(list.slice(lo, hi), want);
+  }
+  assert.deepEqual(stampSlice(list, null), [0, list.length]);
+});
+
+// Etiquetas presas à área livre da tela (sem DOM): fora dos botões de toque, do menu e das bordas
+import { safeBoxScreen } from '../public/src/render/safe-box.js';
+test('safeBoxScreen: rótulo sai de baixo dos botões de toque, do menu e da borda', () => {
+  const vw = 844, vh = 390, hud = [[0, 0, 240, 130], [vw - 150, 0, vw, 140], [vw - 540, 0, vw, 60], [vw - 280, vh - 250, vw, vh]];
+  const out = { x: 0, y: 0 };
+  const hit = (r, sw, sh) => r.x + sw / 2 > hud[3][0] && r.x - sw / 2 < hud[3][2] && r.y + sh > hud[3][1] && r.y < hud[3][3];
+  safeBoxScreen(800, 330, 150, 22, vw, vh, hud, out); // herói no canto inferior direito
+  assert.equal(hit(out, 150, 22), false);
+  safeBoxScreen(700, 20, 140, 14, vw, vh, hud, out); // etiqueta atrás do menu desce
+  assert.ok(out.y >= 60);
+  safeBoxScreen(-50, 380, 100, 22, vw, vh, [], out); // fora da tela: preso às bordas
+  assert.ok(out.x >= 54 && out.y <= vh - 26);
+  safeBoxScreen(400, 200, 100, 22, vw, vh, hud, out); // livre: não mexe
+  assert.deepEqual([out.x, out.y], [400, 200]);
+});

@@ -39,3 +39,9 @@ Uma linha JSON por evento (`{t, level, msg, …campos}`) em stdout; o orquestrad
 
 ## Não coberto
 TLS/WSS (proxy), vários processos com estado compartilhado (SQLite → PostgreSQL), CI/CD, alertas, limites de CPU/memória do contêiner, rotação de logs, teste de restauração em máquina limpa.
+
+## Versão da arte estática (cache do service worker)
+- `public/src/assets-version.js` exporta `ASSET_V` e `asset(path)` (anexa `?v=`). `ui.js`, `touch.js` e os ícones (`skill-icons.js`, `spirit-sprites.js`) usam o helper; o teste `tests/assets-version.test.js` exige que nenhum `src="assets/` fique cru.
+- `ASSET_V` e a `VERSION` do `public/sw.js` NÃO são editados à mão: `node tools/bump-assets.mjs` calcula o hash do conteúdo de `public/assets/**` e reescreve os dois (`aetheria-<hash>`); sem `--no-css` ele também anexa `?v=<hash>` às referências `assets/*.webp|png|svg` de `style.css` e `index.html`. `--check` só confere (sai com 1 se desatualizado).
+- Rodar o script sempre que a arte de `public/assets` mudar, antes de publicar. Como o `sw.js` muda junto, os aparelhos descartam o cache antigo.
+- `node tools/dead-code.mjs` lista exports que ninguém importa e imports não usados (candidatos a código morto; `--internal` mostra também os exports só usados no próprio arquivo).

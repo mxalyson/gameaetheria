@@ -15,13 +15,17 @@ const TYPES = {
   '.json': 'application/json',
   '.webmanifest': 'application/manifest+json',
   '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
 };
 
 http.createServer(async (req, res) => {
-  const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let urlPath;
+  try { urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400).end('bad request'); return; } // B26: % inválido não derruba o Node
   const rel = normalize(urlPath === '/' ? '/index.html' : urlPath).replace(/^[\\/]+/, '');
   const file = join(ROOT, rel);
   if (!file.startsWith(ROOT)) { res.writeHead(403).end(); return; }

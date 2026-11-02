@@ -6,7 +6,7 @@ import { deathPose } from './hero-death.js';
 import { MOBS } from '../data/mobs.js';
 
 const KEY = 'aetheria_monstros';
-let on = null, index = null, indexLoading = null;
+let on = null, index = null, indexLoading = null, indexFailed = false;
 const items = new Map(); // id -> { state: 'loading'|'ready'|'none', img, meta }
 export const stats = { drawn: 0, loaded: 0 };
 
@@ -23,7 +23,9 @@ export function mobSpritesEnabled() {
 // índice das criaturas que têm arte (evita pedir arquivos que não existem): assets/mobs/index.json = { ids: [...] }
 function loadIndex() {
   if (indexLoading) return indexLoading;
-  indexLoading = fetch('assets/mobs/index.json').then((r) => (r.ok ? r.json() : { ids: [] })).catch(() => ({ ids: [] })).then((j) => { index = new Set(j.ids ?? []); });
+  // B27: falha de rede no índice não pode virar 'sem arte' para sempre: marca a falha e deixa a próxima carga tentar de novo
+  indexFailed = false;
+  indexLoading = fetch('assets/mobs/index.json').then((r) => (r.ok ? r.json() : Promise.reject(new Error('index')))).then((j) => { index = new Set(j.ids ?? []); }, () => { index = new Set(); indexFailed = true; });
   return indexLoading;
 }
 
@@ -74,7 +76,7 @@ function tint(img, t, sharp = 0) {
     }
   }
   g.putImageData(d, 0, 0);
-  return createImageBitmap ? createImageBitmap(c) : c; // bitmap (GPU) em vez de canvas de CPU
+  return typeof createImageBitmap === 'function' ? createImageBitmap(c) : c; // bitmap (GPU) em vez de canvas de CPU
 }
 
 function load(id) {
@@ -82,7 +84,9 @@ function load(id) {
   if (it) return it;
   it = { state: 'loading', img: null, meta: null }; items.set(id, it);
   const V = MOBS[id], art = V?.art ?? id; // variante recolorida usa a arte de `art`
+  const retryLater = () => { it.state = 'none'; setTimeout(() => items.delete(id), 4000); }; // B27: a próxima chamada recarrega (uma nova tentativa a cada 4 s)
   loadIndex().then(async () => {
+    if (indexFailed) { indexLoading = null; retryLater(); return; }
     if (!index.has(art)) { it.state = 'none'; return; }
     try {
       // o json vem primeiro: seu `v` (muda a cada bake) vai na URL da imagem, senão o service worker (cache primeiro p/ .webp) serve a imagem velha com o json novo
@@ -90,7 +94,7 @@ function load(id) {
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/mobs/${art}.webp?v=${meta.v ?? 0}`; });
       if (img.naturalWidth !== meta.cell[0] * meta.cols || img.naturalHeight !== meta.cell[1] * meta.rows) { it.state = 'none'; return; } // imagem e medidas não combinam: desenho antigo em vez de sprite quebrado
       await img.decode?.(); it.meta = meta; it.img = V?.tint || BIG.has(art) ? await tint(img, V?.tint, BIG.has(art) ? 0.55 : 0) : img; it.state = 'ready'; stats.loaded++;
-    } catch { it.state = 'none'; }
+    } catch { retryLater(); }
   });
   return it;
 }

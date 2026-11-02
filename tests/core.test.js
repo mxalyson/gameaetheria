@@ -675,10 +675,42 @@ test('G5: chefes de zona reaparecem em 7–15 min (mesmo recriando o mundo) e ab
   assert.ok(half / full > 0.4 && half / full < 0.6, `razão ${half / full}`);
 });
 
-test('G6/G7: mobs de nível baixo são mais fracos que na curva pura e a rampa some no nível 6; chefes não mudam', () => {
+test('G6/G7: a rampa de iniciante dos mobs é leve (só poder) e some no nível 6; chefes não mudam', () => {
   const pure = (lv) => 60 + 120 * lv ** 1.15;
-  assert.ok(makeMobActor('wolf', 1, 0, 0).maxHp < pure(1) * 0.9 * 1.15);
+  const p = (lv) => 6 + 4.2 * lv ** 1.42;
+  assert.equal(makeMobActor('wolf', 1, 0, 0).maxHp, Math.round(pure(1) * 0.9 * 1.15));
+  assert.ok(makeMobActor('wolf', 1, 0, 0).stats.power < p(1) * 3.1 && makeMobActor('wolf', 1, 0, 0).stats.power > p(1) * 3.1 * 0.9);
+  assert.ok(Math.abs(makeMobActor('wolf', 6, 0, 0).stats.power - p(6) * 3.1 * 1.0) / (p(6) * 3.1) < 0.06, 'quase na curva pura no 6');
   assert.equal(makeMobActor('wolf', 6, 0, 0).maxHp, Math.round(pure(6) * 0.9 * 1.15));
   assert.equal(makeMobActor('treant', 3, 0, 0).maxHp, Math.round(pure(3) * 9));
-  assert.ok(rookieHp(1) > rookieHp(4) && rookieHp(4) > 0 && rookieHp(9) === 0 && rookiePower(9) === 0, 'bônus de iniciante some antes do PvP (nível 10)');
+  assert.ok(rookieHp(1) > rookieHp(4) && rookieHp(4) > 0 && rookieHp(10) === 0 && rookiePower(10) === 0, 'bônus de iniciante some antes do PvP (nível 10)');
+});
+
+test('G10: reforço de iniciante do Clérigo existe só abaixo do nível 10 e o PvP libera as 3 habilidades', async () => {
+  const { PVP_MIN_LEVEL } = await import('../public/src/core/power.js');
+  const { isSkillUnlocked } = await import('../public/src/core/unlocks.js');
+  assert.ok(CLASSES.cleric.rookie > 1 && CLASSES.warrior.rookie === undefined);
+  const mk = (classId, level) => ({ classId, level, alloc: {}, equipment: {} });
+  assert.ok(computeStats(mk('cleric', 3)).maxHp > computeStats(mk('warrior', 3)).maxHp - 150, 'Clérigo iniciante não fica atrás em vida');
+  assert.equal(rookieHp(PVP_MIN_LEVEL, CLASSES.cleric.rookie), 0);
+  // no nível 10 a conta do Clérigo é a mesma de qualquer classe: sem bônus escondido nos duelos
+  const c10 = computeStats(mk('cleric', 10)), base = CLASSES.cleric;
+  assert.equal(c10.maxHp, Math.round(base.hpBase + c10.vit * 12 + 9 * 8));
+  for (let i = 0; i < 3; i++) assert.ok(isSkillUnlocked(PVP_MIN_LEVEL, i), 'habilidade ' + i + ' liberada no nível mínimo do PvP');
+});
+
+test('G10: acampamento só volta CAMP_RESPAWN s depois do último morto (não 150 s)', async () => {
+  const { CAMP_RESPAWN } = await import('../public/src/data/mobs.js');
+  const w = new World('forest', { seed: 3, visuals: false });
+  const hero = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 10, 10));
+  const camp = w.zone.camps[0].id;
+  w.spawnCamps(hero.level, camp);
+  const alive = () => w.actors.filter((a) => a.camp === camp && !a.dead).length;
+  assert.ok(alive() > 0);
+  for (const a of w.actors) if (a.camp === camp) a.dead = true;
+  assert.ok(CAMP_RESPAWN >= 300);
+  for (let t = 0; t < 200; t += 1) w.updateSpawns(1, hero);
+  assert.equal(alive(), 0, 'aos 200 s ainda vazio');
+  for (let t = 0; t < CAMP_RESPAWN; t += 1) w.updateSpawns(1, hero);
+  assert.ok(alive() > 0, 'depois de CAMP_RESPAWN o acampamento volta');
 });

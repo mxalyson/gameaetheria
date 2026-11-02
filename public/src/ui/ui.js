@@ -17,10 +17,11 @@ import { skillImg, attackImg, iconImg, POTION_ICON, preloadSkillIcons, skillCate
 import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
 import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
-import { DIALOGS } from '../data/dialogs.js';
+import { DIALOGS, TIPS } from '../data/dialogs.js';
 import { ZONES, WORLD_ROUTE, teleportCost } from '../data/zones.js';
-import { offeredBy, readyFor, activeFor, titleText, achievementProgress, ensureJournal, greetFor } from '../core/journal.js';
+import { offeredBy, readyFor, activeFor, titleText, achievementProgress, ensureJournal, greetFor, LORE_ZONES, loreSeen, loreCount, tipSeen } from '../core/journal.js';
 import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
+import { asset } from '../assets-version.js';
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -40,27 +41,34 @@ export const noticeText = (n) => {
 };
 
 // Ícone do equipamento: arte pintada por tipo (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto); se a imagem faltar, volta ao emoji.
-const itemImg = (type, emoji) => `<img class="it-img" src="assets/icons/item/item-${type}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
+const itemImg = (type, emoji) => `<img class="it-img" src="${asset(`assets/icons/item/item-${type}.webp`)}" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
-const SCROLL = '<img class="coin" src="assets/icons/item/res-scroll.webp" alt="📜" draggable="false">';
+const SCROLL = `<img class="coin" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false">`;
 // ícones de zona pintados (recortes dos sprites 3D: tools/ui-icon-from-atlas.py); sem arte (ember: falta brasa) ou com o arquivo ausente, vale o emoji
 const ZONE_EMOJI = { town: '🏠', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
 const ZONE_ART = new Set(['town', 'forest', 'plains', 'ruins', 'glacier']);
-const zoneIcon = (id) => (ZONE_ART.has(id) ? `<img class="zone-ic" src="assets/icons/ui/zone-${id}.webp" alt="${ZONE_EMOJI[id]}" draggable="false" onerror="this.replaceWith(this.alt)">` : ZONE_EMOJI[id] ?? '🗺️');
-const HOME_IMG = '<img class="art" src="assets/icons/ui/home.webp" alt="🏠" draggable="false" onerror="this.replaceWith(this.alt)">';
-const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${spiritUrl(type, stage)}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
+const zoneIcon = (id) => (ZONE_ART.has(id) ? `<img class="zone-ic" src="${asset(`assets/icons/ui/zone-${id}.webp`)}" alt="${ZONE_EMOJI[id]}" draggable="false" onerror="this.replaceWith(this.alt)">` : ZONE_EMOJI[id] ?? '🗺️');
+const HOME_IMG = `<img class="art" src="${asset('assets/icons/ui/home.webp')}" alt="🏠" draggable="false" onerror="this.replaceWith(this.alt)">`;
+const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${asset(spiritUrl(type, stage))}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
 // Retratos pintados (busto): classes no cartão do herói, no painel do personagem e na criação; NPCs no oval do diálogo. Sem a imagem, volta ao emblema/emoji.
-const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src="assets/portraits/class-${classId}.webp" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
-const npcPortrait = (id) => `<img class="por" src="assets/portraits/npc-${id === 'merchant' ? 'merchant' : id}.webp" alt="" draggable="false">`;
+const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src="${asset(`assets/portraits/class-${classId}.webp`)}" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
+const npcPortrait = (id) => `<img class="por" src="${asset(`assets/portraits/npc-${id === 'merchant' ? 'merchant' : id}.webp`)}" alt="" draggable="false">`;
 // Emblema no oval do diálogo (provisório até haver retrato pintado de cada NPC): moeda, espada, spirit, escudo, cruz.
-const NPC_EMBLEM = { shop: '<img src="assets/icons/item/res-gold-coin.webp" alt="">', arena: null, sage: null, guard: null, herbalist: null };
+const NPC_EMBLEM = { shop: `<img src="${asset('assets/icons/item/res-gold-coin.webp')}" alt="">`, arena: null, sage: null, guard: null, herbalist: null };
 const npcEmblem = (id) => {
   const html = ['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith'].includes(id) ? npcPortrait(id) : id === 'shop' ? NPC_EMBLEM.shop : attackImg('warrior', '⚔');
   return `<span class="npc-emb por">${html}</span>`;
 };
 // moeda e poção pintadas no lugar dos emojis 🪙 🧪 dentro dos painéis
-const COIN = '<img class="coin" src="assets/icons/item/res-gold-coin.webp" alt="🪙" draggable="false">';
-const POT = '<img class="coin" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false">';
+const COIN = `<img class="coin" src="${asset('assets/icons/item/res-gold-coin.webp')}" alt="🪙" draggable="false">`;
+// sinais dos painéis (cadeado, aqui, arena, conquista) com arte pintada; o emoji só entra se o arquivo falhar
+const sign = (src, alt, cls = 'coin') => `<img class="${cls}" src="${asset(src)}" alt="${alt}" draggable="false" onerror="this.replaceWith(this.alt)">`;
+const LOCK = sign('assets/icons/item/res-key.webp', '🔒');
+const HERE = sign('assets/icons/menu/menu-map.webp', '📍', 'ic-img');
+const ARENA = (cls = 'coin') => sign('assets/icons/attack/atk-warrior.webp', '⚔️', cls);
+const TROPHY = sign('assets/icons/menu/menu-journal.webp', '🏆', 'ic-img');
+const LOCK_CELL = sign('assets/icons/item/res-key.webp', '🔒', 'ic-img');
+const POT = `<img class="coin" src="${asset('assets/icons/item/res-potion-health.webp')}" alt="🧪" draggable="false">`;
 export const itemIcon = (it) => (it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
 const ghostIcon = (s, cls) => (s === 'weapon' ? itemImg(cls.weapon, WEAPON_TYPES[cls.weapon].icon) : itemImg(s, SLOT_ICONS[s]));
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
@@ -266,7 +274,7 @@ export class UI {
   updateHud(game) {
     const { char, player, world } = game;
     if (!player) return;
-    // ritual do chefe final ("Ritual 23/40"): só nas zonas em que o chefe aparece por contador
+    // ritual do chefe final ("Ritual 23/40"): só nas zonas em que o chefe aparece por contador. B28 (limitação conhecida): na instância online o ritual é do servidor e o HUD não o mostra (mode 'net')
     const rp = game.mode === 'explore' ? world.bossProgress : null, rit = $('ritual');
     if (rit) {
       const txt = !rp || rp.alive ? '' : rp.omen ? 'O chão estremece…' : rp.cool > 0 ? `Ritual em repouso · ${Math.ceil(rp.cool / 60)} min` : `Ritual ${rp.have}/${rp.need}`;
@@ -338,13 +346,13 @@ export class UI {
     setTimeout(() => el.remove(), 8200);
   }
 
-  toast(title, sub = '', tone = '') {
+  toast(title, sub = '', tone = '', ms = 2200) { // ms: tempo visível (textos de lore pedem mais)
     const el = document.createElement('div');
     el.className = 'toast ' + tone;
     el.innerHTML = `<div class="t1">${title}</div>${sub ? `<div class="t2">${sub}</div>` : ''}`;
     $('toast-layer').appendChild(el);
-    setTimeout(() => el.classList.add('out'), 2200);
-    setTimeout(() => el.remove(), 2800);
+    setTimeout(() => el.classList.add('out'), ms);
+    setTimeout(() => el.remove(), ms + 600);
   }
 
   banner(text) {
@@ -450,7 +458,7 @@ export class UI {
   // Especialização (nível 15): duas por classe; a primeira escolha é grátis, trocar custa ouro.
   specBlock(char) {
     const list = specsOf(char.classId);
-    if (char.level < SPEC_LEVEL) return `<h3>Especialização</h3><p class="hint">🔒 Libera no nível ${SPEC_LEVEL} (você está no ${char.level}): duas escolhas que ajustam suas habilidades.</p>`;
+    if (char.level < SPEC_LEVEL) return `<h3>Especialização</h3><p class="hint">${LOCK} Libera no nível ${SPEC_LEVEL} (você está no ${char.level}): duas escolhas que ajustam suas habilidades.</p>`;
     const cost = respecCost(char);
     const cards = Object.entries(list).map(([id, sp]) => `
       <div class="shop-item ${char.spec === id ? 'sel' : ''}"><div class="cell r-epic"><span class="ic">${sp.icon}</span></div>
@@ -493,11 +501,11 @@ export class UI {
     const potion = PRICES.potion(char.level);
     return this.frame('shop', this.shopAnchor === 'smith' ? 'Ferreiro Brok' : 'Mercadora Lia', `
       <p class="npc-line">${npcEmblem('merchant')}"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
-      <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="assets/icons/item/res-potion-health.webp" alt="🧪" draggable="false"></span></div>
+      <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="${asset('assets/icons/item/res-potion-health.webp')}" alt="🧪" draggable="false"></span></div>
         <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>
         <button class="btn small" data-action="buy-potion" data-arg="5">5 · ${COIN} ${potion * 5}</button></div></div>
-      <div class="shop-item"><div class="cell r-uncommon"><span class="ic"><img class="it-img" src="assets/icons/item/res-scroll.webp" alt="📜" draggable="false"></span></div>
+      <div class="shop-item"><div class="cell r-uncommon"><span class="ic"><img class="it-img" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false"></span></div>
         <div><div class="nm">Pergaminho de Viagem</div><div class="sub">Teletransporte a mapa visitado · tem ${char.scrolls ?? 0}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-scroll" data-arg="1">1 · ${COIN} ${PRICES.scroll(char.level)}</button>
         <button class="btn small" data-action="buy-scroll" data-arg="3">3 · ${COIN} ${PRICES.scroll(char.level) * 3}</button></div></div>
@@ -528,7 +536,7 @@ export class UI {
       <div class="arena-badge" style="--tc:${tier.color}"><div class="tier">${tier.name}</div><div class="rt">${char.arena.rating}</div>
         <div class="wl">${char.arena.wins}V · ${char.arena.losses}D · Melhor onda: ${char.arena.bestWave}</div></div>
       <div class="arena-badge"><div class="wl">⚡ Seu poder: <b>${playerPower(char)}</b></div></div>
-      ${pvpUnlocked(char) ? Object.entries(MODES).map(([id, md]) => `<button class="btn primary wide" data-action="match" data-arg="${id}">⚔️ Grande Arena ${md.label} · rating ${getRating(char, id)}</button>`).join('') : `<p class="hint">🔒 O PvP libera no <b>nível ${PVP_MIN_LEVEL}</b> (você está no ${char.level}).</p>`}
+      ${pvpUnlocked(char) ? Object.entries(MODES).map(([id, md]) => `<button class="btn primary wide" data-action="match" data-arg="${id}">${ARENA()} Grande Arena ${md.label} · rating ${getRating(char, id)}</button>`).join('') : `<p class="hint">${LOCK} O PvP libera no <b>nível ${PVP_MIN_LEVEL}</b> (você está no ${char.level}).</p>`}
       <p class="hint">Times de ecos (aliados e inimigos com classe, itens e spirit próprios) na Grande Arena. Segure o ponto central: 100 pontos vencem; eliminar o outro time também. Cada modo tem seu rating. Poções desativadas.</p>
       ${this.game.online ? this.onlineArenaBlock(char) : ''}
       <button class="btn wide" data-action="waves">🌊 Desafio de Ondas (PvE)</button>
@@ -543,7 +551,7 @@ export class UI {
     if (q) return `<p class="hint">🔎 Procurando <b>${q.mode === 'coop' ? 'cooperativo' : q.mode}</b>… ${q.waited}s</p><button class="btn wide" data-action="net-cancel">Cancelar busca</button>`;
     const pvp = pvpUnlocked(char);
     const modes = Object.entries(MODES).map(([id, md]) => `<button class="btn ${pvp ? 'primary' : ''} wide" data-action="net-queue" data-arg="${id}" ${pvp ? '' : 'disabled'}>🌐 ${md.label} com jogadores reais · rating ${getRating(char, id)}</button>`).join('');
-    return `<h3>Jogadores reais</h3>${pvp ? '' : `<p class="hint">🔒 PvP online libera no nível ${PVP_MIN_LEVEL}.</p>`}${modes}
+    return `<h3>Jogadores reais</h3>${pvp ? '' : `<p class="hint">${LOCK} PvP online libera no nível ${PVP_MIN_LEVEL}.</p>`}${modes}
       <button class="btn wide" data-action="net-queue" data-arg="coop">🤝 Cooperativo: ondas e chefe (1–4 jogadores)</button>
       <p class="hint">Aliados e adversários são pareados por rating e poder; vagas vazias são preenchidas por bots. Grupo: botão 👥.</p>
       <button class="btn small" data-action="toggle" data-arg="party">👥 Grupo</button>`;
@@ -574,15 +582,16 @@ export class UI {
     const D = DIALOGS[npc.id] ?? { greet: '…', service: null };
     ensureJournal(char);
     const ready = readyFor(char, npc.id)[0], offer = offeredBy(char, npc.id, { server: !!g.online })[0], active = activeFor(char, npc.id)[0];
-    let text = greetFor(char, D.greet, { online: !!g.online }), body = '';
+    let text = greetFor(char, D.greet, { online: !!g.online }), body = '', foot = '';
     const rewardLine = (q) => { const r = q.reward; return `<p class="hint">Recompensa: ${[r.gold ? `${COIN} ${r.gold}` : '', r.xp ? `${r.xp} XP` : '', r.potions ? `🧪 ${r.potions}` : '', ...(r.items ?? []).map((i) => `item ${RARITY[i.rarity]?.name ?? ''}`)].filter(Boolean).join(' · ')}</p>`; };
-    if (ready) { const q = QUESTS[ready]; text = q.text.done; body = `<h3>✔ ${q.name}</h3>${rewardLine(q)}<button class="btn primary wide" data-action="quest-turnin" data-arg="${q.id}">Entregar missão</button>`; }
-    else if (offer) { const q = offer; text = q.text.offer; body = `<h3>❗ ${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
+    if (ready) { const q = QUESTS[ready]; text = q.text.done; body = `<h3>✔ ${q.name}</h3>`; foot = `${rewardLine(q)}<button class="btn primary wide" data-action="quest-turnin" data-arg="${q.id}">Entregar missão</button>`; }
+    else if (offer) { const q = offer; text = q.text.offer; body = `<h3>❗ ${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>`; foot = `${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
     else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>⏳ ${q.name}</h3>${this.questLines(char, active)}`; }
     const more = (offeredBy(char, npc.id, { server: !!g.online }).length > (offer ? 1 : 0)) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
     const svc = D.service ? `<button class="btn wide" data-action="dialog-service" data-arg="${D.service.panel}">${D.service.label}</button>` : '';
     const say = (Array.isArray(text) ? text : [text]).map(esc).join('<br>'); // `done` pode ser uma lista de falas (epílogo)
-    return this.frame('dialog', npc.name, `<p class="npc-line">${npcEmblem(npc.id)}"${say}"</p>${body}${more}${svc}`);
+    // texto e lista rolam; recompensa e botões ficam num rodapé fixo, sempre visível (epílogos longos)
+    return this.frame('dialog', npc.name, `<div class="dlg-scroll"><p class="npc-line">${npcEmblem(npc.id)}"${say}"</p>${body}${more}</div><div class="dlg-foot">${foot}${svc}</div>`);
   }
 
   questLines(char, id) {
@@ -605,10 +614,15 @@ export class UI {
     const missions = act.length ? act.map((id) => `<div class="shop-item quest-card"><div class="qtxt"><div class="nm">${esc(QUESTS[id].name)}</div>${this.questLines(char, id)}<div class="sub">${esc(QUESTS[id].text.progress)}</div></div>
       <button class="btn small" data-action="quest-abandon" data-arg="${id}">Abandonar</button></div>`).join('') : `<p class="hint">Nenhuma missão ativa. Converse com ${this.questGiverNames()}.</p>`;
     const done = Object.keys(char.quests.done).length;
-    const ach = ACHIEVEMENTS.map((a) => { const p = achievementProgress(char, a); return `<div class="shop-item ${p.earned ? '' : 'locked'}"><div class="cell ${p.earned ? 'r-epic' : ''}"><span class="ic">${p.earned ? '🏆' : '🔒'}</span></div>
+    const ach = ACHIEVEMENTS.map((a) => { const p = achievementProgress(char, a); return `<div class="shop-item ${p.earned ? '' : 'locked'}"><div class="cell ${p.earned ? 'r-epic' : ''}"><span class="ic">${p.earned ? TROPHY : LOCK_CELL}</span></div>
       <div><div class="nm">${esc(a.name)}</div><div class="sub">${esc(a.desc)} ${p.earned ? '' : `(${p.value}/${p.min})`}</div></div>
       ${p.earned && a.title ? `<button class="btn small ${char.title === a.id ? 'primary' : ''}" data-action="set-title" data-arg="${a.id}">${char.title === a.id ? 'Título ✔' : 'Usar título'}</button>` : ''}</div>`; }).join('');
+    // Inscrições lidas (placas e estátuas das zonas) e dicas já vistas: só texto
+    const lore = LORE_ZONES.map((id) => { const l = (ZONES[id].lore ?? [])[0]; return l && loreSeen(char, id) ? `<p class="hint"><b>${esc(ZONES[id].name)}:</b> “${esc(l.text)}”</p>` : ''; }).join('');
+    const tips = Object.keys(TIPS).filter((k) => tipSeen(char, k)).map((k) => `<p class="hint"><b>${esc(TIPS[k][0])}:</b> ${esc(TIPS[k][1])}</p>`).join('');
+    const notes = `<h3>Inscrições <span class="pts">${loreCount(char)}/${LORE_ZONES.length}</span></h3>${lore || '<p class="hint">Placas e estátuas nas zonas guardam frases dos ecos. Chegue perto e toque no pergaminho.</p>'}${tips ? `<h3>Dicas vistas</h3>${tips}` : ''}`;
     return this.frame('journal', 'Diário', `<h3>Missões ativas <span class="pts">${act.length}/5</span></h3>${missions}<p class="hint">Concluídas: ${done} · Baús abertos: ${char.stats.chests} · Criaturas derrotadas: ${char.stats.kills}</p>
+      ${notes}
       <h3>Conquistas <span class="pts">${Object.keys(char.achievements).length}/${ACHIEVEMENTS.length}</span></h3>${ach}
       ${char.title ? '<button class="btn small" data-action="set-title" data-arg="">Remover título</button>' : ''}`);
   }
@@ -618,9 +632,9 @@ export class UI {
     const g = this.game, here = g.world.zoneId;
     const route = WORLD_ROUTE, canTp = g.mode === 'explore', vis = g.char.visited ?? {};
     const rows = route.map((id, i) => { const z = ZONES[id]; const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura'; const boss = z.boss ? `Chefe: ${esc(MOBS[z.boss.id].name)}` : '';
-      return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : zoneIcon(id)}</span></div>
-      <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div>${here === id ? '' : id === 'town' || vis[id] ? `<button class="btn small" data-action="teleport" data-arg="${id}" ${canTp ? '' : 'disabled'}>Viajar · ${teleportCost(id) ? SCROLL + ' ' + teleportCost(id) : 'grátis'}</button>` : '<span class="tag dim">🔒 não visitado</span>'}</div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
-    const arenas = '<div class="shop-item"><div class="cell"><span class="ic">⚔️</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>';
+      return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? HERE : zoneIcon(id)}</span></div>
+      <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div>${here === id ? '' : id === 'town' || vis[id] ? `<button class="btn small" data-action="teleport" data-arg="${id}" ${canTp ? '' : 'disabled'}>Viajar · ${teleportCost(id) ? SCROLL + ' ' + teleportCost(id) : 'grátis'}</button>` : `<span class="tag dim">${LOCK} não visitado</span>`}</div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
+    const arenas = `<div class="shop-item"><div class="cell"><span class="ic">${ARENA('ic-img')}</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>`;
     return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas ⇄ Cume Gélido ⇄ Cinzas Ardentes. Mapas já visitados têm <b>teletransporte</b>: gasta 1 Pergaminho (você tem ${g.char.scrolls ?? 0}; a Mercadora Lia vende). Ir para a Vila é grátis, e o medalhão da casa também volta à vila.</p>${rows}${arenas}`);
   }
 
@@ -636,7 +650,7 @@ export class UI {
       <div class="shop-item"><div class="cell r-epic"><span class="ic">💠</span></div>
         <div><div class="nm">Essência Prismática</div><div class="sub">Spirit Raro ou melhor</div></div>
         <button class="btn small" data-action="buy-essence" data-arg="prism">${COIN} ${PRICES.prism(char.level)}</button></div>
-      <div class="row-btns"><button class="btn small" data-action="toggle" data-arg="spirits">Ver meus spirits (P)</button></div>`);
+      <div class="row-btns"><button class="btn small" data-action="toggle" data-arg="spirits">Ver meus spirits</button></div>`);
   }
 
   panel_options() {

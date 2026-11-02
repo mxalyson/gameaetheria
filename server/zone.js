@@ -8,7 +8,7 @@ import { makeRng } from '../public/src/core/rng.js';
 import { mobXp, createSpirit } from '../public/src/core/progression.js';
 import { rollMobLoot } from '../public/src/core/loot.js';
 import { applyZoneBatch } from '../public/src/core/rewards.js';
-import { MOBS } from '../public/src/data/mobs.js';
+import { MOBS, XP_MULT } from '../public/src/data/mobs.js';
 import { ZONES } from '../public/src/data/zones.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { wire } from './wire.js';
@@ -119,7 +119,7 @@ export class ZoneRoom {
   // ---- recompensas: o servidor sorteia tudo ----
   onMobKilled(m) {
     const M = MOBS[m.mobId];
-    const mul = M.xp * (m.boss ? 10 : m.elite ? 3 : 1);
+    const mul = M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1);
     for (const p of this.alive()) {
       const a = p.actor;
       if (Math.hypot(a.x - m.x, a.y - m.y) > SHARE_RADIUS) continue;

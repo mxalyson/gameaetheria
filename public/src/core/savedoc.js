@@ -23,10 +23,6 @@ const int = (v, min, max, dflt) => {
   if (!Number.isFinite(n)) return dflt;
   return Math.min(max, Math.max(min, Math.round(n)));
 };
-const num = (v, min, max, dflt) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : dflt;
-};
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 

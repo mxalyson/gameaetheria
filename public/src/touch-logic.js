@@ -56,12 +56,15 @@ export function dragAim(dx, dy, min = DRAG_AIM_MIN) {
 
 // Alvo do botão de interagir: NPC (raio 80) tem prioridade; senão baú (raio 70). Devolve {kind, ref} ou null.
 // 'opened' (opcional) é o conjunto de baús já abertos: o alvo continua valendo (o jogo avisa que está vazio).
-export const NPC_REACH = 80, CHEST_REACH = 70;
+// Prioridade NPC > baú > lore (placa/estátua de zona, raio 80).
+export const NPC_REACH = 80, CHEST_REACH = 70, LORE_REACH = 80;
 export function interactTarget(player, world) {
   const zone = world?.zone;
   if (!player || !zone) return null;
   const npc = (zone.npcs ?? []).find((n) => len(n.x - player.x, n.y - player.y) < NPC_REACH);
   if (npc) return { kind: 'npc', ref: npc };
   const chest = (zone.chests ?? []).find((c) => len(c.x - player.x, c.y - player.y) < CHEST_REACH);
-  return chest ? { kind: 'chest', ref: chest } : null;
+  if (chest) return { kind: 'chest', ref: chest };
+  const lore = (zone.lore ?? []).find((l) => len(l.x - player.x, l.y - player.y) < LORE_REACH);
+  return lore ? { kind: 'lore', ref: lore } : null;
 }

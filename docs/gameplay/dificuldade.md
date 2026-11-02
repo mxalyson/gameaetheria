@@ -1,6 +1,6 @@
 # Dificuldade, chefes, habilidades por nível e loot
 
-Números medidos com `node tools/boss-check.mjs --n 6` (simulação real: World + IA, passo fixo 1/60 s, sementes fixas, 4 classes × 6 sementes por célula, robô que usa skills, bebe poção abaixo de 45% de vida e esquiva 60% dos golpes telegrafados) e `node tools/loot-check.mjs`. Reproduzíveis.
+Números medidos em 2026-11-02 com `node tools/boss-check.mjs --n 4` (simulação real: World + IA, passo fixo 1/60 s, sementes fixas, 4 classes × 4 sementes por célula, robô que usa skills, bebe poção abaixo de 45% de vida e esquiva 60% dos golpes telegrafados), `node tools/loot-check.mjs`, `node tools/waves-check.mjs --n 4` e `npm run balance`. Reproduzíveis.
 
 ## Perfis de equipamento do simulador
 - normal: itens incomuns/raros do nível, aprimoramento +floor(nível/7), 5 poções, sem spirit.
@@ -15,48 +15,94 @@ Números medidos com `node tools/boss-check.mjs --n 6` (simulação real: World 
 - Elites usam o golpe em área só a partir da Planície; mobs comuns nunca.
 
 ## Chefes: vitória% (tempo mediano de vitória; xNN = tempo mediano até morrer)
-    
-    
-    Carvalho Ancestral (treant, Nv 7)
-      normal  Nv5:   0% x42s      Nv7:  38% 36s       Nv10: 100% 25s      Nv15: 100% 15s      Nv19: 100% 11s      Nv25: 100% 8s       Nv30: 100% 6s      
-      good    Nv5:  71% 36s       Nv7: 100% 26s       Nv10: 100% 16s      Nv15: 100% 10s      Nv19: 100% 7s       Nv25: 100% 5s       Nv30: 100% 4s      
-      best    Nv5: 100% 22s       Nv7: 100% 16s       Nv10: 100% 11s      Nv15: 100% 6s       Nv19: 100% 5s       Nv25: 100% 4s       Nv30: 100% 3s      
-    
-    Colosso de Cristal (colossus, Nv 13)
-      normal  Nv5:   0% x10s      Nv10:   0% x50s     Nv13:  13% 65s      Nv15:  46% 48s      Nv19: 100% 34s      Nv25: 100% 25s      Nv30: 100% 20s     
-      good    Nv5:   0% x25s      Nv10:  50% 56s      Nv13: 100% 36s      Nv15: 100% 30s      Nv19: 100% 22s      Nv25: 100% 15s      Nv30: 100% 12s     
-      best    Nv5:   0% x89s      Nv10: 100% 34s      Nv13: 100% 23s      Nv15: 100% 20s      Nv19: 100% 15s      Nv25: 100% 11s      Nv30: 100% 9s      
-    
-    Guardião das Ruínas (guardian, Nv 21)
-      normal  Nv5:   0% x5s       Nv10:   0% x9s      Nv15:   0% x55s     Nv19:   0% x58s     Nv21:   0% x58s     Nv25:  21% 64s      Nv30:  92% 50s     
-      good    Nv5:   0% x5s       Nv10:   0% x30s     Nv15:   4% 83s      Nv19:  79% 57s      Nv21: 100% 48s      Nv25: 100% 39s      Nv30: 100% 31s     
-      best    Nv5:   0% x15s      Nv10:   0% x137s    Nv15:  88% 69s      Nv19: 100% 37s      Nv21: 100% 35s      Nv25: 100% 28s      Nv30: 100% 23s     
-    
-    Ancião Gélido (frostlord, Nv 26)
-      normal  Nv5:   0% x5s       Nv10:   0% x5s      Nv15:   0% x25s     Nv19:   0% x62s     Nv25:   4% 87s      Nv26:   8% 66s      Nv30:  38% 62s     
-      good    Nv5:   0% x5s       Nv10:   0% x10s     Nv15:   0% x25s     Nv19:   4% 99s      Nv25: 100% 42s      Nv26: 100% 40s      Nv30: 100% 33s     
-      best    Nv5:   0% x6s       Nv10:   0% x111s    Nv15:  13% 171s     Nv19:  88% 63s      Nv25: 100% 31s      Nv26: 100% 30s      Nv30: 100% 26s     
-    
-    Cavaleiro Rubro (infernoknight, Nv 31)
-      normal  Nv5:   0% x5s       Nv10:   0% x5s      Nv15:   0% x5s      Nv19:   0% x6s      Nv25:   0% x10s     Nv30:   0% x37s    
-      good    Nv5:   0% x5s       Nv10:   0% x5s      Nv15:   0% x10s     Nv19:   0% x15s     Nv25:   0% x78s     Nv30:  46% 88s     
-      best    Nv5:   0% x5s       Nv10:   0% x15s     Nv15:   0% x70s     Nv19:   0% x156s    Nv25:  33% 125s     Nv30:  88% 74s     
 
-Leitura: herói normal com nível ≤ chefe−8 perde sempre (0% em todas as células); good no nível do chefe vence em 26–48 s (Treant/Colosso/Guardião/Ancião) com poções; o Cavaleiro Rubro (Nv 31) exige nível 30 + épico/lendário aprimorado: good Nv30 vence ~50% em ~87 s, best Nv30 ~91%; Nv25 good 0%, best ~38%; Nv ≤19 nunca. (Valores de n=8 para o último chefe: good Nv30 50%, best Nv30 91%, best Nv25 38%.)
+    Carvalho Ancestral (treant, Nv 7)
+      normal  Nv5:  44% 50s       Nv7:  69% 36s       Nv10: 100% 23s      Nv15: 100% 13s      Nv19: 100% 10s      Nv25: 100% 8s       Nv30: 100% 6s
+      good    Nv5:  88% 33s       Nv7: 100% 25s       Nv10: 100% 16s      Nv15: 100% 10s      Nv19: 100% 7s       Nv25: 100% 5s       Nv30: 100% 4s
+      best    Nv5: 100% 20s       Nv7: 100% 15s       Nv10: 100% 10s      Nv15: 100% 6s       Nv19: 100% 5s       Nv25: 100% 3s       Nv30: 100% 2s
+
+    Colosso de Cristal (colossus, Nv 13)
+      normal  Nv5:   0% x25s      Nv10:   0% x52s     Nv13:  13% 70s      Nv15:  63% 47s      Nv19: 100% 33s      Nv25: 100% 24s      Nv30: 100% 19s
+      good    Nv5:   0% x88s      Nv10:  50% 53s      Nv13: 100% 35s      Nv15: 100% 29s      Nv19: 100% 21s      Nv25: 100% 15s      Nv30: 100% 12s
+      best    Nv5:   0% x84s      Nv10: 100% 32s      Nv13: 100% 22s      Nv15: 100% 19s      Nv19: 100% 14s      Nv25: 100% 11s      Nv30: 100% 9s
+
+    Guardião das Ruínas (guardian, Nv 21)
+      normal  Nv5:   0% x5s       Nv10:   0% x15s     Nv15:   0% x53s     Nv19:   0% x49s     Nv21:   0% x44s     Nv25:  50% 50s      Nv30:  94% 36s
+      good    Nv5:   0% x6s       Nv10:   0% x30s     Nv15:   6% 77s      Nv19:  88% 41s      Nv21: 100% 34s      Nv25: 100% 26s      Nv30: 100% 23s
+      best    Nv5:   0% x15s      Nv10:   0% x101s    Nv15:  94% 48s      Nv19: 100% 26s      Nv21: 100% 23s      Nv25: 100% 21s      Nv30: 100% 17s
+
+    Ancião Gélido (frostlord, Nv 26)
+      normal  Nv5:   0% x5s       Nv10:   0% x5s      Nv15:   0% x25s     Nv19:   0% x44s     Nv25:   6% 55s      Nv26:  13% 67s      Nv30:  44% 42s
+      good    Nv5:   0% x6s       Nv10:   0% x10s     Nv15:   0% x26s     Nv19:  19% 70s      Nv25: 100% 31s      Nv26: 100% 30s      Nv30: 100% 25s
+      best    Nv5:   0% x10s      Nv10:   0% x79s     Nv15:  13% 139s     Nv19:  88% 47s      Nv25: 100% 23s      Nv26: 100% 23s      Nv30: 100% 20s
+
+    Cavaleiro Rubro (infernoknight, Nv 31)
+      normal  Nv5:   0% x5s       Nv10:   0% x5s      Nv15:   0% x5s      Nv19:   0% x6s      Nv25:   0% x55s     Nv30:   0% x76s
+      good    Nv5:   0% x5s       Nv10:   0% x5s      Nv15:   0% x10s     Nv19:   0% x15s     Nv25:   0% x105s    Nv30:  56% 84s
+      best    Nv5:   0% x5s       Nv10:   0% x15s     Nv15:   0% x141s    Nv19:   0% x156s    Nv25:  13% 125s     Nv30:  81% 69s
+
+Leitura: herói normal com nível ≤ chefe−8 perde sempre; good no nível do chefe vence em 25–40 s (Treant/Colosso/Guardião/Ancião) com poções; o Cavaleiro Rubro (Nv 31) exige nível 30 + épico/lendário aprimorado (good Nv 30 ≈ 56%, best Nv 30 ≈ 81%; Nv 25 good 0%, best 13%; Nv ≤ 19 nunca). O Carvalho ficou mais fácil para o herói normal Nv 5–7 (44% / 69%; era 0% / 38%) porque o bônus de iniciante agora some mais devagar (ver "Rampa de iniciante").
 
 ## Mobs comuns (herói normal do mesmo nível, sem poção)
-Solo: perde 9–18% da vida, 4–7 s para matar. 2 mobs: 16–24% e 1–19% de derrotas. 3 mobs: 21–31% e 6–36% de derrotas (Cinzas: 36%).
+Medido pelo mesmo comando (perda média de vida, tempo, derrotas):
+
+      forest   Nv4 x1: perde   4% da vida · 3s · derrotas 0%
+      forest   Nv4 x2: perde   8% da vida · 5s · derrotas 0%
+      forest   Nv4 x3: perde  10% da vida · 7s · derrotas 0%
+      plains   Nv9 x1: perde  14% da vida · 5s · derrotas 0%
+      plains   Nv9 x2: perde  20% da vida · 9s · derrotas 6%
+      plains   Nv9 x3: perde  31% da vida · 11s · derrotas 17%
+      ruins    Nv16 x1: perde  17% da vida · 6s · derrotas 0%
+      ruins    Nv16 x2: perde  20% da vida · 10s · derrotas 13%
+      ruins    Nv16 x3: perde  24% da vida · 13s · derrotas 25%
+      glacier  Nv23 x1: perde  12% da vida · 6s · derrotas 0%
+      glacier  Nv23 x2: perde  18% da vida · 9s · derrotas 6%
+      glacier  Nv23 x3: perde  20% da vida · 13s · derrotas 21%
+      ember    Nv28 x1: perde  15% da vida · 8s · derrotas 0%
+      ember    Nv28 x2: perde  20% da vida · 12s · derrotas 19%
+      ember    Nv28 x3: perde  28% da vida · 17s · derrotas 38%
+
+Resumo: 1 mob custa 4–17% da vida (Bosque 4%, o resto 12–17%); 2 mobs 8–20%; 3 mobs 10–31% com 0–38% de derrotas (Cinzas Nv 28 x3: 38%).
 
 ## Habilidades por nível
-Ataque básico no 1; s0 no 1, s1 no 5, s2 no 10 (`SKILL_UNLOCK` em data/skills.js; `core/unlocks.js`). `World.castSkill` ignora intenções de skill bloqueada (jogador, servidor e rival).
+Ataque básico no 1; s0 no 1, s1 no 5, s2 no 10 (`SKILL_UNLOCK` em data/skills.js; `core/unlocks.js`). `World.castSkill` ignora intenções de skill bloqueada (jogador, servidor e rival). O PvP abre no nível 10 (`PVP_MIN_LEVEL`), exatamente quando a terceira habilidade é liberada: toda partida usa as 3 (teste "G10" em tests/core.test.js; `npm run balance` roda no nível 10 com as 3).
 
-## Aparição do último chefe
-Não reaparece por tempo. Contador "Ritual" (`world.bossProgress` = `{have, need, cool, omen, alive}`): mob comum vale 1, elite 4; ao chegar em 40 o chefe surge após 3 s de aviso. Depois da metade, cada elite tem chance crescente (6% × nº de elites, máx. 50%) de adiantar. Ao morrer: recarga de 1500 s de jogo e contador zerado. A missão `cavaleiro_rubro` ativa libera uma primeira aparição. Configurável em `BOSS_SPAWN` (data/mobs.js); chefes iniciais mantêm respawn de 90–150 s. Eventos: `boss_warn {stage: 'omen'|'arrive', name, x, y}`, `phase {actor, phase}` (fase 3 = "Enfurecido!").
+## Aparição do último chefe e reaparição
+Não reaparece por tempo. Contador "Ritual" (`world.bossProgress` = `{have, need, cool, omen, alive}`): mob comum vale 1, elite 4; ao chegar em 40 o chefe surge após 3 s de aviso. Depois da metade, cada elite tem chance crescente (6% × nº de elites, máx. 50%) de adiantar. Ao morrer: **recarga de 1200 s** (tempo absoluto: corre mesmo fora da zona) e contador zerado. A missão `cavaleiro_rubro` ativa libera uma primeira aparição. Configurável em `BOSS_SPAWN` (data/mobs.js).
+
+**Chefes de zona** reaparecem 420 s (Carvalho), 540 s (Colosso), 720 s (Guardião) e 900 s (Ancião) depois de morrer, mesmo recriando o mundo. Abates repetidos na janela de 30 min dão metade e depois um quarto da chance de item (`BOSS_REPEAT`). Acampamentos voltam 300 s depois do último morto (`CAMP_RESPAWN`; era 150 s); mini-chefes (elite maior) a cada 240 s. Eventos: `boss_warn {stage: 'omen'|'arrive', name, x, y}`, `phase {actor, phase}` (fase 3 = "Enfurecido!").
+
+## Rampa de iniciante (2026-11-02)
+Dois mecanismos; ambos somem até o nível 10 para não tocar nos duelos:
+- Herói: `ROOKIE` em core/stats.js, +360 vida e +12 poder no nível 1, caindo linearmente até 0 no nível 10. Clérigo: `rookie: 3` em data/classes.js (multiplica os dois; ataque lento e sem escudo antes do nível 5). Antes: +240 / +36 até o nível 9, sem reforço do Clérigo.
+- Mob não-chefe: poder × (0,95 + 0,01·(nível−1)) (`MOB_CURVE.early`; era 0,6 + 0,08·(nível−1)) e vida sem corte (`earlyHp` era 0,8 + 0,05·(nível−1)).
+
+Perda média de vida contra 1 mob do Bosque do mesmo nível (lobo/geleia/cogumelo), 4 classes, sem poção; entre colchetes guerreiro/mago/arqueiro/clérigo:
+
+    Nível   kit ANTES              kit DEPOIS             incomum ANTES   incomum DEPOIS
+    1        0% [1/0/0/0]           1% [1/0/0/1]           0%              0% [1/0/0/0]
+    2        1% [2/0/0/2]           3% [6/1/1/4]           1%              1% [2/0/0/2]
+    3        4% [6/1/1/9]           7% [13/1/2/11]         1%              2% [4/0/0/4]
+    4       11% [16/2/2/23]        12% [21/2/5/20]         4% [5/0/1/8]    4% [8/0/1/8]
+    5       10% [16/2/2/21]         9% [20/3/3/11]         2%              2% [5/1/0/0]
+    6       17% [27/3/4/35]        15% [27/5/4/24]         3%              3% [7/1/0/2]
+
+Vitória% contra 2 lobos do mesmo nível, kit inicial, sem poção (`node tools/boss-check.mjs --only early`, 20 sementes):
+
+    Nível        Guerreiro   Mago   Arqueiro   Clérigo
+    4 ANTES        100       100       93        43
+    4 DEPOIS        75        95       90       100
+    5 ANTES         65       100       95         0
+    5 DEPOIS        70        95      100        95
+
+1 lobo: 100% em todas as células (meta ≥ 80%). 2 lobos ≥ 60% até o nível 5 em todas as classes; o Guerreiro cai a 38% no nível 6 sem equipamento (a meta vai só até o 5). Limite da medição: o robô mantém Mago e Arqueiro à distância e eles quase não perdem vida, então a média das 4 classes fica abaixo do alvo de 8–14% (kit) e 5–9% (incomum); só Guerreiro e Clérigo chegam perto (kit 11–29%, incomum 5–8% nos níveis 4–6). O Guerreiro iniciante ficou um pouco mais fraco (menos poder de iniciante), o Clérigo bem mais forte; Mago e Arqueiro só mudam pela rampa dos mobs.
 
 ## Loot
 Pesos por fonte [comum, incomum, raro, épico, lendário] (core/loot.js `LOOT_SOURCES`): mob 67/26/6.4/0.55/0.05 (14% de chance de item), elite 34/40/21.5/4/0.5 (70%, 1–2 itens), chefe 0/20/50/26/4 (2–3 itens). Surpresa: 1,5% de subir 1–2 raridades. Pity (`char.pity`): peso de épico +1,5% por item sem épico (garantido em 120 itens), lendário +0,4% por item (garantido em 600). Atributo base varia ±15%.
 
-    
+Medido agora com `node tools/loot-check.mjs`:
+
+
     SEM pity (servidor atual): 10000 abates (684 elites), 1952 itens
       common      1093  55.99% dos itens
       uncommon     586  30.02% dos itens
@@ -64,7 +110,7 @@ Pesos por fonte [comum, incomum, raro, épico, lendário] (core/loot.js `LOOT_SO
       epic          33  1.69% dos itens
       legendary      5  0.26% dos itens
       por hora (300 abates/h): 0.99 épico · 0.15 lendário · maior seca sem épico+: 187 itens
-    
+
     COM pity (jogo offline): 10000 abates (676 elites), 1972 itens
       common      1090  55.27% dos itens
       uncommon     579  29.36% dos itens
@@ -72,10 +118,12 @@ Pesos por fonte [comum, incomum, raro, épico, lendário] (core/loot.js `LOOT_SO
       epic          47  2.38% dos itens
       legendary      7  0.35% dos itens
       por hora (300 abates/h): 1.41 épico · 0.21 lendário · maior seca sem épico+: 106 itens
-    
-    Cavaleiro Rubro: 932 exclusivos em 2000 abates (1 a cada 2.15), pior seca 4 abates
 
-(Premissa: 300 abates/h. O servidor de zona ainda não passa `pity` a `rollMobLoot` — sem pity lá: ~1 épico/h.)
+    Cavaleiro Rubro: 1239 exclusivos em 2000 abates (1 a cada 1.61), pior seca 2 abates
+
+(Premissa: 300 abates/h. O servidor de zona ainda não passa `pity` a `rollMobLoot`: sem pity lá, ~1 épico/h.)
+
+XP por hora de exploração (`node tools/economy.mjs`, 300 abates/h, jogador no nível médio da zona): Bosque Nv 4 ≈ 5,3 níveis/h (57 abates por nível); Planície Nv 9 ≈ 2,6; Ruínas Nv 16 ≈ 1,5; Geleira Nv 23 ≈ 0,9; Cinzas Nv 28 ≈ 0,8. PvP 1×1 ≈ 0,5 nível/h; coop 8–12% de um nível por partida (~4 min).
 
 ## Exclusivo do Cavaleiro Rubro
 Espada/Cajado/Arco/Maça Opalina (60%, da classe do jogador) ou Couraça de Ópalo (40%); 75% épico / 25% lendário (nome "Radiante"); atributos base ×1.3 mais crítico+vel. de ataque (arma) ou VIT+vel. de movimento (armadura); `opal: true`. Chance por abate 30% +20% por abate sem drop (garantido no 5º); sem pity (servidor) 35%. Ícone: o do tipo do item (sem arte própria; ver pendencias.md).
@@ -83,13 +131,53 @@ Espada/Cajado/Arco/Maça Opalina (60%, da classe do jogador) ou Couraça de Ópa
 ## Arena das Ondas (solo) e cooperativo
 Medido com `node tools/waves-check.mjs --n 4` (World + IA reais, robô de `boss-check`, herói perfil normal, 4 classes; coop com classes mistas, 16 execuções por célula). Composição das ondas em `core/economy.js` (`WAVES`, `soloWaveSpec`, `coopWaveSpec`, `waveBoss`), usada por `main.js`, `server/coop.js` e pelo simulador (`--tune '{"coop":{...}}'` experimenta valores sem editar código).
 
-Antes (2+n mobs juntos, +20% de vida entre ondas, chefe sorteado entre todos, inclusive o Cavaleiro Rubro Nv 31): solo mediana 1–3 ondas em todos os níveis; coop 0% de vitória em quase toda célula (4 jogadores Nv 12–20: 0%; só 2 jogadores Nv 30: 13%).
+Medido agora (`node tools/waves-check.mjs --n 4`):
 
-Depois (mobs = 1 + floor(0.3·n), +1 nível a cada 3 ondas, elite a cada 5 ondas 3 níveis abaixo, cura de 50% entre ondas, chefe pela faixa de nível: Carvalho/Colosso/Guardião/Ancião, nunca o Rubro):
-- Solo, ondas vencidas (mediana): Nv5 5 · Nv10 6 · Nv15 6 · Nv20 6 · Nv30 9. Guerreiro/Clérigo caem nas ondas 4–6; Mago/Arqueiro chegam à onda 9 e param no chefe da 10 (a IA do robô de corpo a corpo sofre mais com atiradores; ver pendência abaixo).
-- Coop (5 ondas + chefe; +1 mob por jogador extra, vida dos mobs +35% por jogador extra, chefe sem bônus de nível, elite só com 3+ jogadores, 1 jogador enfrenta o chefe da faixa anterior): vitória 4 jogadores Nv12 75% · Nv20 69% · Nv30 94%; 2 jogadores 44% · 25% · 38%; 1 jogador 13% · 19% · 0% (o 1 jogador vence quase só com Mago/Arqueiro).
-- Recompensas (`COOP`): XP bruto da vitória agora vem das ondas reais (`estimatePoolXp`) + 6% do nível pelo chefe: ≈ 12% de um nível no Nv8, 10% no Nv12, 8% no Nv20 (≈ 4 min por partida); o farm normal rende mais XP por hora, o coop paga loot de chefe, poções e ouro (266 no Nv12). Antes a estimativa dava 25–30% de um nível por vitória (exploitável contra o farm desacelerado).
+    SOLO — ondas vencidas (mediana [mín–máx]) até cair (teto 25), perfil normal; 16 execuções por célula
+      Nv5   mediana 8 [5–9]  (war 6, mag 9, arc 9, cle 8)
+      Nv10  mediana 7 [4–9]  (war 6, mag 9, arc 9, cle 6)
+      Nv15  mediana 6 [3–9]  (war 5, mag 9, arc 9, cle 6)
+      Nv20  mediana 7 [2–9]  (war 4, mag 9, arc 9, cle 6)
+      Nv30  mediana 9 [3–19]  (war 6, mag 11, arc 9, cle 6)
+
+    COOP — vitória% (5 ondas + chefe) e ondas médias vencidas; grupos de classes mistas, perfil normal; 16 execuções por célula
+      Nv5   1j:  63% (ondas 4.6)   2j: 100% (ondas 5.0)   4j: 100% (ondas 5.0)
+      Nv10  1j:  13% (ondas 4.1)   2j:  38% (ondas 4.4)   4j:  94% (ondas 4.9)
+      Nv15  1j:   0% (ondas 3.9)   2j:  44% (ondas 4.4)   4j: 100% (ondas 5.0)
+      Nv20  1j:  19% (ondas 4.0)   2j:  38% (ondas 4.4)   4j:  94% (ondas 4.9)
+      Nv30  1j:   0% (ondas 3.9)   2j:  56% (ondas 4.6)   4j:  94% (ondas 4.9)
+
+Composição: mobs = 1 + floor(0.3·n), +1 nível a cada 3 ondas, elite a cada 5 ondas 3 níveis abaixo, cura de 50% entre ondas, chefe pela faixa de nível (nunca o Rubro). Coop: 5 ondas + chefe, +1 mob por jogador extra, vida dos mobs +35% por jogador extra, elite só com 3+ jogadores, 1 jogador enfrenta o chefe da faixa anterior. Antes da recalibragem (2+n mobs juntos, +20% de vida entre ondas, chefe sorteado inclusive o Rubro): solo mediana 1–3 ondas; coop 0% quase sempre.
+- Recompensas (`COOP`): XP bruto da vitória vem das ondas reais (`estimatePoolXp`) + 6% do nível pelo chefe: ≈ 12% de um nível no Nv8, 10% no Nv12, 8% no Nv20 (≈ 4 min por partida); ouro 266 no Nv12.
 - Pendência: melhorar o robô corpo a corpo (ai.js) ou o Guerreiro/Clérigo contra grupos mistos; o Nv20+ solo sem equipamento melhor que "normal" não derruba o chefe da onda 10.
+
+## Duelos (npm run balance, equipamento incomum, 30 duelos por par; meta 45–55% e 20–40 s)
+Nível 10:
+    mage            37%        -      20%      77%
+    archer          40%      80%        -      50%
+    cleric          67%      27%      70%        -
+    warrior    52% · 14 s
+    mage       44% · 29 s  <- fora da meta
+    archer     57% · 29 s  <- fora da meta
+    cleric     54% · 23 s
+Nível 20:
+    mage            57%        -       0%      80%
+    archer          30%      83%        -      23%
+    cleric          73%      30%      67%        -
+    warrior    50% · 16 s
+    mage       46% · 36 s
+    archer     46% · 30 s
+    cleric     57% · 27 s  <- fora da meta
+Nível 30:
+    mage            50%        -       7%      60%
+    archer          27%      80%        -      38%
+    cleric          77%      50%      73%        -
+    warrior    43% · 20 s  <- fora da meta
+    mage       39% · 40 s  <- fora da meta
+    archer     48% · 35 s
+    cleric     67% · 34 s  <- fora da meta
+
+Não mudou nesta rodada (o bônus de iniciante é 0 no nível 10). Fora da meta, pendente: Nv10 Mago 44% / Arqueiro 57%; Nv20 Clérigo 57%; Nv30 Guerreiro 43%, Mago 39% (40 s), Clérigo 67%.
 
 ## Rodada G4/G9 (2026-11-02)
 - Vida do Guardião das Ruínas 12→9 e do Ancião Gélido 11→8,5 (`data/mobs.js`); missões `guardiao_das_ruinas` Nv 16→22 e `anciao_gelido` Nv 22→27.
@@ -97,3 +185,8 @@ Depois (mobs = 1 + floor(0.3·n), +1 nível a cada 3 ondas, elite a cada 5 ondas
 - Item opalino: atributos ×1,5 (era ×1,3) e roubo de vida (+4% arma, +3% armadura): pontuação +29–31% sobre o lendário comum (era +10–12%).
 - Baús: chance de item `min(0,8; 0,15×tier)` e sorte `0,25×tier` (ver `economia.md`).
 
+
+## Exploits avaliados (2026-11-02)
+- Acampamentos: uma elite (70% de item, 4% de épico) + grupo a cada 150 s rendia ~24 elites/h por acampamento, perto de 1,3 épico/h parado num ponto (o farm normal rende ~1/h). Corrigido: `CAMP_RESPAWN = 300` em data/mobs.js (teste "G10" em tests/core.test.js). Os baús dos acampamentos já têm recarga própria (`CHEST_COOLDOWN_MS`).
+- Mini-chefe (elite com 4–5× de vida, `zones.js › miniboss.respawn = 240`): ~15 elites/h só dele, ≈ 0,9 épico/h. Sugestão (arquivo de outro agente, `data/zones.js`): subir `respawn` para 600 em todas as zonas.
+- O Alfa da Matilha do Bosque está em nível 8 numa zona 1–6 (LEVEL_GAP o torna intratável abaixo do nível 6, o que protege o iniciante).

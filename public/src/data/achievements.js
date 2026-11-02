@@ -24,11 +24,13 @@ export const ACHIEVEMENTS = [
   { id: 'viajante', name: 'Viajante', desc: 'Use o teletransporte do mapa 5 vezes.', stat: 'teleports', min: 5, title: 'Viajante' },
   { id: 'mao_de_ferro', name: 'Mão de Ferro', desc: 'Aprimore equipamentos 10 vezes com o Ferreiro.', stat: 'upgrades', min: 10, title: 'Mão de Ferro' },
   { id: 'voz_dos_ecos', name: 'Voz dos Ecos', desc: 'Conclua o arco final: Os Ecos Unidos.', quest: 'ecos_unidos', min: 1, title: 'Voz dos Ecos' },
+  // `mask` = o contador é uma máscara de bits (vale quantos bits estão ligados): 1 lore por zona de farm (core/journal.js LORE_ZONES).
+  { id: 'leitor_de_ecos', name: 'Leitor de Ecos', desc: 'Leia as 5 inscrições deixadas nas zonas: placas e estátuas.', stat: 'lore', mask: true, min: 5, title: 'Leitor de Ecos' },
 ];
 export const ACHIEVEMENT_IDS = ACHIEVEMENTS.map((a) => a.id);
 export const ACH = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 // Contadores do personagem. `SERVER_STATS` só o servidor altera (vêm de partidas decididas lá).
-export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin', 'teleports', 'upgrades', 'tips'];
-// `tips` não é contador: é uma máscara de bits (dicas já mostradas, core/journal.js TIP_BITS); o servidor une os bits em vez de limitar o salto.
-export const FLAG_STATS = ['tips'];
+export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin', 'teleports', 'upgrades', 'tips', 'lore'];
+// `tips` e `lore` não são contadores: são máscaras de bits (dicas já mostradas, core/journal.js TIP_BITS; inscrições lidas, LORE_ZONES); o servidor une os bits em vez de limitar o salto.
+export const FLAG_STATS = ['tips', 'lore'];
 export const SERVER_STATS = ['pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin']; // os 5 últimos limitam o XP de PvP (core/rewards.js)
