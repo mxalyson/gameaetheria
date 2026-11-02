@@ -62,7 +62,15 @@ export function fight(char, foes, seed, { zoneId = 'arena', dodge = DODGE, maxT 
   let potions = char.potions ?? 0, potCd = 0, t = 0, used = 0;
   const decided = new Map(); // telegrafo -> vai esquivar?
   while (t < maxT && !hero.dead && w.actors.some((a) => a.kind === 'mob' && !a.dead)) {
+    // robô corpo a corpo: fecha a distância dos atiradores primeiro (alvo mais próximo entre os de longo alcance); os outros ficam "invisíveis" só nesta decisão
+    const hid = [];
+    if (MELEE.has(char.classId)) {
+      let best = null, bd = Infinity;
+      for (const a of w.actors) if (a.kind === 'mob' && !a.dead && MOBS[a.mobId].kind === 'ranged') { const d = Math.hypot(a.x - hero.x, a.y - hero.y); if (d < bd) { bd = d; best = a; } }
+      if (best) for (const a of w.actors) if (a.kind === 'mob' && !a.dead && a !== best && !a.untargetable) { a.untargetable = true; hid.push(a); }
+    }
     const it = rivalIntent(hero, w, DT) ?? { mx: 0, my: 0, aimX: hero.x, aimY: hero.y };
+    for (const a of hid) a.untargetable = false;
     // esquiva: depois de ~0,35 s de reação, sai de dentro do golpe marcado
     for (const tg of w.telegraphs) {
       if (!decided.has(tg)) decided.set(tg, rng.chance(dodge));
@@ -83,6 +91,7 @@ const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length 
 const BOSSES = [['treant', 7], ['colossus', 13], ['guardian', 21], ['frostlord', 26], ['infernoknight', 31]];
 const LEVELS = [5, 10, 15, 19, 25, 30];
 const CLASS_IDS = Object.keys(CLASSES);
+const MELEE = new Set(CLASS_IDS.filter((c) => CLASSES[c].basic.kind === 'melee'));
 
 export function bossRow(bossId, bossLevel, level, profileId) {
   let wins = 0, tw = [], tl = [], pots = 0, runs = 0;
@@ -94,10 +103,31 @@ export function bossRow(bossId, bossLevel, level, profileId) {
   return { wins, runs, pct: Math.round((100 * wins) / runs), tWin: Math.round(median(tw)), tLose: Math.round(median(tl)), pots: (pots / runs).toFixed(1) };
 }
 
+// Início de jogo: herói com o kit inicial (sem itens), sem poção, contra k lobos do mesmo nível (níveis 1–4). Meta: 1 lobo >= 80%, 2 lobos >= 40%.
+export function earlyHero(classId, level, seed) {
+  const c = newCharacter('Bot', classId, makeRng(seed)), cls = CLASSES[classId], pts = POINTS_PER_LEVEL * (level - 1);
+  c.level = level;
+  c.alloc[cls.primary] += Math.round(pts * 0.6); c.alloc.vit += Math.round(pts * 0.3); c.alloc.agi += pts - Math.round(pts * 0.6) - Math.round(pts * 0.3);
+  c.potions = 0;
+  return c;
+}
+export function earlyRow(classId, level, k, seeds = 30, mobId = 'wolf') {
+  let wins = 0, lost = 0;
+  for (let s = 0; s < seeds; s++) {
+    const r = fight(earlyHero(classId, level, 5 + s), Array.from({ length: k }, () => ({ mobId, level })), 700 + s, { maxT: 90 });
+    if (r.win) { wins++; lost += 1 - r.hpLeft; }
+  }
+  return { pct: Math.round((100 * wins) / seeds), lostPct: Math.round((100 * lost) / (wins || 1)) };
+}
+
 const out = { bosses: [], mobs: [] };
 const isMain = /boss-check\.mjs$/.test(process.argv[1] ?? ''); // importado por outro script (ex.: testes), não roda a tabela
 if (isMain) {
-if (ONLY !== 'mobs') {
+if (ONLY === 'early') {
+  console.log('INÍCIO — vitória% (vida perdida % nas vitórias) contra k lobos do mesmo nível, kit inicial, sem poção, 30 sementes');
+  for (const k of [1, 2]) for (const c of CLASS_IDS) console.log(`  ${k} lobo(s) ${c.padEnd(8)} ` + [1, 2, 3, 4].map((l) => { const r = earlyRow(c, l, k); return `Nv${l}: ${String(r.pct).padStart(3)}% (-${String(r.lostPct).padStart(2)}%)`.padEnd(20); }).join(' '));
+}
+if (ONLY !== 'mobs' && ONLY !== 'early') {
   console.log(`CHEFES — vitória% (mediana do tempo de vitória / de derrota em s), ${CLASS_IDS.length} classes × ${N} sementes por célula, esquiva ${DODGE}`);
   for (const [bid, bl] of BOSSES) {
     console.log(`\n${MOBS[bid].name} (${bid}, Nv ${bl})`);
@@ -112,7 +142,7 @@ if (ONLY !== 'mobs') {
     }
   }
 }
-if (ONLY !== 'boss') {
+if (ONLY !== 'boss' && ONLY !== 'early') {
   console.log(`\nMOBS COMUNS — herói normal do MESMO nível contra 1/2/3 mobs da zona: vida média perdida (%) e tempo para vencer; "L" = derrota`);
   for (const [zid, z] of Object.entries(ZONES)) {
     if (!z.mobs) continue;

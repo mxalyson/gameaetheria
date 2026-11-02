@@ -2,6 +2,9 @@
 // Só envia INTENÇÕES (mover/mirar/atacar/skill) e comandos de lobby; tudo que chega (estado, dano, recompensa) vem do servidor.
 import { PROTOCOL_VERSION } from '../core/protocol.js';
 
+// Recusas após as quais reconectar nunca vai funcionar: o jogador precisa de novo login/token.
+export const AUTH_LOST = ['bad_token', 'bad_session', 'auth_required'];
+
 export class NetClient {
   // h: { welcome, party, invite, queue, matchFound, snap, reward, matchEnd, notice, reject, close }
   constructor({ url, session, characterId, handlers = {} }) {
@@ -21,19 +24,28 @@ export class NetClient {
       ws.onmessage = (e) => {
         let m; try { m = JSON.parse(e.data); } catch { return; }
         if (m.t === 'welcome' && first) { first = false; resolve(m); }
-        if (m.t === 'reject' && first && ['bad_session', 'bad_character', 'already_online', 'auth_required'].includes(m.code)) { first = false; reject(new Error(m.code)); }
+        if (m.t === 'reject' && AUTH_LOST.includes(m.code)) this.dead = true; // token/sessão vencidos: reconectar só repete a recusa
+        if (m.t === 'reject' && first && ['bad_session', 'bad_character', 'already_online', 'auth_required', 'bad_token'].includes(m.code)) { first = false; reject(new Error(m.code)); }
         this.onMessage(m);
       };
       ws.onerror = () => { if (first) { first = false; reject(new Error('network')); } };
       ws.onclose = () => {
         this.connected = false;
         if (this.closing) return;
-        if (this.token) setTimeout(() => { if (!this.closing && this.ws === ws) this.reconnect(); }, 900); // volta com o token: mantém grupo e partida
+        if (this.dead) { this.token = null; this.joined = false; this.h.authLost?.(); return; }
+        if (this.token) setTimeout(() => { if (!this.closing && this.ws === ws) this.reconnect(); }, this.retryDelay()); // volta com o token: mantém grupo e partida
         this.h.close?.();
       };
     });
   }
-  reconnect() { this.connect().catch(() => { if (!this.closing) setTimeout(() => this.reconnect(), 1500); }); }
+  // Recuo exponencial: 1, 2, 4, 8… até 60 s (zera ao reconectar). Evita martelar o servidor com token vencido.
+  retryDelay() { const d = Math.min(60, 2 ** (this.tries ?? 0)) * 1000; this.tries = (this.tries ?? 0) + 1; return d; }
+  reconnect() {
+    this.connect().then(() => { this.tries = 0; }).catch(() => {
+      if (this.closing || this.dead) return;
+      setTimeout(() => { if (!this.closing && !this.dead) this.reconnect(); }, this.retryDelay());
+    });
+  }
 
   onMessage(m) {
     switch (m.t) {

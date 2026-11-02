@@ -171,7 +171,7 @@ export class TouchControls {
       const t = el.querySelector('.cdt');
       if (t) t.textContent = text && cd > 0 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
     };
-    const blocked = p.stunT > 0 || p.dead || !!p.dash;
+    const blocked = p.stunT > 0 || p.dead; // sem a investida (dash): durava ~0,3 s e parecia erro (V19)
     cls.skills.forEach((s, i) => {
       const b = this.root.querySelector(`.sk${i}`), lk = !isSkillUnlocked(p, i);
       setCd(b, lk ? 0 : cdOf[i], skillOf(p.classId, p.spec, s).cd, true);
@@ -193,7 +193,7 @@ export class TouchControls {
       act.dataset.kind = tg.kind;
       act.querySelector('.icon').innerHTML = tg.kind === 'chest'
         ? '<img class="art" src="assets/icons/item/res-chest.webp" alt="🧰" draggable="false" onerror="this.replaceWith(this.alt)">'
-        : '<span class="bubble" aria-label="Conversar">💬</span>';
+        : '<img class="art" src="assets/icons/menu/menu-journal.webp" alt="Conversar" draggable="false">'; // pergaminho pintado (V6): sem emoji nem disco chapado
     }
   }
 }

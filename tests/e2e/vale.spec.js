@@ -82,6 +82,7 @@ test('Vale: ataque e Golpe Giratório causam dano real no alvo de treino', async
   const after = await page.evaluate(() => ({ n: window.vale.dummy.hits, cd: window.vale.player.cds.skill, kinds: window.vale.log.map((l) => l.kind) }));
   expect(after.n).toBeGreaterThan(before);
   expect(after.kinds).toContain('skill');
-  expect(after.cd).toBeGreaterThan(3);
+  expect(after.cd).toBeGreaterThan(0.5); // recarga 4 s (era 5); o resto depende do tempo de parede sob carga (medido 1,4–2,6)
+  expect(after.cd).toBeLessThanOrEqual(4);
   expect(errors).toEqual([]);
 });

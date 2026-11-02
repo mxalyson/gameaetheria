@@ -95,10 +95,20 @@ test('NPC sem missão abre o serviço direto (como antes); missões de arena rea
   const errors = await criar(page);
   await page.evaluate(() => { window.game.char.level = 12; window.game.enterZone('town', 1100, 600); });
   await irAoNpc(page, 'arena');
+  expect(await page.evaluate(() => window.game.computeMarks().arena ?? null)).toBeNull(); // sem missão: sem marca
+  // 1ª conversa offline da sessão: a fala do Doran (sem as filas) abre antes, com o botão do serviço
   await page.keyboard.press('e');
-  await expect(page.locator('.panel')).toContainText('Mestre Doran'); // painel da arena, sem diálogo de missão
+  await expect(page.locator('.panel')).toContainText('Mestre Doran');
+  await expect(page.locator('.panel')).toContainText('Sem rede');
+  expect(await page.evaluate(() => window.game.dialogNpc)).toBe('arena');
+  await expect(page.locator('[data-action="quest-accept"], [data-action="quest-turnin"]')).toHaveCount(0);
+  await page.evaluate(() => window.game.ui.closePanels());
+  // 2ª conversa: abre a arena direto, como antes
+  await page.evaluate(() => { window.game.dialogNpc = null; });
+  await page.keyboard.press('e');
+  await expect(page.locator('.panel')).toContainText('Mestre Doran');
+  await expect(page.locator('[data-action="match"], [data-action="waves"]').first()).toBeVisible();
   expect(await page.evaluate(() => window.game.dialogNpc ?? null)).toBeNull();
-  expect(await page.evaluate(() => window.game.computeMarks().arena ?? null)).toBeNull();
   await page.evaluate(() => window.game.ui.closePanels());
   await irAoNpc(page, 'merchant');
   await page.evaluate(() => { const n = window.game.world.zone.npcs.find((x) => x.id === 'merchant'); window.game.player.x = n.x + 30; window.game.player.y = n.y; });

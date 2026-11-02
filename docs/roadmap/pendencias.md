@@ -21,6 +21,17 @@ Relatórios completos com tabelas e correções sugeridas: `auditoria-visual.md`
 - [ ] Risco: limites novos de XP/nível do servidor (`levelJump` 2, `xpFreeLevels` 1,5) podem reverter progresso de uma sessão longa sem gravar (aba suspensa). Gravação a cada 8 s limita a perda.
 - [x] Brilho animado da lava: já existe em `drawGroundLife` (pulso aditivo nos trechos visíveis).
 
+### Depois do P1 (2026-11-02)
+- [x] Bugs B5, B6, B7, B10, B11, B13, B14, B17, B18; história S1–S4, S5–S7, S9, S10, S12, S13, S15, S16, S19, S20; jogabilidade G5, G6/G7, G11, G12; visual V5–V30 (exceto o que depende de arte). Unitários 301/301; e2e 100–102 de 102 (1–4 testes oscilam por carga, passam isolados).
+- [ ] **Pico de entrada no Bosque** (400–510 ms nos primeiros quadros em CPU, também na 2ª visita): investigar populate/blocos com GPU (`node tools/perf-tiles.mjs`).
+- [ ] Medalhão de interagir cobre o rótulo "Toque para conversar" quando o herói fica fora do centro; etiqueta "Nv 31 · Cavaleiro Rubro" parcialmente atrás do menu; no epílogo da Yun a recompensa e o botão "Entregar" ficam abaixo da dobra.
+- [ ] S17 lore coletável (placas/estátuas tocáveis) exige objeto interativo no mapa; passos do onboarding "pulso no Ren" não feitos; evento `teleport` online não conta para a missão da Lia (emitir ao receber `zone_joined` de teleporte).
+- [ ] Mob desconhecido vindo do servidor lança exceção a cada quadro (guard esconde): `if (!MOBS[sm.mob]) continue` em `updateNet`.
+- [ ] Imagens estáticas do HTML (`<img src>` em ui.js/touch.js: ícones, retratos) sem `?v=`; subir `GROUND_V` junto com o `VERSION` do sw.js ao mudar texturas.
+- [ ] Clérigo ainda perde para 2 lobos nível 4 sem poção (43% de vitória); Bosque ficou fácil para quem tem equipamento incomum (rampa em `data/mobs.js`).
+- [ ] `docs/gameplay/dificuldade.md` ficou desatualizada (tabela de mobs comuns, recarga do ritual 1200 s, respawn de chefes 420–900 s).
+- [ ] Rubro tint retocado (vermelho mais profundo) sem captura; B15, B19–B30 (baixa gravidade) não feitos; arte: ponte reta longa, baú aberto, adornos do Cume, retrato do Rubro, emojis 📍⚔️🔒🏆 em painéis de mapa/diário.
+
 ### P1 — importantes
 - [ ] **B5** `frame()` sem try/finally (uma exceção congela o jogo). **B6** reconexão infinita com token vencido. **B7** soft-lock com sala cheia. **B8** `flushAll()` nunca chamado (perde até 10 s de recompensa). **B9** exceção numa sala derruba o servidor. **B10** `cloud.attach` desfaz a pausa na instância. **B11** mobs travam na margem do rio e morrem a tiros (IA/colisão no rio). **B12** botão de spec mostra `${COIN}` literal. **B13** atlas com JSON novo e imagem velha pelo service worker. **B14** chefe reaparece na hora ao reentrar (e o log mente). **B16** sem botão de voltar à vila por toque na instância online. **B17** drops no chão nunca expiram. **B18** `separate()` O(n²) custa 35% da sala do servidor.
 - [ ] **S1/S2/S3/S4** história: fechar o cânone (3 guardiões + 2 reflexos), epílogo de `ecos_unidos`, pistas de lore nos níveis 1–19, introdução narrativa do ritual; **S7/S9/S10** missões da Lia e do Brok, falas condicionais, onboarding de 6 passos.
@@ -190,4 +201,5 @@ Relatórios completos com tabelas e correções sugeridas: `auditoria-visual.md`
 - [ ] Balanceamento: mobs 2× e mapa 1,6× mais comprido mudam o ritmo de XP/hora e o tempo de percurso. Calibrar com jogadores.
 - [ ] Itens de Ópalo (exclusivos do Cavaleiro Rubro) usam o ícone do tipo (espada/cajado/arco/maça/armadura); falta arte opalescente própria e destaque visual (cor do nome) na mochila.
 - [ ] `server/zone.js` e `server/coop.js` chamam `rollMobLoot` sem `pity` e sem `bossState` no World: pity e ritual do último chefe valem só offline; no servidor o ritual reinicia por instância e `boss_warn`/`phase` não são repassados ao cliente (server/wire.js).
+- [ ] História (S17): lore coletável (placas/estátuas tocáveis por zona, ≤160 caracteres; textos em docs/roadmap/auditoria-historia.md) exige objeto interativo no mapa (layout.js/renderer): não feito. Também pendente: evento `teleport` online (hub), pulso visual no Ren no primeiro minuto e e2e que confira a fala do Doran offline (agora a 1ª conversa da sessão abre o diálogo).
 - [ ] UI: mostrar "Ritual N/40" com `world.bossProgress`; XP de esbirros de chefe ainda é concedido pelo servidor de zona (server/zone.js não checa `summoned`).

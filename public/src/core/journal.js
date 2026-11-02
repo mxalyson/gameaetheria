@@ -32,6 +32,8 @@ export const isComplete = (doc, id) => { const a = doc.quests.active[id], q = QU
 export const readyFor = (doc, npcId) => Object.keys(doc.quests.active).filter((id) => (QUESTS[id].turnIn ?? QUESTS[id].giver) === npcId && isComplete(doc, id));
 export const activeFor = (doc, npcId) => Object.keys(doc.quests.active).filter((id) => (QUESTS[id].turnIn ?? QUESTS[id].giver) === npcId && !isComplete(doc, id));
 
+export const evolvedSpirits = (doc) => (doc.spirits ?? []).filter((s) => s.stage === 2).length;
+
 export function acceptQuest(doc, id, now = Date.now()) {
   const q = QUESTS[id];
   if (!q) return { ok: false, reason: 'Missão inexistente.' };
@@ -42,6 +44,7 @@ export function acceptQuest(doc, id, now = Date.now()) {
   doc.quests.active[id] = { p: q.objectives.map(() => 0), at: now };
   recordEvent(doc, { type: 'level', level: doc.level });
   recordEvent(doc, { type: 'spirit', count: doc.spirits?.length ?? 0 });
+  recordEvent(doc, { type: 'spiritStage', count: evolvedSpirits(doc) });
   return { ok: true };
 }
 export function abandonQuest(doc, id) { delete doc.quests.active[id]; }
@@ -53,6 +56,8 @@ function matches(o, ev) {
     case 'chest': return ev.type === 'chest' && (o.zone === 'any' || o.zone === ev.zoneId);
     case 'pvp': return ev.type === 'pvp' && ev.won && (o.mode === 'any' || o.mode === ev.mode);
     case 'coop': return ev.type === 'coop' && ev.victory;
+    case 'teleport': return ev.type === 'teleport';
+    case 'upgrade': return ev.type === 'upgrade';
     default: return false;
   }
 }
@@ -66,6 +71,8 @@ export function recordEvent(doc, ev, now = Date.now()) {
   else if (ev.type === 'chest') st.chests++;
   else if (ev.type === 'pvp') { st.pvpGames++; if (ev.won) st.pvpWins++; }
   else if (ev.type === 'coop' && ev.victory) st.coopClears++;
+  else if (ev.type === 'teleport') st.teleports++;
+  else if (ev.type === 'upgrade') st.upgrades++;
   for (const [id, a] of Object.entries(doc.quests.active)) {
     const q = QUESTS[id]; let changed = false;
     q.objectives.forEach((o, i) => {
@@ -73,6 +80,7 @@ export function recordEvent(doc, ev, now = Date.now()) {
       let v = before;
       if (o.type === 'level' && ev.type === 'level') v = Math.max(before, Math.min(max, ev.level));
       else if (o.type === 'spirit' && ev.type === 'spirit') v = Math.max(before, Math.min(max, ev.count));
+      else if (o.type === 'spiritStage' && ev.type === 'spiritStage') v = Math.max(before, Math.min(max, ev.count));
       else if (matches(o, ev)) v = Math.min(max, before + 1);
       if (v !== before) { a.p[i] = v; changed = true; }
     });
@@ -103,12 +111,14 @@ export function turnInQuest(doc, id, rng, now = Date.now()) {
 
 // ---------- conquistas ----------
 export function statValue(doc, stat) { return stat === 'level' ? doc.level : doc.stats?.[stat] ?? 0; }
-export const achievementProgress = (doc, a) => ({ value: Math.min(a.min, statValue(doc, a.stat)), min: a.min, earned: doc.achievements?.[a.id] != null });
+// Conquista da história (`quest`) vale 1 quando a missão foi concluída; as outras leem o contador.
+export const achievementValue = (doc, a) => (a.quest ? (doc.quests?.done?.[a.quest] != null ? 1 : 0) : statValue(doc, a.stat));
+export const achievementProgress = (doc, a) => ({ value: Math.min(a.min, achievementValue(doc, a)), min: a.min, earned: doc.achievements?.[a.id] != null });
 // Concede as conquistas cujo contador já foi atingido (o servidor repete este cálculo; o cliente não escolhe).
 export function checkAchievements(doc, now = Date.now()) {
   const out = [];
   doc.achievements ??= {};
-  for (const a of ACHIEVEMENTS) if (doc.achievements[a.id] == null && statValue(doc, a.stat) >= a.min) { doc.achievements[a.id] = now; out.push(a.id); }
+  for (const a of ACHIEVEMENTS) if (doc.achievements[a.id] == null && achievementValue(doc, a) >= a.min) { doc.achievements[a.id] = now; out.push(a.id); }
   return out;
 }
 export function setTitle(doc, achievementId) {
@@ -118,6 +128,33 @@ export function setTitle(doc, achievementId) {
   doc.title = achievementId; return true;
 }
 export const titleText = (doc) => (doc.title && ACH[doc.title]?.title) || '';
+
+// ---------- dicas de onboarding (cada uma aparece 1× por personagem: máscara de bits em stats.tips) ----------
+export const TIP_BITS = { forest: 0, chest: 1, level: 2, skill: 3, spirit: 4, boss: 5, ritual: 6 };
+export const tipSeen = (doc, key) => ((doc.stats?.tips ?? 0) & (1 << TIP_BITS[key])) !== 0;
+export function takeTip(doc, key) { // true se for a primeira vez (e marca como vista)
+  if (!(key in TIP_BITS) || tipSeen(doc, key)) return false;
+  ensureJournal(doc);
+  doc.stats.tips = (doc.stats.tips | (1 << TIP_BITS[key])) >>> 0;
+  return true;
+}
+
+// ---------- falas condicionais dos NPCs ----------
+// `greet` = texto ou lista de { when, text }; vale a primeira entrada cuja `when` bate (sem `when` = padrão).
+// Condições (todas precisam valer): level (>=), bossKills (>=), bossKillsMax (<=), done (missão concluída, id ou lista), offline (true = só sem servidor).
+export function greetMatches(doc, when = {}, { online = false } = {}) {
+  if (when.level != null && doc.level < when.level) return false;
+  const bk = doc.stats?.bossKills ?? 0;
+  if (when.bossKills != null && bk < when.bossKills) return false;
+  if (when.bossKillsMax != null && bk > when.bossKillsMax) return false;
+  for (const id of [].concat(when.done ?? [])) if (doc.quests?.done?.[id] == null) return false;
+  if (when.offline != null && when.offline !== !online) return false;
+  return true;
+}
+export function greetFor(doc, greet, opts) {
+  if (typeof greet === 'string') return greet;
+  return (greet ?? []).find((g) => greetMatches(doc, g.when, opts))?.text ?? '…';
+}
 
 // ---------- baús ----------
 export const chestReady = (doc, chestId, now = Date.now()) => now - (doc.chests?.[chestId] ?? -Infinity) >= CHEST_COOLDOWN_MS;

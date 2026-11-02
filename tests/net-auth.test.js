@@ -173,3 +173,20 @@ test('abandono na contagem regressiva cancela a partida sem punir ninguém', asy
   assert.equal(db.raw.prepare('select count(*) n from operations').get().n, 0);
   await closeAll(srv, a, b);
 });
+
+test('B6: tokens vencidos repetidos do mesmo IP não inundam a auditoria e acabam cortados', async () => {
+  const { db } = world();
+  const audits = [];
+  const orig = db.audit.bind(db); db.audit = (k, d) => { audits.push(k + ':' + d?.detail); return orig(k, d); };
+  const srv = await start(db);
+  for (let i = 0; i < 14; i++) {
+    const c = await connect(srv);
+    c.send({ t: 'hello', session: 'a'.repeat(40), characterId: 1, token: 'tokenvencido12345' });
+    const r = await c.waitFor((m) => m.t === 'reject');
+    assert.ok([REJECT.BAD_TOKEN, REJECT.RATE_LIMIT].includes(r.code));
+    if (i >= 11) assert.equal(r.code, REJECT.RATE_LIMIT, 'depois de 10 falhas no minuto o IP é cortado');
+    await c.waitClose();
+  }
+  assert.ok(audits.filter((a) => a.startsWith('ws_abuse:bad_token')).length <= 3, 'no máximo 3 linhas de auditoria por IP/minuto');
+  await closeAll(srv);
+});

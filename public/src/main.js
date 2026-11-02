@@ -24,7 +24,8 @@ import { skillOf } from './core/specs.js';
 import { SKILLS } from './data/skills.js';
 import { newlyUnlocked } from './core/unlocks.js';
 import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
-import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady } from './core/journal.js';
+import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, evolvedSpirits } from './core/journal.js';
+import { TIPS } from './data/dialogs.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
 import { PRICES, buildShopStock, sellValue } from './shop.js';
@@ -88,32 +89,59 @@ class Game {
     requestAnimationFrame((t) => this.frame(t));
   }
 
+  // Executa um trecho do quadro sem deixar uma exceção matar o loop; loga uma vez por tipo e avisa após 20 falhas seguidas.
+  guard(tag, fn) {
+    try { fn(); return true; } catch (err) {
+      const k = `${tag}:${err?.message ?? err}`;
+      this.frameErrs ??= new Set();
+      if (!this.frameErrs.has(k)) { this.frameErrs.add(k); console.error(`[frame/${tag}]`, err); }
+      return false;
+    }
+  }
+
   frame(now) {
-    const dt = Math.min(0.05, (now - this.last) / 1000);
-    this.last = now;
+    try {
+      const dt = Math.min(0.05, (now - this.last) / 1000);
+      this.last = now;
+      const ok = this.guard('quadro', () => this.frameBody(dt));
+      this.frameFails = ok ? 0 : (this.frameFails ?? 0) + 1;
+      if (this.frameFails === 20) this.ui.toast('Erro', 'Algo deu errado, recarregue a página.', '');
+    } finally {
+      requestAnimationFrame((t) => this.frame(t));
+    }
+  }
+
+  frameBody(dt) {
+    let bad = false;
     if (this.mode === 'title') {
       const w = this.titleWorld;
-      w.update(dt);
-      w.events.length = 0;
-      const cam = this.renderer.camera(w, { x: 850 + Math.cos(w.time * 0.1) * 320, y: 640 + Math.sin(w.time * 0.13) * 200 });
-      this.renderer.draw(w, cam, {});
+      bad = !this.guard('update', () => { w.update(dt); w.events.length = 0; }) || bad;
+      bad = !this.guard('draw', () => {
+        const cam = this.renderer.camera(w, { x: 850 + Math.cos(w.time * 0.1) * 320, y: 640 + Math.sin(w.time * 0.13) * 200 });
+        this.renderer.draw(w, cam, {});
+      }) || bad;
     } else {
       // Celular em retrato: a tela pede para girar o aparelho; o mundo fica parado até voltar à horizontal.
-      if (!this.portrait.matches) this.step(dt);
-      const p = this.player;
-      if (this.mode === 'explore' && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
-      const exploring = this.mode === 'explore';
-      this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: exploring ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, chestsOpen: exploring ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
-      if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
-      this.ui.updateHud(this);
-      this.touch.update(this);
+      if (!this.portrait.matches) bad = !this.guard('update', () => this.step(dt)) || bad;
+      bad = !this.guard('draw', () => {
+        const p = this.player;
+        if (this.mode === 'explore' && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
+        const exploring = this.mode === 'explore';
+        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: exploring ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, chestsOpen: exploring ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
+        if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
+        this.ui.updateHud(this);
+        this.touch.update(this);
+      }) || bad;
     }
-    this.cloud?.tick();
-    if (this.net?.connected && (this.netPingT = (this.netPingT ?? 0) - dt) <= 0) { this.net.ping(); this.netPingT = 2; }
-    if (this.net?.queue && this.mode === 'explore') { this.ui.banner(`🔎 Procurando ${this.net.queue.mode === 'coop' ? 'cooperativo' : this.net.queue.mode}… ${this.net.queue.waited}s`); this.netBanner = true; }
-    else if (this.netBanner && this.mode === 'explore') { this.ui.banner(null); this.netBanner = false; }
+    this.guard('rede', () => {
+      this.cloud?.tick();
+      if (this.net?.connected && (this.netPingT = (this.netPingT ?? 0) - dt) <= 0) { this.net.ping(); this.netPingT = 2; }
+      if (this.net?.queue && this.mode === 'explore') { this.ui.banner(`🔎 Procurando ${this.net.queue.mode === 'coop' ? 'cooperativo' : this.net.queue.mode}… ${this.net.queue.waited}s`); this.netBanner = true; }
+      else if (this.netBanner && this.mode === 'explore') { this.ui.banner(null); this.netBanner = false; }
+    });
     this.input.endFrame();
-    requestAnimationFrame((t) => this.frame(t));
+    // Falha em update/draw conta como quadro ruim (frame() soma os seguidos).
+    if (bad) throw new Error('quadro com falha');
   }
 
   // ---------------- ações da UI ----------------
@@ -205,23 +233,36 @@ class Game {
     if (heroSpritesEnabled()) showHeroLoading(preloadHero(char.classId)); // visual novo: espera o herói carregar
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
-      this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Siga o portal a leste para o Bosque Verdejante', 'gold');
+      setTimeout(() => this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Fale com a Guarda Ren (marca ❗) para receber sua primeira missão', 'gold'), 2600); // depois da tela "Preparando seu herói" (antes o toast expirava escondido)
       // o tutorial segue o modo de controle (toque é o padrão; teclado e mouse só se escolhido nas opções)
       if (this.touch?.active) this.ui.log('Arraste à esquerda para andar · botão grande ataca · círculos menores são as habilidades', '#cfe8ff');
       else this.ui.log('Mover: arraste o botão esquerdo do mouse ou use as setas · clique ataca · habilidades nos botões', '#cfe8ff');
       this.ui.log('💬 conversa com NPCs · 🧪 poção · 🏠 volta à vila · 🎒 mochila · 🧙 personagem · 🔮 spirits · 📖 diário', '#cfe8ff');
+      this.ui.log('Missões dão ouro, XP e itens: fale com a Guarda Ren e, depois, siga o portal a leste.', '#ffd34d');
       const sp = SPIRITS[char.spirits[0].type];
       this.ui.log(`Um spirit te acompanha: <b style="color:${sp.color}">${sp.name}</b> (${sp.element}).`, sp.color);
     }
+  }
+
+  // Ao sair de uma zona, guarda a recarga de quem está morto; quem estava vivo reaparece inteiro na volta.
+  stashRespawns(w) {
+    if (!w?.zone || !this.bossStates?.[w.zoneId]) return;
+    const bs = this.bossStates[w.zoneId];
+    bs.bossT = w.zone.boss && !w.actors.some((a) => a.boss && !a.dead) ? w.bossT : null;
+    bs.miniT = w.zone.miniboss && !w.actors.some((a) => a.miniboss && !a.dead) ? w.miniT : null;
   }
 
   enterZone(zoneId, x, y, mode = 'explore') {
     const prev = this.player;
     const ratio = prev && !prev.dead ? prev.hp / prev.maxHp : 1;
     this.skillLv = this.char.level;
+    this.stashRespawns(this.world);
     const bs = ((this.bossStates ??= {})[zoneId] ??= {}); // contador do ritual do chefe sobrevive à troca de mapa (só nesta sessão)
     if (zoneId === 'ember' && this.char.quests?.active?.cavaleiro_rubro && !bs.questShown) { bs.go = true; bs.questShown = true; } // a missão libera a primeira aparição
     this.world = new World(zoneId, { bossState: bs });
+    // chefe/mini-chefe abatidos continuam em recarga ao reentrar (sem isso o World novo os recriava na hora)
+    if (bs.bossT != null) this.world.bossT = bs.bossT;
+    if (bs.miniT != null) this.world.miniT = bs.miniT;
     this.mode = mode;
     if (ZONES[zoneId].mobs || zoneId === 'town') (this.char.visited ??= {})[zoneId] = 1; // desbloqueia o teletransporte para este mapa
     this.player = this.world.add(makeHeroActor(this.char, x, y));
@@ -237,7 +278,14 @@ class Game {
     const z = this.world.zone;
     this.ui.toast(z.name, z.level ? `Nível ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : z.safe ? 'Zona segura' : '');
     if (zoneId === 'town') this.refreshShop();
+    if (zoneId === 'ember') this.tip('ritual'); // explica o "Ritual N/40" na primeira visita
+    else if (zoneId === 'forest') this.tip('forest');
     this.save();
+  }
+
+  // Dica de onboarding: aparece 1× por personagem (bit em char.stats.tips) e vira um toast curto.
+  tip(key) {
+    if (this.char && takeTip(this.char, key) && TIPS[key]) this.ui.toast(TIPS[key][0], TIPS[key][1], '');
   }
 
   save() {
@@ -348,6 +396,7 @@ class Game {
 
   // Gravação recusada (revisão velha ou valor implausível): volta ao estado oficial do servidor.
   resync(doc, err) {
+    if (this.mode === 'net') return; // na instância o servidor manda no personagem; recarregar aqui deixaria um herói parado na sala
     this.ui.toast('Sincronização', err.status === 409 ? 'O personagem foi alterado em outro lugar; recarreguei.' : 'O servidor recusou o salvamento; voltei ao último estado salvo.', '');
     this.loadGame(doc);
   }
@@ -367,7 +416,7 @@ class Game {
         queue: () => { refresh(); },
         invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (botão 👥)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
-        reject: (m) => { this.zoneBusy = false; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
+        reject: (m) => { this.zoneBusy = false; this.portalCd = 0; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
@@ -376,6 +425,13 @@ class Game {
         reward: (m) => this.onNetReward(m),
         matchEnd: () => { this.netEnded = true; },
         close: () => { if (this.mode === 'net') this.ui.toast('Conexão', 'Reconectando ao servidor de partidas…', ''); },
+        // token/sessão vencidos: reconectar não adianta; volta ao login (o personagem já foi gravado)
+        authLost: async () => {
+          this.ui.toast('Sessão expirada', 'Entre de novo para continuar.', '');
+          await this.leaveCharacter().catch(() => {});
+          this.online.setToken?.(null);
+          this.showAuth('login', 'Sua sessão expirou. Entre de novo.');
+        },
       },
     });
     try { await net.connect(); refresh(); }
@@ -449,7 +505,7 @@ class Game {
     if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos na vila (🧙).', 'gold');
     for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     for (const id of r.achievements ?? []) this.announceAchievements([id]);
-    try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char); } } catch { /* tenta no próximo lote */ }
+    try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char, { paused: true }); } } catch { /* tenta no próximo lote */ }
   }
 
   enterNetMatch(m) {
@@ -861,6 +917,7 @@ class Game {
     this.ui.closePanels();
     const at = z.spawn ?? { x: FARM_ENTRY, y: FARM_MID };
     this.enterZone(id, at.x, at.y);
+    this.gameEvent({ type: 'teleport' });
   }
 
   // Teletransporte online: só pede; o servidor decide e cobra (a contagem nova volta em zone_joined.scrolls). Recusas voltam em 'reject' (toast).
@@ -895,7 +952,9 @@ class Game {
   talk(npc) {
     const c = this.char;
     const hasQuest = npc.role === 'quest' || offeredBy(c, npc.id, { server: !!this.online }).length || readyFor(c, npc.id).length || activeFor(c, npc.id).length;
-    if (hasQuest) { this.dialogNpc = npc.id; this.ui.openPanel('dialog'); return; }
+    // Doran offline: sem missões do servidor, a primeira conversa da sessão mostra a fala dele (depois abre a arena direto)
+    const offlineDoran = npc.id === 'arena' && !this.online && !this.metDoran && (this.metDoran = true);
+    if (hasQuest || offlineDoran) { this.dialogNpc = npc.id; this.ui.openPanel('dialog'); return; }
     if (npc.role === 'shop') this.ui.openPanel('shop');
     else if (npc.role === 'arena') this.ui.openPanel('arena');
     else if (npc.role === 'spirit') this.ui.openPanel('sage');
@@ -918,6 +977,7 @@ class Game {
     const out = recordEvent(this.char, ev);
     for (const q of out.quests) if (q.complete) this.ui.toast('Missão pronta!', QUESTS[q.id].name + ' — volte ao NPC (marca ?)', 'gold');
     this.announceAchievements(out.achievements);
+    if (ev.type === 'kill' && ev.boss) this.tip('boss');
     if (out.quests.length || out.achievements.length) { this.save(); if (this.ui.isOpen('journal')) this.ui.render(); }
     return out;
   }
@@ -961,6 +1021,7 @@ class Game {
     this.ui.toast('Baú aberto!', r.item ? `+${r.gold} 🪙 e ${r.item.name}${r.item.converted ? ' (virou ouro: mochila cheia)' : ''}` : `+${r.gold} 🪙`, 'gold');
     for (const q of r.quests) if (q.complete) this.ui.toast('Missão pronta!', QUESTS[q.id].name, 'gold');
     this.announceAchievements(r.achievements);
+    this.tip('chest');
     this.chestsOpen = null; this.marksT = 0;
     this.save(); if (this.ui.anyOpen()) this.ui.render();
   }
@@ -1000,7 +1061,7 @@ class Game {
     this.gameEvent({ type: 'kill', mobId: m.mobId, zoneId: this.world.zoneId, boss: !!m.boss });
     if (m.boss) {
       this.ui.toast(`${M.name} derrotado!`, 'Tesouros caíram no chão', 'gold');
-      this.ui.log(`Você derrotou <b>${M.name}</b>! Ele retorna em 90s.`, '#ffd27a');
+      this.ui.log(`Você derrotou <b>${M.name}</b>! Ele só reaparece depois de um tempo.`, '#ffd27a');
     }
   }
 
@@ -1024,9 +1085,11 @@ class Game {
     this.world.burst(p.x, p.y, '#ffd34d', 40, 260);
     this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o personagem (🧙)`, 'gold');
     this.ui.log(`Você alcançou o nível <b>${this.char.level}</b>.`, '#ffd34d');
+    this.tip('level');
     for (const u of newlyUnlocked(this.char.classId, this.skillLv ?? this.char.level - 1, this.char.level)) { // habilidades aprendidas neste nível
       this.ui.toast('Nova habilidade: ' + SKILLS[u.id].name, SKILLS[u.id].desc, 'gold');
       this.ui.log(`Nova habilidade: <b>${SKILLS[u.id].name}</b>.`, '#ffd34d');
+      this.tip('skill');
     }
     this.skillLv = this.char.level;
     this.gameEvent({ type: 'level', level: this.char.level });
@@ -1084,6 +1147,7 @@ class Game {
     const S = SPIRITS[sp.type], R = RARITY[sp.rarity];
     this.ui.toast(`Novo spirit: ${S.name}`, `${R.name} · ${S.element} · ${S.role}`, 'gold');
     this.ui.log(`Essência despertou <b style="color:${S.color}">${S.name}</b> (${R.name})! Veja em 🔮.`, S.color);
+    this.tip('spirit');
     if (!c.activeSpirit) this.setSpirit(sp.id);
     this.save();
     return true;
@@ -1125,6 +1189,7 @@ class Game {
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
     const it = findGear(this.char, id);
     this.ui.log(`${it.name} aprimorado para +${r.plus} (-${r.cost} 🪙)`, '#ffd34d');
+    this.gameEvent({ type: 'upgrade' });
     this.refreshStats(); this.ui.render(); this.save();
   }
 
@@ -1195,6 +1260,7 @@ class Game {
     if (actor && this.char.activeSpirit === id) { actor.stats.power = spiritPower(sp); actor.stage = 2; }
     this.ui.toast(`${S.name} evoluiu!`, `Forma evoluída · poder ${spiritPower(sp)}`, 'gold');
     this.ui.log(`${S.name} evoluiu para a forma 2 (−${r.cost} 🪙).`, S.color);
+    this.gameEvent({ type: 'spiritStage', count: evolvedSpirits(this.char) });
     this.ui.render(); this.save();
   }
 

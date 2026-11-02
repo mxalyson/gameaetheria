@@ -26,7 +26,7 @@ export const MOBS_EXTRA = {
   magmaslime: { name: 'Geleia de Magma', art: 'slime', tint: { hue: -115, sat: 1.4, bri: 1.1 }, shape: 'slime', color: '#ff8a4a', temper: 0.6, hp: 1.1, atk: 0.9, speed: 95, range: 30, cd: 1.0, size: 16, aggro: 240, xp: 1.0 },
   emberwolf: { name: 'Lobo de Brasa', art: 'wolf', tint: { mul: [1.5, 0.85, 0.55], bri: 1.05 }, shape: 'wolf', color: '#ff7a4a', hp: 1.2, atk: 1.25, speed: 170, range: 34, cd: 0.8, size: 17, aggro: 320, xp: 1.2 },
   cinderwraith: { name: 'Espectro de Cinzas', art: 'wraith', tint: { hue: 140, sat: 1.4, bri: 1.05 }, shape: 'wraith', color: '#ffb066', hp: 1.0, atk: 1.3, speed: 125, kind: 'ranged', range: 290, projSpeed: 340, projColor: '#ffb066', cd: 1.35, size: 15, aggro: 330, xp: 1.25 },
-  infernoknight: { name: 'Cavaleiro Rubro', art: 'guardian', tint: { mul: [1.55, 0.7, 0.55], bri: 1.05 }, shape: 'knight', color: '#e0553a', hp: 16, atk: 3.2, speed: 90, range: 70, cd: 1.2, size: 46, aggro: 460, xp: 1, boss: true, def: 1.5 },
+  infernoknight: { name: 'Cavaleiro Rubro', art: 'guardian', tint: { mul: [1.4, 0.55, 0.6], sat: 1.25, bri: 0.95 }, shape: 'knight', color: '#e0553a', hp: 16, atk: 3.2, speed: 90, range: 70, cd: 1.2, size: 46, aggro: 460, xp: 1, boss: true, def: 1.5 },
 };
 Object.assign(MOBS, MOBS_EXTRA);
 
@@ -43,6 +43,9 @@ export const MOB_CURVE = {
   elite: { hp: 3.2, atk: 1.4, def: 1.15 },
   // Mobs comuns só têm o ataque básico (sem golpe em área): compensam com mais dano base. Chefes usam a curva pura + mecânica.
   common: { hp: 1.15, atk: 3.1 },
+  // Rampa de início (G6/G7): mobs não-chefe de nível baixo têm menos dano e vida, para o kit inicial das 4 classes vencer o mob do mesmo nível sem poção (sobe até 1 no nível 6).
+  early: (lv) => Math.min(1, 0.6 + 0.08 * (lv - 1)),
+  earlyHp: (lv) => Math.min(1, 0.8 + 0.05 * (lv - 1)),
 };
 
 // Diferença de nível (mob - herói) acima de `free` níveis: o herói causa menos dano ao mob e leva mais dano dele. Impede pular zonas só com equipamento.
@@ -63,9 +66,14 @@ export const BOSS_PHASES = {
 // Reaparição dos chefes (por id de mob). Padrão: volta `respawn` s depois de morrer.
 // ritual: o chefe NÃO aparece sozinho; um contador enche com os abates da zona (elite vale `eliteWeight`) e, ao chegar em `need`, ele surge
 // (antes disso, cada elite abatida depois de metade do contador tem chance crescente de adiantar). Depois de morrer, `cooldown` s de jogo antes de um novo ciclo.
+export const BOSS_REPEAT = { window: 1800, mul: 0.5, floor: 0.25 };
 export const BOSS_SPAWN = {
-  default: { respawn: 90 },
-  guardian: { respawn: 120 },
-  frostlord: { respawn: 150 },
-  infernoknight: { ritual: { need: 40, eliteWeight: 4, earlyAt: 0.5, earlyChance: 0.06, omen: 3 }, cooldown: 1500 },
+  // G5: reaparição longa (7–15 min) + abates repetidos do mesmo chefe em `repeatWindow` s valem `repeatMul` da chance de item a cada vez (World.onMobDeath).
+  default: { respawn: 420 },
+  treant: { respawn: 420 },
+  colossus: { respawn: 540 },
+  guardian: { respawn: 720 },
+  frostlord: { respawn: 900 },
+  // cooldown corre no relógio real (bossState.coolUntil), mesmo fora da zona.
+  infernoknight: { ritual: { need: 40, eliteWeight: 4, earlyAt: 0.5, earlyChance: 0.06, omen: 3 }, cooldown: 1200 },
 };

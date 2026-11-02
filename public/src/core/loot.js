@@ -55,6 +55,8 @@ export const LOOT_SOURCES = {
   mob: { weights: [67, 26, 6.4, 0.55, 0.05], chance: 0.14, items: [1, 1] },
   elite: { weights: [34, 40, 21.5, 4, 0.5], chance: 0.7, items: [1, 2] },
   boss: { weights: [0, 20, 50, 26, 4], chance: 1, items: [2, 3] },
+  // Cavaleiro Rubro: o ritual + recarga longa pagam mais (itens a mais e metade deles épico ou melhor).
+  finalboss: { weights: [0, 0, 35, 48, 17], chance: 1, items: [3, 4] },
 };
 // Proteção de azar: cada item que cai sem ser épico+ (ou lendário) aumenta o peso; garantido ao atingir o teto. Zera ao obter.
 export const PITY = { epicStep: 0.015, epicCap: 120, legStep: 0.004, legCap: 600, surprise: 0.015 };
@@ -79,7 +81,7 @@ export function rollSourceRarity(rng, source, pity = null) {
 
 // ---------- item exclusivo do último chefe (tema ópalo) ----------
 export const OPAL_BOSS = 'infernoknight';
-export const OPAL = { base: 0.3, perMiss: 0.2, legendary: 0.25, weaponShare: 0.6, statMul: 1.5 };
+export const OPAL = { base: 0.5, perMiss: 0.25, legendary: 0.25, weaponShare: 0.6, statMul: 1.5 };
 export function generateOpalItem(rng, level, classId, forceSlot = null) {
   const weapon = forceSlot ? forceSlot === 'weapon' : rng.chance(OPAL.weaponShare);
   const rarityId = rng.chance(OPAL.legendary) ? 'legendary' : 'epic';
@@ -97,12 +99,13 @@ export function generateOpalItem(rng, level, classId, forceSlot = null) {
 // Recompensas de um mob abatido (ouro, item, essência de spirit). `pity` (opcional): contadores do personagem, alterados no lugar.
 export function rollMobLoot(rng, mob, playerClassId, pity = null) {
   if (mob.summoned) return []; // esbirros de chefe não dão nada
-  const source = mob.boss ? 'boss' : mob.elite ? 'elite' : 'mob';
+  const source = mob.mobId === OPAL_BOSS ? 'finalboss' : mob.boss ? 'boss' : mob.elite ? 'elite' : 'mob';
   const S = LOOT_SOURCES[source];
   const out = [{ kind: 'gold', amount: rng.int(mob.level * 2 + 1, mob.level * 4 + 3) * (mob.boss ? 8 : mob.elite ? 3 : 1) }];
   const nItems = rng.int(S.items[0], S.items[1]);
   for (let i = 0; i < nItems; i++) {
-    if (!rng.chance(i === 0 ? S.chance : S.chance * 0.5)) continue;
+    // lootMul (World.onMobDeath): abates repetidos do mesmo chefe em 30 min valem menos itens
+    if (!rng.chance((i === 0 ? S.chance : S.chance * 0.5) * (mob.lootMul ?? 1))) continue;
     out.push({ kind: 'item', item: generateItem(rng, mob.level, { classId: playerClassId, rarityId: rollSourceRarity(rng, source, pity) }) });
   }
   if (mob.mobId === OPAL_BOSS) { // exclusivo: chance base + pity por abate sem drop

@@ -16,22 +16,31 @@ export function natureEnabled() {
   return on;
 }
 
+// Versão derivada do CONTEÚDO do json (hash curto): vai na URL da imagem para o service worker (cache primeiro p/ .webp) nunca casar json novo com imagem velha.
+const vHash = (t) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
+async function loadAtlas(name) {
+  const text = await fetch(`assets/nature/${name}.json`).then((r) => r.text());
+  const m = JSON.parse(text);
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/nature/${name}.webp?v=${vHash(text)}`; });
+  return [m, img];
+}
+
 export function loadNature() {
   if (!natureEnabled() || loading) return loading;
   loading = (async () => {
     try {
-      const [m, img] = await Promise.all([fetch('assets/nature/atlas.json').then((r) => r.json()), new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'assets/nature/atlas.webp'; })]);
+      const [m, img] = await loadAtlas('atlas');
       await img.decode?.();
       meta = m.sprites; atlas = img; stats.sprites = Object.keys(meta).length; window.natureStats = stats;
     } catch { atlas = null; } // sem atlas: fica o desenho antigo
     try {
-      const [m, img] = await Promise.all([fetch('assets/nature/meshy.json').then((r) => r.json()), new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'assets/nature/meshy.webp'; })]);
+      const [m, img] = await loadAtlas('meshy');
       await img.decode?.();
       if (meta) for (const [k, v] of Object.entries(m.sprites)) meta['m_' + k] = { ...v, im: img }; // peças do Meshy (CC BY 4.0): casas, estátuas, ruínas, cerejeiras, cristais...
       stats.meshy = Object.keys(m.sprites).length;
     } catch { /* sem o atlas do Meshy: valem o Quaternius e o desenho antigo */ }
     try {
-      const [m, img] = await Promise.all([fetch('assets/nature/ground.json').then((r) => r.json()), new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'assets/nature/ground.webp'; })]);
+      const [m, img] = await loadAtlas('ground');
       await img.decode?.();
       gMeta = m.sprites; gAtlas = img;
     } catch { gAtlas = null; }
@@ -94,7 +103,10 @@ let zoneSet = null;
 export const bridgeArtReady = () => !!(atlas && gAtlas && meta?.m_bridge);
 export function drawBridgeSprite(g, b) {
   const sp = meta.m_bridge, kx = (b.len * 0.92) / sp.w, ky = (b.hw * 3.5) / sp.h;
-  g.fillStyle = 'rgba(8,16,36,0.28)'; g.beginPath(); g.ellipse(b.x + 6, b.y + 14, b.len * 0.46, b.hw * 0.78, 0, 0, Math.PI * 2); g.fill(); // sombra na água
+  // sombra na água suave (V15): gradiente radial que some nas bordas, em vez da elipse escura chapada
+  g.save(); g.translate(b.x + 6, b.y + 14); g.scale(1, (b.hw * 0.9) / (b.len * 0.5));
+  const sh = g.createRadialGradient(0, 0, 0, 0, 0, b.len * 0.5); sh.addColorStop(0, 'rgba(8,16,36,0.30)'); sh.addColorStop(0.7, 'rgba(8,16,36,0.14)'); sh.addColorStop(1, 'rgba(8,16,36,0)');
+  g.fillStyle = sh; g.beginPath(); g.arc(0, 0, b.len * 0.5, 0, Math.PI * 2); g.fill(); g.restore();
   g.drawImage(sp.im, sp.x, sp.y, sp.w, sp.h, b.x - sp.ax * kx, b.y + 10 - sp.ay * ky, sp.w * kx, sp.h * ky);
 }
 // os troncos que faziam de guarda-corpo (layout.js) ficam escondidos: a ponte pintada já tem o seu

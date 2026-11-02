@@ -158,11 +158,16 @@ function drawWhirl(g, f, k, cx, cy, lite) {
 // rastro do avanço/rolamento: acompanha o ator e guarda os últimos pontos (alocação só no início do efeito)
 function drawTrail(g, f, el, cx, cy, c1, c2, w) {
   const pts = f.pts;
-  if (el < 0.38) { const l = pts[pts.length - 2]; if (l === undefined || Math.hypot(cx - l, cy - pts[pts.length - 1]) > 3) pts.push(cx, cy); if (pts.length > 30) pts.splice(0, 2); }
+  if (el < 0.38) {
+    const l = pts[pts.length - 2], d = l === undefined ? 0 : Math.hypot(cx - l, cy - pts[pts.length - 1]);
+    if (d > 140) pts.length = 0; // salto grande (teletransporte/troca de mapa/empurrão): recomeça o rastro em vez de riscar uma faixa diagonal até o ponto antigo (V18)
+    if (l === undefined || d > 3) pts.push(cx, cy); if (pts.length > 30) pts.splice(0, 2);
+  }
   const fade = clamp01(1 - (el - 0.2) / 0.45);
   const n = pts.length / 2;
   if (n < 2) return;
   for (let i = 1; i < n; i++) {
+    if (Math.hypot(pts[i * 2] - pts[(i - 1) * 2], pts[i * 2 + 1] - pts[(i - 1) * 2 + 1]) > 140) continue;
     const u = i / n;
     g.globalAlpha = fade * u * 0.9;
     g.strokeStyle = 'rgba(40,20,10,0.32)'; g.lineWidth = w * u + 4;

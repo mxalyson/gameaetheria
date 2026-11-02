@@ -15,10 +15,11 @@ export function groundTexEnabled() {
   return on;
 }
 
+const GROUND_V = 2; // suba junto com VERSION do sw.js ao trocar as texturas (o service worker serve .webp do cache primeiro)
 export function loadGroundTextures() {
   if (!groundTexEnabled() || loading) return loading;
   loading = Promise.all(NAMES.map((n) => new Promise((res) => {
-    const i = new Image(); i.onload = () => { imgs.set(n, i); res(); }; i.onerror = () => res(); i.src = `assets/ground/${n}.webp`;
+    const i = new Image(); i.onload = () => { imgs.set(n, i); res(); }; i.onerror = () => res(); i.src = `assets/ground/${n}.webp?v=${GROUND_V}`;
   }))).then(() => { ready = imgs.size === NAMES.length; });
   return loading;
 }

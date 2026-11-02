@@ -3,7 +3,7 @@
 // gravações e tornamos do servidor o que ele já decide: rating, vitórias/derrotas, contadores de PvP/cooperativo, progresso de missões
 // desses tipos e as conquistas (recalculadas a partir dos contadores).
 import { QUESTS } from '../public/src/data/quests.js';
-import { SERVER_STATS, STAT_KEYS_PROGRESS } from '../public/src/data/achievements.js';
+import { SERVER_STATS, STAT_KEYS_PROGRESS, FLAG_STATS } from '../public/src/data/achievements.js';
 import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, MAX_ACTIVE, isComplete } from '../public/src/core/journal.js';
 import { RARITY, AFFIXES } from '../public/src/data/items.js';
 import { xpToNext } from '../public/src/core/progression.js';
@@ -100,6 +100,7 @@ export function checkSave(oldDoc, neuDoc, now = Date.now()) {
   const stats = {};
   for (const k of STAT_KEYS_PROGRESS) {
     if (SERVER_STATS.includes(k)) { stats[k] = old.stats[k]; continue; }
+    if (FLAG_STATS.includes(k)) { stats[k] = (old.stats[k] | neu.stats[k]) >>> 0; continue; } // máscara de dicas: só ganha bits, sem limite de salto
     if (neu.stats[k] - old.stats[k] > LIMITS.statJump) return { ok: false, reason: `stat_jump_${k}` };
     stats[k] = Math.max(old.stats[k], neu.stats[k]);
   }

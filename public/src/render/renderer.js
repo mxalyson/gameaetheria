@@ -13,6 +13,7 @@ import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
 import { RARITY } from '../data/items.js';
+import { DROP_LIFE, DROP_BLINK } from '../game/sim.js'; // só as constantes (o drop some sozinho em DROP_LIFE s e pisca antes)
 import { makeRng, hashString } from '../core/rng.js';
 import { paintGroundScenery, drawGroundLife, drawAtmosphere, drawTreeRich, drawPineRich, drawSceneryDecor, sceneryShadow } from './scenery.js';
 
@@ -52,6 +53,10 @@ export class Renderer {
     this.c.width = Math.round(this.vw * this.dpr);
     this.c.height = Math.round(this.vh * this.dpr);
     this.vignettes = {};
+    // áreas cobertas pela interface (px de tela): cartão do herói/ouro, minimapa, fileira de menu e botões de toque. Etiquetas de monstros sob elas não são desenhadas (V21)
+    const u = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1, vw = this.vw, vh = this.vh;
+    this.hud = [[0, 0, 240 * u, 130 * u], [vw - 150 * u, 0, vw, 140 * u], [vw - 540 * u, 0, vw, 60 * u], [vw - 280 * u, vh - 250 * u, vw, vh]];
+    this.labels = [];
   }
 
   // Qualidade gráfica: limita a resolução e corta efeitos de atmosfera mais caros (para celulares).
@@ -83,10 +88,10 @@ export class Renderer {
     const vis = (x, y) => x > x0 && x < x1 && y > y0 && y < y1;
     if (z.scenery) drawGroundLife(g, world, t, vis);
 
-    for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortal(g, p, t);
+    for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortal(g, p, t, cam.x + 10, cam.x + this.ww - 10);
     if (world.objective) drawObjective(g, world.objective, t);
     for (const ar of world.areas) drawArea(g, ar, t);
-    for (const tg of world.telegraphs) drawTelegraph(g, tg);
+    for (const tg of world.telegraphs) drawTelegraph(g, tg, t);
 
     const items = [];
     for (const d of world.layout.decor) if (d.type === 'house' || vis(d.x, d.y)) items.push({ y: d.y, k: 'decor', o: d });
@@ -127,9 +132,12 @@ export class Renderer {
     trackActors(world);
 
     // Barras e nomes por cima de tudo.
-    for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y)) drawBars(g, a, a === player);
+    this.labels.length = 0;
+    const hud = this.hud, zm = this.zoom;
+    const covered = (a) => { const sx = (a.x - cam.x) * zm, sy = (a.y - cam.y) * zm - 40 * zm; for (const [x0, y0, x1, y1] of hud) if (sx > x0 && sx < x1 && sy > y0 && sy < y1) return true; return false; };
+    for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y) && (a === player || a.kind !== 'mob' || a.boss || !covered(a))) drawBars(g, a, a === player, this.labels);
     for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id], view.keys);
-    for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : view.keys ? '[E] Abrir baú' : 'Toque para abrir');
+    for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : 'Toque para abrir');
     for (const tx of world.texts) {
       const a = 1 - Math.max(0, (tx.t - tx.life * 0.6) / (tx.life * 0.4));
       g.globalAlpha = a;
@@ -290,6 +298,7 @@ function drawShadow(g, it) {
   if (it.k === 'actor') {
     if (o.kind === 'spirit') { ellipse(g, o.x, o.y + 26, 7, 3); g.fill(); return; }
     ellipse(g, o.x, o.y + o.r * 0.8, o.r * 0.95, o.r * 0.38); g.fill();
+    if (o.kind === 'mob') { ellipse(g, o.x, o.y + o.r * 0.82, o.r * 1.15, o.r * 0.44); g.fill(); } // mobs: base mais escura, destaca do chão (V28)
   } else if (it.k === 'npc') { ellipse(g, o.x, o.y + 12, 14, 5); g.fill(); }
   else if (it.k === 'drop') { ellipse(g, o.x, o.y + 4, 7, 3); g.fill(); }
   else if (o.type === 'tree' || o.type === 'pine') { ellipse(g, o.x + 8, o.y + 2, o.s * 0.85, o.s * 0.32); g.fill(); }
@@ -672,6 +681,7 @@ function drawSpirit(g, s, t) {
 
 // ---------------- itens no chão ----------------
 function drawDrop(g, d, t) {
+  if (d.t >= DROP_LIFE - DROP_BLINK && Math.floor(d.t * 6) % 2) return; // some sozinho: pisca nos últimos segundos antes de expirar
   const y = d.y - 4 - Math.abs(Math.sin(t * 3 + d.x)) * 3;
   if (d.kind === 'gold') {
     g.fillStyle = '#e8b23a'; ellipse(g, d.x, y + 2, 6, 3); g.fill();
@@ -743,20 +753,30 @@ function drawArea(g, ar, t) {
   g.globalAlpha = 1;
 }
 
-function drawTelegraph(g, tg) {
-  const k = Math.min(1, tg.t / tg.delay);
-  g.fillStyle = 'rgba(255,70,70,0.14)';
-  circle(g, tg.x, tg.y, tg.r); g.fill();
-  g.fillStyle = 'rgba(255,70,70,0.3)';
-  circle(g, tg.x, tg.y, tg.r * k); g.fill();
-  g.strokeStyle = 'rgba(255,90,90,0.9)'; g.lineWidth = 2;
-  circle(g, tg.x, tg.y, tg.r); g.stroke();
+// Telégrafo de golpe do chefe (V17): disco que esquenta do centro para a borda, anel de runas girando e preenchimento que cresce até o impacto.
+function drawTelegraph(g, tg, t) {
+  const k = Math.min(1, tg.t / tg.delay), r = tg.r, pulse = 0.75 + Math.sin(t * 10) * 0.25;
+  g.save(); g.translate(tg.x, tg.y);
+  let gr = g.createRadialGradient(0, 0, r * 0.15, 0, 0, r);
+  gr.addColorStop(0, 'rgba(120,10,10,0.06)'); gr.addColorStop(0.75, 'rgba(210,40,30,0.2)'); gr.addColorStop(1, 'rgba(255,90,50,0.34)');
+  g.fillStyle = gr; circle(g, 0, 0, r); g.fill();
+  g.globalCompositeOperation = 'lighter';
+  gr = g.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, r * k));
+  gr.addColorStop(0, 'rgba(255,160,60,0.05)'); gr.addColorStop(1, `rgba(255,110,40,${0.3 + k * 0.25})`);
+  g.fillStyle = gr; circle(g, 0, 0, Math.max(1, r * k)); g.fill();
+  g.strokeStyle = `rgba(255,120,70,${0.55 * pulse})`; g.lineWidth = 3; circle(g, 0, 0, r); g.stroke();
+  g.lineWidth = 2; g.strokeStyle = `rgba(255,190,110,${0.5 * pulse})`;
+  g.setLineDash([r * 0.12, r * 0.09]); g.lineDashOffset = -t * r * 0.4; circle(g, 0, 0, r * 0.84); g.stroke();
+  g.setLineDash([r * 0.05, r * 0.07]); g.lineDashOffset = t * r * 0.3; circle(g, 0, 0, r * 0.62); g.stroke(); g.setLineDash([]);
+  g.fillStyle = `rgba(255,210,150,${0.7 * pulse})`; // 8 runas (losangos) no anel, girando devagar
+  for (let i = 0; i < 8; i++) { const an = (i / 8) * TAU + t * 0.5, x = Math.cos(an) * r * 0.92, y = Math.sin(an) * r * 0.92; g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x + 3, y); g.lineTo(x, y + 4); g.lineTo(x - 3, y); g.closePath(); g.fill(); }
+  g.restore();
 }
 
 // Cor do portal pelo destino (borda clara, miolo, brilho).
 const PORTAL_COL = { town: ['255,236,170', '255,200,90'], forest: ['190,255,190', '90,200,110'], plains: ['255,200,235', '190,140,255'], ruins: ['225,205,255', '140,100,255'], glacier: ['215,240,255', '110,180,255'], ember: ['255,220,170', '255,110,50'] };
 // Portal: círculo de runas no chão, dois pilares de pedra e um redemoinho vertical de luz que sobe em fagulhas.
-function drawPortal(g, p, t) {
+function drawPortal(g, p, t, minX = -1e9, maxX = 1e9) {
   const [hi, mid] = PORTAL_COL[p.to] ?? PORTAL_COL.ruins, pulse = 0.85 + Math.sin(t * 2.2) * 0.15;
   g.save(); g.translate(p.x, p.y);
   // runas no chão
@@ -788,11 +808,11 @@ function drawPortal(g, p, t) {
   g.restore();
   g.font = '700 13px Cinzel, Nunito, serif';
   g.textAlign = 'center';
-  const w = g.measureText(p.label).width + 18;
+  const w = g.measureText(p.label).width + 18, lx = Math.max(minX + w / 2, Math.min(maxX - w / 2, p.x)); // etiqueta presa à tela (V23)
   g.fillStyle = 'rgba(24,16,8,0.78)';
-  g.beginPath(); g.roundRect(p.x - w / 2, p.y - 118, w, 22, 11); g.fill();
+  g.beginPath(); g.roundRect(lx - w / 2, p.y - 118, w, 22, 11); g.fill();
   g.fillStyle = '#efe6ff';
-  g.fillText(p.label, p.x, p.y - 102);
+  g.fillText(p.label, lx, p.y - 102);
 }
 
 // ---------------- barras / nomes ----------------
@@ -808,7 +828,7 @@ function drawObjective(g, ob, t) {
   g.restore();
 }
 
-function drawBars(g, a, isPlayer) {
+function drawBars(g, a, isPlayer, placed) {
   if (a.kind === 'spirit') return;
   const showMob = a.kind === 'mob' && (a.hp < a.maxHp || a.elite || a.boss);
   if (a.kind === 'mob' && !showMob) return;
@@ -838,9 +858,16 @@ function drawBars(g, a, isPlayer) {
   if (a.kind === 'rival') label = `${a.name} · Nv ${a.level}`;
   else if (a.kind === 'mob') label = `Nv ${a.level}${a.boss || a.elite ? ' · ' + a.name : ''}`;
   if (label) {
-    g.strokeText(label, a.x, top - 4);
+    // etiquetas coladas se afastam para cima (V21): até 3 degraus de 12 px; a posição fica registrada no quadro
+    let ly = top - 4;
+    if (placed) {
+      const hw = g.measureText(label).width / 2 + 2;
+      for (let n = 0; n < 3 && placed.some((q) => Math.abs(q.x - a.x) < q.hw + hw && Math.abs(q.y - ly) < 12); n++) ly -= 12;
+      placed.push({ x: a.x, y: ly, hw });
+    }
+    g.strokeText(label, a.x, ly);
     g.fillStyle = a.boss ? '#ffb4a8' : a.elite ? '#ffd27a' : a.kind === 'rival' && a.team === 1 ? '#bfe0ff' : '#ffffff';
-    g.fillText(label, a.x, top - 4);
+    g.fillText(label, a.x, ly);
   }
 }
 
@@ -864,14 +891,14 @@ function drawNpcTag(g, n, near, t, mark, keys) {
   g.fillText(n.name, n.x, ny);
   const by = ny - 22 + Math.sin(t * 3) * 3;
   // marca de missão: '!' = tem missão para você, '?' = pronta para entregar, 'none' = nada a fazer (esconde); sem informação = '!' de serviço
-  if (mark !== 'none') {
+  if (mark && mark !== 'none') { // sem informação = sem marca: o ❗ é só de missão (antes os NPCs de serviço também o mostravam)
     g.fillStyle = mark === 'ready' ? '#7dffb0' : '#ffd34d'; circle(g, n.x, by, 9); g.fill();
     g.fillStyle = '#5a3d00'; g.font = '900 13px Nunito, system-ui, sans-serif';
     g.fillText(mark === 'ready' ? '?' : '!', n.x, by + 5);
   }
   if (near) {
     g.font = '800 13px Cinzel, Nunito, serif';
-    const txt = keys ? '[E] Conversar' : 'Toque para conversar';
+    const txt = 'Toque para conversar'; // sem tecla no texto (decisão 0016, V5)
     const w = g.measureText(txt).width + 16;
     g.fillStyle = 'rgba(24,16,8,0.82)';
     g.beginPath(); g.roundRect(n.x - w / 2, n.y + 22, w, 22, 11); g.fill();

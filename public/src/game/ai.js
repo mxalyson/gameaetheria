@@ -4,8 +4,31 @@ import { SKILLS } from '../data/skills.js';
 import { skillOf } from '../core/specs.js';
 import { MOBS, BOSS_PHASES } from '../data/mobs.js';
 import { isSkillUnlocked } from '../core/unlocks.js';
+import { riverX } from './layout.js';
 
-const toward = (a, x, y, spd = 1) => ({ mx: x - a.x, my: y - a.y, aimX: x, aimY: y, spd });
+// Rio: a água bloqueia o movimento (não os projéteis). Se a reta até (tx, ty) cruza um rio, devolve o próximo ponto de passagem
+// pela ponte que menos desvia do caminho (margem de aproximação -> pela lacuna -> margem oposta); senão null.
+export function waterWaypoint(w, a, tx, ty) {
+  const rivers = w.layout.rivers;
+  if (!rivers?.length) return null;
+  let best = null, bc = Infinity;
+  for (const rv of rivers) {
+    const sa = Math.sign(a.x - riverX(rv, a.y)), sb = Math.sign(tx - riverX(rv, ty));
+    if (!sa || sa === sb) continue; // mesma margem: caminho livre
+    const off = rv.w / 2 + 75;
+    for (const b of rv.bridges) {
+      const ap = { x: b.x + sa * off, y: b.y }, ex = { x: b.x - sa * off, y: b.y };
+      const c = Math.hypot(ap.x - a.x, ap.y - a.y) + 2 * off + Math.hypot(tx - ex.x, ty - ex.y);
+      if (c < bc) { bc = c; best = Math.abs(a.y - b.y) <= b.hw - 14 ? ex : ap; }
+    }
+  }
+  return best;
+}
+
+const toward = (a, x, y, spd = 1, w = null) => {
+  const wp = w && waterWaypoint(w, a, x, y);
+  return { mx: (wp ?? { x }).x - a.x, my: (wp ?? { y }).y - a.y, aimX: x, aimY: y, spd };
+};
 
 export function mobIntent(m, w, dt) {
   const ai = m.ai, M = MOBS[m.mobId];
@@ -15,16 +38,17 @@ export function mobIntent(m, w, dt) {
 
   if (ai.state === 'return') {
     if (homeD < 30) ai.state = 'idle';
-    else return toward(m, m.home.x, m.home.y, 1.3);
+    else return toward(m, m.home.x, m.home.y, 1.3, w);
   }
   if (!tgt && !w.zone.safe && m.hostile !== false) { // passivo: só reage depois de apanhar (ver World.damage)
     const e = w.nearestEnemy(m, M.aggro);
     if (e) { ai.target = e.id; tgt = e; ai.state = 'chase'; }
   }
-  if (tgt && !m.boss && !w.zone.noLeash && homeD > 700) {
+  // a trela é maior quando a casa fica do outro lado de um rio: o desvio pela ponte alonga o caminho
+  if (tgt && !m.boss && !w.zone.noLeash && homeD > (waterWaypoint(w, m, m.home.x, m.home.y) ? 1100 : 700)) {
     ai.state = 'return'; ai.target = null;
     m.hp = m.maxHp;
-    return toward(m, m.home.x, m.home.y, 1.3);
+    return toward(m, m.home.x, m.home.y, 1.3, w);
   }
   if (!tgt) {
     ai.t -= dt;
@@ -46,12 +70,12 @@ export function mobIntent(m, w, dt) {
   }
   const it = { aimX: tgt.x, aimY: tgt.y, mx: 0, my: 0, attack: false };
   if (M.kind === 'ranged') {
-    if (d > M.range * 0.85) { it.mx = tgt.x - m.x; it.my = tgt.y - m.y; }
+    if (d > M.range * 0.85) { const wp = waterWaypoint(w, m, tgt.x, tgt.y) ?? tgt; it.mx = wp.x - m.x; it.my = wp.y - m.y; }
     else if (d < M.range * 0.4) { it.mx = m.x - tgt.x; it.my = m.y - tgt.y; it.spd = 0.7; }
     if (d <= M.range) it.attack = true;
   } else {
     const reach = M.range + tgt.r + m.r * 0.5;
-    if (d > reach - 6) { it.mx = tgt.x - m.x; it.my = tgt.y - m.y; }
+    if (d > reach - 6) { const wp = waterWaypoint(w, m, tgt.x, tgt.y) ?? tgt; it.mx = wp.x - m.x; it.my = wp.y - m.y; }
     if (d <= reach + 4) it.attack = true;
   }
   return it;

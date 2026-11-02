@@ -1,6 +1,6 @@
 // Habilidades são dados; o simulador interpreta pelo campo `kind`.
 export const SKILLS = {
-  whirlwind: { name: 'Golpe Giratório', icon: '🌀', cd: 5, kind: 'aoe_self', radius: 110, mult: 1.7, color: '#ffb199',
+  whirlwind: { name: 'Golpe Giratório', icon: '🌀', cd: 4, kind: 'aoe_self', radius: 110, mult: 2.0, color: '#ffb199',
     desc: 'Gira a lâmina, ferindo todos ao redor.' },
   charge: { name: 'Investida', icon: '⚡', cd: 6, kind: 'dash', dist: 280, speed: 900, mult: 1.5, stun: 1.2, color: '#ffd27a',
     desc: 'Avança até o cursor, atordoando quem atingir.' },

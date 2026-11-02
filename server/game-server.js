@@ -38,6 +38,14 @@ export function createGameServer({
   const rng = makeRng(seed);
   const stats = { connections: 0, messages: 0, rejected: 0, kicked: 0, refused: 0, helloTimeouts: 0 };
   const perIp = new Map();
+  // Handshakes inválidos (token vencido, sessão ruim) por IP em janela de 60 s: poucos entram na auditoria; muitos são cortados sem nova linha.
+  const badHello = new Map();
+  const noteBadHello = (ip) => {
+    const now = Date.now(), e = badHello.get(ip);
+    if (!e || now > e.until) { badHello.set(ip, { n: 1, until: now + 60000 }); return 1; }
+    return ++e.n;
+  };
+  const helloBlocked = (ip) => { const e = badHello.get(ip); return !!e && Date.now() <= e.until && e.n > 10; };
   const send = (ws, msg) => { if (ws && ws.readyState === 1) ws.send(encode(msg)); };
   const reject = (ws, code, close = false, extra = {}) => {
     stats.rejected++;
@@ -47,7 +55,10 @@ export function createGameServer({
       if (ws.ctx) ws.ctx.kicked = true;
       stats.kicked++; ws.close(1008, code);
       // abuso fica no registro de auditoria (quem, de onde, por quê); erros comuns de login não entram aqui
-      if (db && [REJECT.RATE_LIMIT, REJECT.TOO_MANY_ERRORS, REJECT.BAD_SESSION, REJECT.BAD_TOKEN].includes(code)) db.audit('ws_abuse', { accountId: ws.ctx?.session?.accountId ?? null, ip: ws.ctx?.ip ?? null, detail: code });
+      const handshake = code === REJECT.BAD_TOKEN || code === REJECT.BAD_SESSION;
+      const nBad = handshake ? noteBadHello(ws.ctx?.ip ?? '?') : 0;
+      // token vencido de cliente legítimo não inunda a auditoria: só as 3 primeiras do minuto por IP
+      if (db && nBad <= 3 && [REJECT.RATE_LIMIT, REJECT.TOO_MANY_ERRORS, REJECT.BAD_SESSION, REJECT.BAD_TOKEN].includes(code)) db.audit('ws_abuse', { accountId: ws.ctx?.session?.accountId ?? null, ip: ws.ctx?.ip ?? null, detail: code });
     }
   };
   const hub = new Hub({ db, seed, reconnectSec, out: { send: (s, m) => send(s.ws, m), raw: (s, text) => { if (s.ws && s.ws.readyState === 1) s.ws.send(text); } } });
@@ -75,6 +86,7 @@ export function createGameServer({
   function join(ws, msg) {
     const c = ws.ctx;
     if (c.session) return reject(ws, REJECT.ALREADY_JOINED);
+    if (helloBlocked(c.ip)) { if (!c.kicked) { c.kicked = true; stats.rejected++; stats.kicked++; send(ws, { t: 'reject', code: REJECT.RATE_LIMIT }); ws.close(1008, REJECT.RATE_LIMIT); } return; }
     let s = null, resumed = false;
     if (msg.token) {
       s = hub.sessionByToken(msg.token);
@@ -148,6 +160,7 @@ export function createGameServer({
     get room() { return firstRoom(); },
     get players() { return firstRoom()?.players ?? new Map(); },
     actor(id) { for (const r of hub.rooms.values()) { const p = r.players.get(id); if (p) return p.actor; } return null; },
+    badHello, // exposto para teste
     close() { clearInterval(timer); clearInterval(hb); for (const c of wss.clients) c.terminate(); return new Promise((res) => wss.close(res)); },
   };
 }

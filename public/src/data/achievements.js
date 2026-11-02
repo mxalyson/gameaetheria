@@ -17,9 +17,18 @@ export const ACHIEVEMENTS = [
   { id: 'campeao', name: 'Campeão da Arena', desc: 'Vença 25 partidas de arena contra jogadores reais.', stat: 'pvpWins', min: 25, title: 'Campeão da Arena' },
   { id: 'camarada', name: 'Camarada', desc: 'Vença 1 desafio cooperativo.', stat: 'coopClears', min: 1, title: 'Camarada' },
   { id: 'lider_de_ecos', name: 'Líder de Ecos', desc: 'Vença 5 desafios cooperativos.', stat: 'coopClears', min: 5, title: 'Líder de Ecos' },
+  // Conquistas da história: `quest` = missão concluída (min 1) em vez de contador. O servidor as recalcula pelo mesmo caminho (checkAchievements).
+  { id: 'primeiro_sussurro', name: 'Primeiro Sussurro', desc: 'Derrube o Carvalho Ancestral e ouça suas últimas palavras.', quest: 'carvalho_ancestral', min: 1, title: 'Ouvinte de Sussurros' },
+  { id: 'dono_do_gelo', name: 'Dono do Gelo', desc: 'Liberte o Ancião Gélido no Cume.', quest: 'anciao_gelido', min: 1, title: 'Dono do Gelo' },
+  { id: 'brasa_adormecida', name: 'Brasa Adormecida', desc: 'Apague o Cavaleiro Rubro nas Cinzas Ardentes.', quest: 'cavaleiro_rubro', min: 1, title: 'Brasa Adormecida' },
+  { id: 'viajante', name: 'Viajante', desc: 'Use o teletransporte do mapa 5 vezes.', stat: 'teleports', min: 5, title: 'Viajante' },
+  { id: 'mao_de_ferro', name: 'Mão de Ferro', desc: 'Aprimore equipamentos 10 vezes com o Ferreiro.', stat: 'upgrades', min: 10, title: 'Mão de Ferro' },
+  { id: 'voz_dos_ecos', name: 'Voz dos Ecos', desc: 'Conclua o arco final: Os Ecos Unidos.', quest: 'ecos_unidos', min: 1, title: 'Voz dos Ecos' },
 ];
 export const ACHIEVEMENT_IDS = ACHIEVEMENTS.map((a) => a.id);
 export const ACH = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 // Contadores do personagem. `SERVER_STATS` só o servidor altera (vêm de partidas decididas lá).
-export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin'];
+export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin', 'teleports', 'upgrades', 'tips'];
+// `tips` não é contador: é uma máscara de bits (dicas já mostradas, core/journal.js TIP_BITS); o servidor une os bits em vez de limitar o salto.
+export const FLAG_STATS = ['tips'];
 export const SERVER_STATS = ['pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin']; // os 5 últimos limitam o XP de PvP (core/rewards.js)

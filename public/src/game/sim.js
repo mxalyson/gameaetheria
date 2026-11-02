@@ -8,7 +8,7 @@ import { spiritPower } from '../core/progression.js';
 import { CLASSES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
 import { skillOf, activeSpec } from '../core/specs.js';
-import { MOBS, MOB_CURVE, LEVEL_GAP, BOSS_SPAWN } from '../data/mobs.js';
+import { MOBS, MOB_CURVE, LEVEL_GAP, BOSS_SPAWN, BOSS_REPEAT } from '../data/mobs.js';
 import { skillUnlockLevel } from '../core/unlocks.js';
 import { ZONES } from '../data/zones.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -16,6 +16,7 @@ import { buildLayout, campSpawns, minibossSpawn } from './layout.js';
 import { mobIntent, rivalIntent } from './ai.js';
 
 const TAU = Math.PI * 2;
+export const DROP_LIFE = 120, DROP_BLINK = 10, DROP_MAX = 120; // drops no chão: vida (s), piscar final (s) e teto por mundo
 export const PVP_DAMAGE = 0.32; // duelos entre heróis mais longos e táticos (medido com npm run balance)
 let nextId = 1;
 
@@ -46,8 +47,8 @@ export function makeMobActor(mobId, level, x, y, { elite = false, hostile = true
   const m = MOBS[mobId];
   const E = MOB_CURVE.elite;
   const C = m.boss ? { hp: 1, atk: 1 } : MOB_CURVE.common;
-  const hp = Math.round(MOB_CURVE.hp(level) * m.hp * C.hp * (elite ? E.hp : 1));
-  const power = MOB_CURVE.power(level) * m.atk * C.atk * (elite ? E.atk : 1);
+  const hp = Math.round(MOB_CURVE.hp(level) * m.hp * C.hp * (m.boss ? 1 : MOB_CURVE.earlyHp(level)) * (elite ? E.hp : 1));
+  const power = MOB_CURVE.power(level) * m.atk * C.atk * (m.boss ? 1 : MOB_CURVE.early(level)) * (elite ? E.atk : 1);
   return baseActor({
     kind: 'mob', team: 2, mobId, name: (elite ? 'Elite: ' : '') + m.name, level, boss: !!m.boss, elite, summoned: summoned || undefined,
     x, y, r: m.size * (elite ? 1.3 : 1),
@@ -69,8 +70,10 @@ export function makeSpiritActor(sp, owner) {
 export class World {
   // visuals:false (servidor, simulador de balanceamento): nada de partículas/textos/efeitos é criado — só estado de jogo e eventos.
   // bossState: objeto de quem chama que sobrevive à troca de mundo (contador do ritual e recarga do chefe) — sem ele, cada visita recomeça.
-  constructor(zoneId, { seed, visuals = true, bossState } = {}) {
+  // clock: relógio absoluto em s (injetável nos testes) para recargas que sobrevivem à recriação do mundo (bossState.coolUntil / respawnUntil).
+  constructor(zoneId, { seed, visuals = true, bossState, clock } = {}) {
     this.bossState = bossState ?? {};
+    this.clock = clock ?? (() => Date.now() / 1000);
     this.visuals = visuals;
     this.zoneId = zoneId;
     this.zone = ZONES[zoneId];
@@ -185,7 +188,7 @@ export class World {
     if (z.boss && !this.actors.some((a) => a.boss && !a.dead)) {
       const cfg = BOSS_SPAWN[z.boss.id] ?? BOSS_SPAWN.default, st = this.bossState;
       if (cfg.ritual) {
-        st.cool = Math.max(0, (st.cool ?? 0) - dt);
+        st.cool = this.coolLeft(st, dt);
         if (st.omenT > 0 && (st.omenT -= dt) <= 0) { st.omenT = 0; this.spawnBoss(true); }
         else if (!st.omenT && st.cool <= 0 && (st.go || (st.progress ?? 0) >= cfg.ritual.need)) {
           st.omenT = cfg.ritual.omen; st.go = false; st.progress = 0;
@@ -194,7 +197,7 @@ export class World {
         }
       } else {
         this.bossT -= dt;
-        if (this.bossT <= 0) { this.spawnBoss(false); this.bossT = cfg.respawn; }
+        if (this.bossT <= 0 && this.clock() >= (this.bossState.respawnUntil ?? 0)) { this.spawnBoss(false); this.bossT = cfg.respawn; }
       }
     }
   }
@@ -211,18 +214,36 @@ export class World {
     const id = this.zone.boss?.id, cfg = id && BOSS_SPAWN[id];
     if (!cfg?.ritual) return null;
     const st = this.bossState;
-    return { have: Math.min(cfg.ritual.need, Math.floor(st.progress ?? 0)), need: cfg.ritual.need, cool: Math.ceil(st.cool ?? 0), omen: (st.omenT ?? 0) > 0, alive: this.actors.some((a) => a.boss && !a.dead) };
+    return { have: Math.min(cfg.ritual.need, Math.floor(st.progress ?? 0)), need: cfg.ritual.need, cool: Math.ceil(this.coolLeft(st)), omen: (st.omenT ?? 0) > 0, alive: this.actors.some((a) => a.boss && !a.dead) };
+  }
+
+  // Recarga restante do ritual (s). Com `coolUntil` (relógio absoluto) corre mesmo fora da zona; sem ele (estado antigo), cai para o contador por tick (`dt`).
+  coolLeft(st, dt = 0) {
+    if (st.coolUntil != null) return Math.max(0, st.coolUntil - this.clock());
+    return Math.max(0, (st.cool ?? 0) - dt);
+  }
+
+  // Abate de chefe: guarda o horário (relógio absoluto) e reduz o loot de abates repetidos do mesmo chefe em 30 min (t.lootMul lido por rollMobLoot).
+  noteBossKill(t, cfg, st) {
+    const now = this.clock(), R = BOSS_REPEAT;
+    const recent = (st.kills ?? []).filter((x) => now - x < R.window);
+    t.lootMul = Math.max(R.floor, R.mul ** recent.length);
+    recent.push(now);
+    st.kills = recent;
+    if (!cfg.ritual) st.respawnUntil = now + cfg.respawn;
   }
 
   // Abate de mob comum/elite alimenta o ritual; a morte do chefe inicia a recarga.
   onMobDeath(t) {
     const id = this.zone.boss?.id, cfg = id && BOSS_SPAWN[id], st = this.bossState;
+    if (t.boss && !t.summoned) this.noteBossKill(t, cfg ?? BOSS_SPAWN.default, st);
     if (!cfg?.ritual || t.summoned) return;
-    if (t.boss) { st.cool = cfg.cooldown; st.progress = 0; st.elites = 0; return; }
-    if (st.cool > 0 || st.omenT > 0 || this.actors.some((a) => a.boss && !a.dead)) return;
-    const R = cfg.ritual;
-    st.progress = Math.min(R.need, (st.progress ?? 0) + (t.elite ? R.eliteWeight : 1));
-    if (t.elite) {
+    if (t.boss) { st.cool = cfg.cooldown; st.coolUntil = this.clock() + cfg.cooldown; st.progress = 0; st.elites = 0; return; }
+    if (st.omenT > 0 || this.actors.some((a) => a.boss && !a.dead)) return;
+    const R = cfg.ritual, cooling = this.coolLeft(st) > 0;
+    // durante a recarga o contador já anda (nada se perde), mas para em need-1: o chefe só surge quando a recarga acaba
+    st.progress = Math.min(cooling ? R.need - 1 : R.need, (st.progress ?? 0) + (t.elite ? R.eliteWeight : 1));
+    if (t.elite && !cooling) {
       st.elites = (st.elites ?? 0) + 1;
       if (st.progress >= R.need * R.earlyAt && this.rng.chance(Math.min(0.5, R.earlyChance * st.elites))) st.go = true;
     }
@@ -331,21 +352,48 @@ export class World {
     return out;
   }
 
+  // Empurra atores sobrepostos. Poucos atores: todos os pares. Muitos: grade de células de 128 px (maior diâmetro ~120), só vizinhos,
+  // visitados em ordem crescente de índice — mesmo resultado do todos-contra-todos (testado), sem o custo O(n²).
   separate() {
     const list = (this._sep ??= []);
     list.length = 0;
     for (const a of this.actors) if (!a.dead && a.kind !== 'spirit') list.push(a);
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i], b = list[j];
-        const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = a.r + b.r;
-        if (d < min && d > 0.001) {
-          const push = (min - d) / 2, nx = dx / d, ny = dy / d;
-          const wa = a.boss ? 0.1 : 1, wb = b.boss ? 0.1 : 1;
-          a.x -= nx * push * wa; a.y -= ny * push * wa;
-          b.x += nx * push * wb; b.y += ny * push * wb;
+    const n = list.length;
+    if (n < 24) {
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) this.pushApart(list[i], list[j]);
+      return;
+    }
+    const C = 128, cols = Math.ceil(this.zone.w / C) + 2, rows = Math.ceil(this.zone.h / C) + 2;
+    let g = this._sepGrid;
+    if (!g || g.cols !== cols || g.rows !== rows) g = this._sepGrid = { cols, rows, head: new Int32Array(cols * rows), next: new Int32Array(64), cand: [] };
+    if (g.next.length < n) g.next = new Int32Array(n * 2);
+    g.head.fill(-1);
+    const cell = (v, max) => Math.max(0, Math.min(max - 1, Math.floor(v / C)));
+    for (let i = n - 1; i >= 0; i--) { // inserção de trás para frente: cada lista fica em ordem crescente de índice
+      const k = cell(list[i].y, rows) * cols + cell(list[i].x, cols);
+      g.next[i] = g.head[k]; g.head[k] = i;
+    }
+    const cand = g.cand;
+    for (let i = 0; i < n; i++) {
+      const a = list[i], cx = cell(a.x, cols), cy = cell(a.y, rows);
+      cand.length = 0;
+      for (let yy = Math.max(0, cy - 1); yy <= Math.min(rows - 1, cy + 1); yy++) {
+        for (let xx = Math.max(0, cx - 1); xx <= Math.min(cols - 1, cx + 1); xx++) {
+          for (let j = g.head[yy * cols + xx]; j !== -1; j = g.next[j]) if (j > i) cand.push(j);
         }
       }
+      if (cand.length > 1) cand.sort((p, q) => p - q);
+      for (let c = 0; c < cand.length; c++) this.pushApart(a, list[cand[c]]);
+    }
+  }
+
+  pushApart(a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = a.r + b.r;
+    if (d < min && d > 0.001) {
+      const push = (min - d) / 2, nx = dx / d, ny = dy / d;
+      const wa = a.boss ? 0.1 : 1, wb = b.boss ? 0.1 : 1;
+      a.x -= nx * push * wa; a.y -= ny * push * wa;
+      b.x += nx * push * wb; b.y += ny * push * wb;
     }
   }
 
@@ -718,6 +766,11 @@ export class World {
     for (const d of this.drops) {
       d.t += dt;
       if (d.t < 0.35) { d.x += d.vx * dt; d.y += d.vy * dt; }
+    }
+    // Drops expiram (o renderer pisca nos últimos DROP_BLINK s a partir de d.t) e há um teto: descarta os mais antigos.
+    if (this.drops.length > DROP_MAX || this.drops.some((d) => d.t >= DROP_LIFE)) {
+      this.drops = this.drops.filter((d) => d.t < DROP_LIFE);
+      if (this.drops.length > DROP_MAX) this.drops.splice(0, this.drops.length - DROP_MAX);
     }
   }
 }

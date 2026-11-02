@@ -20,18 +20,31 @@ export function groundBudget(zone, viewW = 1534, viewH = 709) {
 
 export class GroundCache {
   // build(world, ox, oy, w, h) -> canvas w×h com o terreno do retângulo [ox, ox+w) × [oy, oy+h) em coordenadas do mundo
-  constructor(build) { this.build = build; this.map = new Map(); this.bytes = 0; this.frame = 0; }
+  constructor(build) { this.build = build; this.map = new Map(); this.bytes = 0; this.frame = 0; this.t0 = 0; this.built = 0; this.idle = new Set(); this.stats = { built: 0, deferred: 0, maxMs: 0 }; }
 
-  get(key, mk, bytes, rdy, hint) {
+  // Orçamento de construção por quadro (V30): o 1º bloco do quadro sempre pode ser feito; os seguintes só se ainda couber ~6 ms.
+  // Antes, entrar num mapa construía 4+ blocos de 1030² no MESMO quadro (picos de 100–270 ms); agora o resto vem nos quadros seguintes.
+  canBuild() { return this.built === 0 || performance.now() - this.t0 < 6; }
+
+  // `soft` = pode devolver null (bloco ainda por construir: o chamador desenha o chão liso no lugar). Bloco velho (atlas novo chegou) segue visível até ser refeito.
+  get(key, mk, bytes, rdy, hint, soft = false) {
     let e = this.map.get(key);
-    if (e && e.rdy < rdy) { this.bytes -= e.bytes; this.map.delete(key); e = null; } // chegou um atlas de chão: refaz
-    if (!e) { e = { cv: mk(), bytes, rdy, used: 0 }; this.map.set(key, e); this.bytes += bytes; }
+    if (e && e.rdy < rdy) { // chegou um atlas de chão: refaz (um por quadro; enquanto isso vale o bloco antigo)
+      if (soft && !this.canBuild()) { this.stats.deferred++; e.used = hint; return e; }
+      this.bytes -= e.bytes; this.map.delete(key); e.cv.width = e.cv.height = 0; e = null;
+    }
+    if (!e) {
+      if (soft && !this.canBuild()) { this.stats.deferred++; return null; }
+      const a = performance.now(); e = { cv: mk(), bytes, rdy, used: 0 }; this.map.set(key, e); this.bytes += bytes;
+      this.built++; this.stats.built++; this.stats.maxMs = Math.max(this.stats.maxMs, performance.now() - a);
+    }
     e.used = hint; return e;
   }
 
   // Desenha o terreno que aparece em [x0,x1]×[y0,y1] (mundo). `rdy` muda quando chegam texturas/atlas (invalida só o que já existia).
   draw(g, world, x0, y0, x1, y1, rdy = 0) {
     const z = world.zone, f = ++this.frame;
+    this.t0 = performance.now(); this.built = 0;
     if (z.w * z.h * 4 <= WHOLE_MAX) {
       const e = this.get(world.zoneId + ':all', () => this.build(world, 0, 0, z.w, z.h), z.w * z.h * 4, rdy, f);
       g.drawImage(e.cv, 0, 0);
@@ -40,12 +53,25 @@ export class GroundCache {
     const c0 = Math.max(0, Math.floor(x0 / TILE)), c1 = Math.min(Math.ceil(z.w / TILE) - 1, Math.floor(x1 / TILE));
     const r0 = Math.max(0, Math.floor(y0 / TILE)), r1 = Math.min(Math.ceil(z.h / TILE) - 1, Math.floor(y1 / TILE));
     for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) this.tile(g, world, c, r, rdy, f);
-    // pré-aquece UM bloco vizinho por quadro (o custo de construção se espalha em vez de travar ao cruzar a borda)
+    // pré-aquece UM bloco vizinho por vez, em ociosidade (requestIdleCallback; sem ele, no máximo um por quadro e só se sobrar orçamento):
+    // o custo de construção sai do caminho do quadro em vez de travar ao cruzar a borda
     const pc = [c0 - 1, c1 + 1], pr = [r0 - 1, r1 + 1];
     outer: for (let r = pr[0]; r <= pr[1]; r++) for (let c = pc[0]; c <= pc[1]; c++) {
       if (c < 0 || r < 0 || c * TILE >= z.w || r * TILE >= z.h || (c >= c0 && c <= c1 && r >= r0 && r <= r1)) continue;
       if (this.bytes + (TILE + PAD * 2) ** 2 * 4 > BUDGET_MIB * MIB) break outer; // sem folga no teto: não pré-aquece (evita construir e expulsar a cada quadro)
-      if (!this.map.has(`${world.zoneId}:${c},${r}`)) { this.get(`${world.zoneId}:${c},${r}`, () => this.make(world, c, r), (TILE + PAD * 2) ** 2 * 4, rdy, f - 0.5); break outer; }
+      const key = `${world.zoneId}:${c},${r}`;
+      if (this.map.has(key)) continue;
+      if (typeof requestIdleCallback === 'function') {
+        if (this.idle.size < 1 && !this.idle.has(key)) {
+          this.idle.add(key);
+          requestIdleCallback((dl) => {
+            this.idle.delete(key);
+            if (this.map.has(key) || this.frame - f > 120 || (dl.timeRemaining() < 12 && !dl.didTimeout)) return; // sem folga ou vista já longe: o próximo quadro tenta de novo
+            this.get(key, () => this.make(world, c, r), (TILE + PAD * 2) ** 2 * 4, rdy, this.frame - 0.5);
+          }, { timeout: 1500 });
+        }
+      } else if (this.canBuild()) this.get(key, () => this.make(world, c, r), (TILE + PAD * 2) ** 2 * 4, rdy, f - 0.5);
+      break outer;
     }
     this.trim(f);
   }
@@ -56,8 +82,9 @@ export class GroundCache {
   }
 
   tile(g, world, c, r, rdy, f) {
-    const e = this.get(`${world.zoneId}:${c},${r}`, () => this.make(world, c, r), (TILE + PAD * 2) ** 2 * 4, rdy, f);
-    g.drawImage(e.cv, c * TILE - PAD, r * TILE - PAD);
+    const e = this.get(`${world.zoneId}:${c},${r}`, () => this.make(world, c, r), (TILE + PAD * 2) ** 2 * 4, rdy, f, true);
+    if (e) g.drawImage(e.cv, c * TILE - PAD, r * TILE - PAD);
+    else { g.fillStyle = world.zone.palette.ground; g.fillRect(c * TILE - PAD, r * TILE - PAD, TILE + PAD * 2, TILE + PAD * 2); } // chão liso por 1–3 quadros, até o bloco ficar pronto
   }
 
   // expulsa os blocos menos usados (nunca os do quadro atual) até caber no teto

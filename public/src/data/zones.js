@@ -131,7 +131,7 @@ export const ZONES = {
 
   ruins: {
     name: 'Ruínas Sombrias', w: FARM_W, h: FARM_H, border: true, level: [12, 20], scale: true,
-    mobs: [['wraith', 3], ['knight', 3], ['gargoyle', 3]], count: 46, hostile: 1,
+    mobs: [['wraith', 3], ['knight', 3], ['gargoyle', 3]], count: 46, hostile: 0.85,
     boss: { id: 'guardian', level: 21, x: 4000, y: FARM_MID },
     chests: [{ id: 'ruins:1', x: 700, y: 900, tier: 1.5 }, { id: 'ruins:2', x: 1100, y: 2150, tier: 1.5 }, { id: 'ruins:3', x: 2300, y: 800, tier: 1.5 }, { id: 'ruins:4', x: 2700, y: 2100, tier: 2 }, { id: 'ruins:5', x: 3500, y: 700, tier: 2 }],
     rivers: [{ x: 1500, amp: 120, wl: 1400, w: 150, bridges: [1400, 2100] }, { x: 3000, amp: 120, wl: 1400, w: 150, bridges: [1900, 1200] }],
@@ -185,7 +185,7 @@ export const ZONES = {
 ZONES.glacier = {
   // `look` = conjunto de sprites de cenário (render/nature-sprites.js › SET): o Cume tem o seu (pinheiros, cristais de gelo, pedras claras).
   name: 'Cume Gélido', w: FARM_W, h: FARM_H, border: true, level: [20, 25], look: 'glacier',
-  mobs: [['frostslime', 4], ['frostwolf', 3], ['icewisp', 3]], count: 44, hostile: 0.85,
+  mobs: [['frostslime', 4], ['frostwolf', 3], ['icewisp', 3]], count: 44, hostile: 0.8,
   boss: { id: 'frostlord', level: 26, x: 3950, y: 850 },
   chests: [{ id: 'glacier:1', x: 760, y: 1000, tier: 1.8 }, { id: 'glacier:2', x: 1050, y: 2150, tier: 1.8 }, { id: 'glacier:3', x: 2250, y: 1000, tier: 1.8 }, { id: 'glacier:4', x: 2800, y: 2350, tier: 2.2 }, { id: 'glacier:5', x: 3500, y: 1850, tier: 2.2 }],
   // rio congelado: gelo sobre a água (pontes de madeira geladas)

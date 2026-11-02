@@ -47,7 +47,7 @@ const STYLE = {
   plains: {
     blobs: [['#b7e0c9', 0.34], ['#e6f0b5', 0.36], ['#bfe3f0', 0.26], ['#a8c98a', 0.20]], glade: '225,250,255',
     trail: [[92, 'rgba(90,110,130,0.16)'], [70, '#c3cfd6'], [54, '#dce5e9'], [30, '#eef3f4']], specks: ['#a5b2bb', '#ffffff'],
-    shore: ['rgba(120,170,190,0.30)', '#eae6ff', '#c9c0ee'], water: ['#a5ecf2', '#6cc0e6'],
+    shore: ['rgba(60,110,150,0.45)', '#dde9e4', '#b7cdc6'], water: ['#7fd6ee', '#3fa8dc'], // V14: margem clara esverdeada e água azul na saturação do Bosque (antes lavanda)
   },
   town: {
     blobs: [['#c9e2a4', 0.34], ['#86c27f', 0.24], ['#e6dca8', 0.20]], glade: '255,248,210',
@@ -111,7 +111,7 @@ function paintRivers(g, world, rng) {
     else { const gr = g.createLinearGradient(rv.x - w / 2, 0, rv.x + w / 2, 0); gr.addColorStop(0, S.water[0]); gr.addColorStop(1, S.water[1]); stroke(w, gr); }
     if (kind === 'glacier') { stroke(w - 8, 'rgba(236,248,255,0.55)'); stroke(w * 0.5, 'rgba(255,255,255,0.28)'); } // gelo por cima da água
     else if (kind === 'ruins') { stroke(w, '#1b1838'); stroke(w * 0.78, '#262150'); stroke(w * 0.36, 'rgba(120,150,210,0.22)'); } // água escura e opaca, com um brilho frio no meio
-    else stroke(w * 0.5, 'rgba(255,255,255,0.10)');
+    else { if (kind === 'plains') stroke(w, 'rgba(30,140,220,0.40)'); stroke(w * 0.5, 'rgba(255,255,255,0.10)'); } // planície: azul por cima da textura de cristal, que é lavanda (V14)
     // margem: pedrinhas claras e junco/espuma ao longo das duas bordas (determinístico, mesmo rng do terreno)
     g.fillStyle = kind === 'glacier' ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.45)';
     for (let i = 0; i < pts.length; i += 2) {
@@ -188,6 +188,30 @@ function paintLavaCracks(g, z, rng) {
   }
 }
 
+// Cume Gélido (V29): o chão era quase liso. Placas de gelo mais escuras, montes de neve com sombra e rachaduras, tudo determinístico (hash, sem mexer na sequência do rng do terreno).
+function paintIceDetail(g, z) {
+  const area = z.w * z.h;
+  for (let i = 0, n = Math.round(area / 150000); i < n; i++) { // placas de gelo azulado com brilho
+    const x = hash(i, 11) * z.w, y = hash(i, 12) * z.h, rx = 70 + hash(i, 13) * 150, ry = rx * (0.4 + hash(i, 14) * 0.3), rot = (hash(i, 15) - 0.5) * 0.6;
+    g.fillStyle = 'rgba(120,165,205,0.26)'; ellipse(g, x, y, rx, ry, rot); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.35)'; ellipse(g, x - rx * 0.12, y - ry * 0.18, rx * 0.7, ry * 0.55, rot); g.fill();
+  }
+  for (let i = 0, n = Math.round(area / 110000); i < n; i++) { // montes de neve: sombra azul embaixo, topo branco
+    const x = hash(i, 21) * z.w, y = hash(i, 22) * z.h, rx = 26 + hash(i, 23) * 54, ry = rx * 0.5;
+    g.fillStyle = 'rgba(110,150,190,0.38)'; ellipse(g, x + rx * 0.12, y + ry * 0.28, rx, ry); g.fill();
+    const gr = g.createRadialGradient(x - rx * 0.2, y - ry * 0.4, 1, x, y, rx); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#dcebf6');
+    g.fillStyle = gr; ellipse(g, x, y, rx * 0.92, ry * 0.88); g.fill();
+  }
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (let i = 0, n = Math.round(area / 90000); i < n; i++) { // rachaduras
+    let x = hash(i, 31) * z.w, y = hash(i, 32) * z.h, a = hash(i, 33) * TAU;
+    const pts = [[x, y]]; for (let k = 0; k < 5; k++) { a += (hash(i, 40 + k) - 0.5) * 1.3; x += Math.cos(a) * (18 + hash(i, 50 + k) * 26); y += Math.sin(a) * (18 + hash(i, 60 + k) * 26) * 0.7; pts.push([x, y]); }
+    for (const [dx, dy, col, lw] of [[0, 0, 'rgba(70,110,160,0.55)', 1.8], [1.2, 1.2, 'rgba(255,255,255,0.7)', 1]]) {
+      g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); pts.forEach(([px, py], j) => (j ? g.lineTo(px + dx, py + dy) : g.moveTo(px + dx, py + dy))); g.stroke();
+    }
+  }
+}
+
 function paintNatureGround(g, world, rng, S) {
   const z = world.zone, L = world.layout;
   const blobs = S.blobs;
@@ -204,6 +228,7 @@ function paintNatureGround(g, world, rng, S) {
     gr.addColorStop(0, `rgba(${S.glade},0.30)`); gr.addColorStop(1, `rgba(${S.glade},0)`);
     g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
   }
+  if (z.scenery.kind === 'glacier') paintIceDetail(g, z);
   // Trilha de terra batida.
   if (L.trail.length > 1) {
     g.lineCap = 'round'; g.lineJoin = 'round';

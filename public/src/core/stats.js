@@ -22,6 +22,11 @@ export function primaryStats(char) {
   return out;
 }
 
+// Bônus de iniciante (vida e poder): some até o nível 9 (o PvP só abre no 10). Mantém o kit inicial vivo contra 2 mobs do mesmo nível sem mexer no balanço de duelos.
+const rookieFade = (level) => Math.max(0, 1 - (level - 1) / 8);
+export const rookieHp = (level) => Math.round(240 * rookieFade(level));
+export const rookiePower = (level) => Math.round(36 * rookieFade(level));
+
 // Atributos derivados usados em combate. Mesma função para jogador e rivais da arena.
 export function computeStats(char) {
   const cls = CLASSES[char.classId];
@@ -29,8 +34,8 @@ export function computeStats(char) {
   const p = primaryStats(char);
   return {
     ...p,
-    maxHp: Math.round(cls.hpBase + p.vit * 12 + (char.level - 1) * 8 + (g.hp ?? 0)),
-    power: Math.round((g.atk ?? 4) + p[cls.primary] * 2.2 + char.level * 1.5),
+    maxHp: Math.round(cls.hpBase + p.vit * 12 + (char.level - 1) * 8 + rookieHp(char.level) + (g.hp ?? 0)),
+    power: Math.round((g.atk ?? 4) + p[cls.primary] * 2.2 + char.level * 1.5 + rookiePower(char.level)),
     def: Math.round((g.def ?? 0) + p.vit * 0.4 + p.agi * 0.2),
     crit: Math.min(60, 5 + p.agi * 0.25 + (g.crit ?? 0)),
     critMult: 1.6,

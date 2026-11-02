@@ -640,3 +640,63 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .shop-item .sub { font-size: 12px; }
 /* o grid empilhava texto, moeda e número em 3 linhas: em linha, centralizado */
 .sp-btns .btn, .sp-btns .tag { display: flex; align-items: center; justify-content: center; gap: .3em; flex-wrap: nowrap; }
+
+/* ===== Auditoria visual, média/baixa (V5–V30) ===== */
+/* V6: botão de interagir (toque) no mesmo medalhão pintado dos outros; o ícone é pintado (baú ou pergaminho), sem disco amarelo */
+.tbtn.act { width: 60px; height: 60px; background: url(assets/ui/medal-normal.webp) center / 100% 100% no-repeat; border: 0; border-radius: 50%; box-shadow: none; animation: act-glow 1.4s ease-in-out infinite; }
+.tbtn.act.down { background-image: url(assets/ui/medal-pressed.webp); }
+.tbtn.act .icon { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0; }
+.tbtn.act .icon img { width: 66%; height: 66%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); pointer-events: none; }
+@keyframes act-glow { 50% { filter: drop-shadow(0 0 8px rgba(255,214,120,.9)) brightness(1.12); } }
+
+/* V8: missão ativa no Diário: texto em largura total e botão Abandonar embaixo */
+.shop-item.quest-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 8px 10px; }
+.shop-item.quest-card .qtxt { min-width: 0; }
+.shop-item.quest-card .btn { align-self: flex-end; min-width: 120px; min-height: 40px; }
+
+/* V9: painéis de uma coluna só ficam mais largos em celular deitado, e Personagem/Opções se dividem em duas colunas (menos rolagem) */
+.cols { display: block; }
+@media (max-height: 520px) and (min-width: 700px) and (orientation: landscape) {
+  #panel-layer .panel:only-child:is(.p-character, .p-options, .p-map, .p-journal, .p-spirits) { width: min(660px, calc(80vw / var(--ui))); }
+  #panel-layer .panel:only-child:is(.p-character, .p-options) .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; align-items: start; }
+  #panel-layer .panel:only-child:is(.p-character, .p-options) .col > h3:first-child { margin-top: 4px; }
+  .panel h3 { margin: 10px 0 6px; }
+  .stat-row { padding: 4px 8px; margin-bottom: 3px; }
+}
+
+/* V10/V11: o aviso de zona fica por baixo dos painéis e desce abaixo da barra do chefe (classes alternadas por ui.js) */
+#toast-layer { z-index: 15; }
+body.boss-on #toast-layer { top: 38%; }
+body.panel-open #toast-layer { top: 6%; }
+@media (max-height: 520px) { body.boss-on #toast-layer { top: 40%; } }
+
+/* V18: pílula do ritual com a moldura de metal da barra do chefe */
+#ritual { top: calc(var(--map) + 30px); right: calc(8px + env(safe-area-inset-right, 0px)); padding: 5px 26px 7px; background: url(assets/ui/plaque.webp) center / 100% 100% no-repeat; border: 0; border-radius: 0; color: #fff0d6; text-shadow: 0 2px 0 #000b; font-size: 12px; white-space: nowrap; }
+body.touch #ritual { top: calc(var(--map) + 10px); }
+body:not(.touch) #ritual { top: calc(var(--map) + 150px); }
+
+/* V19: habilidade bloqueada (atordoado/morto) só escurece; o X vermelho lido como erro saiu */
+.slot.art.blocked::after, .tbtn.sk.blocked::after { content: none; }
+.slot.art.blocked .icon img, .tbtn.sk.blocked .icon img { filter: grayscale(.85) brightness(.5); }
+
+/* V24: item opalino: moldura prateada (rarity-2, que sobrava) com brilho em arco-íris pulsando */
+.cell.opal { background-image: url(assets/ui/rarity-2.webp); animation: opal-pulse 2.8s linear infinite; }
+.cell.opal::after { content: ''; position: absolute; inset: 6%; border-radius: 12px; pointer-events: none; mix-blend-mode: screen; opacity: .55;
+  background: linear-gradient(115deg, rgba(255,120,200,.0) 10%, rgba(255,140,220,.7) 28%, rgba(120,230,255,.7) 46%, rgba(170,255,170,.7) 62%, rgba(255,230,130,.7) 78%, rgba(255,120,200,0) 92%); background-size: 220% 100%; animation: opal-sheen 3.4s ease-in-out infinite; }
+@keyframes opal-pulse { 0%, 100% { filter: drop-shadow(0 0 5px rgba(255,150,230,.7)); } 33% { filter: drop-shadow(0 0 7px rgba(130,230,255,.8)); } 66% { filter: drop-shadow(0 0 6px rgba(190,255,170,.75)); } }
+@keyframes opal-sheen { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+@media (prefers-reduced-motion: reduce) { .cell.opal, .cell.opal::after { animation: none; } }
+
+/* V25: nome do item em Cinzel */
+.tt-name { font-family: Cinzel, serif; font-weight: 800; letter-spacing: .02em; }
+.tt-foot { font-family: Nunito, sans-serif; }
+
+/* V26: subtítulos de cartão em Cinzel (classe, spirit, missão, loja) */
+.char-head .nm, .sp-info .nm, .shop-item .nm, .quest-card .nm, .sage-type b, .arena-badge .tier { font-family: Cinzel, serif; font-weight: 700; letter-spacing: .02em; }
+.char-head .nm { font-size: 17px; }
+
+/* V27: nível do item numa plaquinha escura no canto da célula (legível sobre armas claras) */
+.cell .lv { right: 3px; bottom: 3px; min-width: 15px; padding: 0 3px; line-height: 14px; text-align: center; font: 800 10px Nunito, sans-serif; color: #ffe9a8; background: rgba(14,10,6,.82); border: 1px solid rgba(201,162,74,.6); border-radius: 6px; z-index: 2; pointer-events: none; }
+
+/* P1: tooltip de item lendario/opalino com comparacao passava da tela em paisagem baixa (390 px): fonte e espacos menores */
+@media (max-height: 420px) { #tooltip { font-size: 11px; line-height: 1.2; max-width: 280px; } #tooltip > div { margin-top: 1px; margin-bottom: 1px; } #tooltip .tt-name { font-size: 14px; } }

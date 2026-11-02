@@ -31,3 +31,20 @@ test('poço, cercas e ponte do Meshy existem no atlas e a Vila e as zonas vivas 
   assert.ok(SET.town.well && SET.town.fence);
   for (const z of ['forest', 'plains', 'glacier']) assert.ok(SET[z].fence, 'cerca em ' + z);
 });
+
+// V30: entrar num mapa não pode construir todos os blocos de terreno no mesmo quadro (picos de 100–270 ms); o resto vem nos quadros seguintes (chão liso por 1–3 quadros).
+import { GroundCache } from '../public/src/render/ground-tiles.js';
+test('terreno em blocos: no máximo ~um bloco novo por quadro, sem buracos depois', () => {
+  const spin = (ms) => { const t = performance.now(); while (performance.now() - t < ms); };
+  const gc = new GroundCache(() => { spin(12); return { width: 1, height: 1 }; });
+  const world = { zoneId: 'z', zone: { w: 4600, h: 2800, palette: { ground: '#000' } } };
+  let flat = 0, imgs = 0;
+  const g = { drawImage() { imgs++; }, fillRect() { flat++; }, set fillStyle(v) {} };
+  gc.draw(g, world, 0, 0, 2100, 1100, 0); // vista 3×2 blocos
+  assert.ok(gc.stats.built <= 2, 'construiu demais no 1º quadro: ' + gc.stats.built);
+  assert.ok(flat >= 1, 'blocos pendentes devem sair como chão liso');
+  for (let i = 0; i < 8; i++) gc.draw(g, world, 0, 0, 2100, 1100, 0);
+  flat = 0; imgs = 0; gc.draw(g, world, 0, 0, 2100, 1100, 0);
+  assert.equal(flat, 0, 'todos os blocos visíveis prontos após alguns quadros');
+  assert.equal(imgs, 6);
+});

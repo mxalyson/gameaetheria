@@ -19,7 +19,7 @@ import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { DIALOGS } from '../data/dialogs.js';
 import { ZONES, WORLD_ROUTE, teleportCost } from '../data/zones.js';
-import { offeredBy, readyFor, activeFor, titleText, achievementProgress, ensureJournal } from '../core/journal.js';
+import { offeredBy, readyFor, activeFor, titleText, achievementProgress, ensureJournal, greetFor } from '../core/journal.js';
 import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
 
 const $ = (id) => document.getElementById(id);
@@ -294,7 +294,7 @@ export class UI {
       const cd = cdOf[id];
       const pct = cd > 0 ? Math.min(1, cd / maxOf[id]) : 0;
       this.set(`slot-${id}`, '--p', pct.toFixed(3));
-      this.set(`slot-${id}`, 'class', 'slot' + (id.startsWith('s') && id !== 'spirit' || id === 'potion' || id === 'basic' ? ' art' : '') + (id.startsWith('s') && id !== 'spirit' && !isSkillUnlocked(char.level, Number(id[1])) ? ' locked' : id.startsWith('s') && (player.stunT > 0 || player.dead || player.dash) ? ' blocked' : '') + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
+      this.set(`slot-${id}`, 'class', 'slot' + (id.startsWith('s') && id !== 'spirit' || id === 'potion' || id === 'basic' ? ' art' : '') + (id.startsWith('s') && id !== 'spirit' && !isSkillUnlocked(char.level, Number(id[1])) ? ' locked' : id.startsWith('s') && (player.stunT > 0 || player.dead) ? ' blocked' : '') + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
     }
     for (const id of ['s0', 's1', 's2']) {
       if (!isSkillUnlocked(char.level, Number(id[1]))) this.set(`slot-${id}`, '--lv', `"${skillUnlockLevel(Number(id[1]))}"`);
@@ -318,6 +318,9 @@ export class UI {
       this.set('boss-portrait', 'display', pt ? 'block' : 'none');
       if (pt) this.set('boss-portrait', 'background-image', `url(${pt.url})`); // recorte do rosto/torso já tingido (ver mobPortrait)
     } else this.set('boss-bar', 'class', 'hidden');
+    // o aviso de zona desce abaixo da barra do chefe em vez de ficar por cima do nome (V11)
+    const bossOn = !!(boss && !boss.dead);
+    if (this.bossOn !== bossOn) { this.bossOn = bossOn; document.body.classList.toggle('boss-on', bossOn); }
   }
 
   // Alvo da barra de chefe: o chefe tem prioridade sobre elites próximos (senão o retrato mostrava um elite qualquer ao lado do chefe).
@@ -374,6 +377,7 @@ export class UI {
 
   render() {
     this.hideTooltip();
+    document.body.classList.toggle('panel-open', this.open.size > 0); // avisos ficam por baixo dos painéis (V10)
     const order = ['character', 'arena', 'party', 'dialog', 'journal', 'map', 'sage', 'shop', 'spirits', 'inventory', 'options'];
     // Refazer o HTML a cada +1 ponto/ação fazia a janela "piscar" (a animação de abrir tocava de novo) e voltar ao topo: guardamos a rolagem e só animamos o que acabou de abrir.
     const pid = (el) => [...el.classList].find((c) => c.startsWith('p-'));
@@ -393,7 +397,7 @@ export class UI {
 
   itemCell(it, action, arg) {
     if (!it) return '<div class="cell empty"></div>';
-    return `<div class="cell r-${it.rarity}" data-action="${action}" data-arg="${arg}" data-tip="item:${it.id}">
+    return `<div class="cell r-${it.rarity}${it.opal ? ' opal' : ''}" data-action="${action}" data-arg="${arg}" data-tip="item:${it.id}">
       <span class="ic">${itemIcon(it)}</span><span class="lv">${it.level}</span></div>`;
   }
 
@@ -427,18 +431,20 @@ export class UI {
       ['Vida', st.maxHp], ['Poder', st.power], ['Defesa', st.def], ['Crítico', st.crit.toFixed(1) + '%'],
       ['Vel. de Ataque', Math.round(st.atkSpeed * 100) + '%'], ['Vel. de Movimento', Math.round(st.moveSpeed)], ['Roubo de Vida', Math.round(st.lifesteal * 100) + '%'],
     ].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('');
-    return this.frame('character', 'Personagem', `
+    return this.frame('character', 'Personagem', `<div class="cols"><div class="col">
       <div class="char-head" style="--cc:${cls.color}">
         <div class="avatar art">${classPortrait(char.classId, cls.icon)}</div>
         <div><div class="nm">${esc(char.name)}</div><div class="sub">${cls.name} · Nível ${char.level}</div>
         <div class="sub" style="color:${tier.color}">Arena: ${tier.name} (${char.arena.rating})</div></div>
       </div>
       <div class="equip-grid">${equip}</div>
+      <h3>Combate</h3><div class="kv-grid">${d}</div>
+      </div><div class="col">
       <h3>Atributos ${char.statPoints ? `<span class="pts">${char.statPoints} pontos livres</span>` : ''}</h3>
       ${char.statPoints ? '<div class="row-btns"><button class="btn small" data-action="alloc-auto">Distribuir automático</button></div>' : ''}
       ${stats}
       ${this.specBlock(char)}
-      <h3>Combate</h3><div class="kv-grid">${d}</div>`);
+      </div></div>`);
   }
 
   // Especialização (nível 15): duas por classe; a primeira escolha é grátis, trocar custa ouro.
@@ -568,14 +574,15 @@ export class UI {
     const D = DIALOGS[npc.id] ?? { greet: '…', service: null };
     ensureJournal(char);
     const ready = readyFor(char, npc.id)[0], offer = offeredBy(char, npc.id, { server: !!g.online })[0], active = activeFor(char, npc.id)[0];
-    let text = D.greet, body = '';
+    let text = greetFor(char, D.greet, { online: !!g.online }), body = '';
     const rewardLine = (q) => { const r = q.reward; return `<p class="hint">Recompensa: ${[r.gold ? `${COIN} ${r.gold}` : '', r.xp ? `${r.xp} XP` : '', r.potions ? `🧪 ${r.potions}` : '', ...(r.items ?? []).map((i) => `item ${RARITY[i.rarity]?.name ?? ''}`)].filter(Boolean).join(' · ')}</p>`; };
     if (ready) { const q = QUESTS[ready]; text = q.text.done; body = `<h3>✔ ${q.name}</h3>${rewardLine(q)}<button class="btn primary wide" data-action="quest-turnin" data-arg="${q.id}">Entregar missão</button>`; }
     else if (offer) { const q = offer; text = q.text.offer; body = `<h3>❗ ${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
     else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>⏳ ${q.name}</h3>${this.questLines(char, active)}`; }
     const more = (offeredBy(char, npc.id, { server: !!g.online }).length > (offer ? 1 : 0)) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
     const svc = D.service ? `<button class="btn wide" data-action="dialog-service" data-arg="${D.service.panel}">${D.service.label}</button>` : '';
-    return this.frame('dialog', npc.name, `<p class="npc-line">${npcEmblem(npc.id)}"${esc(text)}"</p>${body}${more}${svc}`);
+    const say = (Array.isArray(text) ? text : [text]).map(esc).join('<br>'); // `done` pode ser uma lista de falas (epílogo)
+    return this.frame('dialog', npc.name, `<p class="npc-line">${npcEmblem(npc.id)}"${say}"</p>${body}${more}${svc}`);
   }
 
   questLines(char, id) {
@@ -583,13 +590,20 @@ export class UI {
     return '<ul class="qlist">' + q.objectives.map((o, i) => { const max = o.count ?? 1, v = a?.p[i] ?? 0; return `<li class="${v >= max ? 'done' : ''}">${esc(o.label)} <b>${v}/${max}</b>${o.type === 'pvp' || o.type === 'coop' ? ' <small>(contado pelo servidor)</small>' : ''}</li>`; }).join('') + '</ul>';
   }
 
+  // nomes dos NPCs que dão missões (gerados de QUESTS + NPCs da Vila): "A, B e C"
+  questGiverNames() {
+    const npcs = ZONES.town.npcs ?? [];
+    const names = [...new Set(Object.values(QUESTS).map((q) => q.giver))].map((id) => npcs.find((n) => n.id === id)?.name).filter(Boolean).map(esc);
+    return names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names.at(-1)}` : names[0] ?? 'os moradores da Vila';
+  }
+
   // ---- diário: missões e conquistas ----
   panel_journal() {
     const g = this.game, char = g.char;
     ensureJournal(char);
     const act = Object.keys(char.quests.active);
-    const missions = act.length ? act.map((id) => `<div class="shop-item"><div><div class="nm">${esc(QUESTS[id].name)}</div>${this.questLines(char, id)}<div class="sub">${esc(QUESTS[id].text.progress)}</div></div>
-      <button class="btn small" data-action="quest-abandon" data-arg="${id}">Abandonar</button></div>`).join('') : '<p class="hint">Nenhuma missão ativa. Converse com Guarda Ren, Herbalista Mel, Mestre Doran e Sábia Yun.</p>';
+    const missions = act.length ? act.map((id) => `<div class="shop-item quest-card"><div class="qtxt"><div class="nm">${esc(QUESTS[id].name)}</div>${this.questLines(char, id)}<div class="sub">${esc(QUESTS[id].text.progress)}</div></div>
+      <button class="btn small" data-action="quest-abandon" data-arg="${id}">Abandonar</button></div>`).join('') : `<p class="hint">Nenhuma missão ativa. Converse com ${this.questGiverNames()}.</p>`;
     const done = Object.keys(char.quests.done).length;
     const ach = ACHIEVEMENTS.map((a) => { const p = achievementProgress(char, a); return `<div class="shop-item ${p.earned ? '' : 'locked'}"><div class="cell ${p.earned ? 'r-epic' : ''}"><span class="ic">${p.earned ? '🏆' : '🔒'}</span></div>
       <div><div class="nm">${esc(a.name)}</div><div class="sub">${esc(a.desc)} ${p.earned ? '' : `(${p.value}/${p.min})`}</div></div>
@@ -628,7 +642,7 @@ export class UI {
   panel_options() {
     const pr = this.game.prefs;
     const seg = (key, items) => `<div class="seg">${items.map(([v, label]) => `<button class="btn small ${pr[key] === v ? 'sel' : ''}" data-action="pref" data-arg="${key}:${v}">${label}</button>`).join('')}</div>`;
-    return this.frame('options', 'Opções', `
+    return this.frame('options', 'Opções', `<div class="cols"><div class="col">
       <div class="opt-row"><b>Tamanho da interface</b>
         <div class="seg"><button class="btn small" data-action="pref" data-arg="scale:-10" ${pr.scale <= SCALE_MIN ? 'disabled' : ''}>−</button>
         <span class="opt-val">${pr.scale}%</span>
@@ -638,9 +652,11 @@ export class UI {
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Toque (padrão)'], ['keyboard', 'Teclado e mouse']])}</div>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
+      </div><div class="col">
       ${this.game.online ? '<div class="opt-row"><b>Conta</b><div class="seg"><button class="btn small" data-action="switch-char">Trocar personagem</button><button class="btn small" data-action="logout">Sair</button></div></div>' : ''}
       <div class="opt-row"><b>Save do personagem</b><div class="seg"><button class="btn small" data-action="save-export">Exportar</button><button class="btn small" data-action="save-import">Importar</button></div></div>
-      <p class="hint">Exportar baixa um arquivo com seu personagem (guarde como backup ou leve para outro aparelho). Importar substitui o personagem atual.</p>`);
+      <p class="hint">Exportar baixa um arquivo com seu personagem (guarde como backup ou leve para outro aparelho). Importar substitui o personagem atual.</p>
+      </div></div>`);
   }
 
   // ---------------- tooltips ----------------
@@ -716,7 +732,7 @@ export class UI {
     else if (ok.ok) action = `${again} para equipar`;
     return `<div class="tt-name" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}
       ${ok.ok ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
-      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? ` · vale ${COIN} ${sellValue(it)}` : ''}</div>`;
+      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? `${action ? ' · ' : ''}vale ${COIN} ${sellValue(it)}` : ''}</div>`;
   }
 }
 

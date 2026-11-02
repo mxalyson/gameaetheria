@@ -10,6 +10,8 @@ import { parseSave, migrate, validate } from '../public/src/core/savedoc.js';
 import { checkSave, LIMITS } from '../server/plausible.js';
 import { applyMatchResult, applyCoopResult } from '../public/src/core/rewards.js';
 import { ZONES } from '../public/src/data/zones.js';
+import { DIALOGS, TIPS } from '../public/src/data/dialogs.js';
+import { greetFor, takeTip, tipSeen, TIP_BITS, achievementProgress, evolvedSpirits } from '../public/src/core/journal.js';
 
 const rng = makeRng(9);
 const hero = (level = 1, classId = 'warrior') => { const c = newCharacter('Heroi', classId, makeRng(5)); c.level = level; return c; };
@@ -19,8 +21,10 @@ test('dados: toda missão é coerente (giver/after/objetivos/recompensa) e o enc
   const npcs = new Set(Object.values(ZONES).flatMap((z) => (z.npcs ?? []).map((n) => n.id)));
   for (const q of Object.values(QUESTS)) {
     assert.ok(npcs.has(q.giver), `${q.id}: NPC ${q.giver} não existe`);
-    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop'].includes(o.type)));
+    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage'].includes(o.type)));
     assert.ok(q.text.offer && q.text.progress && q.text.done);
+    // coerência de nível ↔ zona: ninguém pede para caçar numa zona muito acima do nível da missão
+    for (const o of q.objectives) if (o.zone && o.zone !== 'any') assert.ok(q.level >= ZONES[o.zone].level[0] - 2, `${q.id}: nível ${q.level} baixo demais para ${o.zone}`);
     assert.ok(q.reward && (q.reward.gold > 0 || q.reward.xp > 0 || q.reward.items));
     if (q.after) assert.ok(QUESTS[q.after], `${q.id}: depende de ${q.after}`);
     let hops = 0, cur = q; while (cur.after && hops++ < 30) cur = QUESTS[cur.after];
@@ -200,4 +204,93 @@ test('recompensas do servidor atualizam contadores, missões de arena/cooperativ
   assert.deepEqual(c.summary.achievements, ['camarada']);
   const lost = applyCoopResult(c.doc, { gold: 0, xp: 0, victory: false });
   assert.equal(lost.doc.stats.coopClears, 1, 'derrota cooperativa não conta como limpeza');
+});
+
+// ---------- história: textos, novos objetivos, falas condicionais, dicas ----------
+test('textos de jogo: até 220 caracteres por fala, sem teclas e sem NPC inexistente', () => {
+  const lines = [];
+  for (const q of Object.values(QUESTS)) for (const [k, t] of Object.entries(q.text)) for (const s of [].concat(t)) lines.push([`${q.id}.${k}`, s]);
+  for (const [id, d] of Object.entries(DIALOGS)) for (const g of [].concat(d.greet)) lines.push([`${id}.greet`, typeof g === 'string' ? g : g.text]);
+  for (const [k, t] of Object.entries(TIPS)) lines.push([`dica.${k}`, t.join(' ')]);
+  for (const a of ACHIEVEMENTS) lines.push([`ach.${a.id}`, a.desc]);
+  for (const [where, s] of lines) {
+    assert.ok(s.length <= 220, `${where}: ${s.length} caracteres`);
+    assert.ok(!/tecla|\[E\]|\(H\)|\(G\)/i.test(s), `${where}: cita tecla`);
+  }
+  assert.equal(QUESTS.ecos_unidos.text.done.length, 3, 'epílogo em 3 linhas');
+  for (const g of Object.values(DIALOGS).map((d) => d.greet)) assert.ok(typeof g === 'string' || !g[g.length - 1].when, 'a última fala é o padrão');
+});
+
+test('missões de Lia e Brok: teletransporte e aprimoramento contam, e o servidor aceita os contadores', () => {
+  const d = ensureJournal(hero(18)); d.quests.done.ruinas_sombrias = 1;
+  assert.deepEqual(offeredBy(d, 'merchant').map((q) => q.id), ['pergaminho_de_cortesia']);
+  assert.deepEqual(offeredBy(d, 'smith').map((q) => q.id), ['fogo_de_forja', 'martelo_do_guardiao']);
+  for (const id of ['pergaminho_de_cortesia', 'fogo_de_forja', 'martelo_do_guardiao']) assert.equal(acceptQuest(d, id).ok, true);
+  recordEvent(d, { type: 'upgrade' });
+  assert.equal(isComplete(d, 'fogo_de_forja'), true); assert.equal(isComplete(d, 'pergaminho_de_cortesia'), false);
+  const out = recordEvent(d, { type: 'teleport' });
+  assert.equal(isComplete(d, 'pergaminho_de_cortesia'), true); assert.deepEqual(out.quests.map((q) => q.id), ['pergaminho_de_cortesia']);
+  assert.equal(d.stats.teleports, 1); assert.equal(d.stats.upgrades, 1);
+  for (let i = 0; i < 3; i++) recordEvent(d, { type: 'chest', zoneId: 'forest' });
+  assert.equal(isComplete(d, 'martelo_do_guardiao'), false, 'baú de outra zona não conta');
+  for (let i = 0; i < 3; i++) recordEvent(d, { type: 'chest', zoneId: 'ruins' });
+  assert.equal(isComplete(d, 'martelo_do_guardiao'), true);
+  const g0 = d.gold; assert.equal(turnInQuest(d, 'fogo_de_forja', rng).ok, true); assert.equal(d.gold, g0 + QUESTS.fogo_de_forja.reward.gold);
+  // servidor: os novos contadores sobem normalmente e o salto é limitado
+  const base = ensureJournal(hero(10)); const n = structuredClone(base); n.stats.teleports = 5; n.stats.upgrades = 3;
+  const ok = checkSave(base, n); assert.equal(ok.ok, true); assert.equal(ok.doc.stats.teleports, 5);
+  assert.ok(ok.doc.achievements.viajante, 'Viajante concedida pelo contador');
+  n.stats.upgrades = LIMITS.statJump + 1; assert.equal(checkSave(base, n).reason, 'stat_jump_upgrades');
+});
+
+test('epílogo: Os Ecos Unidos exigem nível 30 e um spirit evoluído; conquistas da história saem das missões', () => {
+  const d = ensureJournal(hero(30)); d.quests.done.cavaleiro_rubro = 1;
+  d.spirits = [createSpirit(rng, { rarity: 'common' })];
+  assert.equal(acceptQuest(d, 'ecos_unidos').ok, true);
+  assert.equal(isComplete(d, 'ecos_unidos'), false, 'falta evoluir');
+  recordEvent(d, { type: 'spiritStage', count: evolvedSpirits(d) });
+  assert.equal(isComplete(d, 'ecos_unidos'), false);
+  d.spirits[0].stage = 2;
+  recordEvent(d, { type: 'spiritStage', count: evolvedSpirits(d) });
+  assert.equal(isComplete(d, 'ecos_unidos'), true);
+  // já evoluído ao aceitar: completa na hora
+  const e = ensureJournal(hero(30)); e.quests.done.cavaleiro_rubro = 1; e.spirits = [{ ...createSpirit(rng, { rarity: 'common' }), stage: 2 }];
+  acceptQuest(e, 'ecos_unidos'); assert.equal(isComplete(e, 'ecos_unidos'), true);
+  assert.ok(turnInQuest(e, 'ecos_unidos', rng).achievements.includes('voz_dos_ecos'));
+  assert.equal(setTitle(e, 'voz_dos_ecos'), true); assert.equal(titleText(e), 'Voz dos Ecos');
+  const p = achievementProgress(hero(1), ACHIEVEMENTS.find((a) => a.id === 'dono_do_gelo'));
+  assert.deepEqual([p.value, p.min, p.earned], [0, 1, false]);
+  for (const id of ['primeiro_sussurro', 'dono_do_gelo', 'brasa_adormecida', 'viajante', 'mao_de_ferro', 'voz_dos_ecos']) assert.ok(ACHIEVEMENTS.some((a) => a.id === id), id);
+});
+
+test('falas condicionais dos NPCs: primeira que bate, com padrão', () => {
+  const d = ensureJournal(hero(1));
+  assert.match(greetFor(d, DIALOGS.guard.greet), /Se o bosque te assustar/);
+  d.stats.bossKills = 1;
+  assert.match(greetFor(d, DIALOGS.guard.greet), /vila está calma/, 'depois do 1º chefe cai no padrão');
+  d.quests.done.guardiao_das_ruinas = 1; assert.match(greetFor(d, DIALOGS.guard.greet), /Guardião caiu/);
+  d.quests.done.cavaleiro_rubro = 1; assert.match(greetFor(d, DIALOGS.guard.greet), /Cinzas apagadas/, 'a mais específica vem primeiro');
+  assert.match(greetFor(hero(1), DIALOGS.arena.greet, { online: false }), /Sem rede/);
+  assert.match(greetFor(hero(1), DIALOGS.arena.greet, { online: true }), /guarda os ecos/);
+  assert.match(greetFor(hero(25), DIALOGS.smith.greet), /cansado/); assert.match(greetFor(hero(24), DIALOGS.smith.greet), /Metal bom/);
+  assert.equal(greetFor(d, 'texto fixo'), 'texto fixo');
+});
+
+test('dicas de onboarding: cada uma aparece 1× e o servidor não perde os bits', () => {
+  const d = ensureJournal(hero(1));
+  assert.equal(takeTip(d, 'chest'), true); assert.equal(takeTip(d, 'chest'), false); assert.equal(tipSeen(d, 'chest'), true); assert.equal(tipSeen(d, 'ritual'), false);
+  assert.equal(takeTip(d, 'inexistente'), false);
+  for (const k of Object.keys(TIP_BITS)) assert.ok(TIPS[k], `texto da dica ${k}`);
+  assert.ok(Math.max(...Object.values(TIP_BITS)) < 26, 'a máscara cabe no limite de 1e8 do documento');
+  const base = ensureJournal(hero(5)); base.stats.tips = 0b1011;
+  const n = structuredClone(base); n.stats.tips = 0b1011 | (1 << TIP_BITS.ritual) | (1 << 20);
+  const r = checkSave(base, n); assert.equal(r.ok, true, 'a máscara não esbarra no limite de salto'); assert.equal(r.doc.stats.tips, n.stats.tips);
+  n.stats.tips = 0; assert.equal(checkSave(base, n).doc.stats.tips, 0b1011, 'bits nunca somem');
+  const v = validate({ ...hero(5), stats: { tips: 1e12 } }); assert.ok(v.ok); assert.ok(v.char.stats.tips <= 1e8);
+});
+
+test('diário: a lista de NPCs vem dos givers das missões (todos existem na Vila)', () => {
+  const givers = [...new Set(Object.values(QUESTS).map((q) => q.giver))];
+  assert.ok(givers.includes('merchant') && givers.includes('smith'));
+  for (const g of givers) assert.ok(ZONES.town.npcs.some((n) => n.id === g), g);
 });

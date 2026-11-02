@@ -1,14 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeRng } from '../public/src/core/rng.js';
-import { computeStats, canEquip } from '../public/src/core/stats.js';
+import { computeStats, canEquip, rookieHp, rookiePower } from '../public/src/core/stats.js';
 import { computeHit, eloDelta, tierFor } from '../public/src/core/combat.js';
 import { generateItem, rollMobLoot } from '../public/src/core/loot.js';
 import { addXp, xpToNext, newCharacter, createSpirit, addSpiritXp, MAX_LEVEL } from '../public/src/core/progression.js';
 import { generateRival } from '../public/src/core/rival.js';
 import { CLASSES } from '../public/src/data/classes.js';
 import { SLOTS } from '../public/src/data/items.js';
-import { World, makeHeroActor, makeMobActor, makeSpiritActor } from '../public/src/game/sim.js';
+import { World, makeHeroActor, makeMobActor, makeSpiritActor, DROP_MAX } from '../public/src/game/sim.js';
+import { riverX } from '../public/src/game/layout.js';
 
 test('rng é determinístico pela semente', () => {
   const a = makeRng(42), b = makeRng(42);
@@ -424,7 +425,9 @@ test('ritual do último chefe: não aparece sozinho; contador enche com abates, 
   w.damage(hero, boss, 1e9);
   assert.ok(w.bossProgress.cool > 1000, 'recarga longa depois da morte');
   kill('emberwolf');
-  assert.equal(w.bossProgress.have, 0, 'durante a recarga o contador não anda');
+  assert.equal(w.bossProgress.have, 1, 'durante a recarga o contador anda, mas nunca passa de need-1');
+  for (let i = 0; i < 60; i++) kill('emberwolf');
+  assert.equal(w.bossProgress.have, 39);
   // o estado externo sobrevive à troca de mundo; elite vale mais
   const st = {};
   const w2 = new World('ember', { seed: 2, visuals: false, bossState: st });
@@ -585,4 +588,97 @@ test('G9/G10: opalino rende ≥ 25% a mais que lendário comum e Ferreiro +6..+8
   assert.equal(enhanceCost({ ...it, plus: 4 }), raw(5));
   assert.equal(enhanceCost({ ...it, plus: 5 }), Math.round(raw(6) * 0.6));
   assert.ok(totalEnhanceCost(it) * 6 < 420000 && totalEnhanceCost(it) * 6 > 340000, 'seis lendários +8: ' + totalEnhanceCost(it) * 6);
+});
+
+// ---- Rodada de balanceamento: rio, drops, separate, chefe, ritual ----
+test('mob atravessa o rio pela ponte para chegar ao herói na outra margem (e volta para casa)', () => {
+  const w = new World('forest', { seed: 3, visuals: false });
+  const hero = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 1850, 900)); hero.hp = hero.maxHp = 1e9;
+  const wolf = w.add(makeMobActor('wolf', 3, 1150, 900, { hostile: true }));
+  wolf.ai.target = hero.id; wolf.ai.state = 'chase'; // alvo já travado (fora do alcance de aggro)
+  const side = (a) => Math.sign(a.x - riverX(w.layout.rivers[0], a.y));
+  assert.notEqual(side(wolf), side(hero));
+  let reached = -1;
+  for (let i = 0; i < 60 * 25 && reached < 0; i++) { w.update(1 / 60, { [hero.id]: { mx: 0, my: 0, aimX: hero.x, aimY: hero.y } }); if (Math.hypot(wolf.x - hero.x, wolf.y - hero.y) < 60) reached = i / 60; }
+  assert.ok(reached > 0 && reached < 25, 'chegou em ' + reached + ' s');
+  // em retorno, o lobo do outro lado também cruza de volta até o ponto de origem
+  wolf.ai.target = null; wolf.ai.state = 'return'; wolf.hp = wolf.maxHp;
+  hero.x = 3000; hero.y = 2600;
+  for (let i = 0; i < 60 * 25 && wolf.ai.state === 'return'; i++) w.update(1 / 60, {});
+  assert.ok(Math.hypot(wolf.x - wolf.home.x, wolf.y - wolf.home.y) < 60, 'voltou para casa');
+});
+
+test('drops no chão expiram em 120 s e há teto por mundo (descarta os mais antigos)', () => {
+  const w = new World('arena', { seed: 1, visuals: false });
+  w.drops.push({ kind: 'gold', x: 1, y: 1, vx: 0, vy: 0, t: 0 });
+  for (let i = 0; i < 60 * 119; i++) w.update(1 / 60, {});
+  assert.equal(w.drops.length, 1, 'ainda no chão aos 119 s');
+  for (let i = 0; i < 60 * 2; i++) w.update(1 / 60, {});
+  assert.equal(w.drops.length, 0, 'sumiu depois de 120 s');
+  for (let i = 0; i < DROP_MAX + 40; i++) w.drops.push({ kind: 'gold', n: i, x: 1, y: 1, vx: 0, vy: 0, t: 0 });
+  w.update(1 / 60, {});
+  assert.equal(w.drops.length, DROP_MAX);
+  assert.equal(w.drops[0].n, 40, 'os mais antigos foram descartados');
+});
+
+test('separate() com grade dá o mesmo resultado do todos-contra-todos', () => {
+  for (const zone of ['forest', 'ruins']) {
+    const mk = () => { const w = new World(zone, { seed: 1, visuals: false }); const r = makeRng(5); for (let i = 0; i < 90; i++) w.add(makeMobActor(r.pick(['wolf', 'golem', 'slime', 'treant']), 5, r.range(400, 900), r.range(400, 800), { elite: r.chance(0.2) })); return w; };
+    const fast = mk(), slow = mk();
+    slow.separate = function () { const l = this.actors.filter((a) => !a.dead && a.kind !== 'spirit'); for (let i = 0; i < l.length; i++) for (let j = i + 1; j < l.length; j++) this.pushApart(l[i], l[j]); };
+    for (let k = 0; k < 40; k++) { fast.separate(); slow.separate(); }
+    let worst = 0;
+    fast.actors.forEach((a, i) => { worst = Math.max(worst, Math.abs(a.x - slow.actors[i].x), Math.abs(a.y - slow.actors[i].y)); });
+    assert.ok(worst < 1e-6, `${zone}: divergiu ${worst}`);
+  }
+});
+
+test('G11: a recarga do ritual é em tempo absoluto: corre fora da zona e sobrevive à recriação do mundo', () => {
+  let now = 1000;
+  const clock = () => now, st = {};
+  const w = new World('ember', { seed: 11, visuals: false, bossState: st, clock });
+  const hero = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 500, 500));
+  st.progress = 40; st.go = true;
+  w.updateSpawns(0.1, hero); for (let i = 0; i < 60 * 5; i++) w.updateSpawns(1 / 60, hero);
+  const boss = w.actors.find((a) => a.boss); assert.ok(boss);
+  w.damage(hero, boss, 1e9);
+  assert.equal(st.coolUntil, 1000 + 1200, 'recarga de 1200 s em relógio absoluto');
+  now += 600; // 10 min fora da zona: o mundo é recriado
+  const w2 = new World('ember', { seed: 2, visuals: false, bossState: st, clock });
+  assert.equal(w2.bossProgress.cool, 600);
+  now += 601;
+  assert.equal(w2.bossProgress.cool, 0, 'terminou sem nenhum tick dentro da zona');
+});
+
+test('G5: chefes de zona reaparecem em 7–15 min (mesmo recriando o mundo) e abates repetidos em 30 min dão metade, depois um quarto, da chance de item', () => {
+  let now = 5000;
+  const clock = () => now, st = {};
+  const mk = () => new World('forest', { seed: 1, visuals: false, bossState: st, clock });
+  let w = mk();
+  const hero = w.add(makeHeroActor(newCharacter('T', 'mage', makeRng(1)), 500, 500));
+  const killBoss = () => { w.updateSpawns(0.1, hero); const b = w.actors.find((a) => a.boss && !a.dead); assert.ok(b, 'chefe presente'); w.damage(hero, b, 1e9); return b; };
+  assert.equal(killBoss().lootMul, 1, 'primeiro abate: tabela cheia');
+  now += 100; w = mk(); w.add(hero);
+  w.updateSpawns(0.1, hero); assert.ok(!w.actors.some((a) => a.boss), 'recriar o mundo não zera o respawn');
+  now += 330; w = mk(); w.add(hero); // 430 s depois do abate
+  assert.equal(killBoss().lootMul, 0.5);
+  now += 500; w = mk(); w.add(hero);
+  assert.equal(killBoss().lootMul, 0.25);
+  now += 2000; w = mk(); w.add(hero); // fora da janela de 30 min
+  assert.equal(killBoss().lootMul, 1);
+  // lootMul reduz a chance de item no sorteio
+  let full = 0, half = 0;
+  for (let i = 0; i < 2000; i++) {
+    full += rollMobLoot(makeRng(i), { level: 7, boss: true, mobId: 'treant' }, 'mage').filter((l) => l.kind === 'item').length;
+    half += rollMobLoot(makeRng(i), { level: 7, boss: true, mobId: 'treant', lootMul: 0.5 }, 'mage').filter((l) => l.kind === 'item').length;
+  }
+  assert.ok(half / full > 0.4 && half / full < 0.6, `razão ${half / full}`);
+});
+
+test('G6/G7: mobs de nível baixo são mais fracos que na curva pura e a rampa some no nível 6; chefes não mudam', () => {
+  const pure = (lv) => 60 + 120 * lv ** 1.15;
+  assert.ok(makeMobActor('wolf', 1, 0, 0).maxHp < pure(1) * 0.9 * 1.15);
+  assert.equal(makeMobActor('wolf', 6, 0, 0).maxHp, Math.round(pure(6) * 0.9 * 1.15));
+  assert.equal(makeMobActor('treant', 3, 0, 0).maxHp, Math.round(pure(3) * 9));
+  assert.ok(rookieHp(1) > rookieHp(4) && rookieHp(4) > 0 && rookieHp(9) === 0 && rookiePower(9) === 0, 'bônus de iniciante some antes do PvP (nível 10)');
 });

@@ -28,25 +28,50 @@ function loadIndex() {
 }
 
 // Quanto o desenho da célula (com margem) é mais alto que o raio de colisão da criatura; ajustável por criatura.
+// criaturas grandes (chefes), ampliadas ~2× na tela: realce de nitidez leve ao carregar; o orçamento de textura (tests/mobs-art.test.js, 8 MiB por zona) não deixa subir os px do bake
+const BIG = new Set(['treant', 'colossus', 'guardian', 'golem']);
 const ART = { default: { h: 3.4 }, slime: { h: 3.0 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
 
 // Recolore uma vez ao carregar (hue em graus, sat/bri multiplicadores, mul = multiplicador por canal): as variantes de cor reaproveitam a arte da criatura de base.
-function tint(img, t) {
+// V16: a cor nova vem do matiz/mul, mas a LUMINÂNCIA é a da pintura original (sombras e brilhos intactos) em vez de multiplicar o canal (que achatava tudo numa cor só);
+// brilhos que estouram dessaturam em direção ao branco, como luz de verdade. `sharp` (0–1) aplica um realce leve de nitidez (criaturas grandes ampliadas, V15/V16).
+function tint(img, t, sharp = 0) {
   const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
-  const d = g.getImageData(0, 0, c.width, c.height), p = d.data, a = ((t.hue ?? 0) * Math.PI) / 180, cs = Math.cos(a), sn = Math.sin(a);
-  const m = [0.213 + cs * 0.787 - sn * 0.213, 0.715 - cs * 0.715 - sn * 0.715, 0.072 - cs * 0.072 + sn * 0.928,
-    0.213 - cs * 0.213 + sn * 0.143, 0.715 + cs * 0.285 + sn * 0.14, 0.072 - cs * 0.072 - sn * 0.283,
-    0.213 - cs * 0.213 - sn * 0.787, 0.715 - cs * 0.715 + sn * 0.715, 0.072 + cs * 0.928 + sn * 0.072];
-  const sat = t.sat ?? 1, bri = t.bri ?? 1, [mr, mg, mb] = t.mul ?? [1, 1, 1];
-  for (let i = 0; i < p.length; i += 4) {
-    if (!p[i + 3]) continue;
-    let r = p[i], gg = p[i + 1], b = p[i + 2];
-    const r2 = m[0] * r + m[1] * gg + m[2] * b, g2 = m[3] * r + m[4] * gg + m[5] * b, b2 = m[6] * r + m[7] * gg + m[8] * b;
-    const l = 0.299 * r2 + 0.587 * g2 + 0.114 * b2;
-    p[i] = Math.max(0, Math.min(255, (l + (r2 - l) * sat) * mr * bri));
-    p[i + 1] = Math.max(0, Math.min(255, (l + (g2 - l) * sat) * mg * bri));
-    p[i + 2] = Math.max(0, Math.min(255, (l + (b2 - l) * sat) * mb * bri));
+  const d = g.getImageData(0, 0, c.width, c.height), p = d.data, W = c.width, H = c.height;
+  const src = sharp > 0 ? new Uint8ClampedArray(p) : null; // cópia só para o realce (vizinhos originais)
+  if (t) {
+    const a = ((t.hue ?? 0) * Math.PI) / 180, cs = Math.cos(a), sn = Math.sin(a);
+    const m = [0.213 + cs * 0.787 - sn * 0.213, 0.715 - cs * 0.715 - sn * 0.715, 0.072 - cs * 0.072 + sn * 0.928,
+      0.213 - cs * 0.213 + sn * 0.143, 0.715 + cs * 0.285 + sn * 0.14, 0.072 - cs * 0.072 - sn * 0.283,
+      0.213 - cs * 0.213 - sn * 0.787, 0.715 - cs * 0.715 + sn * 0.715, 0.072 + cs * 0.928 + sn * 0.072];
+    const sat = t.sat ?? 1, bri = t.bri ?? 1, [mr, mg, mb] = t.mul ?? [1, 1, 1];
+    for (let i = 0; i < p.length; i += 4) {
+      if (!p[i + 3]) continue;
+      const r = p[i], gg = p[i + 1], b = p[i + 2], L0 = 0.299 * r + 0.587 * gg + 0.114 * b;
+      const r2 = m[0] * r + m[1] * gg + m[2] * b, g2 = m[3] * r + m[4] * gg + m[5] * b, b2 = m[6] * r + m[7] * gg + m[8] * b;
+      const l2 = 0.299 * r2 + 0.587 * g2 + 0.114 * b2;
+      const cr = (l2 + (r2 - l2) * sat) * mr, cg = (l2 + (g2 - l2) * sat) * mg, cb = (l2 + (b2 - l2) * sat) * mb; // cor-alvo (ainda com a luminância bagunçada pelo mul)
+      const lm = Math.max(1, 0.299 * cr + 0.587 * cg + 0.114 * cb), f = lm / Math.max(1, l2);
+      const lt = L0 * bri * Math.pow(f, 0.6), k = lt / lm; // luminância final = a da pintura (com o brilho pedido e parte do efeito do mul)
+      let R = cr * k, G = cg * k, B = cb * k;
+      const mx = Math.max(R, G, B);
+      if (mx > 255 && mx > lt) { const q = (255 - lt) / (mx - lt); R = lt + (R - lt) * q; G = lt + (G - lt) * q; B = lt + (B - lt) * q; } // estouro: dessatura mantendo a luminância
+      p[i] = Math.max(0, Math.min(255, R)); p[i + 1] = Math.max(0, Math.min(255, G)); p[i + 2] = Math.max(0, Math.min(255, B));
+    }
+    if (sharp > 0) src.set(p);
+  }
+  if (sharp > 0) { // realce 3×3 só no RGB de pixels opacos (vizinho transparente conta como o próprio pixel, sem halo escuro nas bordas)
+    const s0 = src, k = sharp;
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const o = (y * W + x) * 4; if (s0[o + 3] < 200) continue;
+      for (let ch = 0; ch < 3; ch++) {
+        const v = s0[o + ch];
+        const n = (q) => (s0[q + 3] > 128 ? s0[q + ch] : v);
+        const avg = (n(o - 4) + n(o + 4) + n(o - W * 4) + n(o + W * 4)) / 4;
+        p[o + ch] = Math.max(0, Math.min(255, v + (v - avg) * k));
+      }
+    }
   }
   g.putImageData(d, 0, 0);
   return createImageBitmap ? createImageBitmap(c) : c; // bitmap (GPU) em vez de canvas de CPU
@@ -64,7 +89,7 @@ function load(id) {
       const meta = await fetch(`assets/mobs/${art}.json`).then((r) => r.json());
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/mobs/${art}.webp?v=${meta.v ?? 0}`; });
       if (img.naturalWidth !== meta.cell[0] * meta.cols || img.naturalHeight !== meta.cell[1] * meta.rows) { it.state = 'none'; return; } // imagem e medidas não combinam: desenho antigo em vez de sprite quebrado
-      await img.decode?.(); it.meta = meta; it.img = V?.tint ? await tint(img, V.tint) : img; it.state = 'ready'; stats.loaded++;
+      await img.decode?.(); it.meta = meta; it.img = V?.tint || BIG.has(art) ? await tint(img, V?.tint, BIG.has(art) ? 0.55 : 0) : img; it.state = 'ready'; stats.loaded++;
     } catch { it.state = 'none'; }
   });
   return it;
@@ -112,7 +137,7 @@ export function drawMobSprite(g, a, t) {
   if (it.state !== 'ready') return false;
   const { meta, img } = it, [cw, ch] = meta.cell, art = ART[a.mobId] ?? ART[MOBS[a.mobId]?.art] ?? ART.default;
   const view = viewFromFacing(a.facing ?? Math.PI / 2);
-  const H = a.r * art.h, k = H / ch, W = cw * k;
+  const H = a.r * art.h * (a.boss || a.elite ? 1 : 1.15), k = H / ch, W = cw * k; // comuns +15% (V28: pequenos para toque/mira)
   const ph = a.walk ?? 0;
   const moving = !!a.moving && !a.dead;
   const nf = meta.frames ?? 0; // atlas animado: o ciclo já traz o salto/andar; por código fica só o resto

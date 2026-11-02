@@ -61,7 +61,8 @@ export class CloudSave {
   constructor(online, { every = 8000, onSync, onReject } = {}) {
     Object.assign(this, { online, every, onSync, onReject, charId: null, rev: 0, dirty: false, busy: false, last: 0, getDoc: null });
   }
-  attach(charId, rev, getDoc) { Object.assign(this, { charId, rev, getDoc, dirty: false, busy: false, last: Date.now(), paused: false }); }
+  // paused: dentro da instância o servidor é o dono do personagem; um attach de renovação NÃO pode religar a gravação.
+  attach(charId, rev, getDoc, { paused = false } = {}) { Object.assign(this, { charId, rev, getDoc, dirty: false, busy: false, last: Date.now(), paused }); }
   detach() { this.charId = null; this.getDoc = null; this.dirty = false; this.paused = false; }
   markDirty() { this.dirty = true; }
   tick(now = Date.now()) { if (this.paused) return; if (this.dirty && !this.busy && this.charId != null && now - this.last >= this.every) return this.flush(); }

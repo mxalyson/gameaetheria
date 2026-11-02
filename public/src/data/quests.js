@@ -1,6 +1,8 @@
 // Missões (dados). Cada objetivo tem um `type`:
 //   kill  {mob:'any'|id, zone:'any'|id}   boss {mob:'any'|id}   chest {zone:'any'|id}   spirit (ter N spirits)   level (alcançar o nível N)
 //   pvp {mode:'any'|1v1|2v2|4v4}   coop   ← estes dois são do SERVIDOR (só o servidor soma progresso; o cliente não consegue marcá-los)
+//   teleport (usar o teletransporte do mapa)   upgrade (aprimorar um equipamento no Ferreiro)   spiritStage (ter N spirits evoluídos, forma 2)
+// Cânone do arco final: 3 guardiões originais (Carvalho, Colosso, Guardião) e 2 reflexos (Ancião Gélido = gelo, Cavaleiro Rubro = brasa). `text.done` pode ser lista de falas (epílogo).
 // `giver` = NPC que oferece (e recebe a entrega, salvo `turnIn`). `after` = missão exigida antes. Recompensa: ouro, xp (×2,5 depois da curva de XP mais lenta), potions, items [{rarity}].
 export const QUESTS = {
   primeiros_passos: {
@@ -23,13 +25,13 @@ export const QUESTS = {
   },
   primeiro_spirit: {
     id: 'primeiro_spirit', name: 'Companhia de Luz', giver: 'sage', level: 3, after: null,
-    text: { offer: 'Um spirit é um eco da natureza. Reúna ao seu lado ao menos dois deles: compre uma essência comigo ou ache uma em combate.', progress: 'Você ainda precisa de mais um spirit. Compre uma Essência Selvagem aqui.', done: 'Vejo que dois ecos caminham com você. Eles crescem junto com o seu nível.' },
+    text: { offer: 'Um spirit é um eco da natureza. Reúna ao seu lado ao menos dois deles: compre uma essência comigo ou ache uma em combate.', progress: 'Você ainda precisa de mais um spirit. Compre uma Essência Selvagem aqui.', done: 'Vejo que dois ecos caminham com você. Eles crescem com o seu nível e, no nível 10, podem evoluir: abra 🔮 e veja.' },
     objectives: [{ type: 'spirit', count: 2, label: 'Tenha 2 spirits' }],
     reward: { gold: 120, xp: 400 },
   },
   carvalho_ancestral: {
     id: 'carvalho_ancestral', name: 'O Carvalho Ancestral', giver: 'guard', level: 4, after: 'caca_aos_lobos',
-    text: { offer: 'Há um carvalho antigo no fundo do bosque, e ele despertou. Derrube-o antes que as raízes cheguem à vila.', progress: 'O Carvalho Ancestral fica no extremo leste do bosque. Leve poções.', done: 'Você derrubou o Carvalho! Esta peça é a menor das recompensas.' },
+    text: { offer: 'Há um carvalho antigo no fundo do bosque, e ele despertou. Leve poções e fuja se precisar: raízes não perdoam. Derrube-o antes que cheguem à vila.', progress: 'O Carvalho Ancestral fica no extremo leste do bosque. Leve poções.', done: 'Ele caiu sussurrando: "não sou o primeiro". Leve essa frase à Sábia Yun. Esta peça é a menor das recompensas.' },
     objectives: [{ type: 'boss', mob: 'treant', count: 1, label: 'Derrote o Carvalho Ancestral' }],
     reward: { gold: 200, xp: 750, items: [{ rarity: 'rare' }] },
   },
@@ -41,7 +43,7 @@ export const QUESTS = {
   },
   coracao_de_cristal: {
     id: 'coracao_de_cristal', name: 'Coração de Cristal', giver: 'herbalist', level: 8, after: 'cristais_vivos',
-    text: { offer: 'O Colosso de Cristal guarda um núcleo valioso. Derrote-o e a vila lhe deve um favor.', progress: 'O Colosso fica no coração da planície.', done: 'O núcleo brilha! Aceite esta recompensa.' },
+    text: { offer: 'O núcleo do Colosso de Cristal, moído, rende as melhores poções que conheço. Derrube-o e me traga os cacos: a vila lhe deve um favor.', progress: 'O Colosso fica no coração da planície.', done: 'O núcleo canta baixinho, do mesmo jeito que o Carvalho cantava. Fique com esta recompensa, querido.' },
     objectives: [{ type: 'boss', mob: 'colossus', count: 1, label: 'Derrote o Colosso de Cristal' }],
     reward: { gold: 400, xp: 2250, items: [{ rarity: 'rare' }], potions: 3 },
   },
@@ -59,32 +61,51 @@ export const QUESTS = {
   },
   ruinas_sombrias: {
     id: 'ruinas_sombrias', name: 'Sombras nas Ruínas', giver: 'guard', level: 12, after: 'coracao_de_cristal',
-    text: { offer: 'Espectros saem das Ruínas Sombrias à noite. Vá até lá e abata quinze deles e de seus aliados.', progress: 'As Ruínas Sombrias ficam além da Planície de Cristal.', done: 'As ruínas ficaram em silêncio por um tempo. Obrigado.' },
+    text: { offer: 'Espectros saem das Ruínas Sombrias e rondam a estrada. Vá até lá e abata quinze deles e de seus aliados.', progress: 'As Ruínas Sombrias ficam além da Planície de Cristal.', done: 'As ruínas ficaram em silêncio por um tempo. Obrigado.' },
     objectives: [{ type: 'kill', mob: 'any', zone: 'ruins', count: 15, label: 'Derrote 15 criaturas das Ruínas Sombrias' }],
     reward: { gold: 600, xp: 3500 },
   },
   guardiao_das_ruinas: {
     id: 'guardiao_das_ruinas', name: 'O Guardião Esquecido', giver: 'guard', level: 22, after: 'ruinas_sombrias',
-    text: { offer: 'O Guardião das Ruínas protege algo que não devia existir. Derrube-o.', progress: 'O Guardião fica no coração das ruínas.', done: 'Inacreditável. Que seu nome seja lembrado.' },
+    text: { offer: 'O Guardião das Ruínas protege algo que não devia existir. Derrube-o e descubra o quê.', progress: 'O Guardião fica no coração das ruínas.', done: 'Ele não lutava para nos matar. Lutava para nos manter longe. Do quê? Não sei. Que seu nome seja lembrado.' },
     objectives: [{ type: 'boss', mob: 'guardian', count: 1, label: 'Derrote o Guardião das Ruínas' }],
     reward: { gold: 1200, xp: 6250, items: [{ rarity: 'epic' }] },
   },
   rumo_ao_topo: {
     id: 'rumo_ao_topo', name: 'Rumo ao Topo', giver: 'herbalist', level: 10, after: null,
-    text: { offer: 'Os verdadeiros aventureiros não param. Alcance o nível 20 e volte para me contar.', progress: 'Continue evoluindo: missões, chefes e arena dão experiência.', done: 'Você chegou longe! Esta bolsa é por sua perseverança.' },
+    text: { offer: 'Cada região tem uma flor que só abre para quem não desiste. Siga em frente, alcance o nível 20 e volte: vou lhe mostrar o que colhi pelo caminho.', progress: 'Continue evoluindo: missões, chefes e arena dão experiência.', done: 'Você chegou longe! As flores abriram para você. Esta bolsa é por sua perseverança.' },
     objectives: [{ type: 'level', count: 20, label: 'Alcance o nível 20' }],
     reward: { gold: 800, xp: 0, items: [{ rarity: 'epic' }] },
+  },
+  // ---- Tutoriais dos comerciantes (Lia e Brok) ----
+  pergaminho_de_cortesia: {
+    id: 'pergaminho_de_cortesia', name: 'Pergaminho de Cortesia', giver: 'merchant', level: 3, after: null,
+    text: { offer: 'Cortesia da casa, freguês: abra o mapa pelo menu e viaje a um lugar já visitado. Voltar à vila não custa nada. Depois me diga se não é prático.', progress: 'É só abrir o mapa pelo menu e tocar em Viajar. A Vila é de graça.', done: 'Viu como é prático? Quando precisar ir mais longe, pergaminhos estão sempre na minha loja.' },
+    objectives: [{ type: 'teleport', count: 1, label: 'Use 1 teletransporte pelo mapa' }],
+    reward: { gold: 80, xp: 300, potions: 2 },
+  },
+  fogo_de_forja: {
+    id: 'fogo_de_forja', name: 'Fogo de Forja', giver: 'smith', level: 5, after: null,
+    text: { offer: 'Metal sem fogo é só pedra. Traga uma peça e aprimore comigo. Uma vez. Depois você entende.', progress: 'Escolha uma peça e aprimore. Custa ouro.', done: 'Bom aço. Volte quando precisar de mais.' },
+    objectives: [{ type: 'upgrade', count: 1, label: 'Aprimore 1 equipamento com o Ferreiro' }],
+    reward: { gold: 100, xp: 450, potions: 1 },
+  },
+  martelo_do_guardiao: {
+    id: 'martelo_do_guardiao', name: 'Martelo do Guardião', giver: 'smith', level: 18, after: 'ruinas_sombrias',
+    text: { offer: 'O Guardião das Ruínas tinha um martelo, dizem. Os baús de lá guardam restos dele. Abra três. Traga o que achar.', progress: 'Baús nas Ruínas Sombrias. Três.', done: 'Restos do martelo. Fundi o que deu. Fique com isto.' },
+    objectives: [{ type: 'chest', zone: 'ruins', count: 3, label: 'Abra 3 baús nas Ruínas Sombrias' }],
+    reward: { gold: 900, xp: 4500, items: [{ rarity: 'rare' }] },
   },
   // ---- Arco final: "Os Ecos Partidos" (Cume Gélido e Cinzas Ardentes) ----
   cume_gelido: {
     id: 'cume_gelido', name: 'O Silêncio da Geada', giver: 'guard', level: 23, after: 'guardiao_das_ruinas',
-    text: { offer: 'Com o Guardião caído, a passagem a leste das Ruínas se abriu: o Cume Gélido. Viajantes dizem que as criaturas de lá são cópias geladas das que conhecemos. Abata vinte.', progress: 'O Cume Gélido fica a leste das Ruínas Sombrias. Leve poções.', done: 'Cópias, eco de ecos... A Sábia Yun vai querer saber disso.' },
+    text: { offer: 'Com o Guardião caído, a passagem a leste se abriu: o Cume Gélido. Dizem que as criaturas de lá são cópias geladas das nossas. Abata vinte.', progress: 'O Cume Gélido fica a leste das Ruínas Sombrias. Leve poções.', done: 'Cópias, eco de ecos... A Sábia Yun vai querer saber disso.' },
     objectives: [{ type: 'kill', mob: 'any', zone: 'glacier', count: 20, label: 'Derrote 20 criaturas do Cume Gélido' }],
     reward: { gold: 1500, xp: 14000, potions: 3 },
   },
   anciao_gelido: {
     id: 'anciao_gelido', name: 'O Ancião Gélido', giver: 'sage', level: 27, after: 'cume_gelido',
-    text: { offer: 'Os spirits me sussurram: um Ancião de gelo prende os ecos do Cume. É o Carvalho Ancestral, partido e congelado. Libere-o, derrotando-o.', progress: 'O Ancião fica no fundo do Cume Gélido, a nordeste.', done: 'Eu senti o eco se soltar. Mas o frio vinha de algo mais ao leste…' },
+    text: { offer: 'Os spirits me sussurram: um reflexo do Carvalho Ancestral, partido e congelado, prende os ecos do Cume. Libere-o, derrotando-o.', progress: 'O Ancião fica no fundo do Cume Gélido, a nordeste.', done: 'Senti o eco se soltar. O frio não era dele, era do que veio antes. E há outro reflexo, mais ao leste, ardendo…' },
     objectives: [{ type: 'boss', mob: 'frostlord', count: 1, label: 'Derrote o Ancião Gélido' }],
     reward: { gold: 2200, xp: 20000, items: [{ rarity: 'epic' }] },
   },
@@ -96,14 +117,18 @@ export const QUESTS = {
   },
   cavaleiro_rubro: {
     id: 'cavaleiro_rubro', name: 'O Cavaleiro Rubro', giver: 'arena', level: 29, after: 'cinzas_ardentes',
-    text: { offer: 'Há um cavaleiro nas Cinzas que luta como o Guardião lutava, mas em brasa. Se o derrubar, a arena inteira vai cantar seu nome.', progress: 'O Cavaleiro Rubro guarda o centro das Cinzas Ardentes.', done: 'Eu vi de longe. Esse foi um duelo digno de ser contado por gerações!' },
+    text: { offer: 'O Rubro luta como o Guardião lutava, mas em brasa. Ele só desperta quando as Cinzas se alimentam de sangue, mas o chão já estremece para quem traz esta missão.', progress: 'Se ele tombar e voltar a dormir, derrote quarenta criaturas nas Cinzas: o contador "Ritual" mostra quanto falta.', done: 'Ouvi o chão tremer daqui. Um duelo desses vale uma canção na arena.' },
     objectives: [{ type: 'boss', mob: 'infernoknight', count: 1, label: 'Derrote o Cavaleiro Rubro' }],
     reward: { gold: 4500, xp: 38000, items: [{ rarity: 'legendary' }] },
   },
   ecos_unidos: {
     id: 'ecos_unidos', name: 'Os Ecos Unidos', giver: 'sage', level: 30, after: 'cavaleiro_rubro',
-    text: { offer: 'Os três guardiões, do bosque, das ruínas e das cinzas, eram um só eco, partido há muito tempo. Agora ele repousa. Alcance o nível máximo e volte: quero lhe mostrar o que sobrou.', progress: 'Continue crescendo: faltam níveis para o topo.', done: 'Você uniu os ecos de Aetheria. Que cada spirit ao seu lado carregue um pouco dessa história.' },
-    objectives: [{ type: 'level', count: 30, label: 'Alcance o nível 30' }],
+    text: {
+      offer: 'Três guardiões e dois reflexos: o gelo e a brasa foram o eco tentando se juntar de novo. Hoje todos repousam. Evolua um spirit e volte: quero lhe mostrar o que sobrou.',
+      progress: 'Evolua um spirit (abra 🔮; ele precisa do nível 10) e volte a mim. O último capítulo espera.',
+      done: ['Aqui jaz o primeiro eco, inteiro de novo. A vila dorme; os spirits ao seu lado carregam um pouco dele.', 'Você era o último capítulo, herói. A partir de hoje, o eco tem voz, e é a sua.', 'Mas toda estrada tem outra volta. Ouça: já há um novo sussurro na neve.'],
+    },
+    objectives: [{ type: 'level', count: 30, label: 'Alcance o nível 30' }, { type: 'spiritStage', count: 1, label: 'Tenha 1 spirit evoluído (forma 2)' }],
     reward: { gold: 8000, xp: 0, potions: 10, items: [{ rarity: 'legendary' }] },
   },
 };
