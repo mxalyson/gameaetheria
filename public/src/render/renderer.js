@@ -784,10 +784,10 @@ function drawPortal(g, p, t) {
   }
   g.globalCompositeOperation = 'source-over';
   g.restore();
-  g.font = '700 13px Nunito, system-ui, sans-serif';
+  g.font = '700 13px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   const w = g.measureText(p.label).width + 18;
-  g.fillStyle = 'rgba(25,22,45,0.65)';
+  g.fillStyle = 'rgba(24,16,8,0.78)';
   g.beginPath(); g.roundRect(p.x - w / 2, p.y - 64, w, 22, 11); g.fill();
   g.fillStyle = '#efe6ff';
   g.fillText(p.label, p.x, p.y - 48);
@@ -829,7 +829,7 @@ function drawBars(g, a, isPlayer) {
     if (a.mark === 'ally') { g.moveTo(mx, my - 5); g.lineTo(mx + 5, my); g.lineTo(mx, my + 5); g.lineTo(mx - 5, my); g.closePath(); } else g.rect(mx - 4, my - 4, 8, 8);
     g.fill(); g.stroke();
   }
-  g.font = '800 11px Nunito, system-ui, sans-serif';
+  g.font = '800 11px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
   let label = null;
@@ -855,14 +855,14 @@ function drawChest(g, c, ready, t) {
 }
 
 function drawPrompt(g, x, y, txt) {
-  g.font = '800 13px Nunito, system-ui, sans-serif'; g.textAlign = 'center';
+  g.font = '800 13px Cinzel, Nunito, serif'; g.textAlign = 'center';
   const w = g.measureText(txt).width + 16;
-  g.fillStyle = 'rgba(25,22,45,0.75)'; g.beginPath(); g.roundRect(x - w / 2, y, w, 22, 11); g.fill();
+  g.fillStyle = 'rgba(24,16,8,0.82)'; g.beginPath(); g.roundRect(x - w / 2, y, w, 22, 11); g.fill();
   g.fillStyle = '#ffffff'; g.fillText(txt, x, y + 16);
 }
 
 function drawNpcTag(g, n, near, t, mark) {
-  g.font = '800 12px Nunito, system-ui, sans-serif';
+  g.font = '800 12px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
   g.strokeText(n.name, n.x, n.y - 44);
@@ -876,10 +876,10 @@ function drawNpcTag(g, n, near, t, mark) {
     g.fillText(mark === 'ready' ? '?' : '!', n.x, by + 5);
   }
   if (near) {
-    g.font = '800 13px Nunito, system-ui, sans-serif';
+    g.font = '800 13px Cinzel, Nunito, serif';
     const txt = '[E] Conversar';
     const w = g.measureText(txt).width + 16;
-    g.fillStyle = 'rgba(25,22,45,0.75)';
+    g.fillStyle = 'rgba(24,16,8,0.82)';
     g.beginPath(); g.roundRect(n.x - w / 2, n.y + 22, w, 22, 11); g.fill();
     g.fillStyle = '#ffffff';
     g.fillText(txt, n.x, n.y + 38);

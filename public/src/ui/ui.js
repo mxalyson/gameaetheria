@@ -578,7 +578,7 @@ export class UI {
       return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? '📍' : ZONE_ICON[id] ?? '🗺️'}</span></div>
       <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div>${here === id ? '' : id === 'town' || vis[id] ? `<button class="btn small" data-action="teleport" data-arg="${id}" ${canTp ? '' : 'disabled'}>Viajar · ${teleportCost(id) ? COIN + ' ' + teleportCost(id) : 'grátis'}</button>` : '<span class="tag dim">🔒 não visitado</span>'}</div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
     const arenas = '<div class="shop-item"><div class="cell"><span class="ic">⚔️</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>';
-    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas. Mapas já visitados têm <b>teletransporte</b> (fora de combate; a Vila é grátis). O botão 🏠 também volta à vila.</p>${rows}${arenas}`);
+    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas ⇄ Cume Gélido ⇄ Cinzas Ardentes. Mapas já visitados têm <b>teletransporte</b> (fora de combate; a Vila é grátis). O botão 🏠 também volta à vila.</p>${rows}${arenas}`);
   }
 
   panel_sage() {
