@@ -82,8 +82,9 @@ export function mobPortrait(id) {
     const tmp = document.createElement('canvas'); tmp.width = cw; tmp.height = ch;
     const tg = tmp.getContext('2d', { willReadFrequently: true }); tg.drawImage(it.img, 0, 0, cw, ch, 0, 0, cw, ch);
     const px = tg.getImageData(0, 0, cw, ch).data;
-    let x0 = cw, x1 = 0, y0 = ch, y1 = 0;
-    for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) if (px[(y * cw + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    let x0 = cw, x1 = 0, y0 = ch, y1 = 0, lum = 0, nl = 0;
+    for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const o = (y * cw + x) * 4; if (px[o + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; lum += 0.3 * px[o] + 0.59 * px[o + 1] + 0.11 * px[o + 2]; nl++; } }
+    const bright = Math.max(1.1, Math.min(2.2, 105 / Math.max(20, lum / Math.max(1, nl)))); // clareia mais quanto mais escuro o sprite (o Cavaleiro Rubro saía quase ilegível)
     if (x1 > x0 && y1 > y0) {
       const bw = x1 - x0 + 1, bh = y1 - y0 + 1, side = Math.min(Math.max(bw, bh * 0.62) * 1.08, Math.max(bw, bh)); // alto da figura: rosto e tronco; larga: a figura inteira
       const cx = (x0 + x1) / 2, sx = cx - side / 2, sy = y0 - side * 0.04;
@@ -91,7 +92,7 @@ export function mobPortrait(id) {
       const g = c.getContext('2d');
       const bg = g.createRadialGradient(S / 2, S * 0.4, 4, S / 2, S / 2, S * 0.72); bg.addColorStop(0, '#7a5a52'); bg.addColorStop(1, '#2e1a1e');
       g.fillStyle = bg; g.fillRect(0, 0, S, S);
-      if ('filter' in g) g.filter = 'brightness(1.28) contrast(1.05)'; // sprites escuros viravam uma mancha preta
+      if ('filter' in g) g.filter = `brightness(${bright.toFixed(2)}) contrast(1.05)`; // sprites escuros viravam uma mancha preta
       g.drawImage(tmp, sx, sy, side, side, 0, 0, S, S);
       res = { url: c.toDataURL('image/png') };
     }

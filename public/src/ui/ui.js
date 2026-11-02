@@ -12,6 +12,7 @@ import { MOBS } from '../data/mobs.js';
 import { mobPortrait } from '../render/mob-sprites.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
 import { PRICES, sellValue } from '../shop.js';
+import { pickBossTarget } from './boss-target.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, preloadSkillIcons, skillCategory, CATEGORIES } from '../render/skill-icons.js';
 import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
 import { QUESTS } from '../data/quests.js';
@@ -320,14 +321,7 @@ export class UI {
   }
 
   // Alvo da barra de chefe: o chefe tem prioridade sobre elites próximos (senão o retrato mostrava um elite qualquer ao lado do chefe).
-  barTarget(world, player) {
-    let best = null;
-    for (const a of world.actors) {
-      if (!(a.boss || a.elite) || a.dead || Math.hypot(a.x - player.x, a.y - player.y) >= 650) continue;
-      if (!best || (a.boss && !best.boss)) best = a;
-    }
-    return best;
-  }
+  barTarget(world, player) { return pickBossTarget(world.actors, player); }
 
   log(msg, color = '#e8e6f0') {
     const el = document.createElement('div');
@@ -498,7 +492,7 @@ export class UI {
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>
         <button class="btn small" data-action="buy-potion" data-arg="5">5 · ${COIN} ${potion * 5}</button></div></div>
       <div class="shop-item"><div class="cell r-uncommon"><span class="ic"><img class="it-img" src="assets/icons/item/res-scroll.webp" alt="📜" draggable="false"></span></div>
-        <div><div class="nm">Pergaminho de Teletransporte</div><div class="sub">Viaja a um mapa já visitado (painel do mapa) · você tem ${char.scrolls ?? 0}</div></div>
+        <div><div class="nm">Pergaminho de Viagem</div><div class="sub">Teletransporte a mapa visitado · tem ${char.scrolls ?? 0}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-scroll" data-arg="1">1 · ${COIN} ${PRICES.scroll(char.level)}</button>
         <button class="btn small" data-action="buy-scroll" data-arg="3">3 · ${COIN} ${PRICES.scroll(char.level) * 3}</button></div></div>
       <h3>Equipamentos</h3>${stock}
@@ -517,7 +511,7 @@ export class UI {
         <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
         ${max ? '<span class="tag">Máximo</span>' : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
     }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
-    return `<h3 id="smith-section">Ferreiro Brok · aprimorar equipado</h3>${rows}`;
+    return `<h3 id="smith-section">${this.shopAnchor === 'smith' ? 'Aprimorar equipado' : 'Ferreiro Brok · aprimorar equipado'}</h3>${rows}`;
   }
 
   panel_arena() {

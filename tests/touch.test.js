@@ -80,3 +80,14 @@ test('interagir: NPC tem prioridade, depois baú; longe devolve null', () => {
   assert.equal(interactTarget(at(0, 0), { zone: {} }), null);
   assert.equal(interactTarget(null, world), null);
 });
+
+test('barra de chefe: o chefe tem prioridade sobre elites, e elite só vale perto', async () => {
+  const { pickBossTarget } = await import('../public/src/ui/boss-target.js');
+  const p = { x: 0, y: 0 };
+  const elite = { elite: true, x: 100, y: 0 }, boss = { boss: true, x: 500, y: 0 };
+  assert.equal(pickBossTarget([elite, boss], p), boss);
+  assert.equal(pickBossTarget([boss, elite], p), boss);
+  assert.equal(pickBossTarget([elite], p), elite);
+  assert.equal(pickBossTarget([{ boss: true, x: 900, y: 0 }], p), null, 'fora do raio');
+  assert.equal(pickBossTarget([{ boss: true, dead: true, x: 10, y: 0 }], p), null, 'morto não conta');
+});

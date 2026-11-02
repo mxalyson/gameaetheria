@@ -633,3 +633,10 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 @media (max-height: 520px) and (max-width: 740px) {
   #boss-bar, body.touch #boss-bar { left: calc(50% + 46px); width: min(290px, 42vw); }
 }
+
+/* acabamento: botão Evoluir numa linha só; linha do pergaminho legível */
+.sp-btns .btn { white-space: nowrap; }
+.sp-btns .btn[data-action="spirit-evolve"] { flex: 2 1 0; min-width: 150px; }
+.shop-item .sub { font-size: 12px; }
+/* o grid empilhava texto, moeda e número em 3 linhas: em linha, centralizado */
+.sp-btns .btn, .sp-btns .tag { display: flex; align-items: center; justify-content: center; gap: .3em; flex-wrap: nowrap; }
