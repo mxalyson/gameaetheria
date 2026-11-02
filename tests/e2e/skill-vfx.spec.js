@@ -1,18 +1,19 @@
 import { test, expect } from '@playwright/test';
 
-// Efeitos das 12 habilidades no jogo real: cada lançamento (evento `cast` real da simulação) gera o efeito certo; sem erros; nada muda na mecânica.
+// Efeitos das 12 habilidades no jogo real (herói nv10: as habilidades liberam nos nv 1/5/10, SKILL_UNLOCK; abaixo disso a simulação ignora o lançamento): cada lançamento (evento `cast` real da simulação) gera o efeito certo; sem erros; nada muda na mecânica.
 const KIND = { whirlwind: 'whirl', charge: 'dashtrail', warcry: 'warcry', fireball: 'muzzle', frostnova: 'frost', blink: 'blink', rain: 'rain', pierce: 'pierce', roll: 'roll', holylight: 'sun', divineshield: 'bubble', judgement: 'beam' };
 const CLASSES = { warrior: ['whirlwind', 'charge', 'warcry'], mage: ['fireball', 'frostnova', 'blink'], archer: ['rain', 'pierce', 'roll'], cleric: ['holylight', 'divineshield', 'judgement'] };
 
 for (const [classe, skills] of Object.entries(CLASSES)) {
   test(`${classe}: as 3 habilidades geram o efeito próprio e a mecânica segue igual`, async ({ browser }) => {
+    test.setTimeout(60_000); // criar personagem + 3 lançamentos com captura; com a máquina carregada 30 s não bastava
     const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const page = await ctx.newPage();
     const errors = []; page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/?api=&visual=original');
     await page.click('[data-action="new-char"]'); await page.click(`[data-action="pick-class"][data-arg="${classe}"]`); await page.click('[data-action="create"]');
     await page.waitForFunction(() => window.game?.mode === 'explore');
-    await page.evaluate(() => { window.game.enterZone('forest', 700, 900); document.getElementById('toast-layer').style.display = 'none'; });
+    await page.evaluate(() => { window.game.char.level = 10; window.game.refreshStats(); window.game.enterZone('forest', 700, 900); document.getElementById('toast-layer').style.display = 'none'; });
     await page.waitForTimeout(600);
     for (let i = 0; i < 3; i++) {
       const id = skills[i];

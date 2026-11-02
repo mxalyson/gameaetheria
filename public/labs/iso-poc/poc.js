@@ -89,7 +89,7 @@ async function boot() {
 
   world = new World('forest', { seed: 11 });
   const rng = makeRng(7);
-  const char = newCharacter('Aren', cls.id, rng); char.level = 8;
+  const char = newCharacter('Aren', cls.id, rng); char.level = 10; // nv10 libera as 3 habilidades (SKILL_UNLOCK); o laboratório mostra todas
   player = world.add(makeHeroActor(char, 700, 950));
   cam = { x: player.x, y: player.y }; prevPos = { x: player.x, y: player.y };
   for (let i = 0; i < cfg.mobs; i++) spawnSlime();

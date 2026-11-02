@@ -487,3 +487,26 @@ test('loot: pesos por fonte (elite > mob), pity eleva e garante épico e zera ao
   for (let i = 0; i < 20000; i++) { const x = rollSourceRarity(r, 'mob', z); if (x === 'epic' || x === 'legendary') run = 0; else worst = Math.max(worst, ++run); }
   assert.ok(worst <= PITY.epicCap, `pior sequência ${worst}`);
 });
+
+// Ondas (Arena das Ondas e cooperativo): composição pura e determinística, calibrada com tools/waves-check.mjs.
+import { soloWaveSpec, coopWaveSpec, waveBoss, COOP_WAVES, WAVES, coopRewardPlan } from '../public/src/core/economy.js';
+test('ondas: composição determinística, nível/quantidade crescem e chefe nunca é o Cavaleiro Rubro', () => {
+  const a = soloWaveSpec(7, { level: 10 }, makeRng(3)), b = soloWaveSpec(7, { level: 10 }, makeRng(3));
+  assert.deepEqual(a, b);
+  assert.ok(soloWaveSpec(9, { level: 10 }).mobs.length > soloWaveSpec(1, { level: 10 }).mobs.length);
+  assert.equal(soloWaveSpec(4, { level: 10 }).lvl, 11);
+  const e = soloWaveSpec(5, { level: 10 }).mobs;
+  assert.equal(e.filter((m) => m.elite).length, 1);
+  assert.ok(e.find((m) => m.elite).level < 10 + 1, 'elite entra abaixo do nível da onda');
+  for (const lv of [1, 12, 20, 30]) for (let s = 0; s < 20; s++) assert.notEqual(waveBoss(lv, makeRng(s)), 'infernoknight');
+  const c1 = coopWaveSpec(COOP_WAVES, { avgLevel: 20, crew: 1 }, makeRng(1)), c4 = coopWaveSpec(COOP_WAVES, { avgLevel: 20, crew: 4 }, makeRng(1));
+  assert.ok(c4.mobs.length > c1.mobs.length && c4.hpMul > c1.hpMul);
+  assert.equal(c4.mobs.filter((m) => !['treant', 'colossus', 'guardian', 'frostlord'].includes(m.id)).length, c4.mobs.length - 1, 'um único chefe na última onda');
+  assert.ok(WAVES.coop.restHeal >= 0.2 && WAVES.solo.restHeal >= 0.2);
+});
+test('economia do coop: vitória paga mais que derrota e o XP fica abaixo do teto de 30% do nível', () => {
+  const win = coopRewardPlan({ level: 12, crew: 4, wavesCleared: 5, bossDown: true });
+  const lose = coopRewardPlan({ level: 12, crew: 4, wavesCleared: 3, bossDown: false, victory: false });
+  assert.ok(win.xp > lose.xp && win.gold > lose.gold);
+  assert.ok(win.xp < xpToNext(12) * 0.3 * 1.3);
+});

@@ -79,3 +79,14 @@ Pesos por fonte [comum, incomum, raro, épico, lendário] (core/loot.js `LOOT_SO
 
 ## Exclusivo do Cavaleiro Rubro
 Espada/Cajado/Arco/Maça Opalina (60%, da classe do jogador) ou Couraça de Ópalo (40%); 75% épico / 25% lendário (nome "Radiante"); atributos base ×1.3 mais crítico+vel. de ataque (arma) ou VIT+vel. de movimento (armadura); `opal: true`. Chance por abate 30% +20% por abate sem drop (garantido no 5º); sem pity (servidor) 35%. Ícone: o do tipo do item (sem arte própria; ver pendencias.md).
+
+## Arena das Ondas (solo) e cooperativo
+Medido com `node tools/waves-check.mjs --n 4` (World + IA reais, robô de `boss-check`, herói perfil normal, 4 classes; coop com classes mistas, 16 execuções por célula). Composição das ondas em `core/economy.js` (`WAVES`, `soloWaveSpec`, `coopWaveSpec`, `waveBoss`), usada por `main.js`, `server/coop.js` e pelo simulador (`--tune '{"coop":{...}}'` experimenta valores sem editar código).
+
+Antes (2+n mobs juntos, +20% de vida entre ondas, chefe sorteado entre todos, inclusive o Cavaleiro Rubro Nv 31): solo mediana 1–3 ondas em todos os níveis; coop 0% de vitória em quase toda célula (4 jogadores Nv 12–20: 0%; só 2 jogadores Nv 30: 13%).
+
+Depois (mobs = 1 + floor(0.3·n), +1 nível a cada 3 ondas, elite a cada 5 ondas 3 níveis abaixo, cura de 50% entre ondas, chefe pela faixa de nível: Carvalho/Colosso/Guardião/Ancião, nunca o Rubro):
+- Solo, ondas vencidas (mediana): Nv5 5 · Nv10 6 · Nv15 6 · Nv20 6 · Nv30 9. Guerreiro/Clérigo caem nas ondas 4–6; Mago/Arqueiro chegam à onda 9 e param no chefe da 10 (a IA do robô de corpo a corpo sofre mais com atiradores; ver pendência abaixo).
+- Coop (5 ondas + chefe; +1 mob por jogador extra, vida dos mobs +35% por jogador extra, chefe sem bônus de nível, elite só com 3+ jogadores, 1 jogador enfrenta o chefe da faixa anterior): vitória 4 jogadores Nv12 75% · Nv20 69% · Nv30 94%; 2 jogadores 44% · 25% · 38%; 1 jogador 13% · 19% · 0% (o 1 jogador vence quase só com Mago/Arqueiro).
+- Recompensas (`COOP`): XP bruto da vitória agora vem das ondas reais (`estimatePoolXp`) + 6% do nível pelo chefe: ≈ 12% de um nível no Nv8, 10% no Nv12, 8% no Nv20 (≈ 4 min por partida); o farm normal rende mais XP por hora, o coop paga loot de chefe, poções e ouro (266 no Nv12). Antes a estimativa dava 25–30% de um nível por vitória (exploitável contra o farm desacelerado).
+- Pendência: melhorar o robô corpo a corpo (ai.js) ou o Guerreiro/Clérigo contra grupos mistos; o Nv20+ solo sem equipamento melhor que "normal" não derruba o chefe da onda 10.

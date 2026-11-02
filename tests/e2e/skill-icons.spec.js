@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Ícones das habilidades no jogo real: barra (teclado), botões de toque, tooltip e escolha de classe usam a arte; recarga radial continua funcionando.
+// Ícones das habilidades no jogo real (o teste de bloqueio sobe o herói ao nv10: habilidade não aprendida mostra 'locked', que vence 'blocked'; ver SKILL_UNLOCK): barra (teclado), botões de toque, tooltip e escolha de classe usam a arte; recarga radial continua funcionando.
 const CLASSES = ['warrior', 'mage', 'archer', 'cleric'];
 async function criar(page, classe, prefs) {
   if (prefs) await page.addInitScript(([p]) => localStorage.setItem('aetheria_prefs_v1', JSON.stringify(p)), [prefs]);
@@ -62,7 +62,7 @@ test('categorias e estado indisponível: selo de categoria em cada habilidade, t
   expect(cats).toEqual(['cura', 'buff', 'controle']); // Luz Sagrada, Escudo Divino, Julgamento
   expect(await page.evaluate(() => document.querySelectorAll('#skillbar .slot .cat').length)).toBe(3);
   expect(await page.evaluate(() => window.game.ui.tooltipHtml('skill:judgement'))).toContain('Controle');
-  await page.evaluate(() => { window.game.player.stunT = 1; });
+  await page.evaluate(() => { window.game.char.level = 10; window.game.refreshStats(); window.game.player.stunT = 1; });
   await page.waitForTimeout(250);
   expect(await page.evaluate(() => [...document.querySelectorAll('#touch .tbtn.sk')].every((b) => b.classList.contains('blocked')))).toBe(true);
   expect(await page.evaluate(() => ['slot-s0', 'slot-s1', 'slot-s2'].every((id) => document.getElementById(id).classList.contains('blocked')))).toBe(true);

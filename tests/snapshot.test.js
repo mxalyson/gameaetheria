@@ -137,7 +137,7 @@ test('sala cooperativa: monstros nascem, se movem e são removidos no cliente; r
       seenMobs = Math.max(seenMobs, full.mobs.length); lastCount = full.mobs.length;
     }
   }
-  assert.ok(seenMobs >= 3);
+  assert.ok(seenMobs >= 1, 'as ondas novas começam com poucos mobs (1 + 0,3·onda): basta ver monstros nascerem');
   s1.log.length = 0; room.sendKeyframe(s1);
   const fresh = new SnapshotDecoder().init({ you, players }).apply(s1.log[0]);
   assert.equal(fresh.mobs.length, room.mobs().filter((m) => !m.dead || m.deadT < 0.6).length);

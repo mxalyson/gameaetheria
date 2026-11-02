@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// PoC isométrico (laboratório). Roda com a simulação REAL do jogo; aqui validamos a camada visual e a integração.
+// PoC isométrico (laboratório). Roda com a simulação REAL do jogo (herói nv10 em poc.js: as 3 habilidades só liberam no nv1/5/10, SKILL_UNLOCK); aqui validamos a camada visual e a integração.
 test.setTimeout(120000);
 
 async function open(page, qs = '') {
@@ -17,9 +17,11 @@ async function clearArea(page, x = 1400, y = 950) {
   await page.evaluate(([x, y]) => {
     const { world, player } = window.poc;
     world.actors.filter((a) => a.kind === 'mob').forEach((m) => { m.x = -500; m.y = -500; m.ai.target = null; });
-    const free = (px, py) => world.layout.obstacles.every((o) => (o.w ? !(px > o.x - 260 && px < o.x + o.w + 260 && py > o.y - 260 && py < o.y + o.h + 260) : Math.hypot(px - o.x, py - o.y) > o.r + 260));
-    let best = { x, y };
-    for (let i = 0; i < 400; i++) { const px = 500 + Math.random() * 1800, py = 400 + Math.random() * 1200; if (free(px, py)) { best = { x: px, y: py }; break; } }
+    // Os mapas novos (4600x2800, rios, acampamentos) são densos: raramente há 260 px livres. Em vez de cair num ponto fixo (que ficava junto do rio),
+    // escolhe entre 600 sorteios o de MAIOR folga até o obstáculo mais próximo (a caminhada de teste usa ~120 px).
+    const folga = (px, py) => Math.min(...world.layout.obstacles.map((o) => (o.w ? Math.hypot(Math.max(o.x - px, 0, px - (o.x + o.w)), Math.max(o.y - py, 0, py - (o.y + o.h))) : Math.hypot(px - o.x, py - o.y) - o.r)));
+    let best = { x, y }, bestF = -1;
+    for (let i = 0; i < 600; i++) { const px = 500 + Math.random() * 1800, py = 400 + Math.random() * 1200, f = folga(px, py); if (f > bestF) { bestF = f; best = { x: px, y: py }; if (f > 260) break; } }
     player.x = best.x; player.y = best.y; player.hp = player.maxHp;
     window.poc.cam.x = best.x; window.poc.cam.y = best.y;
   }, [x, y]);
@@ -52,9 +54,10 @@ test('movimento em 8 direções: o sprite olha para onde a tela diz e o personag
     for (const k of ks) await page.keyboard.down(k);
     // espera o movimento COMEÇAR (em FPS baixo o primeiro passo demora), depois deixa andar um pouco
     try { await page.waitForFunction(() => window.poc.player.moving, null, { timeout: 4000 }); } catch {
-      throw new Error(`${nome}: não começou a andar. teclas=${JSON.stringify(await page.evaluate(() => [...window.poc.keys]))} fps=${await page.evaluate(() => window.poc.stats.fps)}`);
+      throw new Error(`${nome}: não começou a andar. teclas=${JSON.stringify(await page.evaluate(() => [...window.poc.keys]))} fps=${await page.evaluate(() => window.poc.stats.fps)} pos=${await page.evaluate(() => { const p = window.poc.player; return JSON.stringify([Math.round(p.x), Math.round(p.y), p.stunT, p.dead, p.rootT]); })}`);
     }
-    await page.waitForTimeout(500);
+    // anda até 60 px na tela (e não um tempo fixo): com a máquina carregada o simulador recupera quadros em rajada e o tempo fixo levava o herói à borda do mundo (cos < 0,95)
+    await page.waitForFunction(([ax, ay]) => { const s = window.poc.iso.toScreen(window.poc.player.x, window.poc.player.y); return Math.hypot(s.x - ax, s.y - ay) > 60; }, [a.x, a.y], { timeout: 8000, polling: 'raf' });
     const r = await page.evaluate(() => { const p = window.poc.player, st = window.poc.anims.get(p.id), s = window.poc.iso.toScreen(p.x, p.y); return { view: st.view, clip: st.anim.name, moving: p.moving, x: s.x, y: s.y }; });
     for (const k of ks) await page.keyboard.up(k);
     expect(r.moving, nome).toBe(true);

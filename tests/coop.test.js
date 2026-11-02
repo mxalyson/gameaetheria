@@ -5,7 +5,7 @@ import { createGameServer } from '../server/game-server.js';
 import { newOfficialCharacter } from '../server/api.js';
 import { COOP_WAVES } from '../server/coop.js';
 import { COOP_WAIT } from '../server/hub.js';
-import { coopRewardPlan, COOP } from '../public/src/core/economy.js';
+import { coopRewardPlan, COOP, WAVES } from '../public/src/core/economy.js';
 import { xpToNext } from '../public/src/core/progression.js';
 import { INVENTORY_SIZE } from '../public/src/data/items.js';
 import { connect, closeAll } from './helpers/net.js';
@@ -52,7 +52,7 @@ test('cooperativo: um jogador sozinho começa depois da espera e enfrenta ondas 
   assert.equal(room.state, 'fight'); assert.equal(room.wave.n, 1);
   const snap = cs[0].last('snap');
   assert.equal(snap.mode, 'coop'); assert.equal(snap.coop.wave, 1); assert.equal(snap.coop.total, COOP_WAVES);
-  assert.ok(snap.mobs.length >= 3, 'monstros na onda 1');
+  assert.ok(snap.mobs.length >= 1, 'monstros na onda 1');
   assert.ok(snap.mobs.every((m) => m.mob && m.maxHp > 0 && !m.boss));
   await closeAll(srv, ...cs);
 });
@@ -64,7 +64,7 @@ test('quatro jogadores começam na hora; mais jogadores = mais monstros e mais v
   assert.equal(room.players.size, 4);
   srv.step(60 * 8);
   const mobs = room.mobs();
-  assert.equal(mobs.length, 2 + 1 + 2 * 3, 'onda 1 com 4 jogadores: 2 + onda + 2 por jogador extra');
+  assert.equal(mobs.length, WAVES.coop.base + Math.floor(WAVES.coop.perWave) + WAVES.coop.extraPerPlayer * 3, 'onda 1 com 4 jogadores: base + por onda + extra por jogador extra');
   const solo = world([10]); const s2 = await start(solo.db);
   const r2 = await coop(s2, solo.chars); s2.step(60 * 8);
   assert.ok(mobs[0].maxHp > r2.room.mobs()[0].maxHp * 1.5, 'vida dos monstros cresce com o grupo');
