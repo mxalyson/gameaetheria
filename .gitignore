@@ -12,3 +12,4 @@ public/labs/iso-poc/art-local/*
 # banco local e backups (dados de jogadores nunca vao ao Git)
 /data/
 test-results-*.txt
+docs/art-direction/auditoria/

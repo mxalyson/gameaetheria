@@ -6,6 +6,26 @@ Lista viva: o que ficou sem fazer, sem validar ou dependente de você. Atualizad
 **Próximo (sem o Místico):** cenário próprio dos mapas novos; ferreiro como NPC; retrato do chefe na barra; teletransporte online; calibrar XP/farm com jogadores; sobras de fonte/retângulo (mandar capturas).
 **Depende de você:** servidor HTTPS/domínio, Google Client ID, conta Google Play + aparelho Android, medir em celular real, confirmar licença das imagens de IA e da folha com marca d'água.
 
+## Auditoria de 2026-11-02 (visual, jogabilidade, bugs, história)
+Relatórios completos com tabelas e correções sugeridas: `auditoria-visual.md` (V1–V30), `auditoria-jogabilidade.md` (G1–G13), `auditoria-bugs.md` (B1–B30), `auditoria-historia.md` (S1–S20). Capturas em `docs/art-direction/auditoria/` (fora do Git, 193 MB). **Nada abaixo foi corrigido ainda.** Ordem sugerida:
+
+### P0 — segurança e jogo quebrado (corrigir antes de publicar)
+- [ ] **B1** `zone_enter` aceita `from` falso: nível 1 entra nas Cinzas sem pergaminho (server/hub.js:284-293). **B2** save forjado aceita `scrolls=99`, `visited`, `pity`, `opal` e itens absurdos (server/plausible.js, core/savedoc.js): limitar atributos por nível/raridade e ignorar `opal/pity/scrolls/visited` vindos do cliente. **B4** `session.char` nunca relido do banco (equipamento/atributos desatualizados nas salas).
+- [ ] **B3** Não dá para abrir baú no celular (botão de interagir só fala com NPC; `useChest` só pela tecla E): 40 baús inalcançáveis. **S8/V** dicas "[E] abrir baú", "[E] conversar", "(H)", "tecla G" contra a decisão 0016.
+- [ ] **V1** Botões +5/Máx de atributo cortados no painel Personagem (quebrar linha, ≥ 44 px). **V2** botões do menu com 36 px (subir para 44–48). **V7** painel de Spirits com Evoluir espreme o texto. **V3/V4** barra do chefe invade o HUD; retrato escuro/cortado; Cavaleiro Rubro usa o retrato do Guardião. **V13** rio das Cinzas/Ruínas é faixa lilás translúcida.
+- [ ] **G1** baús dão loot demais (18 épicos/h nas Cinzas): `luck = 0,25·tier`, chance de item `min(0,8; 0,15·tier)`. **G2** loja vende épico/lendário a 1 min de renda e refaz o estoque ao recarregar a página (persistir nível+semente, só até raro, `itemMarkup` 6). **G3** XP de PvP sem teto (vitória 6%, derrota 2%, limite por hora, anti-troca). **G4** chefes 3 e 4 viram parede: reduzir vida 25% e subir nível das missões (corrigir junto com G1/G2).
+
+### P1 — importantes
+- [ ] **B5** `frame()` sem try/finally (uma exceção congela o jogo). **B6** reconexão infinita com token vencido. **B7** soft-lock com sala cheia. **B8** `flushAll()` nunca chamado (perde até 10 s de recompensa). **B9** exceção numa sala derruba o servidor. **B10** `cloud.attach` desfaz a pausa na instância. **B11** mobs travam na margem do rio e morrem a tiros (IA/colisão no rio). **B12** botão de spec mostra `${COIN}` literal. **B13** atlas com JSON novo e imagem velha pelo service worker. **B14** chefe reaparece na hora ao reentrar (e o log mente). **B16** sem botão de voltar à vila por toque na instância online. **B17** drops no chão nunca expiram. **B18** `separate()` O(n²) custa 35% da sala do servidor.
+- [ ] **S1/S2/S3/S4** história: fechar o cânone (3 guardiões + 2 reflexos), epílogo de `ecos_unidos`, pistas de lore nos níveis 1–19, introdução narrativa do ritual; **S7/S9/S10** missões da Lia e do Brok, falas condicionais, onboarding de 6 passos.
+- [ ] **G5** farm de chefe a cada 90–150 s rende ~15 épicos/h; **G6/G7** Guerreiro e Clérigo iniciais sofrem no Bosque e contra grupos (robô corpo a corpo fraco: ai.js); **G9/G10** Ferreiro +8 rende pouco (+16% por 90 mil) e o opalino só +8–18% sobre um lendário comum.
+- [ ] V5, V6, V8–V12, V14–V21, V23–V30 (ver tabela visual): baú saqueado igual ao fechado, item opalino sem moldura, painel do Ferreiro com título "Mercadora Lia", faixas laranja ao fim do ritual, chefes/ponte borrados.
+
+### P2 — melhorias
+- [ ] S5/S6/S11–S20 (tom, textos longos, conquistas narrativas, lore coletável, fala do Doran offline). B15, B19–B30 (código morto, `case 'zone_teleport'` duplicado em core/protocol.js:70-75, comentários que mentem). G11–G13 (ritual 25 min de recarga só dentro das Cinzas; hostilidade das zonas; venda de itens paga 100% e a doc diz 50%).
+- [ ] Primeira entrada em cada mapa dá picos de 100–270 ms (blocos de terreno); medir com GPU (`npm run perf:poc`) e num celular real.
+- [ ] Comparar os efeitos de habilidade do laboratório isométrico com os do jogo (pedido do proprietário): precisa dizer quais habilidades.
+
 ## Depende de você (eu não consigo fazer sozinho)
 - [ ] Publicar um servidor com **HTTPS/WSS** e domínio (hoje o GitHub Pages fica offline: não há servidor).
 - [ ] **Google Client ID** do Google Cloud para o domínio do jogo (login Google nunca foi testado com o Google real).
