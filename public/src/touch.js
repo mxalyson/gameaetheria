@@ -3,7 +3,7 @@
 import { CLASSES } from './data/classes.js';
 import { SKILLS } from './data/skills.js';
 import { isSkillUnlocked, skillUnlockLevel, skillIdAt } from './core/unlocks.js';
-import { skillOf } from './core/specs.js';
+import { skillOf, basicOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { asset } from './assets-version.js';
 import { stickVector, pickAim, aimModeFor, dragAim, interactTarget } from './touch-logic.js';
@@ -179,7 +179,7 @@ export class TouchControls {
       b.classList.toggle('locked', lk); // cadeado + "Nv N" (ver style.css); a Maestria mostra "Nv 25" e, passado o nível, "Maestria" (falta a missão)
       if (lk) b.style.setProperty('--lv', i === 3 && p.level >= skillUnlockLevel(3) ? '"25\\A Maestria"' : `"${skillUnlockLevel(i)}"`);
     });
-    setCd(this.root.querySelector('.atk'), p.cds.basic, cls.basic.cd / p.stats.atkSpeed, false);
+    setCd(this.root.querySelector('.atk'), p.cds.basic, basicOf(p.classId, p.spec).cd / p.stats.atkSpeed, false);
     const pot = this.root.querySelector('.pot');
     setCd(pot, game.potionCd, 8, false);
     pot.querySelector('.count').textContent = String(game.char.potions);

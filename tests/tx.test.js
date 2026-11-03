@@ -530,3 +530,52 @@ test('servidor: craft grava no banco, responde tx_result e some quando o persona
   assert.equal(again.ok, false);
   await closeAll(srv, c);
 });
+
+test('protocolo e lugar: respec_buy/respec existem só nas cidades (Vila), com id válido; nunca na instância nem no Porto', () => {
+  assert.ok(TX({ op: 'respec_buy' }).ok);
+  assert.deepEqual(TX({ op: 'respec', id: 'paladin', req: 2, x: 1 }).msg, { t: 'tx', op: 'respec', req: 2, id: 'paladin' });
+  assert.equal(TX({ op: 'respec' }).ok, false, 'sem id');
+  assert.equal(TX({ op: 'respec', id: '<script>' }).ok, false);
+  for (const op of ['respec', 'respec_buy']) {
+    assert.equal(placeProblem(op, { inZone: false, hubAt: null }), null);
+    assert.equal(placeProblem(op, { inZone: false, hubAt: 'harbor' }), 'not_here');
+    assert.equal(placeProblem(op, { inZone: true, hubAt: null }), 'not_here');
+  }
+});
+
+test('runTx (puro): primeira especialização é grátis; Selo custa 15.000; trocar sem Selo falha e com Selo consome 1 e conta a troca', () => {
+  const doc = newOfficialCharacter('Sel', 'mage'); doc.level = 20; doc.gold = 40000; doc.quests.done.prova_do_mestre = 1;
+  const ctx = { rng: makeRng(1), now: Date.now() };
+  assert.throws(() => runTx(doc, { op: 'respec', id: 'guardian' }, ctx), /inválida/, 'spec de outra classe');
+  const first = runTx(doc, { op: 'respec', id: 'arcane' }, ctx);
+  assert.equal(first.doc.spec, 'arcane'); assert.equal(first.doc.gold, 40000); assert.equal(first.summary.paid, false);
+  assert.throws(() => runTx(first.doc, { op: 'respec', id: 'warlock' }, ctx), /Selo/, 'trocar sem Selo');
+  assert.equal(first.doc.spec, 'arcane', 'original intacto');
+  const bought = runTx(first.doc, { op: 'respec_buy' }, ctx);
+  assert.equal(bought.doc.seals, 1); assert.equal(bought.doc.gold, 25000);
+  const swapped = runTx(bought.doc, { op: 'respec', id: 'warlock' }, ctx);
+  assert.equal(swapped.doc.spec, 'warlock'); assert.equal(swapped.doc.seals, 0); assert.equal(swapped.doc.specChanges, 1); assert.equal(swapped.summary.paid, true);
+  assert.throws(() => runTx(swapped.doc, { op: 'respec', id: 'arcane' }, ctx), /Selo/, 'o Selo foi gasto');
+  const poor = structuredClone(swapped.doc); poor.gold = 14999;
+  assert.throws(() => runTx(poor, { op: 'respec_buy' }, ctx), /Faltam 1 de ouro/);
+  const noProva = structuredClone(doc); noProva.quests.done = {};
+  assert.throws(() => runTx(noProva, { op: 'respec', id: 'arcane' }, ctx), /Prova/);
+});
+
+test('servidor: respec_buy e respec gravam no banco; trocar sem Selo é recusado e o ouro/spec não mudam', async () => {
+  const { srv, db, c, ch, patch, tx } = await setup();
+  patch((x) => { x.level = 20; x.gold = 20000; x.quests.done.prova_do_mestre = 1; });
+  const first = await tx({ op: 'respec', id: 'paladin' });
+  assert.equal(first.ok, true); assert.equal(db.character(ch).doc.spec, 'paladin'); assert.equal(db.character(ch).doc.gold, 20000);
+  const bad = await tx({ op: 'respec', id: 'berserker' });
+  assert.equal(bad.ok, false); assert.match(bad.reason, /Selo/); assert.equal(db.character(ch).doc.spec, 'paladin');
+  const buy = await tx({ op: 'respec_buy' });
+  assert.equal(buy.ok, true); assert.equal(db.character(ch).doc.seals, 1); assert.equal(db.character(ch).doc.gold, 5000);
+  const poor = await tx({ op: 'respec_buy' });
+  assert.equal(poor.ok, false);
+  const ok = await tx({ op: 'respec', id: 'berserker' });
+  assert.equal(ok.ok, true); assert.equal(ok.sync, true);
+  const doc = db.character(ch).doc;
+  assert.equal(doc.spec, 'berserker'); assert.equal(doc.seals, 0); assert.equal(doc.specChanges, 1);
+  await closeAll(srv, c);
+});

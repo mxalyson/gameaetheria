@@ -81,3 +81,23 @@ test('Ferreiro: Forja do Eco lista as duas receitas, bloqueia sem fragmentos e m
   c.equipment.weapon = { eco: true, slot: 'weapon' };
   assert.match(ui.echoForge(), /Já forjado/);
 });
+
+test('especialização: primeira escolha grátis; trocar mostra o Selo; o Selo (15.000) só é vendido quando aberto pelo Mestre de Classe', () => {
+  const ui = mk();
+  const char = { classId: 'mage', level: 20, gold: 20000, seals: 0, spec: null, quests: { done: {} } };
+  let html = ui.specBlock(char);
+  assert.match(html, /A primeira escolha é grátis/); assert.match(html, />Escolher</);
+  assert.equal((html.match(/data-action="spec"/g) ?? []).length, 2); assert.doesNotMatch(html, /buy-seal/);
+  Object.assign(char, { spec: 'arcane' });
+  html = ui.specBlock(char);
+  assert.match(html, /Trocar · 1 Selo/); assert.match(html, /disabled/, 'sem Selo o botão de trocar fica desabilitado');
+  assert.match(html, /Mestre de Classe, na Vila, vende/); assert.doesNotMatch(html, /buy-seal/);
+  ui.specMaster = true; // painel aberto pelo serviço do Mestre ('character:master')
+  html = ui.specBlock(char);
+  assert.match(html, /data-action="buy-seal"/); assert.match(html, /15\.000/);
+  char.gold = 100; assert.match(ui.specBlock(char), /buy-seal"\s+disabled/);
+  char.seals = 2; char.gold = 20000;
+  html = ui.specBlock(char);
+  assert.match(html, /Você tem <b>2<\/b>/); assert.doesNotMatch(html, /data-action="spec"[^>]*disabled/);
+  assert.doesNotMatch(html, /tecla/i);
+});

@@ -14,6 +14,7 @@ import { validate } from '../public/src/core/savedoc.js';
 import { QUESTS } from '../public/src/data/quests.js';
 import { CLASSES } from '../public/src/data/classes.js';
 import { craftEcho } from '../public/src/core/echo.js';
+import { chooseSpec, buySeal } from '../public/src/core/specs.js';
 
 export class TxError extends Error {}
 const fail = (msg) => { throw new TxError(msg); };
@@ -32,7 +33,7 @@ export function placeProblem(op, { inZone, hubAt, shop = 'town' }) {
   const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily' || op === 'recycle';
   if (harborOnly && hubAt !== 'harbor') return 'not_here';
   if (shop === 'harbor' && hubAt !== 'harbor') return 'not_here';
-  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk', 'craft'].includes(op)) return 'not_here'; // lojas da Vila só na Vila
+  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk', 'craft', 'respec', 'respec_buy'].includes(op)) return 'not_here'; // lojas da Vila só na Vila
   return null;
 }
 
@@ -194,6 +195,18 @@ export function runTx(doc, m, ctx) {
       const r = craftEcho(c, m.id, ctx.rng);
       if (!r.ok) fail(r.reason);
       Object.assign(s, { item: r.item, name: r.item.name, frags: r.frags, cost: r.gold, fragsTotal: c.echo.frags });
+      break;
+    }
+    case 'respec_buy': { // Mestre de Classe: 1 Selo de Reespecialização por vez (preço e teto fixos em data/specs.js)
+      const r = buySeal(c);
+      if (!r.ok) fail(r.reason);
+      Object.assign(s, { price: r.price, seals: r.seals });
+      break;
+    }
+    case 'respec': { // escolher (1ª vez grátis) ou trocar de especialização: o Selo só existe no documento oficial e é gasto aqui
+      const r = chooseSpec(c, m.id);
+      if (!r.ok) fail(r.reason);
+      Object.assign(s, { spec: m.id, paid: r.paid, seals: r.seals, specChanges: c.specChanges ?? 0 });
       break;
     }
     case 'recycle': {

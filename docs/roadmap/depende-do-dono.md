@@ -50,7 +50,7 @@ Icones de 128×128 (ou 256), fundo transparente, estilo dos demais itens (mesma 
 - Para o Clérigo, se quiser variante: mesmo escudo com símbolo sagrado (sol) no centro (arquivos `shield-<raridade>-cleric.webp`; ainda não usados pelo código, avise para ligar).
 
 ### A7. Místico (5º herói)
-Conceito: místico errante que tece "ecos" (invocações/controle). Prompt: *"chibi fantasy mystic hero, anime style, flowing violet and teal robes, floating glowing sigils, staff with a hanging lantern, hand-painted, full body, standing neutral pose"* → GLB Meshy; depois eu faço atlas, kit de habilidades e ícones.
+Conceito: místico errante que tece "ecos" (invocações/controle). Especializações propostas (só desenho): `docs/gameplay/sistemas.md` › Místico (Tecelão de Ecos e Ceifador de Ecos); no Nv25 cada uma pede uma variante de herói, como as 8 da A8. Prompt: *"chibi fantasy mystic hero, anime style, flowing violet and teal robes, floating glowing sigils, staff with a hanging lantern, hand-painted, full body, standing neutral pose"* → GLB Meshy; depois eu faço atlas, kit de habilidades e ícones.
 
 ## B. Decisões suas
 - Aprovar pilares/assinatura visual (`docs/art-direction/identidade-visual-v1.md`).
@@ -68,12 +68,12 @@ Conceito: místico errante que tece "ecos" (invocações/controle). Prompt: *"ch
 ## A8. "Design completo Nv25" por especialização (8 variantes de herói)
 A aura de evolução já existe (procedural). O visual final do Nv25 (Maestria) precisa de arte sua: um herói por especialização, mesma silhueta/proporção chibi da classe, mais elaborado (armadura/robe refinado, detalhes dourados/prata, sem exagero). Gere no Meshy a partir do herói base da classe e me traga o GLB; eu faço atlas e ligo no gancho `heroLook` (`docs/art-direction/aura-evolucao.md`).
 Prompts (base: *"chibi fantasy {classe} hero, anime style, hand-painted, full body, neutral standing pose, refined elite version"*):
-1. Bastião: *"... paladin, heavy gold-and-steel plate, tower shield with engraved crest, short cape, calm radiant look"*
-2. Carrasco: *"... executioner warrior, dark crimson armor with ember-lit cracks, huge two-handed axe, horned helm"*
-3. Piromante: *"... pyromancer mage, orange-and-black robes with flame embroidery, floating ember orb, staff with fire crystal"*
-4. Criomante: *"... cryomancer mage, icy blue and white robes, frost crystal crown, staff with ice shard, cold mist hem"*
-5. Atirador: *"... marksman archer, teal leather coat with silver fittings, long precision bow with scope-like rune, hooded cape"*
-6. Caçador: *"... hunter archer, forest green and bark-brown gear, leaf mantle, antler-shaped bow, quiver with feathers"*
+1. Paladino (antigo Bastião): *"... paladin, heavy gold-and-steel plate, tower shield with engraved crest, short cape, calm radiant look"*
+2. Berserker (antigo Carrasco): *"... berserker warrior, dark crimson armor with ember-lit cracks, huge two-handed axe, horned helm"*
+3. Arcano (antigo Piromante): *"... arcane mage, deep violet and blue robes with silver runes, floating prism crystal, staff with a faceted arcane gem"*
+4. Bruxo (antigo Criomante): *"... warlock mage, dark green and black robes, toxic green glow, skull-topped staff, hanging vials and tattered hem"*
+5. Franco-atirador (antigo Atirador): *"... sniper archer, teal leather coat with silver fittings, long precision bow with scope-like rune, hooded cape"*
+6. Pistoleiro (antigo Caçador): *"... gunslinger archer, amber and brown gear with brass fittings, compact repeating-crossbow-style bow, bandolier of bolts, short coat"* (a classe segue usando arco; "besta de repetição" é só sabor, sem arma nova)
 7. Guardião: *"... guardian cleric, white and gold vestments, winged shoulder guards, radiant shield-staff, halo ornament"*
 8. Inquisidor: *"... inquisitor cleric, violet and amber ornate robes, floating rune book, judgement mace with glowing sigils"*
 

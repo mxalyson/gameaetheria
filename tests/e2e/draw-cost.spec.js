@@ -31,7 +31,7 @@ test('custo de draw() com 8, 25 e 50 atores (CPU, pessimista)', async ({ page })
     };
     for (const n of [8, 25, 50]) res[n] = measure(n);
     // aura de evolução: 25 atores, todos especializados (tier 1) e depois todos com Maestria (tier 2); a diferença para `res[25]` é o custo da aura
-    const specs = ['bastion', 'pyromancer', 'marksman', 'guardian'];
+    const specs = ['paladin', 'arcane', 'sniper', 'guardian'];
     const withAura = (tier) => { const pl = w.actors.filter((a) => a.kind !== 'mob' && a.kind !== 'spirit'); const old = pl.map((a) => [a.spec, a.mastery]); pl.forEach((a, i) => { a.spec = specs[i % 4]; a.mastery = tier === 2; }); const r = measure(25); pl.forEach((a, i) => { a.spec = old[i][0]; a.mastery = old[i][1]; }); return r; };
     res.aura1 = withAura(1); res.aura2 = withAura(2);
     return res;

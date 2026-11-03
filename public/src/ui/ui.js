@@ -1,7 +1,7 @@
 import { CLASSES, STAT_KEYS, STAT_NAMES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
 import { isSkillUnlocked, skillUnlockLevel } from '../core/unlocks.js';
-import { skillOf, specsOf, specInfo, activeSpec, respecCost, SPEC_LEVEL } from '../core/specs.js';
+import { skillOf, specsOf, specInfo, activeSpec, basicOf, sealsOf, SPEC_LEVEL, SEAL_PRICE } from '../core/specs.js';
 import { SHIELD_CLASSES, SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
 import { computeStats, canEquip, itemScore, itemClassId, itemClassName } from '../core/stats.js';
@@ -325,7 +325,7 @@ export class UI {
     this.set('zone-name', 'html', esc(world.zone.name) + (zoneHasCycle(world.zone) && isNight(currentHour()) ? '<span class="night-tag" title="Noite: criaturas enxergam mais longe e dão mais XP, ouro e itens">🌙 Noite: +15% XP/ouro</span>' : ''));
 
     const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, s3: player.cds.s3 ?? 0, potion: game.potionCd };
-    const maxOf = { basic: CLASSES[char.classId].basic.cd / player.stats.atkSpeed, potion: 8 };
+    const maxOf = { basic: basicOf(char.classId, activeSpec(char)).cd / player.stats.atkSpeed, potion: 8 };
     [...CLASSES[char.classId].skills, CLASSES[char.classId].mastery].forEach((s, i) => { maxOf['s' + i] = skillOf(char.classId, activeSpec(char), s).cd; });
     for (const id of Object.keys(cdOf)) {
       const cd = cdOf[id];
@@ -442,6 +442,7 @@ export class UI {
     const [id, anchor] = String(spec).split(':');
     if (['shop', 'bank', 'board', 'arena', 'sage', 'party', 'dialog', 'journal', 'map'].includes(id)) for (const p of ['shop', 'bank', 'board', 'arena', 'sage', 'party', 'dialog', 'journal', 'map', 'spirits', 'character', 'options']) this.open.delete(p);
     if (id === 'options') this.open.clear();
+    if (id === 'character') this.specMaster = anchor === 'master'; // aberto pelo Mestre de Classe: o Selo de Reespecialização está à venda
     if (id === 'map') this.mapSel = null; // o mapa sempre abre selecionando onde você está
     this.open.add(id);
     if (id === 'shop') { this.open.add('inventory'); this.shopAnchor = anchor ?? null; } // título: Ferreiro Brok (anchor 'smith') ou Mercador do Porto ('harbor')
@@ -531,16 +532,21 @@ export class UI {
       </div></div>`);
   }
 
-  // Especialização (nível 15): duas por classe; a primeira escolha é grátis, trocar custa ouro.
+  // Especialização (nível 15): duas por classe; a primeira escolha é grátis, trocar consome um Selo de Reespecialização (vendido pelo Mestre de Classe).
   specBlock(char) {
     const list = specsOf(char.classId);
     if (char.level < SPEC_LEVEL) return `<h3>Especialização</h3><p class="hint">${LOCK} Libera no nível ${SPEC_LEVEL} (você está no ${char.level}): duas escolhas que ajustam suas habilidades.</p>`;
-    const cost = respecCost(char);
+    const seals = sealsOf(char), has = !!specInfo(char.classId, char.spec);
+    const buy = this.specMaster
+      ? `<div class="shop-item"><div class="cell r-epic"><span class="ic">🔖</span></div><div><div class="nm">Selo de Reespecialização</div><div class="sub">Consumido ao trocar de especialização.</div></div>
+          <button class="btn small" data-action="buy-seal" ${char.gold < SEAL_PRICE ? 'disabled' : ''}>${COIN} ${SEAL_PRICE.toLocaleString('pt-BR')}</button></div>`
+      : '<p class="hint">O Mestre de Classe, na Vila, vende o Selo de Reespecialização.</p>';
     const cards = Object.entries(list).map(([id, sp]) => `
       <div class="shop-item ${char.spec === id ? 'sel' : ''}"><div class="cell r-epic"><span class="ic">${sp.icon}</span></div>
         <div><div class="nm">${sp.name}${char.spec === id ? ' ✔' : ''}</div><div class="sub">${sp.desc}</div></div>
-        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}">${cost ? COIN + ' ' + cost : 'Escolher'}</button>`}</div>`).join('');
-    return `<h3>Especialização ${char.spec ? `<span class="pts">${specInfo(char.classId, char.spec).name}</span>` : '<span class="pts">escolha uma</span>'}</h3>${cards}`;
+        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}" ${has && !seals ? 'disabled' : ''}>${has ? 'Trocar · 1 Selo' : 'Escolher'}</button>`}</div>`).join('');
+    const rule = has ? `<p class="hint">Trocar consome 1 Selo de Reespecialização. Você tem <b>${seals}</b>.</p>` : '<p class="hint">A primeira escolha é grátis. Trocar depois exige um Selo de Reespecialização.</p>';
+    return `<h3 id="master-section">Especialização ${char.spec ? `<span class="pts">${specInfo(char.classId, char.spec).name}</span>` : '<span class="pts">escolha uma</span>'}</h3>${rule}${cards}${buy}`;
   }
 
   panel_spirits() {
@@ -868,7 +874,7 @@ export class UI {
     }
     if (kind === 'skill') {
       if (arg === 'basic') {
-        const b = CLASSES[char.classId].basic;
+        const b = basicOf(char.classId, activeSpec(char));
         return `<div class="tt-name">Ataque básico</div><div class="tt-sub">Botão esquerdo · segure para atacar</div>
           <div>${b.kind === 'melee' ? 'Golpe corpo a corpo em arco' : 'Projétil à distância'} · ${Math.round(b.mult * 100)}% do poder</div>`;
       }

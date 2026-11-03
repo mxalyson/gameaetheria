@@ -1,6 +1,6 @@
 // IA produz as mesmas "intenções" que o input do jogador.
 import { CLASSES } from '../data/classes.js';
-import { skillOf } from '../core/specs.js';
+import { skillOf, basicOf } from '../core/specs.js';
 import { MOBS, BOSS_PHASES } from '../data/mobs.js';
 import { isSkillUnlocked, skillIdAt } from '../core/unlocks.js';
 import { riverX } from './layout.js';
@@ -133,7 +133,7 @@ export function rivalIntent(r, w, dt) {
   const tgt = w.nearestEnemy(r);
   if (!tgt) return null;
   const cls = CLASSES[r.classId];
-  const melee = cls.basic.kind === 'melee';
+  const basic = basicOf(r.classId, r.spec), melee = basic.kind === 'melee';
   const dx = tgt.x - r.x, dy = tgt.y - r.y, d = Math.hypot(dx, dy) || 1;
   const nx = dx / d, ny = dy / d;
 
@@ -169,12 +169,12 @@ export function rivalIntent(r, w, dt) {
   let lead = 0;
   if (!melee) {
     const sk = ai.cast ? skillOf(r.classId, r.spec, skillIdAt(r.classId, ai.cast.idx)) : null;
-    const sp = sk ? (sk.kind === 'projectile' ? sk.speed : 0) : cls.basic.speed;
+    const sp = sk ? (sk.kind === 'projectile' ? sk.speed : 0) : basic.speed;
     if (sp) lead = Math.min(0.9, d / sp) * LEAD;
   }
   const it = {
     mx, my, aimX: tgt.x + ai.vx * lead + ai.jx, aimY: tgt.y + ai.vy * lead + ai.jy, cast: null,
-    attack: d <= (melee ? cls.basic.range + tgt.r : cls.basic.range * 0.95),
+    attack: d <= (melee ? basic.range + tgt.r : basic.range * 0.95),
   };
   if (ai.cast) {
     it.cast = ai.cast.idx;

@@ -13,7 +13,7 @@ import { generateRivalForPower } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
 import { MODES, newMatch, controlTick, matchWinner, getRating, setRating, spawnSlots } from './core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from './core/power.js';
-import { chooseSpec, specInfo, activeSpec } from './core/specs.js';
+import { chooseSpec, buySeal, specInfo, activeSpec, needsSeal, sealsOf, SEAL_PRICE } from './core/specs.js';
 import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.js';
 import { cleanName } from './core/savedoc.js';
 import { apiUrl, Online, CloudSave } from './online.js';
@@ -21,7 +21,7 @@ import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
 import { decodeLook } from './core/aura.js';
 import { noticeText } from './ui/ui.js';
-import { skillOf } from './core/specs.js';
+import { skillOf, basicOf } from './core/specs.js';
 import { SKILLS } from './data/skills.js';
 import { newlyUnlocked, masteryUnlock } from './core/unlocks.js';
 import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
@@ -212,6 +212,7 @@ class Game {
       case 'craft-echo': this.craftEcho(arg); break;
       case 'alloc': this.alloc(arg); break;
       case 'spec': this.pickSpec(arg); break;
+      case 'buy-seal': this.buySealAsk(); break;
       case 'sort-inv': this.sortInventory(); break;
       case 'pref': this.setPref(arg); break;
       case 'fullscreen': this.toggleFullscreen(); document.getElementById('menu-btns')?.classList.remove('open'); break;
@@ -641,7 +642,7 @@ class Game {
       case 'swing': {
         if (!a) break;
         a.swing = 0.25;
-        const b = a.kind === 'mob' ? null : CLASSES[a.classId]?.basic;
+        const b = a.kind === 'mob' || !CLASSES[a.classId] ? null : basicOf(a.classId, a.spec);
         if (!b) break;
         if (b.kind === 'melee') w.addFx({ type: 'slash', x: a.x, y: a.y, ang: e.ang ?? a.facing, arc: b.arc, r: b.range, t: 0, life: 0.2, color: b.color });
         else this.netShoot(a, e.ang ?? a.facing, b);
@@ -896,6 +897,7 @@ class Game {
     p.maxHp = st.maxHp;
     p.hp = Math.max(1, Math.round(st.maxHp * ratio));
     p.level = this.char.level;
+    p.spec = activeSpec(this.char); // a especialização também mexe nos atributos (data/specs.js › mods)
     p.mastery = hasMastery(this.char); // a Maestria libera a 4ª habilidade (s3)
   }
 
@@ -1453,12 +1455,37 @@ class Game {
   pickSpec(id) {
     if (this.inNetZone()) return this.ui.toast('Na exploração online', 'Escolher especialização só na Vila.', '');
     if (this.mode === 'pvp') return this.ui.log('Não dá para trocar de especialização durante uma partida.', '#ffb4a8');
+    const info = specInfo(this.char.classId, id);
+    if (!info) return;
+    if (!needsSeal(this.char)) return this.applySpec(id); // primeira escolha: grátis, sem confirmação
+    if (sealsOf(this.char) < 1) return this.ui.toast('Selo necessário', 'Trocar de especialização exige um Selo de Reespecialização. O Mestre de Classe, na Vila, vende.', '');
+    this.ui.confirm(`Trocar para ${info.name}? Isso consome 1 Selo de Reespecialização (você tem ${sealsOf(this.char)}).`, () => this.applySpec(id), 'Trocar');
+  }
+
+  // Aplica a escolha: online é o servidor quem confere o Selo e grava (tx 'respec'); sem servidor vale a mesma regra localmente (core/specs.js).
+  applySpec(id) {
+    if (this.serverTx({ op: 'respec', id }, () => { this.player.spec = activeSpec(this.char); this.ui.toast('Especialização', specInfo(this.char.classId, id).name, 'gold'); })) return;
     const r = chooseSpec(this.char, id);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
     this.player.spec = activeSpec(this.char);
-    this.ui.toast('Especialização', specInfo(this.char.classId, id).name + (r.cost ? ` · -${r.cost} ouro` : ''), 'gold');
+    this.refreshStats();
+    this.ui.toast('Especialização', specInfo(this.char.classId, id).name + (r.paid ? ' · -1 Selo' : ''), 'gold');
     this.ui.render();
     this.save();
+  }
+
+  // Compra do Selo de Reespecialização no Mestre de Classe (preço fixo em ouro; confirmação do próprio jogo).
+  buySealAsk() {
+    const c = this.char;
+    if (c.gold < SEAL_PRICE) return this.ui.toast('Ouro insuficiente', `O Selo custa ${SEAL_PRICE.toLocaleString('pt-BR')} de ouro.`, '');
+    this.ui.confirm(`Comprar 1 Selo de Reespecialização por ${SEAL_PRICE.toLocaleString('pt-BR')} de ouro?`, () => {
+      if (this.serverTx({ op: 'respec_buy' }, () => this.ui.toast('Selo comprado', 'Use-o para trocar de especialização.', 'gold'))) return;
+      const r = buySeal(this.char);
+      if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
+      this.ui.toast('Selo comprado', `-${r.price.toLocaleString('pt-BR')} ouro`, 'gold');
+      this.ui.render();
+      this.save();
+    }, 'Comprar');
   }
 
   // arg: 'str', ou 'str:5' / 'str:max' (toque: botões +1, +5 e Máx; o Shift do teclado ainda dá +5)

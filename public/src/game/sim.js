@@ -6,7 +6,7 @@ import { computeHit } from '../core/combat.js';
 import { computeStats, hasMastery } from '../core/stats.js';
 import { spiritPower } from '../core/progression.js';
 import { CLASSES } from '../data/classes.js';
-import { skillOf, activeSpec } from '../core/specs.js';
+import { skillOf, activeSpec, basicOf, lowHpBonus } from '../core/specs.js';
 import { MOBS, MOB_CURVE, LEVEL_GAP, BOSS_SPAWN, BOSS_REPEAT, CAMP_RESPAWN } from '../data/mobs.js';
 import { isSkillUnlocked, skillIdAt } from '../core/unlocks.js';
 import { ZONES } from '../data/zones.js';
@@ -432,7 +432,7 @@ export class World {
 
   // ---------- ataques ----------
   basicSpec(a) {
-    if (a.kind !== 'mob') return CLASSES[a.classId].basic;
+    if (a.kind !== 'mob') return a.spec ? basicOf(a.classId, a.spec) : CLASSES[a.classId].basic; // com os ajustes da especialização (Franco-atirador/Pistoleiro)
     const m = MOBS[a.mobId];
     return m.kind === 'ranged'
       ? { kind: 'projectile', speed: m.projSpeed, range: m.range + 60, cd: m.cd, mult: 1, color: m.projColor, radius: a.boss ? 10 : 6 }
@@ -466,7 +466,7 @@ export class World {
       vx: Math.cos(ang) * spec.speed, vy: Math.sin(ang) * spec.speed, ang,
       team: a.team, src: a, mult: spec.mult, radius: spec.radius ?? 6, color: spec.color ?? '#fff',
       range: spec.range ?? 500, traveled: 0, pierce: !!spec.pierce, explode: spec.explode ?? 0,
-      stun: spec.stun ?? 0, hit: new Set(), dead: false, only: spec.only ?? null, // only: acerta só este alvo (tiro de spirit não machuca quem está no caminho)
+      stun: spec.stun ?? 0, burn: spec.burn ?? null, hit: new Set(), dead: false, only: spec.only ?? null, // only: acerta só este alvo (tiro de spirit não machuca quem está no caminho)
     });
   }
 
@@ -488,7 +488,7 @@ export class World {
       case 'aoe_self':
         this.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius, color: s.color, t: 0, life: 0.45 });
         for (const e of this.enemiesOf(a)) {
-          if (Math.hypot(e.x - a.x, e.y - a.y) <= s.radius + e.r) this.damage(a, e, s.mult, { slow: s.slow, slowDur: s.slowDur });
+          if (Math.hypot(e.x - a.x, e.y - a.y) <= s.radius + e.r) { this.damage(a, e, s.mult, { slow: s.slow, slowDur: s.slowDur, stun: s.stun }); if (s.burn) this.applyBurn(a, e, s.burn); }
         }
         if (s.heal) {
           this.heal(a, a.maxHp * s.heal);
@@ -498,6 +498,10 @@ export class World {
         break;
       case 'dash':
         a.dash = { vx: cos * s.speed, vy: sin * s.speed, t: s.dist / s.speed, mult: s.mult, stun: s.stun, hit: new Set(), invuln: !!s.invuln, color: s.color, slam: s.slam ?? null };
+        if (s.aegis) for (const al of this.alliesOf(a, s.aegis.range)) { // Investida do Paladino: escudo curto para aliados por perto
+          al.shield = Math.max(al.shield, al.maxHp * s.aegis.shield); al.shieldT = Math.max(al.shieldT, 4);
+          this.events.push({ type: 'status', actor: al, kind: 'shield', dur: 4, skill: id, from: a, t: this.time });
+        }
         if (s.buff) { // Fúria do Colosso: o reforço de dano dura desde o lançamento
           a.buffs.push({ id, t: s.dur, ...s.buff });
           this.events.push({ type: 'status', actor: a, kind: 'buff', dur: s.dur, skill: id, t: this.time });
@@ -528,6 +532,10 @@ export class World {
         a.buffs.push({ id, t: s.dur, ...s.buff });
         if (s.buff.shieldPct) { a.shield = a.maxHp * s.buff.shieldPct; a.shieldT = s.dur; }
         this.events.push({ type: 'status', actor: a, kind: s.buff.shieldPct ? 'shield' : 'buff', dur: s.dur, skill: id, t: this.time });
+        if (s.allyBuff) for (const al of this.alliesOf(a, s.allyBuff)) { // Grito do Paladino: o reforço também vale para aliados por perto
+          al.buffs.push({ id, t: s.dur, ...s.buff });
+          this.events.push({ type: 'status', actor: al, kind: 'buff', dur: s.dur, skill: id, from: a, t: this.time });
+        }
         if (s.allyShield) {
           let best = null, bd = s.allyRange;
           for (const al of this.alliesOf(a, s.allyRange)) { const d = Math.hypot(al.x - a.x, al.y - a.y); if (d <= bd) { bd = d; best = al; } }
@@ -541,7 +549,9 @@ export class World {
         this.burst(a.x, a.y, s.color, 16, 120);
         break;
       case 'projectile':
-        this.spawnProjectile(a, ang, s);
+        if (s.volley > 1) { // rajada em leque (Pistoleiro)
+          for (let i = 0; i < s.volley; i++) this.spawnProjectile(a, ang + (i - (s.volley - 1) / 2) * (s.spread ?? 0.15), s);
+        } else this.spawnProjectile(a, ang, s);
         break;
       case 'ground_aoe': {
         const d = Math.min(s.range, Math.hypot(ax - a.x, ay - a.y));
@@ -611,7 +621,7 @@ export class World {
       blocked = true;
     }
     const res = computeHit(this.rng,
-      { power: src.stats.power, crit: src.stats.crit, critMult: src.stats.critMult, dmgBonus: this.buffVal(src, 'dmg') },
+      { power: src.stats.power, crit: src.stats.crit, critMult: src.stats.critMult, dmgBonus: this.buffVal(src, 'dmg') + lowHpBonus(src) },
       { def: t.stats.def, dr: this.buffVal(t, 'dr') }, mult);
     let amt = res.amount;
     if (t.shield > 0) { const ab = Math.min(t.shield, amt); t.shield -= ab; amt -= ab; }
@@ -681,6 +691,7 @@ export class World {
           p.hit.add(e.id);
           if (p.explode) { done = true; break; }
           this.damage(p.src, e, p.mult, { stun: p.stun });
+          if (p.burn) this.applyBurn(p.src, e, p.burn);
           if (!p.pierce) done = true;
         }
       }
@@ -703,8 +714,15 @@ export class World {
     this.burst(p.x, p.y, p.color, 24, 240);
     for (const e of this.actors) {
       if (e.dead || e.untargetable || e.team === p.team) continue;
-      if (Math.hypot(e.x - p.x, e.y - p.y) <= p.explode + e.r) this.damage(p.src, e, p.mult);
+      if (Math.hypot(e.x - p.x, e.y - p.y) <= p.explode + e.r) { this.damage(p.src, e, p.mult); if (p.burn) this.applyBurn(p.src, e, p.burn); }
     }
+  }
+
+  // Dano periódico (queimadura/veneno): renova, não acumula; o mesmo estado do Meteoro Arcano (`a.burn`).
+  applyBurn(src, e, burn) {
+    if (e.dead || e.untargetable) return;
+    e.burn = { t: burn.dur, every: burn.every, next: burn.every, mult: burn.mult, src };
+    this.events.push({ type: 'status', actor: e, kind: 'burn', dur: burn.dur, t: this.time });
   }
 
   updateAreas(dt) {

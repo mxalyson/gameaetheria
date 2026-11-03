@@ -8,6 +8,7 @@ import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, PVE_SE
 import { RARITY, AFFIXES, SHIELD_BLOCK } from '../public/src/data/items.js';
 import { xpToNext } from '../public/src/core/progression.js';
 import { PRICES } from '../public/src/shop.js';
+import { SPECS, SPEC_LEVEL, SPEC_ALIASES } from '../public/src/data/specs.js';
 
 // itemSlack: folga sobre o máximo que o gerador (core/loot.js) consegue sortear; itemLevelAhead: quantos níveis acima do herói um drop pode vir (chefes/zonas mais fortes).
 export const LIMITS = { levelJump: 2, goldBase: 5000, goldPerLevel: 800, newItems: 12, potions: 25, spirits: 3, waves: 6, statJump: 400, skillUsesJump: 1500, newQuests: 3, doneQuests: 3, newChests: 6, plusJump: 10, itemSlack: 1.15, itemLevelAhead: 10, xpPerKillMul: 3, xpFreeLevels: 1.5 };
@@ -95,6 +96,12 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   if (neu.name !== old.name) return { ok: false, reason: 'name_changed' };
   if (neu.created !== old.created) return { ok: false, reason: 'created_changed' };
   if (opts.strictPve) { const bad = pveProblem(old, neu); if (bad) return { ok: false, reason: bad }; }
+  // Especialização: a 1ª escolha (de nada para uma válida) é grátis e pode vir no salvamento; qualquer TROCA exige o Selo e só acontece pela transação `respec` (server/tx.js)
+  const specOf = (d) => SPEC_ALIASES[d.spec] ?? d.spec ?? null, oldSpec = specOf(old), neuSpec = specOf(neu);
+  if (neuSpec !== oldSpec) {
+    const okFirst = !oldSpec && SPECS[neu.classId]?.[neuSpec] && neu.level >= SPEC_LEVEL && neu.quests?.done?.prova_do_mestre != null;
+    if (!okFirst) return { ok: false, reason: 'spec_forged' };
+  }
   if (neu.level < old.level) return { ok: false, reason: 'level_decreased' };
   if (neu.level > old.level + LIMITS.levelJump) return { ok: false, reason: 'level_jump' };
   if (neu.gold - old.gold > LIMITS.goldBase + LIMITS.goldPerLevel * neu.level) return { ok: false, reason: 'gold_jump' };
@@ -191,7 +198,9 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   else if (nd && od && nd.day === od.day) daily = { day: nd.day, p: { ...nd.p }, done: { ...nd.done, ...od.done } };
   // Cripta dos Ecos: fragmentos, chaves e o instante da última entrada são do servidor (só caem; a entrada nunca volta no tempo)
   const echo = { frags: Math.min(neu.echo?.frags ?? 0, old.echo?.frags ?? 0), keys: Math.min(neu.echo?.keys ?? 0, old.echo?.keys ?? 0), entry: Math.max(neu.echo?.entry ?? 0, old.echo?.entry ?? 0) };
-  const out = { ...neu, echo, ...(daily ? { daily } : {}), arena, stats, quests, chests, scrolls, visited: { ...(old.visited ?? {}) }, pity, achievements: { ...old.achievements } };
+  // Selos e contagem de trocas são do servidor: só a transação (respec_buy/respec) mexe; o cliente nunca ganha Selo
+  const seals = Math.min(neu.seals ?? 0, old.seals ?? 0), specChanges = old.specChanges ?? 0;
+  const out = { ...neu, seals, specChanges, echo, ...(daily ? { daily } : {}), arena, stats, quests, chests, scrolls, visited: { ...(old.visited ?? {}) }, pity, achievements: { ...old.achievements } };
   checkAchievements(out, now); // as conquistas são recalculadas aqui: o cliente não "se concede" nenhuma
   out.title = out.title && out.achievements[out.title] != null ? out.title : null;
   return { ok: true, doc: out };

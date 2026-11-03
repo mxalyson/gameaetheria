@@ -84,3 +84,36 @@ test('API: createApi({ strictPve }) recusa o PUT com ganho de PvE (422 implausib
     await new Promise((res) => srv.close(res));
   }
 });
+
+test('especialização: o cliente não troca de graça nem forja Selo (modo normal e estrito); a primeira escolha passa', () => {
+  const old = base(); old.level = 20; old.quests.done.prova_do_mestre = 1;
+  const first = structuredClone(old); first.spec = 'paladin';
+  assert.equal(strict(old, first).ok, true, 'primeira escolha é grátis'); assert.equal(loose(old, first).ok, true);
+  const noProva = structuredClone(first); noProva.quests.done = {};
+  assert.equal(loose(old, noProva).ok, false);
+  const wrong = structuredClone(old); wrong.spec = 'sniper'; // de outra classe
+  assert.equal(strict(old, wrong).reason, 'spec_forged');
+  const has = structuredClone(first);
+  const swap = structuredClone(has); swap.spec = 'berserker';
+  for (const f of [strict, loose]) { const r = f(has, swap); assert.equal(r.ok, false); assert.equal(r.reason, 'spec_forged'); }
+  const swapSeal = structuredClone(swap); swapSeal.seals = 1; // forjar o Selo junto não adianta
+  assert.equal(strict(has, swapSeal).reason, 'spec_forged');
+  const unspec = structuredClone(has); unspec.spec = null; assert.equal(loose(has, unspec).reason, 'spec_forged');
+  const sealOnly = structuredClone(has); sealOnly.seals = 3; sealOnly.specChanges = 9;
+  const kept = loose(has, sealOnly);
+  assert.equal(kept.ok, true); assert.equal(kept.doc.seals, 0, 'Selo é do servidor'); assert.equal(kept.doc.specChanges, 0);
+  // id antigo no banco x id novo no cliente não é "troca"
+  const legacy = structuredClone(has); legacy.spec = 'bastion';
+  assert.equal(loose(legacy, has).ok, true);
+});
+
+test('especialização: o resultado de respec/respec_buy do servidor é aceito como estado oficial e o save seguinte, igual, passa', () => {
+  const doc = base(); doc.level = 20; doc.gold = 30000; doc.quests.done.prova_do_mestre = 1;
+  const ctx = { rng: makeRng(2), now: Date.now() };
+  let cur = runTx(doc, { op: 'respec', id: 'paladin' }, ctx).doc;
+  cur = runTx(cur, { op: 'respec_buy' }, ctx).doc;
+  const swapped = runTx(cur, { op: 'respec', id: 'berserker' }, ctx).doc;
+  assert.equal(strict(swapped, structuredClone(swapped)).ok, true);
+  const withSeal = runTx(cur, { op: 'respec_buy' }, ctx).doc;
+  assert.equal(strict(cur, withSeal).doc.seals, cur.seals, 'o cliente não ganha Selo sozinho');
+});

@@ -13,7 +13,7 @@ function fullChar(classId = 'mage', level = 16) {
   c.alloc.int = 20; c.statPoints = 5;
   for (let i = 0; i < 5; i++) c.inventory.push(generateItem(rng, level, { classId }));
   const sp = createSpirit(rng, { rarity: 'rare' }); c.spirits.push(sp); c.activeSpirit = sp.id;
-  c.spec = 'pyromancer';
+  c.spec = 'arcane';
   return c;
 }
 const parse = (o) => parseSave(JSON.stringify(o));
@@ -34,7 +34,7 @@ test('ida e volta: exportar e importar preserva o personagem inteiro', () => {
   assert.deepEqual(r.char.equipment, c.equipment);
   assert.deepEqual(r.char.inventory, c.inventory);
   assert.deepEqual(r.char.spirits, c.spirits);
-  assert.equal(r.char.spec, 'pyromancer');
+  assert.equal(r.char.spec, 'arcane');
   assert.equal(r.char.gold, 500); assert.equal(r.char.level, 16); assert.equal(r.char.alloc.int, 20);
   assert.deepEqual(r.warnings, []);
 });
@@ -122,12 +122,12 @@ test('spirits: tipos/raridades inválidos saem e o ativo aponta para um spirit q
 });
 
 test('especialização inválida ou abaixo do nível 15 é removida', () => {
-  const c = fullChar('mage', 12); c.spec = 'pyromancer';
+  const c = fullChar('mage', 12); c.spec = 'arcane';
   assert.equal(parse(c).char.spec, null);
   const d = fullChar('mage', 20); d.spec = 'guardian'; // spec de outra classe
   assert.equal(parse(d).char.spec, null);
-  const e = fullChar('mage', 20); e.spec = 'cryomancer';
-  assert.equal(parse(e).char.spec, 'cryomancer');
+  const e = fullChar('mage', 20); e.spec = 'warlock';
+  assert.equal(parse(e).char.spec, 'warlock');
 });
 
 test('nomes: HTML e símbolos não passam; acentos e espaços sim; sempre há um nome', () => {
@@ -152,4 +152,19 @@ test('validate recusa documento sem classe e não altera o objeto de entrada', (
   const c = fullChar(); const copia = JSON.stringify(c);
   validate(c);
   assert.equal(JSON.stringify(c), copia);
+});
+
+test('especialização: ids antigos migram para os novos e Selos/trocas entram no documento (seals 0..9, specChanges)', () => {
+  const old = { bastion: ['warrior', 'paladin'], executioner: ['warrior', 'berserker'], pyromancer: ['mage', 'arcane'], cryomancer: ['mage', 'warlock'], marksman: ['archer', 'sniper'], hunter: ['archer', 'gunslinger'] };
+  for (const [id, [cls, neu]] of Object.entries(old)) {
+    const c = fullChar(cls, 20); c.spec = id;
+    const r = parse(c);
+    assert.equal(r.char.spec, neu); assert.ok(!r.warnings.some((w) => /especializa/.test(w)));
+  }
+  const c = fullChar('mage', 20); c.seals = 4; c.specChanges = 2;
+  const r = parse(c);
+  assert.equal(r.char.seals, 4); assert.equal(r.char.specChanges, 2);
+  const lost = fullChar('mage', 20); lost.seals = 50; lost.specChanges = -3;
+  assert.equal(parse(lost).char.seals, 9); assert.equal(parse(lost).char.specChanges, 0);
+  assert.equal(parse(fullChar('mage', 20)).char.seals, 0, 'save antigo sem o campo');
 });

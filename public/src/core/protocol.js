@@ -36,6 +36,7 @@ export const TX_OPS = {
   // ganhos que antes eram locais: spirits (libertar/comprar/evoluir), reciclagem, placa de lore; equipamento e atributos (valem também na instância)
   spirit_free: { id: true }, spirit_evolve: { id: true }, buy_essence: { kind: ['essence', 'prism'] }, recycle: { ids: 3 }, lore: { id: true },
   equip: { id: true }, unequip: { slot: true }, alloc: { stat: true, n: [1, 999] }, alloc_auto: {},
+  respec_buy: {}, respec: { id: true }, // Mestre de Classe: comprar o Selo de Reespecialização / escolher ou trocar de especialização (o Selo é conferido e gasto no servidor)
   craft: { id: true }, // forja do Ferreiro: item Eco (fragmentos da Cripta + ouro); id = receita (data/crypt.js ECHO_RECIPES)
 };
 const TX_ID = /^[A-Za-z0-9_:.-]{1,48}$/;

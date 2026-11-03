@@ -4,6 +4,7 @@
 import { viewFromFacing } from './hero-sprites.js';
 import { deathPose } from './hero-death.js';
 import { MOBS } from '../data/mobs.js';
+import { asset } from '../assets-version.js';
 
 const KEY = 'aetheria_monstros';
 const HD = typeof devicePixelRatio === 'number' && devicePixelRatio >= 2.5; // tela 3×: as criaturas são ampliadas pouco, mas lidas de perto; leve realce de nitidez ao carregar
@@ -114,7 +115,10 @@ function load(id) {
 // Retrato do chefe para a barra de vida: recorte do ROSTO/torso da vista frontal (célula 0,0 do atlas) já recolorido pelo mesmo tint() do sprite
 // (it.img é a imagem tingida), clareado e enquadrado pela caixa dos pixels visíveis. Gera um PNG (data URL) uma vez por criatura; null enquanto o atlas não carregou ou sem arte.
 const portraits = new Map();
+// Retratos pintados pelo dono (busto 512×512): substituem o recorte do sprite na barra do chefe.
+const PAINTED_PORTRAIT = { infernoknight: 'assets/portraits/boss-rubro.webp' };
 export function mobPortrait(id) {
+  if (PAINTED_PORTRAIT[id]) return { url: asset(PAINTED_PORTRAIT[id]) };
   if (!mobSpritesEnabled()) return null;
   const it = load(id); if (it.state !== 'ready') return null;
   if (portraits.has(id)) return portraits.get(id);

@@ -925,7 +925,7 @@ test('Mestres de Classe: 4 NPCs lado a lado na Vila; cada um só dá missões e 
 
 test('Prova do Mestre: mini-chefe + 10 usos da habilidade assinatura liberam a especialização (que antes era livre)', () => {
   const c = mkHero('mage', 15); c.gold = 1000;
-  assert.equal(chooseSpec(c, 'pyromancer').ok, false, 'sem a prova não escolhe');
+  assert.equal(chooseSpec(c, 'arcane').ok, false, 'sem a prova não escolhe');
   assert.equal(offeredBy(mkHero('mage', 13), 'master_mage').length, 0, 'nível 14 mínimo');
   assert.ok(acceptQuest(c, 'prova_do_mestre').ok);
   for (let i = 0; i < 20; i++) recordEvent(c, { type: 'skill', skillId: 'frostnova' }); // não é a assinatura
@@ -937,8 +937,8 @@ test('Prova do Mestre: mini-chefe + 10 usos da habilidade assinatura liberam a e
   assert.deepEqual(readyFor(c, 'master_mage'), ['prova_do_mestre']);
   assert.deepEqual(readyFor(c, 'master_warrior'), [], 'outro mestre não recebe');
   assert.ok(turnInQuest(c, 'prova_do_mestre', makeRng(1)).ok);
-  assert.equal(chooseSpec(c, 'pyromancer').ok, true);
-  assert.equal(c.spec, 'pyromancer');
+  assert.equal(chooseSpec(c, 'arcane').ok, true);
+  assert.equal(c.spec, 'arcane');
 });
 
 test('Maestria (nível 25): exige a prova, dá bônus permanente pequeno e o título Mestre', async () => {

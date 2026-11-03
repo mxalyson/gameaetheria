@@ -6,7 +6,7 @@ import { SLOTS, SHIELD_CLASSES, RARITY, WEAPON_TYPES, INVENTORY_SIZE } from '../
 import { SPIRITS, SPIRIT_RARITY_MUL, MAX_SPIRITS } from '../data/spirits.js';
 import { MAX_PLUS } from './enhance.js';
 import { MAX_LEVEL, POINTS_PER_LEVEL, SAVE_VERSION } from './progression.js';
-import { SPECS, SPEC_LEVEL } from '../data/specs.js';
+import { SPECS, SPEC_LEVEL, SPEC_ALIASES, SEAL_MAX } from '../data/specs.js';
 import { QUESTS } from '../data/quests.js';
 import { ZONES } from '../data/zones.js';
 import { BANK_SIZE } from './bank.js';
@@ -156,7 +156,8 @@ export function validate(doc) {
   const a = isObj(doc.arena) ? doc.arena : {};
   const ratings = {};
   for (const m of ['2v2', '4v4']) if (isObj(a.ratings) && a.ratings[m] != null) ratings[m] = int(a.ratings[m], 0, 5000, 1000);
-  const spec = doc.spec && SPECS[doc.classId]?.[doc.spec] && level >= SPEC_LEVEL ? doc.spec : null;
+  const specIn = SPEC_ALIASES[doc.spec] ?? doc.spec; // ids antigos (Bastião, Carrasco, Piromante...) migram para os atuais
+  const spec = specIn && SPECS[doc.classId]?.[specIn] && level >= SPEC_LEVEL ? specIn : null;
   if (doc.spec && !spec) warnings.push('especialização inválida removida');
 
   // ---- diário (v3): tudo é reconstruído a partir de listas brancas ----
@@ -190,6 +191,7 @@ export function validate(doc) {
   const char = {
     version: SAVE_VERSION, visited, name: cleanName(doc.name), quests, stats, achievements, title, chests, daily, classId: doc.classId, level,
     xp: int(doc.xp, 0, 1e9, 0), statPoints, alloc,
+    seals: int(doc.seals, 0, SEAL_MAX, 0), specChanges: int(doc.specChanges, 0, 9999, 0), // Selos de Reespecialização e trocas pagas (histórico)
     gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0), scrolls: int(doc.scrolls, 0, 99, 0),
     equipment, inventory, bank, spirits, activeSpirit, spec,
     arena: { rating: int(a.rating, 0, 5000, 1000), wins: int(a.wins, 0, 1e6, 0), losses: int(a.losses, 0, 1e6, 0), bestWave: int(a.bestWave, 0, 1e4, 0), ratings },

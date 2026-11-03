@@ -3,17 +3,18 @@
 import { SPECS } from '../data/specs.js';
 
 // Ordem FIXA (o código de rede depende dela): só acrescentar no fim.
-export const SPEC_ORDER = ['bastion', 'executioner', 'pyromancer', 'cryomancer', 'marksman', 'hunter', 'guardian', 'inquisitor'];
+// (códigos 1..8 mantidos ao trocar os ids: bastion->paladin, executioner->berserker, pyromancer->arcane, cryomancer->warlock, marksman->sniper, hunter->gunslinger.)
+export const SPEC_ORDER = ['paladin', 'berserker', 'arcane', 'warlock', 'sniper', 'gunslinger', 'guardian', 'inquisitor'];
 
 // kind = formato da partícula; ring = anéis lentos no chão; n = partículas no tier 1 (o tier 2 usa menos e mais finas).
 // c = cor principal; c2 = cor de realce; t2 = assinatura do tier 2 (prata/branco quente, mais fina e discreta).
 export const AURA_STYLES = {
-  bastion:     { c: '#e0b84a', c2: '#aeb9c8', kind: 'spark',   ring: true,  n: 5, rise: 0.4, t2: { c: '#f3dc9a', c2: '#ffffff' } },
-  executioner: { c: '#d8322a', c2: '#ff9a50', kind: 'ember',   ring: false, n: 7, rise: 1.0, t2: { c: '#ff6a5a', c2: '#ffe2d0' } },
-  pyromancer:  { c: '#ff8a1e', c2: '#ffd35a', kind: 'spark',   ring: false, n: 7, rise: 0.9, t2: { c: '#ffb04a', c2: '#fff2c8' } },
-  cryomancer:  { c: '#6cc8ff', c2: '#e6f8ff', kind: 'crystal', ring: false, n: 5, rise: 0.5, t2: { c: '#a8e4ff', c2: '#ffffff' } },
-  marksman:    { c: '#3fd3b0', c2: '#d4fff3', kind: 'spark',   ring: true,  n: 4, rise: 0.6, t2: { c: '#8ff0d8', c2: '#ffffff' } },
-  hunter:      { c: '#7bc84a', c2: '#d8f2a0', kind: 'leaf',    ring: false, n: 6, rise: 0.5, t2: { c: '#b0e07c', c2: '#f6ffe0' } },
+  paladin:     { c: '#e0b84a', c2: '#bcd2ff', kind: 'spark',   ring: true,  n: 5, rise: 0.4, t2: { c: '#f3dc9a', c2: '#ffffff' } }, // ouro e azul-prata: escudo sagrado
+  berserker:   { c: '#d8322a', c2: '#ff9a50', kind: 'ember',   ring: false, n: 7, rise: 1.0, t2: { c: '#ff6a5a', c2: '#ffe2d0' } },
+  arcane:      { c: '#7f8bff', c2: '#e3dcff', kind: 'crystal', ring: true,  n: 5, rise: 0.6, t2: { c: '#b4bcff', c2: '#ffffff' } }, // cristais violeta-azulados e anel arcano
+  warlock:     { c: '#7fd44a', c2: '#d6ff9a', kind: 'ember',   ring: false, n: 7, rise: 0.8, t2: { c: '#aae878', c2: '#f0ffd8' } }, // brasas verde-veneno subindo
+  sniper:      { c: '#3fd3b0', c2: '#d4fff3', kind: 'spark',   ring: true,  n: 4, rise: 0.6, t2: { c: '#8ff0d8', c2: '#ffffff' } },
+  gunslinger:  { c: '#ffae3d', c2: '#fff0b8', kind: 'spark',   ring: false, n: 6, rise: 0.9, t2: { c: '#ffc977', c2: '#fffbe8' } }, // faíscas de latão: disparos rápidos
   guardian:    { c: '#fff1b8', c2: '#ffd36a', kind: 'spark',   ring: true,  n: 5, rise: 0.7, t2: { c: '#fffbe6', c2: '#ffffff' } },
   inquisitor:  { c: '#b070ff', c2: '#ffe08a', kind: 'rune',    ring: true,  n: 5, rise: 0.6, t2: { c: '#d4aaff', c2: '#fff4d0' } },
 };

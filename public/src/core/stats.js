@@ -1,6 +1,7 @@
 import { CLASSES, STAT_KEYS } from '../data/classes.js';
 import { SLOTS, WEAPON_TYPES, RARITY, SHIELD_CLASSES } from '../data/items.js';
 import { plusMul } from './enhance.js';
+import { SPECS, SPEC_LEVEL } from '../data/specs.js';
 
 export function gearTotals(equipment) {
   const t = {};
@@ -38,7 +39,7 @@ export function computeStats(char) {
   const cls = CLASSES[char.classId];
   const g = gearTotals(char.equipment);
   const p = primaryStats(char);
-  return {
+  const out = {
     ...p,
     maxHp: Math.round(cls.hpBase + p.vit * 12 + (char.level - 1) * 8 + Math.max(0, char.level - 4) * 12 + rookieHp(char.level, cls.rookie) + (g.hp ?? 0)),
     power: Math.round((g.atk ?? 4) + p[cls.primary] * 2.2 + char.level * 1.5 + rookiePower(char.level, cls.rookie)),
@@ -50,6 +51,19 @@ export function computeStats(char) {
     lifesteal: Math.min(15, g.lifesteal ?? 0) / 100,
     block: char.equipment?.offhand && SHIELD_CLASSES.includes(char.classId) ? Math.min(60, g.block ?? 0) : 0, // % de chance de bloqueio (core/block.js); só o escudo dá
   };
+  // Especialização (nível 15): ajustes de atributos de combate (data/specs.js › mods.stats); sem especialização nada muda
+  const sm = char.level >= SPEC_LEVEL ? SPECS[char.classId]?.[char.spec]?.mods?.stats : null;
+  if (sm) {
+    if (sm.hpMul) out.maxHp = Math.round(out.maxHp * sm.hpMul);
+    if (sm.powerMul) out.power = Math.round(out.power * sm.powerMul);
+    if (sm.defMul) out.def = Math.round(out.def * sm.defMul);
+    if (sm.critAdd) out.crit = Math.min(70, out.crit + sm.critAdd);
+    if (sm.critMultAdd) out.critMult = Math.round((out.critMult + sm.critMultAdd) * 100) / 100;
+    if (sm.lifesteal) out.lifesteal += sm.lifesteal;
+    if (sm.block && out.block > 0) out.block = Math.min(60, out.block + sm.block); // só quem tem escudo bloqueia
+    if (sm.moveMul) out.moveSpeed *= sm.moveMul;
+  }
+  return out;
 }
 
 // Classe dona do item: `classId` do item; arma antiga sem o campo usa a do tipo de arma. Item antigo SEM classe (armadura/joia genérica de
