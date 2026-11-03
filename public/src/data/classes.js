@@ -9,7 +9,7 @@ export const CLASSES = {
     primary: 'str', base: { str: 9, agi: 4, int: 2, vit: 9 }, growth: { str: 3.0, agi: 1, int: 0, vit: 3.2 },
     hpBase: 180, weapon: 'sword',
     basic: { kind: 'melee', range: 74, arc: 1.8, cd: 0.5, mult: 1.05, color: '#ffe1d0' },
-    skills: ['whirlwind', 'charge', 'warcry'],
+    skills: ['whirlwind', 'charge', 'warcry'], mastery: 'colossus', // mastery = 4ª habilidade (slot s3), liberada pela Maestria
   },
   mage: {
     id: 'mage', name: 'Mago', icon: '🔮', color: '#6a7cf0', accent: '#d5dbff',
@@ -17,7 +17,7 @@ export const CLASSES = {
     primary: 'int', base: { str: 2, agi: 4, int: 10, vit: 6 }, growth: { str: 0, agi: 1, int: 2.65, vit: 1.9 },
     hpBase: 110, weapon: 'staff',
     basic: { kind: 'projectile', speed: 480, range: 520, cd: 0.7, mult: 1.0, color: '#a9b8ff', radius: 7 },
-    skills: ['fireball', 'frostnova', 'blink'],
+    skills: ['fireball', 'frostnova', 'blink'], mastery: 'meteor',
   },
   archer: {
     id: 'archer', name: 'Arqueiro', icon: '🏹', color: '#4fae7a', accent: '#d6f2c2',
@@ -25,7 +25,7 @@ export const CLASSES = {
     primary: 'agi', base: { str: 3, agi: 10, int: 3, vit: 6 }, growth: { str: 0, agi: 1.6, int: 0, vit: 1.2 },
     hpBase: 80, weapon: 'bow',
     basic: { kind: 'projectile', speed: 700, range: 560, cd: 0.5, mult: 0.7, color: '#eaffc0', radius: 4 },
-    skills: ['rain', 'pierce', 'roll'],
+    skills: ['rain', 'pierce', 'roll'], mastery: 'arrowstorm',
   },
   cleric: {
     id: 'cleric', name: 'Clérigo', icon: '✨', color: '#e8c25a', accent: '#fff4cf',
@@ -33,6 +33,6 @@ export const CLASSES = {
     primary: 'int', base: { str: 5, agi: 3, int: 7, vit: 9 }, growth: { str: 1, agi: 0, int: 3.4, vit: 2.8 },
     hpBase: 150, weapon: 'mace', rookie: 3, // reforço de iniciante (core/stats.js): ataque lento e sem escudo antes do nível 5; some até o nível 10
     basic: { kind: 'melee', range: 68, arc: 1.5, cd: 0.65, mult: 1.1, color: '#fff3b0' },
-    skills: ['holylight', 'divineshield', 'judgement'],
+    skills: ['holylight', 'divineshield', 'judgement'], mastery: 'intervention',
   },
 };

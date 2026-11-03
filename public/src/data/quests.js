@@ -62,7 +62,7 @@ export const QUESTS = {
   },
   ruinas_sombrias: {
     id: 'ruinas_sombrias', name: 'Sombras nas Ruínas', giver: 'guard', level: 12, after: 'coracao_de_cristal',
-    text: { offer: 'Espectros vindos das Ruínas Sombrias rondam a estrada. Vá até lá e abata quinze deles e de seus aliados.', progress: 'As Ruínas Sombrias ficam além da Planície de Cristal.', done: 'As ruínas ficaram quietas. Os espectros usavam armaduras de guardas antigos. Alguém os pôs ali de vigia e esqueceu de mandá-los parar.' },
+    text: { offer: 'Espectros vindos das Ruínas Sombrias rondam a estrada. Vá até lá e abata quinze deles e de seus aliados.', progress: 'As Ruínas Sombrias ficam depois do Porto de Marfim, a leste da Planície de Cristal.', done: 'As ruínas ficaram quietas. Os espectros usavam armaduras de guardas antigos. Alguém os pôs ali de vigia e esqueceu de mandá-los parar.' },
     objectives: [{ type: 'kill', mob: 'any', zone: 'ruins', count: 15, label: 'Derrote 15 criaturas das Ruínas Sombrias' }],
     reward: { gold: 600, xp: 3500 },
   },
@@ -125,8 +125,8 @@ export const QUESTS = {
   ecos_unidos: {
     id: 'ecos_unidos', name: 'Os Ecos Unidos', giver: 'sage', level: 30, after: 'cavaleiro_rubro',
     text: {
-      offer: 'Três guardiões e dois reflexos: o gelo e a brasa foram o eco tentando se juntar de novo. Hoje todos repousam. Evolua um spirit e volte: quero lhe mostrar o que sobrou.',
-      progress: 'Evolua um spirit (abra 🔮; ele precisa do nível 10) e volte a mim. O último capítulo espera.',
+      offer: 'Três guardiões e dois reflexos: o gelo e a brasa foram o eco tentando se juntar de novo. Hoje todos repousam. Evolua um spirit (cada elemento tem uma missão minha) e volte: quero lhe mostrar o que sobrou.',
+      progress: 'Evolua um spirit e volte a mim: peça a missão do elemento dele a mim mesma, cumpra-a e use Evoluir no painel de Spirits. O último capítulo espera.',
       done: ['Aqui jaz o primeiro eco, inteiro de novo. A vila dorme; os spirits ao seu lado carregam um pouco dele.', 'Você era o último capítulo, herói. A partir de hoje, o eco tem voz, e é a sua.', 'Mas toda estrada tem outra volta. Ouça: já há um novo sussurro na neve.'],
     },
     objectives: [{ type: 'level', count: 30, label: 'Alcance o nível 30' }, { type: 'spiritStage', count: 1, label: 'Tenha 1 spirit evoluído (forma 2)' }],
@@ -146,9 +146,9 @@ Object.assign(QUESTS, {
   },
   maestria: {
     id: 'maestria', name: 'Maestria', giver: 'master', level: 25, after: 'prova_do_mestre',
-    text: { offer: 'Poucos chegam até aqui. Domínio de verdade é repetição sem pressa: derrube três chefes e use suas habilidades cinquenta vezes. Entrego o que merece quem o faz.', progress: 'Três chefes e cinquenta habilidades. A maestria não tem pressa.', done: 'Mestre, então. Este vigor é seu para sempre, e o título também. Use-os bem.' },
+    text: { offer: 'Poucos chegam até aqui. Domínio de verdade é repetição sem pressa: derrube três chefes e use suas habilidades cinquenta vezes. Entrego o que merece quem o faz.', progress: 'Três chefes e cinquenta habilidades. A maestria não tem pressa.', done: 'Mestre, então. Este vigor é seu para sempre, e o título também. E há mais: ensino-lhe agora a técnica final da sua classe, no quarto botão. Gaste-a com sabedoria.' },
     objectives: [{ type: 'boss', mob: 'any', count: 3, label: 'Derrote 3 chefes' }, { type: 'skillUse', skill: 'any', count: 50, label: 'Use habilidades 50 vezes' }],
-    reward: { gold: 2000, xp: 12000, items: [{ rarity: 'epic' }] }, // + bônus permanente de maestria (core/stats.js MASTERY) e o título
+    reward: { gold: 2000, xp: 12000, items: [{ rarity: 'epic' }] }, // + bônus permanente de maestria (core/stats.js MASTERY), o título e a 4ª habilidade (slot s3, core/unlocks.js)
   },
 });
 
@@ -173,6 +173,41 @@ for (const [type, name, element, key, line] of EVO) {
     reward: { gold: 300, xp: 1500 },
   };
 }
+// ---- Porto de Marfim (hub entre a Planície e as Ruínas): Capitã Maré, Bartolomeu e Kael. Objetivos novos: bank (guardar item), daily (entregar contrato),
+// friendlyDuel (vencer duelo amistoso; só offline, ver core/journal.js OFFLINE_TYPES). ----
+Object.assign(QUESTS, {
+  porto_chegada: {
+    id: 'porto_chegada', name: 'Cofre de Marfim', giver: 'captain', level: 10, after: null,
+    text: { offer: 'Você chegou ao Porto, e carregando metade de uma loja nas costas. Fale com o banqueiro Octávio e guarde um item no cofre. Mochila leve, passo leve.', progress: 'Octávio fica perto da praça. Entregue um item a ele e volte.', done: 'Cofre aberto, mochila respirando. Assim se faz, marujo. O porto é seu.' },
+    objectives: [{ type: 'bank', count: 1, label: 'Guarde 1 item no banco do Porto' }],
+    reward: { gold: 150, xp: 900, potions: 2 },
+  },
+  porto_contrato: {
+    id: 'porto_contrato', name: 'Palavra de Contrato', giver: 'captain', level: 10, after: 'porto_chegada',
+    text: { offer: 'Vesna pendura contratos no quadro toda manhã. Cumpra um e entregue a ela. Quem paga em dia, navega em paz.', progress: 'O Quadro de Contratos fica com a Mestra de Caça Vesna. Cumpra um contrato e entregue.', done: 'Contrato entregue, nome limpo no cais. Volte quando quiser mais trabalho.' },
+    objectives: [{ type: 'daily', count: 1, label: 'Entregue 1 contrato do Quadro' }],
+    reward: { gold: 250, xp: 1400, potions: 2 },
+  },
+  porto_carga: {
+    id: 'porto_carga', name: 'Cargas Perdidas', giver: 'captain', level: 12, after: 'porto_chegada',
+    text: { offer: 'Três carroças sumiram na estrada: duas na Planície, uma nas Ruínas. Algo carrega as caixas embora. Derrote oito criaturas na Planície e sete nas Ruínas, e as cargas voltam para o cais.', progress: 'Oito criaturas na Planície de Cristal e sete nas Ruínas Sombrias. O porto fica no meio das duas.', done: 'Caixas de volta ao cais, só um pouco mordidas. Você ganhou o seu frete.' },
+    objectives: [{ type: 'kill', mob: 'any', zone: 'plains', count: 8, label: 'Derrote 8 criaturas da Planície de Cristal' }, { type: 'kill', mob: 'any', zone: 'ruins', count: 7, label: 'Derrote 7 criaturas das Ruínas Sombrias' }],
+    reward: { gold: 700, xp: 3200, potions: 3 },
+  },
+  porto_gelo: {
+    id: 'porto_gelo', name: 'Carga de Gelo', giver: 'dealer', level: 22, after: 'porto_chegada',
+    text: { offer: 'Gelo do Cume vale ouro no verão. Abra três baús no Cume Gélido e traga o que sobrar das cargas congeladas. Divido o lucro, e a palavra é de comerciante.', progress: 'Três baús no Cume Gélido, a leste das Ruínas. Leve poções e um bom casaco.', done: 'Frio de verdade, mercadoria de verdade. Aqui está a sua parte, e mais um pouco.' },
+    objectives: [{ type: 'chest', zone: 'glacier', count: 3, label: 'Abra 3 baús no Cume Gélido' }],
+    reward: { gold: 1600, xp: 11000, items: [{ rarity: 'rare' }] },
+  },
+  porto_duelo: {
+    id: 'porto_duelo', name: 'Duelo de Cais', giver: 'duelist', level: 10, after: null,
+    text: { offer: 'Sem Elo, sem rancor. Vença um duelo amistoso no meu ringue e eu pago a rodada. Só funciona na jornada solo: o mar conectado tem a Grande Arena.', progress: 'O ringue fica aqui ao lado. Fale comigo para aceitar o duelo amistoso.', done: 'Aço limpo e aperto de mão. Boa luta, herói.' },
+    objectives: [{ type: 'friendlyDuel', count: 1, label: 'Vença 1 duelo amistoso' }],
+    reward: { gold: 300, xp: 1600, potions: 2 },
+  },
+});
+
 // Missão de evolução de cada tipo de spirit (core/progression.js, core/journal.js spiritEvoStatus).
 export const SPIRIT_EVO_QUEST = Object.fromEntries(EVO.map(([type, , , key]) => [type, 'evolucao_do_spirit_' + key]));
 

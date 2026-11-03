@@ -1,6 +1,6 @@
 // Tudo é desenhado proceduralmente (sem imagens), num estilo pastel limpo.
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
-import { safeBoxScreen } from './safe-box.js';
+import { safeBoxScreen, stackLabels } from './safe-box.js';
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
@@ -21,7 +21,7 @@ import { paintGroundScenery, drawGroundLife, drawAtmosphere, drawTreeRich, drawP
 
 const TAU = Math.PI * 2;
 const SKIN = '#f3d2b3';
-const NPC_LOOK = { shop: 'archer', arena: 'warrior', spirit: 'mage', guard: 'warrior', herbalist: 'cleric', master_warrior: 'warrior', master_mage: 'mage', master_archer: 'archer', master_cleric: 'cleric', bank: 'mage', board: 'archer', harborshop: 'archer', duel: 'warrior', quest: 'warrior' }; // roles do Porto de Marfim (sem arte própria ainda)
+const NPC_LOOK = { shop: 'archer', arena: 'warrior', spirit: 'mage', guard: 'warrior', herbalist: 'cleric' }; // só reserva do visual antigo (?visual=original ou falha de carga); os demais NPCs só existem pintados
 
 export function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
@@ -113,7 +113,7 @@ export class Renderer {
     for (const it of items) {
       const o = it.o;
       if (it.k === 'decor') drawDecor(g, o, t, z, player);
-      else if (it.k === 'npc') { if (!drawNpcSprite(g, o, t)) drawHero(g, { ...o, facing: Math.PI / 2, walk: 0, id: o.x }, NPC_LOOK[o.id] ?? NPC_LOOK[o.role], t, o.color, o.accent); }
+      else if (it.k === 'npc') { if (!drawNpcSprite(g, o, t)) drawHero(g, { ...o, facing: Math.PI / 2, walk: 0, id: o.x }, NPC_LOOK[o.id] ?? NPC_LOOK[o.role] ?? 'warrior', t, o.color, o.accent); }
       else if (it.k === 'chest') drawChest(g, o, !view.chestsOpen?.has(o.id), t);
       else if (it.k === 'drop') drawDrop(g, o, t);
       else if (o.kind === 'mob') drawMob(g, o, t);
@@ -143,6 +143,7 @@ export class Renderer {
     PROMPTS.length = 0; SAFE.cx = cam.x; SAFE.cy = cam.y; SAFE.zm = zm; SAFE.vw = this.vw; SAFE.vh = this.vh; SAFE.hud = hud;
     const covered = (a) => { const sx = (a.x - cam.x) * zm, sy = (a.y - cam.y) * zm - 40 * zm; for (const [x0, y0, x1, y1] of hud) if (sx > x0 && sx < x1 && sy > y0 && sy < y1) return true; return false; };
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y) && (a === player || a.kind !== 'mob' || a.boss || !covered(a))) drawBars(g, a, a === player, this.labels);
+    labelLifts(g, z.npcs, vis);
     for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id], view.guideNpc === n.id);
     for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : 'Toque para abrir');
     for (const tx of world.texts) {
@@ -702,12 +703,7 @@ function drawSpirit(g, s, t) {
 function drawDrop(g, d, t) {
   if (d.t >= DROP_LIFE - DROP_BLINK && Math.floor(d.t * 6) % 2) return; // some sozinho: pisca nos últimos segundos antes de expirar
   const y = d.y - 4 - Math.abs(Math.sin(t * 3 + d.x)) * 3;
-  if (d.kind === 'gold') {
-    g.fillStyle = '#e8b23a'; ellipse(g, d.x, y + 2, 6, 3); g.fill();
-    g.fillStyle = '#ffd34d'; ellipse(g, d.x, y, 6, 3); g.fill();
-    g.fillStyle = '#fff2b0'; ellipse(g, d.x - 2, y - 0.5, 2, 1); g.fill();
-    return;
-  }
+  // ouro não vira drop no chão: vai direto para a mochila, com o número dourado flutuante (main.js onMobKilled)
   if (d.kind === 'potion') {
     g.fillStyle = '#f0e6e6'; g.fillRect(d.x - 2, y - 12, 4, 4);
     g.fillStyle = '#ff5a6e'; circle(g, d.x, y - 3, 6); g.fill();
@@ -921,11 +917,20 @@ function drawPrompt(g, x, y, txt) {
   g.fillStyle = '#ffffff'; g.fillText(txt, x, y + 16);
 }
 
+const NPC_LIFT = new Map(); // id -> elevação (px) do nome para não sobrepor o vizinho
+function labelLifts(g, npcs, vis) {
+  NPC_LIFT.clear();
+  const list = (npcs ?? []).filter((n) => vis(n.x, n.y));
+  g.font = '800 12px Cinzel, Nunito, serif';
+  const lifts = stackLabels(list.map((n) => ({ x: n.x, w: g.measureText(n.name).width + 6, y: n.y })));
+  list.forEach((n, i) => { if (lifts[i]) NPC_LIFT.set(n.id, lifts[i]); });
+}
+
 function drawNpcTag(g, n, near, t, mark, guide) {
   g.font = '800 12px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
-  const top = mobSpritesEnabled() ? npcTop(n.id) : null, ny = top != null ? n.y + top - 6 : n.y - 44; // pintado: o nome fica logo acima da cabeça
+  const top = mobSpritesEnabled() ? npcTop(n.id) : null, ny = (top != null ? n.y + top - 6 : n.y - 44) - (NPC_LIFT.get(n.id) ?? 0); // pintado: o nome fica logo acima da cabeça
   g.strokeText(n.name, n.x, ny);
   g.fillStyle = '#fff3c4';
   g.fillText(n.name, n.x, ny);

@@ -15,8 +15,10 @@ const KIND = {
   fireball: 'muzzle', frostnova: 'frost', blink: 'blink',
   rain: 'rain', pierce: 'pierce', roll: 'roll',
   holylight: 'sun', divineshield: 'bubble', judgement: 'beam',
+  // Maestria: reaproveitam efeitos existentes com outra cor/tamanho (colossus e meteor têm desenho próprio, montado sobre o rastro e o clarão)
+  colossus: 'colossus', meteor: 'meteor', arrowstorm: 'rain', intervention: 'sun',
 };
-const LIFE = { crit: 0.32, absorb: 0.4, heal: 0.85, whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.45 };
+const LIFE = { colossus: 6.6, meteor: 1.9, crit: 0.32, absorb: 0.4, heal: 0.85, whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.45 };
 
 // Acerto crítico, golpe absorvido por escudo e cura relevante (eventos reais `hit` e `heal`; o servidor manda os mesmos no online). Cura de regeneração (pequena e constante) não gera efeito.
 const healAt = new WeakMap();
@@ -49,10 +51,10 @@ export function spawnSkillVfx(world, ev) {
   if (list.length >= MAX_FX) list.shift();
   const prev = lastPos.get(a);
   const f = {
-    kind, skill: ev.skill, t0: world.time, life: kind === 'bubble' || kind === 'warcry' ? Math.max(LIFE[kind], (s.dur ?? 0) + 0.4) : LIFE[kind],
+    kind, skill: ev.skill, t0: world.time, life: s.vfxLife ?? (kind === 'bubble' || kind === 'warcry' ? Math.max(LIFE[kind], (s.dur ?? 0) + 0.4) : LIFE[kind]),
     actor: a, x: a.x, y: a.y, ang: ev.ang ?? a.facing ?? 0, color: s.color, r: s.radius ?? 60,
     tx: ev.tx ?? null, ty: ev.ty ?? null, ox: prev ? prev.x : a.x, oy: prev ? prev.y : a.y,
-    seed: ((world.time * 1000) | 0) ^ (a.id ?? 7), pts: kind === 'dashtrail' || kind === 'roll' ? [] : null, dur: s.dur ?? 0, range: s.range ?? 500,
+    seed: ((world.time * 1000) | 0) ^ (a.id ?? 7), pts: kind === 'dashtrail' || kind === 'roll' || kind === 'colossus' ? [] : null, dur: s.dur ?? 0, range: s.range ?? 500,
   };
   list.push(f);
   return f;
@@ -126,6 +128,8 @@ export function drawSkillVfx(g, world, lite = false) {
       case 'muzzle': drawMuzzle(g, f, k); break;
       case 'frost': drawFrost(g, f, k, cx, cy, lite); break;
       case 'blink': drawBlink(g, f, k, cx, cy); break;
+      case 'colossus': drawColossus(g, f, el, cx, cy, lite); break;
+      case 'meteor': drawMeteor(g, f, el, lite); break;
       case 'rain': drawRain(g, f, el, lite); break;
       case 'pierce': drawPierce(g, f, k, cx, cy); break;
       case 'sun': drawSun(g, f, k, cx, cy, lite); break;
@@ -225,23 +229,58 @@ function drawBlink(g, f, k, cx, cy) {
   g.fillStyle = '#7a4dff';
   for (let i = 0; i < 5; i++) { const a = i * 1.26 + k * 3, r = 10 + k * 34; circle(g, cx + Math.cos(a) * r, cy + Math.sin(a) * r, 2.2 * o + 0.4); g.fill(); }
 }
+// Fúria do Colosso: rastro dourado, onda de choque ao chegar e aura que dura o reforço
+function drawColossus(g, f, el, cx, cy, lite) {
+  drawTrail(g, f, el, cx, cy, '#ffa51f', '#fff2b0', 24);
+  if (el > 0.25 && el < 0.9) {
+    const u = (el - 0.25) / 0.65;
+    g.globalAlpha = (1 - u) * 0.9; g.strokeStyle = '#b9650a'; g.lineWidth = 9 * (1 - u) + 2; circle(g, cx, cy, 150 * ease(u)); g.stroke();
+    g.strokeStyle = '#ffe08a'; g.lineWidth = 3.5 * (1 - u) + 0.6; circle(g, cx, cy, 150 * ease(u)); g.stroke();
+  }
+  const aura = clamp01(Math.min(el / 0.3, (f.dur + 0.3 - el) / 0.6));
+  if (aura > 0) {
+    g.globalAlpha = aura * 0.8; g.strokeStyle = '#ffb23d'; g.lineWidth = 3; g.setLineDash([8, 6]); g.lineDashOffset = -el * 50;
+    circle(g, cx, cy + 6, 34 + Math.sin(el * 7) * 2); g.stroke(); g.setLineDash([]);
+    if (!lite) for (let i = 0; i < 6; i++) { const u = (el * 0.9 + i / 6) % 1, ang = i * 2.1 + el; g.globalAlpha = aura * (1 - u) * 0.85; g.fillStyle = i % 2 ? '#fff2b0' : '#ffa51f'; circle(g, cx + Math.cos(ang) * 26, cy + 6 - u * 48, 2.6 * (1 - u) + 0.6); g.fill(); }
+  }
+}
+// Meteoro Arcano: aviso pulsante na área, rocha em chamas caindo (1 s) e explosão
+function drawMeteor(g, f, el, lite) {
+  const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r, fall = 1.0;
+  if (el < fall) {
+    const u = el / fall;
+    g.globalAlpha = 0.25 + 0.2 * Math.sin(el * 14); g.fillStyle = '#ff5a1f'; circle(g, tx, ty, R * ease(Math.min(1, u * 3))); g.fill();
+    g.globalAlpha = 0.9; g.strokeStyle = '#ffb23d'; g.lineWidth = 3; g.setLineDash([10, 7]); g.lineDashOffset = -el * 40; circle(g, tx, ty, R); g.stroke(); g.setLineDash([]);
+    const h = (1 - u) * (1 - u) * 560, mx = tx + h * 0.45, my = ty - h; // rocha vindo de cima, inclinada
+    for (let i = 5; i >= 1; i--) { g.globalAlpha = 0.5 - i * 0.07; g.fillStyle = i > 3 ? '#c8321a' : '#ff9a3a'; circle(g, mx + i * 11 * 0.45, my - i * 11, 20 - i * 2); g.fill(); }
+    g.globalAlpha = 1; g.fillStyle = '#3a2418'; circle(g, mx, my, 20); g.fill(); g.fillStyle = '#ffd27a'; circle(g, mx - 5, my - 5, 8); g.fill();
+    return;
+  }
+  const u = clamp01((el - fall) / 0.9), o = 1 - u;
+  const grd = g.createRadialGradient(tx, ty, 0, tx, ty, R * (0.5 + 0.6 * ease(u)));
+  grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.35, '#ffb23d'); grd.addColorStop(1, 'rgba(255,90,30,0)');
+  g.globalAlpha = o; g.fillStyle = grd; circle(g, tx, ty, R * (0.5 + 0.6 * ease(u))); g.fill();
+  g.strokeStyle = '#8a2a08'; g.lineWidth = 8 * o + 1; circle(g, tx, ty, R * ease(u)); g.stroke(); g.strokeStyle = '#ffe08a'; g.lineWidth = 3 * o + 0.5; circle(g, tx, ty, R * ease(u)); g.stroke();
+  if (!lite) for (let i = 0; i < 10; i++) { const a = i * 0.63 + 0.3, r = R * ease(u) * (0.4 + (i % 3) * 0.3); g.fillStyle = i % 2 ? '#ffb23d' : '#ff5a1f'; circle(g, tx + Math.cos(a) * r, ty + Math.sin(a) * r - u * 30, 3 * o + 0.5); g.fill(); }
+}
 function drawRain(g, f, el, lite) {
   const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r;
   const ring = clamp01(Math.min(el / 0.2, (f.life - el) / 0.4));
-  g.globalAlpha = ring * 0.8; g.strokeStyle = '#2e7d32'; g.lineWidth = 2.5; g.setLineDash([9, 7]); g.lineDashOffset = -el * 36; circle(g, tx, ty, R); g.stroke(); g.setLineDash([]);
-  const N = lite ? 10 : 18; let s = f.seed >>> 0;
+  g.globalAlpha = ring * 0.8; g.strokeStyle = f.skill === 'arrowstorm' ? '#d9541a' : '#2e7d32'; g.lineWidth = 2.5; g.setLineDash([9, 7]); g.lineDashOffset = -el * 36; circle(g, tx, ty, R); g.stroke(); g.setLineDash([]);
+  const storm = f.skill === 'arrowstorm', gap = storm ? 0.1 : 0.125;
+  const N = storm ? (lite ? 16 : 28) : lite ? 10 : 18; let s = f.seed >>> 0;
   for (let i = 0; i < N; i++) {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0; const ra = (s / 4294967296) * TAU;
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0; const rr = Math.sqrt(s / 4294967296) * R * 0.92;
-    const lx = tx + Math.cos(ra) * rr, ly = ty + Math.sin(ra) * rr, local = el - (0.15 + i * 0.125);
+    const lx = tx + Math.cos(ra) * rr, ly = ty + Math.sin(ra) * rr, local = el - (0.15 + i * gap);
     if (local < 0) continue;
     if (local < 0.2) { // flecha caindo (inclinada)
       const u = local / 0.2, h = 150 * (1 - u);
       g.globalAlpha = 0.95; g.strokeStyle = '#4a3010'; g.lineWidth = 3.4; g.beginPath(); g.moveTo(lx + h * 0.35, ly - h - 26); g.lineTo(lx + h * 0.35 - 3, ly - h); g.stroke();
-      g.strokeStyle = '#fff3c4'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(lx + h * 0.35, ly - h - 26); g.lineTo(lx + h * 0.35 - 3, ly - h); g.stroke();
+      g.strokeStyle = storm ? '#ff9a3d' : '#fff3c4'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(lx + h * 0.35, ly - h - 26); g.lineTo(lx + h * 0.35 - 3, ly - h); g.stroke();
     } else if (local < 0.55) { // impacto
-      const u = (local - 0.2) / 0.35; g.globalAlpha = (1 - u) * 0.9; g.strokeStyle = '#2e7d32'; g.lineWidth = 2.6 * (1 - u) + 0.6; circle(g, lx, ly, 4 + u * 20); g.stroke();
-      g.fillStyle = '#d7f5a0'; circle(g, lx, ly, 3 * (1 - u)); g.fill();
+      const u = (local - 0.2) / 0.35; g.globalAlpha = (1 - u) * 0.9; g.strokeStyle = storm ? '#e8501c' : '#2e7d32'; g.lineWidth = 2.6 * (1 - u) + 0.6; circle(g, lx, ly, 4 + u * 20); g.stroke();
+      g.fillStyle = storm ? '#ffd27a' : '#d7f5a0'; circle(g, lx, ly, 3 * (1 - u)); g.fill();
     }
   }
 }
@@ -254,6 +293,10 @@ function drawPierce(g, f, k, cx, cy) { // clarão do disparo + linha de luz até
 }
 function drawSun(g, f, k, cx, cy, lite) {
   const R = f.r * (0.45 + 0.55 * ease(k)), o = 1 - k * k;
+  if (f.skill === 'intervention') { // coluna de luz sobre o clérigo
+    g.globalAlpha = o * 0.7; const col = g.createLinearGradient(cx, cy - 260, cx, cy + 10); col.addColorStop(0, 'rgba(255,242,168,0)'); col.addColorStop(1, 'rgba(255,230,120,0.9)');
+    g.fillStyle = col; g.fillRect(cx - 34 * (1 - k * 0.5), cy - 260, 68 * (1 - k * 0.5), 270);
+  }
   g.globalAlpha = o * 0.6; const grd = g.createRadialGradient(cx, cy, 0, cx, cy, R); grd.addColorStop(0, 'rgba(255,240,170,0.95)'); grd.addColorStop(0.6, 'rgba(255,190,40,0.5)'); grd.addColorStop(1, 'rgba(255,190,40,0)');
   g.fillStyle = grd; circle(g, cx, cy, R); g.fill();
   const rays = lite ? 8 : 14; g.globalAlpha = o * 0.95;

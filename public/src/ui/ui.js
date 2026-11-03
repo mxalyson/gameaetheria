@@ -4,14 +4,15 @@ import { isSkillUnlocked, skillUnlockLevel } from '../core/unlocks.js';
 import { skillOf, specsOf, specInfo, activeSpec, respecCost, SPEC_LEVEL } from '../core/specs.js';
 import { SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
-import { computeStats, canEquip, itemScore } from '../core/stats.js';
+import { computeStats, canEquip, itemScore, itemClassId, itemClassName } from '../core/stats.js';
+import { BANK_SIZE, ensureBank } from '../core/bank.js';
 import { xpToNext, spiritXpToNext, spiritPower, MAX_LEVEL, EVOLVE_LEVEL, evolveCost } from '../core/progression.js';
 import { tierFor } from '../core/combat.js';
 import { MODES, getRating } from '../core/match.js';
 import { MOBS } from '../data/mobs.js';
 import { mobPortrait } from '../render/mob-sprites.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
-import { PRICES, sellValue } from '../shop.js';
+import { PRICES } from '../shop.js';
 import { pickBossTarget } from './boss-target.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, preloadSkillIcons, skillCategory, CATEGORIES } from '../render/skill-icons.js';
 import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
@@ -19,8 +20,8 @@ import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { DIALOGS, TIPS } from '../data/dialogs.js';
 import { ZONES, WORLD_ROUTE, teleportCost } from '../data/zones.js';
-import { offeredBy, readyFor, activeFor, titleText, achievementProgress, ensureJournal, greetFor, LORE_ZONES, loreSeen, loreCount, tipSeen } from '../core/journal.js';
-import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
+import { offeredBy, readyFor, activeFor, serviceFor, questGiverId, spiritEvoStatus, dailyBoard, dailyState, dailyProgressOf, dailyComplete, dayUTC, titleText, achievementProgress, ensureJournal, greetFor, LORE_ZONES, loreSeen, loreCount, tipSeen } from '../core/journal.js';
+import { SCALE_MIN, SCALE_MAX, resolveScale } from '../prefs.js';
 import { asset } from '../assets-version.js';
 
 // posições (%) dos nós no mapa-múndi: zigue-zague seguindo WORLD_ROUTE (serve para qualquer número de zonas)
@@ -76,6 +77,8 @@ const WAVES = sign('assets/icons/spirit/spirit-undine.webp', '🌊');
 const PARTY = sign('assets/icons/menu/menu-party.webp', '👥');
 const SEARCH = sign('assets/icons/menu/menu-map.webp', '🔎');
 const ESSENCE = sign('assets/icons/item/res-essence.webp', '🔮', 'ic-img');
+// preço de compra: o estoque do Porto traz `price`; o da Vila é valor × markup
+const itemPrice = (it) => it.price ?? it.value * PRICES.itemMarkup;
 // Selo dourado de aprimoramento no canto da célula: +1…+5 dourado, +6/+7 laranja, +8 (máximo) "MAX" vermelho
 export const plusBadge = (it) => (it?.plus ? `<span class="plus-b ${it.plus >= MAX_PLUS ? 'max' : it.plus >= 6 ? 'hi' : ''}" title="Aprimorado +${it.plus} de ${MAX_PLUS}">${it.plus >= MAX_PLUS ? 'MAX' : '+' + it.plus}</span>` : '');
 export const itemIcon = (it) => (it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
@@ -256,6 +259,7 @@ export class UI {
     const slots = [
       { key: 'LMB', id: 'basic', icon: attackImg(char.classId, '🖱️'), art: true, tip: 'skill:basic' },
       ...cls.skills.map((s, i) => ({ key: String(i + 1), id: 's' + i, icon: skillImg(s, SKILLS[s].icon), art: true, cat: skillCategory(skillOf(char.classId, null, s)), tip: 'skill:' + s })),
+      { key: '4', id: 's3', icon: skillImg(cls.mastery, SKILLS[cls.mastery].icon), art: true, cat: skillCategory(skillOf(char.classId, null, cls.mastery)), tip: 'skill:' + cls.mastery }, // Maestria
       { key: 'Q', id: 'potion', icon: iconImg(POTION_ICON, '🧪'), art: true, tip: 'potion' },
     ];
     $('skillbar').innerHTML = slots.map((s) => `
@@ -263,7 +267,7 @@ export class UI {
         <span class="icon">${s.icon}</span>${s.cat ? `<i class="cat cat-${s.cat}" title="${CATEGORIES[s.cat]}"></i>` : ''}<span class="key">${s.key}</span>
         <div class="cd"></div><span class="cdt"></span>${s.id === 'potion' ? '<span class="count" id="potion-count"></span>' : ''}
       </div>`).join('') + '<div class="slot spirit" id="slot-spirit" data-tip="spirit-active"><span class="icon" id="spirit-icon"></span><span class="key">P</span></div>';
-    preloadSkillIcons(cls.skills, char.classId);
+    preloadSkillIcons([...cls.skills, cls.mastery], char.classId);
     this.cache.clear();
   }
 
@@ -304,17 +308,17 @@ export class UI {
     this.set('hud-gold', 'html', char.statPoints ? `<span class="pts" data-action="toggle" data-arg="character">+${char.statPoints} pontos</span>` : '');
     this.set('zone-name', 'text', world.zone.name);
 
-    const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, potion: game.potionCd };
+    const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, s3: player.cds.s3 ?? 0, potion: game.potionCd };
     const maxOf = { basic: CLASSES[char.classId].basic.cd / player.stats.atkSpeed, potion: 8 };
-    CLASSES[char.classId].skills.forEach((s, i) => { maxOf['s' + i] = skillOf(char.classId, activeSpec(char), s).cd; });
+    [...CLASSES[char.classId].skills, CLASSES[char.classId].mastery].forEach((s, i) => { maxOf['s' + i] = skillOf(char.classId, activeSpec(char), s).cd; });
     for (const id of Object.keys(cdOf)) {
       const cd = cdOf[id];
       const pct = cd > 0 ? Math.min(1, cd / maxOf[id]) : 0;
       this.set(`slot-${id}`, '--p', pct.toFixed(3));
-      this.set(`slot-${id}`, 'class', 'slot' + (id.startsWith('s') && id !== 'spirit' || id === 'potion' || id === 'basic' ? ' art' : '') + (id.startsWith('s') && id !== 'spirit' && !isSkillUnlocked(char.level, Number(id[1])) ? ' locked' : id.startsWith('s') && (player.stunT > 0 || player.dead) ? ' blocked' : '') + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
+      this.set(`slot-${id}`, 'class', 'slot' + (id.startsWith('s') && id !== 'spirit' || id === 'potion' || id === 'basic' ? ' art' : '') + (id.startsWith('s') && id !== 'spirit' && !isSkillUnlocked(char, Number(id[1])) ? ' locked' : id.startsWith('s') && (player.stunT > 0 || player.dead) ? ' blocked' : '') + (cd > 0 ? ' cooling' : '') + (id === 'potion' && (!char.potions || game.mode === 'pvp' || game.mode === 'net') ? ' empty' : ''));
     }
-    for (const id of ['s0', 's1', 's2']) {
-      if (!isSkillUnlocked(char.level, Number(id[1]))) this.set(`slot-${id}`, '--lv', `"${skillUnlockLevel(Number(id[1]))}"`);
+    for (const id of ['s0', 's1', 's2', 's3']) {
+      if (!isSkillUnlocked(char, Number(id[1]))) this.set(`slot-${id}`, '--lv', id === 's3' && char.level >= skillUnlockLevel(3) ? '"25\\A Maestria"' : `"${skillUnlockLevel(Number(id[1]))}"`);
       const cd = player.cds[id];
       const node = $(`slot-${id}`)?.querySelector('.cdt');
       const txt = cd > 0 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
@@ -405,17 +409,18 @@ export class UI {
   // 'painel:âncora' (ex.: 'shop:smith') abre o painel e rola até o elemento #<âncora>-section
   openPanel(spec) {
     const [id, anchor] = String(spec).split(':');
-    if (['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map', 'spirits', 'character', 'options']) this.open.delete(p);
+    if (['shop', 'bank', 'board', 'arena', 'sage', 'party', 'dialog', 'journal', 'map'].includes(id)) for (const p of ['shop', 'bank', 'board', 'arena', 'sage', 'party', 'dialog', 'journal', 'map', 'spirits', 'character', 'options']) this.open.delete(p);
     if (id === 'options') this.open.clear();
     if (id === 'map') this.mapSel = null; // o mapa sempre abre selecionando onde você está
     this.open.add(id);
-    if (id === 'shop') { this.open.add('inventory'); this.shopAnchor = anchor ?? null; } // título: Ferreiro Brok quando aberto pelo NPC dele
+    if (id === 'shop') { this.open.add('inventory'); this.shopAnchor = anchor ?? null; } // título: Ferreiro Brok (anchor 'smith') ou Mercador do Porto ('harbor')
+    if (id === 'bank') this.open.add('inventory'); // mochila ao lado: tocar nela deposita
     this.render();
     if (anchor) { const go = () => this.layer.querySelector(`#${anchor}-section`)?.scrollIntoView({ block: 'start' }); go(); requestAnimationFrame(go); }
   }
   close(id) {
     this.open.delete(id);
-    if (id === 'inventory') this.open.delete('shop');
+    if (id === 'inventory') { this.open.delete('shop'); this.open.delete('bank'); }
     this.render();
   }
   closePanels() { this.open.clear(); this.render(); }
@@ -423,7 +428,7 @@ export class UI {
   render() {
     this.hideTooltip();
     document.body.classList.toggle('panel-open', this.open.size > 0); // avisos ficam por baixo dos painéis (V10)
-    const order = ['character', 'arena', 'party', 'dialog', 'journal', 'map', 'sage', 'shop', 'spirits', 'inventory', 'options'];
+    const order = ['character', 'arena', 'party', 'dialog', 'journal', 'map', 'sage', 'shop', 'bank', 'board', 'spirits', 'inventory', 'options'];
     // Refazer o HTML a cada +1 ponto/ação fazia a janela "piscar" (a animação de abrir tocava de novo) e voltar ao topo: guardamos a rolagem e só animamos o que acabou de abrir.
     const pid = (el) => [...el.classList].find((c) => c.startsWith('p-'));
     const prev = new Map([...this.layer.querySelectorAll('.panel')].map((el) => [pid(el), el.querySelector('.body')?.scrollTop ?? 0]));
@@ -442,8 +447,10 @@ export class UI {
 
   itemCell(it, action, arg) {
     if (!it) return '<div class="cell empty"></div>';
-    return `<div class="cell r-${it.rarity}${it.opal ? ' opal' : ''}" data-action="${action}" data-arg="${arg}" data-tip="item:${it.id}">
-      <span class="ic">${itemIcon(it)}</span><span class="lv">${it.level}</span>${plusBadge(it)}</div>`;
+    // item de outra classe: célula avermelhada com o nome da classe ("Apenas para Mago" completo no tooltip)
+    const cid = itemClassId(it), wrong = cid && cid !== this.game.char?.classId;
+    return `<div class="cell r-${it.rarity}${it.opal ? ' opal' : ''}${wrong ? ' wrong-class' : ''}" data-action="${action}" data-arg="${arg}" data-tip="item:${it.id}"${wrong ? ` title="Apenas para ${esc(itemClassName(it))}"` : ''}>
+      <span class="ic">${itemIcon(it)}</span><span class="lv">${it.level}</span>${plusBadge(it)}${wrong ? `<span class="cls-x">${esc(itemClassName(it))}</span>` : ''}</div>`;
   }
 
   panel_inventory() {
@@ -453,7 +460,7 @@ export class UI {
       const it = char.inventory[i];
       cells.push(it ? this.itemCell(it, 'item', it.id) : '<div class="cell empty"></div>');
     }
-    const hint = this.isOpen('shop') ? 'Toque em um item para <b>vender</b>.' : 'Toque para equipar · atributos em Personagem.';
+    const hint = this.isOpen('shop') ? 'Toque em um item para <b>vender</b>.' : this.isOpen('bank') ? 'Toque em um item para <b>guardar no banco</b>.' : 'Toque para equipar · atributos em Personagem.';
     return this.frame('inventory', `Inventário <small>${char.inventory.length}/${INVENTORY_SIZE}</small>`, `
       <div class="inv-grid">${cells.join('')}</div>
       <div class="inv-foot"><span class="inv-gold" title="Ouro (vai direto para a mochila)">${COIN}<b>${char.gold}</b></span><span class="inv-res">${POT} ${char.potions}</span><span class="inv-res">${SCROLL} ${char.scrolls ?? 0}</span><span class="hint">${hint}</span></div>
@@ -510,6 +517,7 @@ export class UI {
       const S = SPIRITS[sp.type], R = RARITY[sp.rarity];
       const active = char.activeSpirit === sp.id;
       const need = spiritXpToNext(sp.level);
+      const evo = sp.stage === 2 ? null : spiritEvoStatus(char, sp); // missão do elemento (Sábia Yun) + nível + ouro
       return `<div class="sp-card ${active ? 'active' : ''}" style="--sc:${S.color};--rc:${R.color}">
         ${spiritImg(sp.type, 'big', sp.stage ?? 1)}
         <div class="sp-info">
@@ -517,10 +525,11 @@ export class UI {
           <div class="sub">${S.element} · ${S.role} · Nv ${sp.level} · Poder ${spiritPower(sp)}</div>
           <div class="mini-bar"><div style="width:${sp.level >= char.level ? 100 : (100 * sp.xp) / need}%"></div></div>
           <div class="desc">${S.desc}</div>
+          ${evo ? `<div class="evo-note ${evo.state}">${esc(evo.text)}${evo.ok && char.gold < evolveCost(sp) ? ` Faltam ${evolveCost(sp) - char.gold} de ouro.` : ''}</div>` : ''}
         </div>
         <div class="sp-btns">
           ${active ? '<span class="tag">Ativo</span>' : `<button class="btn small" data-action="spirit-on" data-arg="${sp.id}">Ativar</button>`}
-          ${sp.stage === 2 ? '' : sp.level >= EVOLVE_LEVEL ? `<button class="btn small" data-action="spirit-evolve" data-arg="${sp.id}">Evoluir · ${COIN} ${evolveCost(sp)}</button>` : `<span class="tag dim">Evolui no Nv ${EVOLVE_LEVEL}</span>`}
+          ${!evo ? '' : evo.ok ? `<button class="btn small" data-action="spirit-evolve" data-arg="${sp.id}" ${char.gold < evolveCost(sp) ? 'disabled' : ''}>Evoluir · ${COIN} ${evolveCost(sp)}</button>` : `<span class="tag dim">${evo.state === 'locked' ? `Evolui no Nv ${EVOLVE_LEVEL}` : evo.state === 'active' ? 'Missão em curso' : 'Fale com a Yun'}</span>`}
           <button class="btn small ghost" data-action="spirit-free" data-arg="${sp.id}">Libertar</button>
         </div></div>`;
     }).join('') : '<p class="empty-msg">Você ainda não tem spirits. Derrote monstros para achar <b>Essências</b> ou visite a Sábia Yun na vila.</p>';
@@ -530,14 +539,15 @@ export class UI {
   }
 
   panel_shop() {
-    const { char, shopStock } = this.game;
+    const { char } = this.game, harbor = this.shopAnchor === 'harbor';
+    const shopStock = harbor ? this.game.harborStock : this.game.shopStock; // Porto: estoque do dia (shop.js buildHarborStock), preços próprios, venda a 60%
     const stock = shopStock.map((it, i) => `
       <div class="shop-item">${this.itemCell(it, 'buy-item', i)}
         <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level}</div></div>
-        <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${it.value * PRICES.itemMarkup}</button></div>`).join('') || '<p class="empty-msg">Estoque esgotado. Volte após subir de nível.</p>';
+        <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${itemPrice(it)}</button></div>`).join('') || `<p class="empty-msg">${harbor ? 'Estoque do dia esgotado. O cais traz mercadoria nova amanhã.' : 'Estoque esgotado. Volte após subir de nível.'}</p>`;
     const potion = PRICES.potion(char.level);
-    return this.frame('shop', this.shopAnchor === 'smith' ? 'Ferreiro Brok' : 'Mercadora Lia', `
-      <p class="npc-line">${npcEmblem('merchant')}"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."</p>
+    return this.frame('shop', harbor ? 'Mercador do Porto' : this.shopAnchor === 'smith' ? 'Ferreiro Brok' : 'Mercadora Lia', `
+      <p class="npc-line">${npcEmblem(harbor ? 'dealer' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e compro seus itens por 60% do valor."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
       <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="${asset('assets/icons/item/res-potion-health.webp')}" alt="🧪" draggable="false"></span></div>
         <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>
@@ -546,9 +556,9 @@ export class UI {
         <div><div class="nm">Pergaminho de Viagem</div><div class="sub">Teletransporte a mapa visitado · tem ${char.scrolls ?? 0}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-scroll" data-arg="1">1 · ${COIN} ${PRICES.scroll(char.level)}</button>
         <button class="btn small" data-action="buy-scroll" data-arg="3">3 · ${COIN} ${PRICES.scroll(char.level) * 3}</button></div></div>
-      <h3>Equipamentos</h3>${stock}
-      ${this.smithSection()}
-      <h3>Vender em lote</h3>
+      <h3>${harbor ? 'Estoque do dia' : 'Equipamentos'}</h3>${stock}
+      ${harbor ? '' : this.smithSection()}
+      <h3>Vender em lote${harbor ? ' <span class="pts">60%</span>' : ''}</h3>
       <div class="row-btns"><button class="btn small" data-action="sell-bulk" data-arg="0">Todos Comuns</button>
       <button class="btn small" data-action="sell-bulk" data-arg="1">Comuns + Incomuns</button></div>`);
   }
@@ -625,7 +635,8 @@ export class UI {
     else if (offer) { const q = offer; text = q.text.offer; body = `<h3>${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>`; foot = `${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
     else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>${q.name}</h3>${this.questLines(char, active)}`; }
     const more = (offeredBy(char, npc.id, { server: !!g.online }).length > (offer ? 1 : 0)) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
-    const svc = D.service ? `<button class="btn wide" data-action="dialog-service" data-arg="${D.service.panel}">${D.service.label}</button>` : '';
+    const S = serviceFor(char, D); // serviço do Mestre de Classe só aparece para a própria classe
+    const svc = S ? `<button class="btn wide" data-action="dialog-service" data-arg="${S.panel}">${S.label}</button>` : '';
     const say = (Array.isArray(text) ? text : [text]).map(esc).join('<br>'); // `done` pode ser uma lista de falas (epílogo)
     // texto e lista rolam; recompensa e botões ficam num rodapé fixo, sempre visível (epílogos longos)
     return this.frame('dialog', npc.name, `<div class="dlg-scroll"><p class="npc-line">${npcEmblem(npc.id)}"${say}"</p>${body}${more}</div><div class="dlg-foot">${foot}${svc}</div>`);
@@ -637,9 +648,9 @@ export class UI {
   }
 
   // nomes dos NPCs que dão missões (gerados de QUESTS + NPCs da Vila): "A, B e C"
-  questGiverNames() {
-    const npcs = ZONES.town.npcs ?? [];
-    const names = [...new Set(Object.values(QUESTS).map((q) => q.giver))].map((id) => npcs.find((n) => n.id === id)?.name).filter(Boolean).map(esc);
+  questGiverNames(char = this.game.char) {
+    const npcs = [...(ZONES.town.npcs ?? []), ...(ZONES.harbor.npcs ?? [])];
+    const names = [...new Set(Object.values(QUESTS).map((q) => questGiverId(char, q)))] // 'master' vira o mestre da classe do jogador.map((id) => npcs.find((n) => n.id === id)?.name).filter(Boolean).map(esc);
     return names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names.at(-1)}` : names[0] ?? 'os moradores da Vila';
   }
 
@@ -698,6 +709,35 @@ export class UI {
       <p class="hint mp-hint">Toque num mapa visitado para viajar. Ir para a Vila é grátis; os outros gastam 1 Pergaminho (Mercadora Lia).</p>`);
   }
 
+  // ---- Porto de Marfim: banco (40 vagas) e quadro de contratos diários ----
+  panel_bank() {
+    const { char } = this.game, bank = ensureBank(char);
+    const cells = [];
+    for (let i = 0; i < BANK_SIZE; i++) cells.push(bank[i] ? this.itemCell(bank[i], 'bank-take', bank[i].id) : '<div class="cell empty"></div>');
+    return this.frame('bank', `Banco de Marfim <small>${bank.length}/${BANK_SIZE}</small>`, `
+      <p class="npc-line">${npcEmblem('banker')}"Guardo o que a mochila não aguenta. Quarenta vagas, sem juros e sem perguntas."</p>
+      <div class="inv-grid bank-grid">${cells.join('')}</div>
+      <p class="hint">Toque num item da <b>mochila</b> para guardar; toque num item <b>do banco</b> para retirar. Equipamentos vestidos não entram: tire-os antes.</p>`);
+  }
+
+  panel_board() {
+    const { char } = this.game, day = dayUTC(), st = dailyState(char, day);
+    const left = Math.max(0, (day + 1) * 86400000 - Date.now()), h = Math.floor(left / 3600000), m = Math.floor((left % 3600000) / 60000);
+    const rows = dailyBoard(char, day).map((c) => {
+      const p = dailyProgressOf(char, c), done = !!st.done[c.id], ready = !done && dailyComplete(char, c), r = c.reward;
+      const act = done ? '<span class="tag">Entregue</span>' : ready ? `<button class="btn small primary" data-action="daily-claim" data-arg="${c.id}">Entregar</button>` : '<span class="tag dim">Em andamento</span>';
+      return `<div class="shop-item daily${done ? ' locked' : ''}"><div class="cell ${ready ? 'r-epic' : 'r-uncommon'}"><span class="ic">${c.kind === 'chest' ? LOCK_CELL : TROPHY}</span></div>
+        <div><div class="nm">${esc(c.label)}</div>
+          <div class="mini-bar"><div style="width:${done ? 100 : (100 * p) / c.count}%"></div></div>
+          <div class="sub">${done ? c.count : p}/${c.count} · Recompensa: ${COIN} ${r.gold} · ${r.xp} XP · ${POT} ${r.potions}</div></div>
+        ${act}</div>`;
+    }).join('');
+    return this.frame('board', 'Quadro de Contratos', `
+      <p class="npc-line">${npcEmblem('hunter')}"Três contratos por dia, pagamento na entrega. O quadro renova à meia-noite (horário universal)."</p>
+      ${rows}
+      <p class="hint">Novo quadro em ${h}h ${String(m).padStart(2, '0')}min. Progresso e entregas são do dia.</p>`);
+  }
+
   panel_sage() {
     const { char } = this.game;
     const types = Object.values(SPIRITS).map((S) => `<div class="sage-type" style="--sc:${S.color}">${spiritImg(Object.keys(SPIRITS).find((k) => SPIRITS[k] === S))}<b>${S.name}</b><span>${S.element} · ${S.role}</span></div>`).join('');
@@ -714,16 +754,19 @@ export class UI {
   }
 
   panel_options() {
-    const pr = this.game.prefs;
+    const pr = this.game.prefs, eff = resolveScale(pr, innerWidth, innerHeight);
     const seg = (key, items) => `<div class="seg">${items.map(([v, label]) => `<button class="btn small ${pr[key] === v ? 'sel' : ''}" data-action="pref" data-arg="${key}:${v}">${label}</button>`).join('')}</div>`;
     return this.frame('options', 'Opções', `<div class="cols"><div class="col">
       <div class="opt-row"><b>Tamanho da interface</b>
-        <div class="seg"><button class="btn small" data-action="pref" data-arg="scale:-10" ${pr.scale <= SCALE_MIN ? 'disabled' : ''}>−</button>
-        <span class="opt-val">${pr.scale}%</span>
-        <button class="btn small" data-action="pref" data-arg="scale:+10" ${pr.scale >= SCALE_MAX ? 'disabled' : ''}>+</button></div></div>
+        <div class="seg"><button class="btn small" data-action="pref" data-arg="scale:-10" ${eff <= SCALE_MIN ? 'disabled' : ''}>−</button>
+        <span class="opt-val">${eff}%${pr.scale === 'auto' ? ' · auto' : ''}</span>
+        <button class="btn small" data-action="pref" data-arg="scale:+10" ${eff >= SCALE_MAX ? 'disabled' : ''}>+</button>
+        <button class="btn small ${pr.scale === 'auto' ? 'sel' : ''}" data-action="pref" data-arg="scale:auto">Auto</button></div></div>
       <div class="opt-row"><b>Qualidade gráfica</b>${seg('quality', [['auto', 'Auto'], ['high', 'Alta'], ['medium', 'Média'], ['low', 'Baixa']])}</div>
       <p class="hint">Baixa e média reduzem névoa, partículas e resolução: ajudam em celulares fracos e economizam bateria.</p>
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Toque (padrão)'], ['keyboard', 'Teclado e mouse']])}</div>
+      <div class="opt-row"><b>Dia e noite</b>${seg('daynight', [['auto', 'Automático'], ['day', 'Sempre dia']])}</div>
+      <p class="hint">À noite o ar escurece e as criaturas enxergam mais longe, mas dão um pouco mais de XP, ouro e itens. "Sempre dia" muda só a aparência.</p>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
       </div><div class="col">
@@ -796,16 +839,18 @@ export class UI {
     }
     const ok = canEquip(char, it);
     const equipped = Object.values(char.equipment).some((e) => e?.id === it.id);
-    const inShop = this.game.shopStock.some((s) => s.id === it.id);
+    const inShop = this.game.shopStock.some((s) => s.id === it.id) || this.game.harborStock.some((s) => s.id === it.id);
+    const cid = itemClassId(it), wrongClass = cid && cid !== char.classId;
     let action = '';
     const again = this.game.touch?.active ? 'Toque de novo' : 'Clique';
-    if (inShop) action = `Preço: ${COIN} ${it.value * PRICES.itemMarkup}`;
+    if (inShop) action = `Preço: ${COIN} ${itemPrice(it)}`;
+    else if (this.isOpen('bank')) action = this.game.char.bank?.some((b) => b.id === it.id) ? `${again} para retirar` : `${again} para guardar no banco`;
     else if (equipped) action = `${again} para desequipar`;
-    else if (this.isOpen('shop')) action = `${again} para vender por ${COIN} ${sellValue(it)}`;
+    else if (this.isOpen('shop')) action = `${again} para vender por ${COIN} ${this.game.sellPrice(it)}`;
     else if (ok.ok) action = `${again} para equipar`;
     return `<div class="tt-name" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}
-      ${ok.ok ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
-      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? `${action ? ' · ' : ''}vale ${COIN} ${sellValue(it)}` : ''}</div>`;
+      ${cid ? `<div class="${wrongClass ? 'tt-req' : 'tt-sub'}">Apenas para ${esc(itemClassName(it))}</div>` : ''}${ok.ok || wrongClass && ok.reason.startsWith('Apenas') ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
+      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? `${action ? ' · ' : ''}vale ${COIN} ${this.game.sellPrice(it)}` : ''}</div>`;
   }
 }
 

@@ -57,7 +57,7 @@ const STYLE = {
   harbor: {
     blobs: [['#f2e4bd', 0.34], ['#e6d2a2', 0.26], ['#f7eed0', 0.30], ['#d9c28f', 0.16]], glade: '255,240,205',
     trail: [], specks: ['#b8a272', '#fff3d2'],
-    shore: ['rgba(120,96,60,0.32)', '#eadfbc', '#cdb98a'], water: ['#8fdbe8', '#3f9fc4'],
+    shore: ['#b9a273', '#e3d4a8', '#cdb98a'], water: ['#8fdbe8', '#3f9fc4'], // margem de areia molhada OPACA (sem faixa translúcida)
   },
   // Cume Gélido: neve, trilha de gelo batido, lagos congelados
   glacier: {

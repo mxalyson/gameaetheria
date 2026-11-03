@@ -21,7 +21,7 @@ test('dados: toda missão é coerente (giver/after/objetivos/recompensa) e o enc
   const npcs = new Set(Object.values(ZONES).flatMap((z) => (z.npcs ?? []).map((n) => n.id)));
   for (const q of Object.values(QUESTS)) {
     assert.ok(npcs.has(q.giver) || (q.giver === 'master' && ['warrior', 'mage', 'archer', 'cleric'].every((c) => npcs.has('master_' + c))), `${q.id}: NPC ${q.giver} não existe`);
-    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage', 'miniboss', 'skillUse', 'spiritKill'].includes(o.type)));
+    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage', 'miniboss', 'skillUse', 'spiritKill', 'bank', 'daily', 'friendlyDuel'].includes(o.type)));
     assert.ok(q.text.offer && q.text.progress && q.text.done);
     // coerência de nível ↔ zona: ninguém pede para caçar numa zona muito acima do nível da missão
     for (const o of q.objectives) if (o.zone && o.zone !== 'any') assert.ok(q.level >= ZONES[o.zone].level[0] - 2, `${q.id}: nível ${q.level} baixo demais para ${o.zone}`);
@@ -292,7 +292,7 @@ test('dicas de onboarding: cada uma aparece 1× e o servidor não perde os bits'
 test('diário: a lista de NPCs vem dos givers das missões (todos existem na Vila)', () => {
   const givers = [...new Set(Object.values(QUESTS).map((q) => q.giver))];
   assert.ok(givers.includes('merchant') && givers.includes('smith'));
-  for (const g of givers.filter((x) => x !== 'master')) assert.ok(ZONES.town.npcs.some((n) => n.id === g), g);
+  for (const g of givers.filter((x) => x !== 'master')) assert.ok([...ZONES.town.npcs, ...ZONES.harbor.npcs].some((n) => n.id === g), g); // vila ou Porto
 });
 
 // ---------- lore coletável (S17) ----------
@@ -346,4 +346,92 @@ test('lore: cada leitura conta uma vez; as 5 dão "Leitor de Ecos"; o servidor m
   assert.ok(validate({ ...hero(5), stats: { lore: 1e12 } }).char.stats.lore <= 1e8);
   // bits fora das 5 zonas não contam para a conquista
   const f = ensureJournal(hero(5)); f.stats.lore = 0xffffffe0; assert.equal(achievementValue(f, a), 0);
+});
+
+// ---------- Porto de Marfim: missões, conquistas e falas (hub entre Planície e Ruínas) ----------
+import { claimDaily, dailyBoard, dailyState, dayUTC, OFFLINE_TYPES } from '../public/src/core/journal.js';
+import { depositItem } from '../public/src/core/bank.js';
+import { generateItem } from '../public/src/core/loot.js';
+
+test('Porto: 5 missões novas, com giver no Porto e objetivos bank/daily/friendlyDuel', () => {
+  const ids = ['porto_chegada', 'porto_contrato', 'porto_carga', 'porto_gelo', 'porto_duelo'];
+  for (const id of ids) { assert.ok(QUESTS[id], id); assert.ok(ZONES.harbor.npcs.some((n) => n.id === QUESTS[id].giver), id + ' giver'); }
+  assert.deepEqual(QUESTS.porto_chegada.objectives.map((o) => o.type), ['bank']);
+  assert.deepEqual(QUESTS.porto_contrato.objectives.map((o) => o.type), ['daily']);
+  assert.deepEqual(QUESTS.porto_duelo.objectives.map((o) => o.type), ['friendlyDuel']);
+  assert.ok(QUESTS.porto_gelo.level >= 22 && QUESTS.porto_gelo.objectives[0].zone === 'glacier');
+  assert.ok(OFFLINE_TYPES.has('friendlyDuel'));
+});
+
+test('Porto: guardar item no banco avança porto_chegada e conta o depósito; só a missão ativa progride', () => {
+  const d = ensureJournal(hero(10));
+  d.inventory.push(generateItem(rng, 10, { classId: 'warrior' }));
+  assert.equal(acceptQuest(d, 'porto_chegada').ok, true);
+  assert.equal(depositItem(d, d.inventory[d.inventory.length - 1].id).ok, true);
+  const out = recordEvent(d, { type: 'bank' }); // o jogo emite o evento após o depósito
+  assert.equal(isComplete(d, 'porto_chegada'), true); assert.equal(d.stats.deposits, 1); assert.ok(out.quests.some((q) => q.id === 'porto_chegada' && q.complete));
+  assert.equal(turnInQuest(d, 'porto_chegada', rng).ok, true);
+});
+
+test('Porto: entregar contrato do Quadro cumpre porto_contrato (daily) e soma o contador', () => {
+  const d = ensureJournal(hero(10));
+  recordEvent(d, { type: 'level', level: 10 });
+  d.quests.done.porto_chegada = 1; d.stats.quests++;
+  assert.equal(acceptQuest(d, 'porto_contrato').ok, true);
+  const now = Date.now(), c = dailyBoard(d, dayUTC(now)).find((x) => x.kind === 'chest');
+  dailyState(d, dayUTC(now)).p[c.id] = c.count;
+  const r = claimDaily(d, c.id, now);
+  assert.equal(r.ok, true); assert.equal(d.stats.contracts, 1);
+  assert.equal(isComplete(d, 'porto_contrato'), true); assert.ok(r.quests.some((q) => q.id === 'porto_contrato'));
+});
+
+test('Porto: duelo amistoso só conta vitória; a missão porto_duelo some online e aparece offline', () => {
+  const d = ensureJournal(hero(10));
+  assert.ok(offeredBy(d, 'duelist', { server: false }).some((q) => q.id === 'porto_duelo'), 'offline oferece');
+  assert.ok(!offeredBy(d, 'duelist', { server: true }).some((q) => q.id === 'porto_duelo'), 'online não oferece');
+  acceptQuest(d, 'porto_duelo');
+  recordEvent(d, { type: 'friendlyDuel', won: false });
+  assert.equal(isComplete(d, 'porto_duelo'), false); assert.equal(d.stats.friendlyWins, 0);
+  recordEvent(d, { type: 'friendlyDuel', won: true });
+  assert.equal(isComplete(d, 'porto_duelo'), true); assert.equal(d.stats.friendlyWins, 1);
+});
+
+test('Porto: porto_carga exige Planície e Ruínas; porto_gelo conta baús só no Cume', () => {
+  const d = ensureJournal(hero(22));
+  d.quests.done.porto_chegada = 1;
+  acceptQuest(d, 'porto_carga'); acceptQuest(d, 'porto_gelo');
+  kill(d, 8, { zoneId: 'plains' }); assert.equal(isComplete(d, 'porto_carga'), false);
+  kill(d, 7, { zoneId: 'ruins' }); assert.equal(isComplete(d, 'porto_carga'), true);
+  for (let i = 0; i < 3; i++) recordEvent(d, { type: 'chest', zoneId: 'ruins' });
+  assert.equal(isComplete(d, 'porto_gelo'), false);
+  for (let i = 0; i < 3; i++) recordEvent(d, { type: 'chest', zoneId: 'glacier' });
+  assert.equal(isComplete(d, 'porto_gelo'), true);
+});
+
+test('Porto: conquista Marinheiro ao chegar; o servidor aceita os contadores novos e limita o salto', () => {
+  const d = ensureJournal(hero(10));
+  assert.equal(recordEvent(d, { type: 'visit', zoneId: 'harbor' }).achievements.includes('marinheiro'), true);
+  assert.equal(d.stats.harborVisits, 1);
+  recordEvent(d, { type: 'visit', zoneId: 'forest' }); assert.equal(d.stats.harborVisits, 1, 'só o Porto conta');
+  const old = validate(JSON.parse(JSON.stringify(d))).char, neu = JSON.parse(JSON.stringify(old));
+  neu.stats.deposits = 1;
+  assert.equal(checkSave(old, neu).ok, true);
+  neu.stats.deposits = 9999;
+  assert.equal(checkSave(old, neu).ok, false);
+});
+
+test('Porto: falas condicionais por missão feita', () => {
+  const d = ensureJournal(hero(10));
+  const before = greetFor(d, DIALOGS.captain.greet);
+  d.quests.done.porto_chegada = 1;
+  assert.notEqual(greetFor(d, DIALOGS.captain.greet), before);
+  d.quests.done.porto_carga = 1;
+  assert.match(greetFor(d, DIALOGS.captain.greet), /cargas/i);
+});
+
+test('saves antigos: quem já visitou as Ruínas também visitou o Porto', () => {
+  const d = ensureJournal(hero(15)); d.visited = { town: 1, forest: 1, plains: 1, ruins: 1 };
+  assert.equal(validate(JSON.parse(JSON.stringify(d))).char.visited.harbor, 1);
+  const n = ensureJournal(hero(15)); n.visited = { town: 1, forest: 1 };
+  assert.ok(!validate(JSON.parse(JSON.stringify(n))).char.visited.harbor);
 });

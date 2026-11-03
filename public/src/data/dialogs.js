@@ -57,23 +57,29 @@ export const DIALOGS = {
   ], service: null },
   // ---- Porto de Marfim (zona `harbor`): `service.panel` é o painel que a UI deve abrir (ver docs/gameplay/porto.md) ----
   banker: { greet: [
+    { when: { done: 'porto_chegada' }, text: 'O primeiro item no cofre é sempre o mais difícil de largar. Os outros, o senhor guarda de olhos fechados.' },
     { when: { level: 20 }, text: 'Um cliente de peso! Seu cofre tem 40 vagas e ninguém além de você tem a chave. Nem eu, juro.' },
     { text: 'Banco de Marfim: guardo o que a mochila não aguenta. Quarenta vagas, sem juros e sem perguntas.' },
   ], service: { label: 'Abrir o banco', panel: 'bank' } },
   hunter: { greet: [
+    { when: { done: 'porto_contrato' }, text: 'Seu nome já circula no quadro. Gosto de quem entrega no prazo. Hoje tem contrato novo.' },
     { when: { bossKills: 1 }, text: 'Já derrubou um chefe, é? Ótimo. O quadro muda todo dia: três contratos, pagamento na entrega.' },
     { text: 'O Quadro de Contratos renova toda manhã. Caça, baús, nada que um iniciante não aguente. Volte amanhã por mais.' },
   ], service: { label: 'Ver contratos de hoje', panel: 'board' } },
   dealer: { greet: [
+    { when: { done: 'porto_gelo' }, text: 'O gelo do Cume rendeu bem. Poção e pergaminho com desconto de freguês, e troco itens comuns por um raro. Pergunte.' },
     { when: { level: 20 }, text: 'Mercadoria de navio, nível de gente grande. O estoque gira todo dia: o que sumiu hoje, só volta por sorte.' },
     { text: 'Do cais para a sua mochila! Estoque novo todo dia, preço de porto. Hoje tem até peça épica, se eu não vender antes.' },
   ], service: { label: 'Ver o estoque do dia', panel: 'shop:harbor' } },
   duelist: { greet: [
-    { when: { offline: true }, text: 'Sem rede não há adversário de carne e osso. Volte quando o mar estiver conectado!' },
+    { when: { offline: false }, text: 'Com o mar conectado, a Grande Arena de Doran tem adversários de carne e osso. O duelo amistoso, por ora, é só na jornada solo!' },
+    { when: { done: 'porto_duelo' }, text: 'Lembro do seu golpe de cais. Quando quiser outra rodada, o ringue está de pé.' },
     { text: 'Duelo amistoso: sem pontos, sem rancor, só aço. Ninguém perde Elo no meu ringue. Aceita?' },
   ], service: { label: 'Duelo amistoso 1×1', panel: 'arena:friendly' } },
   captain: { greet: [
     { when: { done: 'ecos_unidos' }, text: 'A maré mudou depois do que fez. Os barcos voltaram a cantar. Obrigada, herói.' },
+    { when: { done: 'porto_carga' }, text: 'As cargas voltaram e o cais respira. Eu devia lhe dar um navio. Por ora, aceite meu agradecimento.' },
+    { when: { done: 'porto_chegada' }, text: 'Entre a Planície e as Ruínas, é aqui que todo mundo faz escala. Tem trabalho no cais, se quiser.' },
     { text: 'Os barcos estão parados desde o último eco. Mas o porto vive: loja, banco e quadro, tudo à mão. Boa caça.' },
   ], service: null },
 };
@@ -84,7 +90,7 @@ export const TIPS = {
   chest: ['Primeiro baú', 'O item novo já está na mochila: abra a Mochila no menu e equipe o melhor. Vale abrir todos os baús que encontrar.'],
   level: ['Pontos de atributo', 'Abra Personagem no menu e distribua os pontos para ficar mais forte.'],
   skill: ['Habilidade nova', 'Ela já está num dos botões de habilidade. As ainda bloqueadas mostram o nível em que liberam.'],
-  spirit: ['Seu spirit', 'Spirits crescem com você. No nível 10 deles, evolua em Spirits para ganhar mais poder.'],
+  spirit: ['Seu spirit', 'Spirits crescem com você. Para evoluir, faça a missão do elemento dele com a Sábia Yun (no nível 10 do spirit) e depois use Evoluir em Spirits.'],
   boss: ['Primeiro chefe', 'O mapa leva você a lugares já visitados. Pergaminhos de viagem são vendidos pela Mercadora Lia.'],
   ritual: ['Cinzas Ardentes', 'Aqui o chefe desperta pelo "Ritual N/40": cada criatura derrotada enche o contador, e o chão estremece ao completar.'],
 };

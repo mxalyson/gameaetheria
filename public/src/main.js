@@ -6,7 +6,7 @@ import { Input } from './input.js';
 import { UI, esc } from './ui/ui.js';
 import { World, makeHeroActor, makeMobActor, makeSpiritActor } from './game/sim.js';
 import { makeRng } from './core/rng.js';
-import { computeStats, canEquip, itemScore } from './core/stats.js';
+import { computeStats, canEquip, itemScore, hasMastery } from './core/stats.js';
 import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit } from './core/progression.js';
 import { generateItem, rollMobLoot } from './core/loot.js';
 import { generateRivalForPower } from './core/rival.js';
@@ -22,16 +22,18 @@ import { SnapshotDecoder } from './core/snapshot.js';
 import { noticeText } from './ui/ui.js';
 import { skillOf } from './core/specs.js';
 import { SKILLS } from './data/skills.js';
-import { newlyUnlocked } from './core/unlocks.js';
+import { newlyUnlocked, masteryUnlock } from './core/unlocks.js';
 import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
-import { ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, evolvedSpirits, readLore } from './core/journal.js';
+import { depositItem, withdrawItem } from './core/bank.js';
+import { claimDaily, ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, evolvedSpirits, readLore } from './core/journal.js';
 import { TIPS } from './data/dialogs.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
-import { PRICES, SCROLL_MAX, buildShopStock, sellValue } from './shop.js';
+import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue } from './shop.js';
 import { TouchControls } from './touch.js';
 import { interactTarget } from './touch-logic.js';
-import { loadPrefs, savePrefs, changePref, resolveQuality } from './prefs.js';
+import { setDayNightMode } from './render/sky.js';
+import { loadPrefs, savePrefs, changePref, resolveQuality, resolveScale } from './prefs.js';
 import { CLASSES } from './data/classes.js';
 import { MOBS, XP_MULT } from './data/mobs.js';
 import { soloWaveSpec, WAVES } from './core/economy.js';
@@ -47,6 +49,9 @@ const MAX_TICKS = 8;
 
 const TELEPORT_REJECT = { not_visited: 'Você ainda não visitou esse mapa.', no_scroll: 'Sem pergaminho de teletransporte.', in_combat: 'Em combate: espere uns segundos para viajar.', teleport_wait: 'Calma: espere alguns segundos entre viagens.' };
 
+// papel do NPC → painel do serviço (Porto de Marfim; ver docs/gameplay/porto.md)
+const SERVICE_OF_ROLE = { bank: 'bank', board: 'board', harborshop: 'shop:harbor', duel: 'arena:friendly' };
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('game');
@@ -57,6 +62,7 @@ class Game {
     this.touch = new TouchControls(this);
     this.portrait = matchMedia('(orientation: portrait) and (pointer: coarse)');
     this.applyPrefs();
+    addEventListener('resize', () => { if (this.prefs.scale === 'auto') this.applyPrefs(); }); // escala automática segue girar/redimensionar
     this.minimap = document.getElementById('minimap');
     this.rng = makeRng();
     this.char = null;
@@ -69,6 +75,7 @@ class Game {
     this.saveT = 15;
     this.mmT = 0;
     this.shopStock = [];
+    this.harborStock = []; // estoque do dia do Mercador do Porto (refeito ao abrir a loja)
     this.shopLevel = 0;
     this.titleWorld = new World('town');
     // Com API configurada o jogo exige conta (login → personagens na nuvem). Sem API, segue offline como antes.
@@ -152,7 +159,10 @@ class Game {
       case 'quest-turnin': this.questTurnIn(arg); break;
       case 'quest-abandon': abandonQuest(this.char, arg); this.save(); this.ui.render(); break;
       case 'set-title': setTitle(this.char, arg || null); this.save(); this.ui.render(); break;
-      case 'dialog-service': this.ui.openPanel(arg); break;
+      case 'dialog-service': this.openService(arg); break;
+      case 'bank-take': this.bankTake(arg); break;
+      case 'daily-claim': this.dailyClaim(arg); break;
+      case 'return-harbor': this.ui.hideScreen(); this.enterZone('harbor', ZONES.harbor.spawn.x, ZONES.harbor.spawn.y); break;
       case 'net-queue': this.netQueue(arg); break;
       case 'net-cancel': this.net?.cancelQueue(); break;
       case 'net-leave': this.leaveNetMatch(); break;
@@ -183,7 +193,7 @@ class Game {
       }
       case 'close': this.ui.close(arg); break;
       case 'toggle': this.togglePanel(arg); document.getElementById('menu-btns')?.classList.remove('open'); break;
-      case 'item': this.ui.isOpen('shop') ? this.sell(arg) : this.equip(arg); break;
+      case 'item': this.ui.isOpen('shop') ? this.sell(arg) : this.ui.isOpen('bank') ? this.bankPut(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
       case 'enhance': this.enhanceItem(arg); break;
       case 'alloc': this.alloc(arg); break;
@@ -260,13 +270,14 @@ class Game {
     this.stashRespawns(this.world);
     const bs = ((this.bossStates ??= {})[zoneId] ??= {}); // contador do ritual do chefe sobrevive à troca de mapa (só nesta sessão)
     if (zoneId === 'ember' && this.char.quests?.active?.cavaleiro_rubro && !bs.questShown) { bs.go = true; bs.questShown = true; } // a missão libera a primeira aparição
-    this.world = new World(zoneId, { bossState: bs });
+    this.world = new World(zoneId, { bossState: bs, night: true });
     // chefe/mini-chefe abatidos continuam em recarga ao reentrar (sem isso o World novo os recriava na hora)
     if (bs.bossT != null) this.world.bossT = bs.bossT;
     if (bs.miniT != null) this.world.miniT = bs.miniT;
     this.mode = mode;
     if (ZONES[zoneId].mobs || ZONES[zoneId].hub) (this.char.visited ??= {})[zoneId] = 1; // desbloqueia o teletransporte para este mapa
     this.player = this.world.add(makeHeroActor(this.char, x, y));
+    if (zoneId === 'harbor' && mode === 'explore') this.gameEvent({ type: 'visit', zoneId }); // conquista Marinheiro (conta chegadas ao Porto)
     if (!this.world.zone.safe && mode === 'explore') this.player.hp = Math.max(1, Math.round(this.player.maxHp * ratio));
     this.spawnSpirit(this.player, this.char);
     this.world.populate(this.char.level);
@@ -498,7 +509,7 @@ class Game {
   async onZoneReward(r) {
     if (!this.inNetZone()) return;
     const parts = [];
-    if (r.gold) parts.push(`${r.gold > 0 ? '+' : ''}${r.gold} 🪙`);
+    if (r.gold) parts.push(`${r.gold > 0 ? '+' : ''}${r.gold} ouro`);
     if (r.xp) parts.push(`+${r.xp} XP`);
     if (r.items) parts.push(`${r.items} item(ns)`);
     if (r.potions) parts.push(`+${r.potions} 🧪`);
@@ -606,7 +617,7 @@ class Game {
     if (this.touch.active) intent = { ...this.touch.read(p, w) };
     else {
       let cast = null;
-      ['1', '2', '3'].forEach((k, i) => { if (inp.hit(k)) cast = i; });
+      ['1', '2', '3', '4'].forEach((k, i) => { if (inp.hit(k)) cast = i; });
       intent = {
         mx: (inp.held('d', 'arrowright') ? 1 : 0) - (inp.held('a', 'arrowleft') ? 1 : 0), my: (inp.held('s', 'arrowdown') ? 1 : 0) - (inp.held('w', 'arrowup') ? 1 : 0),
         aimX: inp.mouse.x / this.renderer.zoom + this.cam.x, aimY: inp.mouse.y / this.renderer.zoom + this.cam.y, attack: inp.mouse.down, cast,
@@ -726,7 +737,7 @@ class Game {
     const r = this.netRewardMsg;
     const lines = [];
     if (r.mode !== 'coop') lines.push(`Rating ${r.mode}: ${r.rating} (${r.ratingDelta >= 0 ? '+' : ''}${r.ratingDelta})`);
-    lines.push(`+${r.gold} 🪙`, `+${r.xp} XP${r.levels ? ` · subiu ${r.levels} nível(is)!` : ''}`);
+    lines.push(`+${r.gold} ouro`, `+${r.xp} XP${r.levels ? ` · subiu ${r.levels} nível(is)!` : ''}`);
     if (r.items) lines.push(`${r.items} item(ns) de recompensa no inventário`);
     if (r.converted) lines.push(`${r.converted} item(ns) viraram ouro (inventário cheio)`);
     const nr = this.netResult ?? {};
@@ -740,7 +751,8 @@ class Game {
     try { const r = await this.online.getCharacter(this.charId); this.char = r.character; this.cloud.attach(this.charId, r.rev, () => this.char); } catch { /* mantém o local */ }
     if (this.cloud) this.cloud.paused = false;
     this.zoneBusy = false;
-    this.enterZone('town', exit?.x ?? TOWN.x, exit?.y ?? TOWN.y);
+    const to = exit?.to && ZONES[exit.to]?.hub ? exit.to : 'town'; // o servidor também manda para o Porto (cidade neutra, sem sala)
+    this.enterZone(to, exit?.x ?? TOWN.x, exit?.y ?? TOWN.y);
     this.fireTeleportEvent();
   }
 
@@ -805,18 +817,21 @@ class Game {
     p.maxHp = st.maxHp;
     p.hp = Math.max(1, Math.round(st.maxHp * ratio));
     p.level = this.char.level;
+    p.mastery = hasMastery(this.char); // a Maestria libera a 4ª habilidade (s3)
   }
 
   // ---------------- preferências do aparelho ----------------
   applyPrefs() {
     const p = this.prefs;
-    document.documentElement.style.setProperty('--ui', String(p.scale / 100));
+    this.uiScale = resolveScale(p) / 100; // 'auto' acompanha a viewport (prefs.js autoScale)
+    document.documentElement.style.setProperty('--ui', String(this.uiScale));
     this.renderer.setQuality(resolveQuality(p, this.touch.coarse));
     this.touch.setMode(p.controls);
+    setDayNightMode(p.daynight); // render/sky.js: 'auto' segue o relógio, 'day' fica sempre claro (o bônus noturno de jogo segue o relógio)
   }
 
   setPref(arg) {
-    this.prefs = changePref(this.prefs, arg);
+    this.prefs = changePref(this.prefs, arg, innerWidth, innerHeight);
     savePrefs(this.prefs);
     this.applyPrefs();
     if (this.ui.isOpen('options')) this.ui.render();
@@ -856,7 +871,7 @@ class Game {
         if (this.touch.active) intents[p.id] = this.touch.read(p, w);
         else {
           let cast = null;
-          ['1', '2', '3'].forEach((k, i) => { if (inp.hit(k)) cast = i; });
+          ['1', '2', '3', '4'].forEach((k, i) => { if (inp.hit(k)) cast = i; });
           intents[p.id] = {
             mx: (inp.held('d', 'arrowright') ? 1 : 0) - (inp.held('a', 'arrowleft') ? 1 : 0),
             my: (inp.held('s', 'arrowdown') ? 1 : 0) - (inp.held('w', 'arrowup') ? 1 : 0),
@@ -915,10 +930,9 @@ class Game {
   teleport(id) {
     if (id === 'town' && this.inNetZone()) { this.ui.closePanels(); return this.hearth(); } // instância online: o nó da Vila do mapa sai da instância (zone_leave)
     const c = this.char, z = ZONES[id];
-    if (this.mode !== 'explore' || !z || !(z.hub || c.visited?.[id])) return;
+    if (this.mode !== 'explore' || !z || !(id === 'town' || c.visited?.[id])) return; // só a Vila vale sem ter visitado
     if (id === this.world.zoneId) return this.ui.toast('Você já está aqui', z.name, '');
     if (this.world.time - this.player.lastCombat < 8) return this.ui.toast('Em combate', 'Espere uns segundos para viajar.', '');
-    if (this.online && this.net?.joined && z.hub && id !== 'town') return this.ui.toast(z.name, 'Online, siga o portal sul da Vila de Lúmen.', ''); // cidades além da Vila são locais (o servidor só teletransporta para a Vila e zonas de farm)
     if (this.online && this.net?.joined) return this.teleportOnline(id); // o servidor confere visitado, pergaminho e combate, e debita o pergaminho
     const cost = teleportCost(id);
     if (cost > (c.scrolls ?? 0)) return this.ui.toast('Sem pergaminho', 'Compre um Pergaminho de Teletransporte com a Mercadora Lia.', '');
@@ -975,6 +989,37 @@ class Game {
     else if (npc.role === 'arena') this.ui.openPanel('arena');
     else if (npc.role === 'spirit') this.ui.openPanel('sage');
     else if (npc.role === 'smith') this.ui.openPanel('shop:smith'); // abre a loja já rolada até o Ferreiro (aprimoramento)
+    else if (SERVICE_OF_ROLE[npc.role]) this.openService(SERVICE_OF_ROLE[npc.role]); // Porto: bank, board, harborshop, duel
+  }
+
+  // Abre o painel de um serviço de NPC (`service.panel` de data/dialogs.js). Loja do Porto refaz o estoque do dia; duelo amistoso inicia a luta.
+  openService(panel) {
+    if (panel === 'shop:harbor') this.harborStock = buildShopStock(this.char, { harbor: true });
+    if (panel === 'arena:friendly') return this.startFriendly();
+    this.ui.openPanel(panel);
+  }
+
+  // ---------------- Porto: banco e contratos ----------------
+  bankPut(id) {
+    const r = depositItem(this.char, id);
+    if (!r.ok) return this.ui.toast('Banco', r.reason, '');
+    this.gameEvent({ type: 'bank' }); // missão do Porto (objetivo `bank`) e contador de depósitos
+    this.ui.render(); this.save();
+  }
+  bankTake(id) {
+    const r = withdrawItem(this.char, id);
+    if (!r.ok) return this.ui.toast('Banco', r.reason, '');
+    this.ui.render(); this.save();
+  }
+  dailyClaim(id) {
+    const r = claimDaily(this.char, id);
+    if (!r.ok) return this.ui.toast('Contrato', r.reason, '');
+    const R = r.reward;
+    this.ui.toast('Contrato entregue!', `+${R.gold} ouro · +${R.xp} XP · +${R.potions} poção(ões)`, 'gold');
+    if (r.levels) this.onLevelUp();
+    for (const q of r.quests ?? []) if (q.complete) this.ui.toast('Missão pronta!', QUESTS[q.id].name + ' — volte ao NPC (marca ?)', 'gold');
+    this.announceAchievements(r.achievements ?? []);
+    this.refreshStats(); this.save(); this.ui.render();
   }
 
   // marca sobre o NPC: '!' tem missão, '?' pronta para entregar, 'none' nada (só para quem existe só por missões)
@@ -1009,10 +1054,15 @@ class Game {
     const r = turnInQuest(this.char, id, this.rng);
     if (!r.ok) return this.ui.toast('Missão', r.reason, '');
     const R = r.reward;
-    this.ui.toast('Missão concluída!', [QUESTS[id].name, R.gold ? `+${R.gold} 🪙` : '', R.xp ? `+${R.xp} XP` : ''].filter(Boolean).join(' · '), 'gold');
+    this.ui.toast('Missão concluída!', [QUESTS[id].name, R.gold ? `+${R.gold} ouro` : '', R.xp ? `+${R.xp} XP` : ''].filter(Boolean).join(' · '), 'gold');
     for (const it of R.items) this.ui.log(`Recompensa: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
     if (R.levels) this.onLevelUp();
     this.refreshStats();
+    if (id === 'maestria') { // a Maestria também ensina a habilidade do 4º slot
+      const m = masteryUnlock(this.char.classId);
+      this.ui.toast('Nova habilidade: ' + SKILLS[m.id].name, SKILLS[m.id].desc, 'gold');
+      this.ui.log(`Nova habilidade: <b>${SKILLS[m.id].name}</b>.`, '#ffd34d');
+    }
     this.announceAchievements(r.achievements);
     this.save(); this.ui.render();
   }
@@ -1075,8 +1125,9 @@ class Game {
   onMobKilled(m) {
     if (m.summoned) return; // esbirros de chefe não dão XP nem loot
     const M = MOBS[m.mobId];
-    this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1)));
-    for (const l of rollMobLoot(this.rng, m, this.char.classId, (this.char.pity ??= { epic: 0, legendary: 0, opal: 0 }))) {
+    const rm = this.world.nightMods?.rewardMul ?? 1; // bônus noturno: +15% de XP, ouro e chance de item (só ao ar livre)
+    this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1) * rm));
+    for (const l of rollMobLoot(this.rng, m, this.char.classId, (this.char.pity ??= { epic: 0, legendary: 0, opal: 0 }), rm)) {
       if (l.kind === 'gold') { // ouro vai direto para a mochila (sem drop no chão), com texto flutuante
         this.char.gold += l.amount;
         this.world.addText({ x: this.player.x, y: this.player.y - 34, t: 0, life: 0.8, text: `+${l.amount}`, size: 13, color: '#ffd34d' });
@@ -1174,7 +1225,7 @@ class Game {
     const c = this.char;
     if (c.spirits.length >= MAX_SPIRITS) {
       c.gold += 100;
-      this.ui.log('Limite de spirits atingido — a essência virou 100 🪙.', '#ffb4a8');
+      this.ui.log('Limite de spirits atingido — a essência virou 100 ouro.', '#ffb4a8');
       return false;
     }
     c.spirits.push(sp);
@@ -1191,7 +1242,7 @@ class Game {
   // ---------------- inventário / atributos ----------------
   findItem(id) {
     const c = this.char;
-    return c.inventory.find((i) => i.id === id) ?? Object.values(c.equipment).find((i) => i?.id === id) ?? this.shopStock.find((i) => i.id === id);
+    return c.inventory.find((i) => i.id === id) ?? Object.values(c.equipment).find((i) => i?.id === id) ?? this.shopStock.find((i) => i.id === id) ?? this.harborStock.find((i) => i.id === id) ?? (c.bank ?? []).find((i) => i.id === id);
   }
 
   equip(id) {
@@ -1223,17 +1274,21 @@ class Game {
     const r = enhance(this.char, id);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
     const it = findGear(this.char, id);
-    this.ui.log(`${it.name} aprimorado para +${r.plus} (-${r.cost} 🪙)`, '#ffd34d');
+    this.ui.log(`${it.name} aprimorado para +${r.plus} (-${r.cost} ouro)`, '#ffd34d');
     this.gameEvent({ type: 'upgrade' });
     this.refreshStats(); this.ui.render(); this.save();
   }
 
+  // preço de venda: 50% na Vila (G13), 60% no Mercador do Porto
+  sellPrice(it) { return this.ui.shopAnchor === 'harbor' && this.ui.isOpen('shop') ? harborSellValue(it) : sellValue(it); }
+
   sell(id) {
     const c = this.char, idx = c.inventory.findIndex((i) => i.id === id);
     if (idx < 0) return;
-    const it = c.inventory.splice(idx, 1)[0], pay = sellValue(it); // G13: 50% do valor
+    const it = c.inventory[idx], pay = this.sellPrice(it);
+    c.inventory.splice(idx, 1);
     c.gold += pay;
-    this.ui.log(`Vendido: ${it.name} (+${pay} 🪙)`, '#ffd34d');
+    this.ui.log(`Vendido: ${it.name} (+${pay} ouro)`, '#ffd34d');
     this.ui.render();
     this.save();
   }
@@ -1242,10 +1297,10 @@ class Game {
     const c = this.char;
     const sold = c.inventory.filter((i) => RARITY[i.rarity].index <= maxRarity);
     if (!sold.length) return;
-    const gold = sold.reduce((s, i) => s + sellValue(i), 0);
+    const gold = sold.reduce((s, i) => s + this.sellPrice(i), 0);
     c.inventory = c.inventory.filter((i) => RARITY[i.rarity].index > maxRarity);
     c.gold += gold;
-    this.ui.log(`${sold.length} itens vendidos (+${gold} 🪙)`, '#ffd34d');
+    this.ui.log(`${sold.length} itens vendidos (+${gold} ouro)`, '#ffd34d');
     this.ui.render();
     this.save();
   }
@@ -1260,7 +1315,7 @@ class Game {
     const r = chooseSpec(this.char, id);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
     this.player.spec = activeSpec(this.char);
-    this.ui.toast('Especialização', specInfo(this.char.classId, id).name + (r.cost ? ` · -${r.cost} 🪙` : ''), 'gold');
+    this.ui.toast('Especialização', specInfo(this.char.classId, id).name + (r.cost ? ` · -${r.cost} ouro` : ''), 'gold');
     this.ui.render();
     this.save();
   }
@@ -1294,7 +1349,7 @@ class Game {
     const actor = this.world.actors.find((a) => a.kind === 'spirit' && a.owner === this.player.id && a.spiritType === sp.type);
     if (actor && this.char.activeSpirit === id) { actor.stats.power = spiritPower(sp); actor.stage = 2; }
     this.ui.toast(`${S.name} evoluiu!`, `Forma evoluída · poder ${spiritPower(sp)}`, 'gold');
-    this.ui.log(`${S.name} evoluiu para a forma 2 (−${r.cost} 🪙).`, S.color);
+    this.ui.log(`${S.name} evoluiu para a forma 2 (−${r.cost} ouro).`, S.color);
     this.gameEvent({ type: 'spiritStage', count: evolvedSpirits(this.char) });
     this.ui.render(); this.save();
   }
@@ -1329,11 +1384,12 @@ class Game {
   }
 
   buyItem(i) {
-    const it = this.shopStock[i];
+    const harbor = this.ui.shopAnchor === 'harbor', stock = harbor ? this.harborStock : this.shopStock, it = stock[i];
     if (!it) return;
     if (this.char.inventory.length >= INVENTORY_SIZE) return this.ui.log('Inventário cheio.', '#ffb4a8');
-    if (!this.spend(it.value * PRICES.itemMarkup)) return;
-    this.shopStock.splice(i, 1);
+    if (!this.spend(it.price ?? it.value * PRICES.itemMarkup)) return;
+    stock.splice(i, 1);
+    delete it.price; // só serve para exibir; o item guardado não leva o campo
     if (it.baseValue != null) { it.value = it.baseValue; delete it.baseValue; } // destaque: volta ao valor real (venda/ceiling)
     this.char.inventory.push(it);
     this.ui.log(`Comprado: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
@@ -1382,9 +1438,15 @@ class Game {
     return out;
   }
 
-  startMatch(mode) {
+  // Duelo amistoso do Porto (Duelista Kael): 1×1 contra rival de IA, sem Elo, sem ouro e sem XP de PvP. Só offline: online ainda não há regra no servidor.
+  startFriendly() {
+    if (this.online) return this.ui.toast('Duelo amistoso', 'Disponível só na jornada solo por enquanto.', '');
+    this.startMatch('1v1', { friendly: true });
+  }
+
+  startMatch(mode, { friendly = false } = {}) {
     if (!MODES[mode]) return;
-    if (!pvpUnlocked(this.char)) { this.ui.log(`O PvP libera no nível ${PVP_MIN_LEVEL}.`, '#ffb4a8'); return; }
+    if (!friendly && !pvpUnlocked(this.char)) { this.ui.log(`O PvP libera no nível ${PVP_MIN_LEVEL}.`, '#ffb4a8'); return; }
     this.ui.closePanels();
     const M = newMatch(mode), size = M.size, c = this.char;
     this.enterZone('arena_team', 900, 900, 'pvp');
@@ -1408,13 +1470,13 @@ class Game {
       this.spawnSpirit(a, rc); team2.push(a); chars.enemies.push(rc);
     });
     w.objective = { ...z.objective, owner: 0, contested: false };
-    this.match = { ...M, team1, team2, chars, myRating };
+    this.match = { ...M, team1, team2, chars, myRating, friendly };
     this.rival = team2[0];
     this.rivalChar = chars.enemies[0];
     w.frozen = 3.2;
     this.duelGo = 0;
     const foePwr = Math.round(chars.enemies.reduce((s, r) => s + playerPower(r), 0) / size);
-    this.ui.log(`<b>${MODES[mode].label}</b> — seu poder ${playerPower(c)} · inimigos (média) ${foePwr} · rating ${myRating}`, '#ffb4a8');
+    this.ui.log(friendly ? `<b>Duelo amistoso</b> — seu poder ${playerPower(c)} · rival ${foePwr} · sem Elo, ouro nem XP` : `<b>${MODES[mode].label}</b> — seu poder ${playerPower(c)} · inimigos (média) ${foePwr} · rating ${myRating}`, '#ffb4a8');
     this.ui.log('Segure o ponto central para pontuar; vence quem chegar a 100 ou eliminar o outro time.', '#ffe9a0');
   }
 
@@ -1442,6 +1504,12 @@ class Game {
     const M = this.match, c = this.char, a = c.arena;
     const won = winner === 1, draw = winner === 3;
     const foes = M.chars.enemies;
+    if (M.friendly) { // amistoso: nada de Elo, vitórias/derrotas, ouro, prêmio ou XP
+      this.ui.banner(null);
+      if (won) this.gameEvent({ type: 'friendlyDuel', won: true }); // só a missão `porto_duelo` e o contador; sem Elo
+      this.ui.showResult({ title: won ? 'Vitória!' : draw ? 'Empate' : 'Derrota', sub: `Duelo amistoso · ${foes.map((r) => CLASSES[r.classId].name).join(', ')}`, lines: [`Pontos: ${Math.floor(M.score[1])} × ${Math.floor(M.score[2])}`, 'Amistoso: sem Elo, ouro nem XP.'], button: 'Voltar ao Porto', action: 'return-harbor', tone: won ? 'win' : 'lose' });
+      return;
+    }
     const foeRating = Math.round(foes.reduce((s, r) => s + r.arena.rating, 0) / foes.length);
     const oldTier = tierFor(M.myRating);
     const delta = draw ? 0 : eloDelta(M.myRating, foeRating, won);
@@ -1450,7 +1518,7 @@ class Game {
     const mul = 1 + (M.size - 1) * 0.2; // times maiores pagam um pouco mais
     const gold = Math.round((won ? 40 + c.level * 8 : draw ? 20 + c.level * 4 : 10 + c.level * 2) * mul);
     c.gold += gold;
-    const lines = [`Rating ${MODES[M.mode].label}: ${getRating(c, M.mode)} (${delta >= 0 ? '+' : ''}${delta})`, `Pontos: ${Math.floor(M.score[1])} × ${Math.floor(M.score[2])}`, `+${gold} 🪙`];
+    const lines = [`Rating ${MODES[M.mode].label}: ${getRating(c, M.mode)} (${delta >= 0 ? '+' : ''}${delta})`, `Pontos: ${Math.floor(M.score[1])} × ${Math.floor(M.score[2])}`, `+${gold} ouro`];
     const newTier = tierFor(getRating(c, M.mode));
     if (newTier.name !== oldTier.name) lines.push(`Nova liga: <b style="color:${newTier.color}">${newTier.name}</b>`);
     if (won && this.rng.chance(0.35)) {
@@ -1458,7 +1526,7 @@ class Game {
       if (c.inventory.length < INVENTORY_SIZE) {
         c.inventory.push(it);
         lines.push(`Prêmio: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
-      } else { c.gold += it.value; lines.push(`Prêmio convertido em ${it.value} 🪙 (inventário cheio)`); }
+      } else { c.gold += it.value; lines.push(`Prêmio convertido em ${it.value} ouro (inventário cheio)`); }
     }
     this.grantXp(xpToNext(c.level) * (won ? 0.12 : 0.04) * mul);
     this.ui.banner(null);
@@ -1490,7 +1558,7 @@ class Game {
       W.t = 4;
       this.char.arena.bestWave = Math.max(this.char.arena.bestWave, W.n);
       this.world.heal(this.player, this.player.maxHp * WAVES.solo.restHeal);
-      this.ui.toast(`Onda ${W.n} vencida!`, `+${reward} 🪙 · +${Math.round(WAVES.solo.restHeal * 100)}% de vida`, 'gold');
+      this.ui.toast(`Onda ${W.n} vencida!`, `+${reward} ouro · +${Math.round(WAVES.solo.restHeal * 100)}% de vida`, 'gold');
     } else {
       W.t -= dt;
       this.ui.banner(`Próxima onda em ${Math.max(1, Math.ceil(W.t))}…`);
@@ -1521,14 +1589,14 @@ class Game {
       c.arena.bestWave = Math.max(c.arena.bestWave, cleared);
       this.mode = 'ended';
       this.ui.banner(null);
-      this.ui.showResult({ title: 'Fim do desafio', lines: [`Ondas vencidas: <b>${cleared}</b>`, `Recorde: ${c.arena.bestWave}`, `Ouro ganho: ${W.gold} 🪙`], tone: 'lose' });
+      this.ui.showResult({ title: 'Fim do desafio', lines: [`Ondas vencidas: <b>${cleared}</b>`, `Recorde: ${c.arena.bestWave}`, `Ouro ganho: ${W.gold} ouro`], tone: 'lose' });
       this.save();
       return;
     }
     const lost = Math.floor(c.gold * 0.1);
     c.gold -= lost;
     this.mode = 'ended';
-    this.ui.showResult({ title: 'Você caiu…', sub: this.world.zone.name, lines: [lost ? `Perdeu ${lost} 🪙` : 'Nada foi perdido.'], button: 'Renascer na vila', tone: 'lose' });
+    this.ui.showResult({ title: 'Você caiu…', sub: this.world.zone.name, lines: [lost ? `Perdeu ${lost} ouro` : 'Nada foi perdido.'], button: 'Renascer na vila', tone: 'lose' });
     this.save();
   }
 }

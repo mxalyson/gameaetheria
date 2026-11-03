@@ -54,7 +54,7 @@ export function parseClientMessage(data) {
     case 'input': {
       if (!Number.isInteger(data.seq) || data.seq < 0 || data.seq > 2 ** 31) return { ok: false, code: REJECT.BAD_MESSAGE };
       if (![data.mx, data.my, data.aimX, data.aimY].every(finite)) return { ok: false, code: REJECT.BAD_MESSAGE };
-      if (data.cast != null && ![0, 1, 2].includes(data.cast)) return { ok: false, code: REJECT.BAD_MESSAGE };
+      if (data.cast != null && ![0, 1, 2, 3].includes(data.cast)) return { ok: false, code: REJECT.BAD_MESSAGE };
       // direção normalizada em [-1,1]; mira dentro de um limite (o servidor ainda clampa à arena)
       return { ok: true, msg: {
         t: 'input', seq: data.seq,
@@ -66,9 +66,9 @@ export function parseClientMessage(data) {
     case 'queue':
       return QUEUE_MODES.includes(data.mode) ? { ok: true, msg: { t: 'queue', mode: data.mode } } : { ok: false, code: REJECT.BAD_MODE };
     case 'zone_enter': // exploração no servidor: `zone` = zona de destino, `from` = zona de onde vem (o servidor confere o portal e decide o ponto de entrada)
-      return ZONES[data.zone]?.mobs && (data.from === 'town' || ZONES[data.from]?.mobs) ? { ok: true, msg: { t: 'zone_enter', zone: data.zone, from: data.from } } : { ok: false, code: REJECT.BAD_MESSAGE };
+      return ZONES[data.zone]?.mobs && (data.from === 'town' || ZONES[data.from]?.mobs || ZONES[data.from]?.hub) ? { ok: true, msg: { t: 'zone_enter', zone: data.zone, from: data.from } } : { ok: false, code: REJECT.BAD_MESSAGE };
     case 'zone_teleport': // teletransporte para mapa já visitado: só o destino; visitado, pergaminho, combate e limite de uso são conferidos no servidor
-      return typeof data.zone === 'string' && (data.zone === 'town' || ZONES[data.zone]?.mobs) ? { ok: true, msg: { t: 'zone_teleport', zone: data.zone } } : { ok: false, code: REJECT.BAD_MESSAGE };
+      return typeof data.zone === 'string' && (data.zone === 'town' || ZONES[data.zone]?.mobs || ZONES[data.zone]?.hub) ? { ok: true, msg: { t: 'zone_teleport', zone: data.zone } } : { ok: false, code: REJECT.BAD_MESSAGE };
     case 'queue_cancel': case 'party_create': case 'party_leave': case 'zone_leave':
       return { ok: true, msg: { t: data.t } };
     case 'party_invite': case 'party_kick':

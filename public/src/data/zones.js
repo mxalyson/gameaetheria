@@ -14,16 +14,20 @@ export const FARM_W = 4600, FARM_H = 2800, FARM_MID = 1400, FARM_ENTRY = 110;
 const FARM_EAST = FARM_W - 40, FARM_EAST_IN = FARM_W - FARM_ENTRY; // portal leste e ponto de chegada vindo de lá
 
 // Ordem do mapa-múndi (painel do mapa e teletransporte).
-export const WORLD_ROUTE = ['town', 'harbor', 'forest', 'plains', 'ruins', 'glacier', 'ember'];
-// Posição de cada zona no mapa-múndi (coordenadas 0-100, x → leste, y → sul). O Porto fica ao sul da Vila (portal sul da Vila).
+export const WORLD_ROUTE = ['town', 'forest', 'plains', 'harbor', 'ruins', 'glacier', 'ember'];
+// Posição de cada zona no mapa-múndi (coordenadas 0-100, x → leste, y → sul). O Porto fica no meio da rota, entre a Planície e as Ruínas.
 export const WORLD_NODES = {
-  town: { x: 14, y: 36 }, harbor: { x: 14, y: 72 },
-  forest: { x: 34, y: 36 }, plains: { x: 53, y: 50 }, ruins: { x: 72, y: 36 }, glacier: { x: 86, y: 54 }, ember: { x: 94, y: 30 },
+  town: { x: 14, y: 36 }, forest: { x: 34, y: 36 }, plains: { x: 53, y: 50 }, harbor: { x: 63, y: 66 },
+  ruins: { x: 72, y: 36 }, glacier: { x: 86, y: 54 }, ember: { x: 94, y: 30 },
 };
-// Cidades neutras (`hub`): zona segura sem monstros, sempre acessível e de viagem grátis. Marcam `visited` ao entrar.
+// Cidades neutras (`hub`): zona segura sem monstros. Ficam sempre longe uma da outra (nunca duas coladas): a Vila no começo, o Porto no meio da rota.
 export const isHub = (id) => !!ZONES[id]?.hub;
-// Custo de viagem em pergaminhos de teletransporte (comprados da Mercadora Lia): as cidades são de graça, as outras zonas custam 1.
-export const teleportCost = (id) => (isHub(id) ? 0 : 1);
+// Custo de viagem em pergaminhos de teletransporte (comprados da Mercadora Lia): só a Vila é de graça; o Porto e as zonas de farm custam 1
+// (e exigem já ter pisado lá: `visited`).
+export const teleportCost = (id) => (id === 'town' ? 0 : 1);
+// Porto: portais nas bordas oeste/leste, na altura da rua principal (a mesma da praça), como os das zonas de farm no meio do mapa.
+export const HARBOR_W = 2400, HARBOR_H = 1700, HARBOR_MID = 780;
+const HARBOR_EAST = HARBOR_W - 40, HARBOR_EAST_IN = HARBOR_W - FARM_ENTRY;
 
 export const ZONES = {
   town: {
@@ -34,18 +38,18 @@ export const ZONES = {
     decor: { trees: 22, rocks: 6, bushes: 16, flowers: 140 },
     // Cenário rico: lanternas nos caminhos, bancos na praça, canteiros, caixas e placa (ver render/scenery.js).
     scenery: {
-      kind: 'town', beds: true, noTrail: true, // com 2 portais a trilha automática cortaria a vila; as ruas são `paths`
+      kind: 'town', beds: true, noTrail: true, // a trilha automática cortaria a vila; as ruas são `paths`
       along: [['lantern', 240, 64, 11, 0.5]],
       fixed: [['bench', 645, 620, 22, 0.5], ['bench', 705, 765, 22, 0.5], ['bench', 995, 765, 22, 0.5],
         ['crates', 505, 615, 14, 0.8], ['signpost', 1575, 690, 16, 0.5],
-        ['well', 1010, 890, 18, 0.6], ['fence', 440, 1040, 22, 0.4], ['fence', 540, 1040, 22, 0.4], ['fence', 1170, 1050, 22, 0.4], ['fence', 1270, 1050, 22, 0.4]],
+        ['well', 1010, 890, 18, 0.6], ['fence', 440, 1040, 22, 0.4], ['fence', 540, 1040, 22, 0.4], ['fence', 1170, 1160, 22, 0.4], ['fence', 1270, 1160, 22, 0.4]],
     },
     atmosphere: {
       tint: 'rgba(255,226,170,0.06)', edge: 'rgba(28,46,40,0.30)', rays: 0.04,
       motes: { n: 22, color: '255,240,190', drift: 5, rise: 4 },
       leaves: { n: 6, colors: ['#f2a2b8', '#ffd27a', '#9fd48a'] },
     },
-    paths: [[850, 620, 1700, 620], [850, 620, 850, 1215], [850, 620, 620, 520], [850, 620, 1080, 520]], // a rua sul vai até o portal do Porto
+    paths: [[850, 620, 1700, 620], [850, 620, 850, 1080], [850, 620, 620, 520], [850, 620, 1080, 520]],
     plaza: { x: 850, y: 620, r: 170 },
     fountain: { x: 850, y: 620 },
     houses: [
@@ -62,15 +66,12 @@ export const ZONES = {
       { id: 'herbalist', name: 'Herbalista Mel', x: 540, y: 720, color: '#6fae5c', accent: '#e8ffd9', role: 'quest' },
       { id: 'smith', name: 'Ferreiro Brok', x: 700, y: 940, color: '#8a6a4a', accent: '#f0d8b8', role: 'smith' },
       // Praça dos Mestres de Classe: lado a lado (facilita o multiplayer). Cada um só ensina a própria classe; ver core/journal.js masterNpcId.
-      { id: 'master_warrior', name: 'Mestre Guerreiro', x: 950, y: 950, color: '#e0635a', accent: '#f4c7a1', role: 'master' },
-      { id: 'master_mage', name: 'Mestre Mago', x: 1010, y: 950, color: '#6a7cf0', accent: '#d5dbff', role: 'master' },
-      { id: 'master_archer', name: 'Mestra Arqueira', x: 1070, y: 950, color: '#4fae7a', accent: '#d6f2c2', role: 'master' },
-      { id: 'master_cleric', name: 'Mestre Clérigo', x: 1130, y: 950, color: '#e8c25a', accent: '#fff3c0', role: 'master' },
+      { id: 'master_warrior', name: 'Mestre Guerreiro', x: 900, y: 1060, color: '#e0635a', accent: '#f4c7a1', role: 'master' },
+      { id: 'master_mage', name: 'Mestre Mago', x: 1015, y: 1060, color: '#6a7cf0', accent: '#d5dbff', role: 'master' },
+      { id: 'master_archer', name: 'Mestra Arqueira', x: 1130, y: 1060, color: '#4fae7a', accent: '#d6f2c2', role: 'master' },
+      { id: 'master_cleric', name: 'Mestre Clérigo', x: 1245, y: 1070, color: '#e8c25a', accent: '#fff3c0', role: 'master' },
     ],
-    portals: [
-      { x: 1650, y: 620, to: 'forest', tx: 110, ty: FARM_MID, label: 'Bosque Verdejante · Nv 1-6' },
-      { x: 850, y: 1250, to: 'harbor', tx: 1500, ty: 110, label: 'Porto de Marfim · cidade neutra' },
-    ],
+    portals: [{ x: 1650, y: 620, to: 'forest', tx: 110, ty: FARM_MID, label: 'Bosque Verdejante · Nv 1-6' }],
   },
 
   forest: {
@@ -144,7 +145,7 @@ export const ZONES = {
     },
     portals: [
       { x: 40, y: FARM_MID, to: 'forest', tx: FARM_EAST_IN, ty: FARM_MID, label: 'Bosque Verdejante' },
-      { x: FARM_EAST, y: FARM_MID, to: 'ruins', tx: FARM_ENTRY, ty: FARM_MID, label: 'Ruínas Sombrias · Nv 12-20+' },
+      { x: FARM_EAST, y: FARM_MID, to: 'harbor', tx: FARM_ENTRY, ty: HARBOR_MID, label: 'Porto de Marfim · cidade neutra' },
     ],
   },
 
@@ -182,15 +183,15 @@ export const ZONES = {
       motes: { n: 28, color: '170,150,255', drift: 4, rise: 9 },
     },
     portals: [
-      { x: 40, y: FARM_MID, to: 'plains', tx: FARM_EAST_IN, ty: FARM_MID, label: 'Planície de Cristal' },
+      { x: 40, y: FARM_MID, to: 'harbor', tx: HARBOR_EAST_IN, ty: HARBOR_MID, label: 'Porto de Marfim · cidade neutra' },
       { x: FARM_EAST, y: FARM_MID, to: 'glacier', tx: FARM_ENTRY, ty: FARM_MID, label: 'Cume Gélido · Nv 20-25' },
     ],
   },
 
-  // Porto de Marfim: segunda cidade neutra (ao sul da Vila, portal sul). Areia clara e lajes, canal com ponte de madeira, baías, casas em arco
-  // em volta da praça do mercado. Serviços novos (roles): bank, board, harborshop, duel. Sem monstros; viagem grátis (hub).
+  // Porto de Marfim: cidade neutra no meio da rota (Planície → Porto → Ruínas; portal oeste e leste, nunca colado à Vila). Areia clara e lajes,
+  // canal com ponte de madeira, baías, casas em arco em volta da praça do mercado. Serviços (roles): bank, board, harborshop, duel. Sem monstros.
   harbor: {
-    name: 'Porto de Marfim', w: 2400, h: 1700, safe: true, hub: true, border: true, spawn: { x: 1500, y: 920 },
+    name: 'Porto de Marfim', w: HARBOR_W, h: HARBOR_H, safe: true, hub: true, border: true, spawn: { x: 1500, y: 920 },
     palette: { ground: '#e9d9b4', ground2: '#e0cda1', outside: '#4d7384', path: '#f1e6cc', path2: '#f8f0dd' },
     treeColors: ['#e59bb9', '#f1b8d0', '#fcd9e6'],
     flowerColors: ['#fff6e0', '#ffd0b0', '#ffb38a', '#cfe8f2', '#ffffff'],
@@ -200,7 +201,7 @@ export const ZONES = {
       // duas baías a oeste do canal (água de lago com margem de areia molhada)
       fixedPonds: [{ x: 400, y: 360, rx: 250, ry: 150, rot: 0.1 }, { x: 420, y: 1330, rx: 250, ry: 140, rot: -0.1 }],
       along: [['lantern', 230, 64, 11, 0.5]],
-      fixed: [['signpost', 1590, 190, 16, 0.5], ['well', 1620, 840, 18, 0.6],
+      fixed: [['signpost', 250, 690, 16, 0.5], ['well', 1620, 840, 18, 0.6],
         ['fence', 1980, 690, 22, 0.4], ['fence', 2090, 690, 22, 0.4], ['fence', 1980, 870, 22, 0.4], ['fence', 2090, 870, 22, 0.4]], // ringue do duelo amistoso
     },
     atmosphere: {
@@ -210,7 +211,7 @@ export const ZONES = {
     },
     // Canal norte-sul com uma ponte de madeira na rua oeste (ver game/layout.js › rivers).
     rivers: [{ x: 900, amp: 50, wl: 1700, w: 160, bridges: [780] }],
-    paths: [[1500, 60, 1500, 780], [1500, 780, 1500, 1560], [1500, 780, 500, 780], [1500, 780, 2300, 780]],
+    paths: [[1500, 260, 1500, 780], [1500, 780, 1500, 1560], [40, HARBOR_MID, HARBOR_EAST, HARBOR_MID]], // rua principal de ponta a ponta (portal a portal)
     plaza: { x: 1500, y: 780, r: 170 },
     // mercado em arco (sul) e flancos da entrada (norte) em volta da praça
     houses: [
@@ -227,10 +228,14 @@ export const ZONES = {
       { id: 'captain', name: 'Capitã Maré', x: 520, y: 780, color: '#3f8aa8', accent: '#d8f2ff', role: 'quest' },
     ],
     // Serviços do Porto: NPC que presta cada um (a UI de cada painel é do agente de UI; ver docs/gameplay/porto.md).
-    services: { bank: 'banker', board: 'hunter', shop: 'dealer', duel: 'duelist' },
+    services: { bank: 'banker', board: 'hunter', shop: 'dealer', recycle: 'dealer', duel: 'duelist' },
     // Duelo amistoso: entrada para o PvP 1×1 SEM rating (não mexe no Elo, não dá XP de PvP).
     arenaFriendly: { npc: 'duelist', mode: '1v1', rated: false, label: 'Duelo Amistoso' },
-    portals: [{ x: 1500, y: 40, to: 'town', tx: 850, ty: 1180, label: 'Vila de Lúmen' }],
+    // Oeste volta à Planície; leste segue às Ruínas. Chegada a 110 px da borda, como nas zonas de farm.
+    portals: [
+      { x: 40, y: HARBOR_MID, to: 'plains', tx: FARM_EAST_IN, ty: FARM_MID, label: 'Planície de Cristal' },
+      { x: HARBOR_EAST, y: HARBOR_MID, to: 'ruins', tx: FARM_ENTRY, ty: FARM_MID, label: 'Ruínas Sombrias · Nv 12-20+' },
+    ],
   },
 
   arena: { ...ARENA, name: 'Arena de Lúmen — Duelo' },

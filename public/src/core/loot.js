@@ -101,15 +101,16 @@ export function generateOpalItem(rng, level, classId, forceSlot = null) {
 }
 
 // Recompensas de um mob abatido (ouro, item, essência de spirit). `pity` (opcional): contadores do personagem, alterados no lugar.
-export function rollMobLoot(rng, mob, playerClassId, pity = null) {
+// rewardMul (bônus noturno, core/daycycle.js): multiplica o ouro e a chance dos itens; 1 de dia.
+export function rollMobLoot(rng, mob, playerClassId, pity = null, rewardMul = 1) {
   if (mob.summoned) return []; // esbirros de chefe não dão nada
   const source = mob.mobId === OPAL_BOSS ? 'finalboss' : mob.boss ? 'boss' : mob.elite ? 'elite' : 'mob';
   const S = LOOT_SOURCES[source];
-  const out = [{ kind: 'gold', amount: rng.int(mob.level * 2 + 1, mob.level * 4 + 3) * (mob.boss ? 8 : mob.elite ? 3 : 1) }];
+  const out = [{ kind: 'gold', amount: Math.round(rng.int(mob.level * 2 + 1, mob.level * 4 + 3) * (mob.boss ? 8 : mob.elite ? 3 : 1) * rewardMul) }];
   const nItems = rng.int(S.items[0], S.items[1]);
   for (let i = 0; i < nItems; i++) {
     // lootMul (World.onMobDeath): abates repetidos do mesmo chefe em 30 min valem menos itens
-    if (!rng.chance((i === 0 ? S.chance : S.chance * 0.5) * (mob.lootMul ?? 1))) continue;
+    if (!rng.chance((i === 0 ? S.chance : S.chance * 0.5) * (mob.lootMul ?? 1) * rewardMul)) continue;
     out.push({ kind: 'item', item: generateItem(rng, mob.level, { classId: playerClassId, rarityId: rollSourceRarity(rng, source, pity) }) });
   }
   if (mob.mobId === OPAL_BOSS) { // exclusivo: chance base + pity por abate sem drop

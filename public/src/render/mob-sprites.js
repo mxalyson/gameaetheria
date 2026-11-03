@@ -48,7 +48,7 @@ function outline(c, px) {
   g.globalCompositeOperation = 'source-over'; g.drawImage(c, 0, 0);
   return o;
 }
-function tint(img, t, sharp = 0, ol = 0, cell = null) {
+export function tint(img, t, sharp = 0, ol = 0, cell = null) {
   const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, c.width, c.height), p = d.data, W = c.width, H = c.height;

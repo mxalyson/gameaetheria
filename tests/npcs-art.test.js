@@ -30,3 +30,27 @@ test('ícones de interface pintados existem (casa e zonas); emoji só como reser
   for (const f of ['home', 'zone-town', 'zone-forest', 'zone-plains', 'zone-ruins', 'zone-glacier']) assert.ok(existsSync(`public/assets/icons/ui/${f}.webp`), f);
   assert.ok(existsSync('public/assets/props/chest.webp'), 'baú pintado');
 });
+
+test('NPCs de classe e do Porto: arte pintada ou alias, sem desenho por código', async () => {
+  const { NPC_ALIAS } = await import('../public/src/render/npc-sprites.js');
+  for (const id of ['master_warrior', 'master_mage', 'master_archer', 'master_cleric']) assert.ok(NPC_ART.has(id), id);
+  for (const id of ['banker', 'hunter', 'dealer', 'duelist', 'captain']) assert.ok(NPC_ART.has(NPC_ALIAS[id]?.art), 'alias de ' + id);
+  const r = readFileSync('public/src/render/renderer.js', 'utf8');
+  assert.ok(!/NPC_LOOK = \{[^}]*(master_|bank|harborshop|duel)/.test(r), 'NPC_LOOK ainda cobre NPCs com arte');
+});
+
+test('mestres de classe: espaçados (>= 110 px) e fora da casa', () => {
+  const m = ZONES.town.npcs.filter((n) => n.role === 'master').sort((a, b) => a.x - b.x);
+  assert.equal(m.length, 4);
+  for (let i = 1; i < m.length; i++) assert.ok(m[i].x - m[i - 1].x >= 110, 'mestres juntos demais');
+  for (const h of ZONES.town.houses) for (const n of m) assert.ok(n.x < h.x - 30 || n.x > h.x + h.w + 30 || n.y < h.y - 60 || n.y > h.y + h.h + 20, `${n.id} na casa`);
+});
+
+test('stackLabels: nomes colados sobem em degraus; distantes ficam no lugar', async () => {
+  const { stackLabels } = await import('../public/src/render/safe-box.js');
+  assert.deepEqual(stackLabels([{ x: 0, w: 100, y: 0 }, { x: 300, w: 100, y: 0 }]), [0, 0]);
+  const l = stackLabels([{ x: 80, w: 100, y: 0 }, { x: 0, w: 100, y: 0 }, { x: 40, w: 100, y: 0 }]);
+  assert.equal(l[1], 0, 'o mais à esquerda fica no lugar');
+  assert.equal(new Set(l).size, 3, 'três nomes sobrepostos precisam de três degraus');
+  assert.ok(Math.max(...stackLabels(Array.from({ length: 8 }, () => ({ x: 0, w: 80, y: 0 })))) <= 42);
+});

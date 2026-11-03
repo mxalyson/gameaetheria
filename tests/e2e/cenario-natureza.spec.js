@@ -28,7 +28,7 @@ for (const zona of ['forest', 'ruins']) {
 test('custo de desenho no Bosque: sprites não pesam mais que o desenho antigo (CPU, só JS)', async ({ browser }) => {
   const medir = async (modo) => {
     const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true }); const page = await ctx.newPage();
-    await entrar(page, 'forest', modo); await page.waitForTimeout(1500);
+    await entrar(page, 'forest', modo); await page.evaluate(() => window.setHora(12)); await page.waitForTimeout(1500); // hora fixa: o custo da noite (render/sky.js) varia com o relógio e não é o que este teste mede
     const r = await page.evaluate(async () => { const g = window.game; const ts = []; for (let i = 0; i < 120; i++) { const t0 = performance.now(); g.renderer.draw(g.world, g.cam, { player: g.player }); ts.push(performance.now() - t0); await new Promise((r2) => requestAnimationFrame(r2)); } ts.sort((a, b) => a - b); return { avg: ts.reduce((a, b) => a + b, 0) / ts.length, p95: ts[Math.floor(ts.length * 0.95)] }; });
     await ctx.close(); return r;
   };

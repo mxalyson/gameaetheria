@@ -19,11 +19,11 @@ for (const classe of CLASSES) {
     const errors = []; page.on('pageerror', (e) => errors.push(e.message)); page.on('response', (r) => { if (r.status() >= 400) errors.push(r.status() + ' ' + r.url()); });
     await criar(page, classe);
     await page.waitForTimeout(800);
-    expect(await carregou(page, '#touch .tbtn.sk img.art')).toEqual([true, true, true]);
+    expect(await carregou(page, '#touch .tbtn.sk img.art')).toEqual([true, true, true, true]); // 3 habilidades + a de Maestria (nível 25: aparece com cadeado)
     expect(await carregou(page, '#touch .tbtn.atk img.art')).toEqual([true]); // ataque básico da classe
     expect(await page.evaluate(() => document.querySelector('#touch .tbtn.atk img.art').src)).toContain(`/attack/atk-${classe}.webp`);
     expect(await carregou(page, '#touch .tbtn.pot img.art')).toEqual([true]);
-    expect(await carregou(page, '#skillbar .slot.art img.art')).toEqual([true, true, true, true, true]); // ataque + 3 habilidades + poção (barra existe no DOM, oculta no toque)
+    expect(await carregou(page, '#skillbar .slot.art img.art')).toEqual([true, true, true, true, true, true]); // ataque + 3 habilidades + Maestria + poção (barra existe no DOM, oculta no toque)
     // recarga radial: ao usar a habilidade 1 o anel (--p) vai a 1 e o número aparece
     await page.evaluate(() => { const g = window.game; g.player.cds.s0 = 4; });
     await page.waitForTimeout(250);
@@ -37,7 +37,7 @@ for (const classe of CLASSES) {
 
 test('modo teclado: a barra mostra a arte com a tecla, e o tooltip tem ícone, nome e recarga', async ({ page }) => {
   await criar(page, 'mage', { scale: 100, quality: 'auto', controls: 'keyboard' });
-  expect(await carregou(page, '#skillbar .slot.art img.art')).toEqual([true, true, true, true, true]); // ataque + 3 habilidades + poção
+  expect(await carregou(page, '#skillbar .slot.art img.art')).toEqual([true, true, true, true, true, true]); // ataque + 3 habilidades + Maestria + poção
   await page.hover('#slot-s0');
   const tip = page.locator('#tooltip');
   await expect(tip).toBeVisible();
@@ -59,12 +59,12 @@ test('categorias e estado indisponível: selo de categoria em cada habilidade, t
   await criar(page, 'cleric');
   await page.waitForTimeout(500);
   const cats = await page.evaluate(() => [...document.querySelectorAll('#touch .tbtn.sk .cat')].map((c) => c.className.replace('cat cat-', '')));
-  expect(cats).toEqual(['cura', 'buff', 'controle']); // Luz Sagrada, Escudo Divino, Julgamento
-  expect(await page.evaluate(() => document.querySelectorAll('#skillbar .slot .cat').length)).toBe(3);
+  expect(cats.slice(0, 3)).toEqual(['cura', 'buff', 'controle']); // Luz Sagrada, Escudo Divino, Julgamento
+  expect(await page.evaluate(() => [...document.querySelectorAll('#skillbar .slot .cat')].length)).toBeGreaterThanOrEqual(3);
   expect(await page.evaluate(() => window.game.ui.tooltipHtml('skill:judgement'))).toContain('Controle');
   await page.evaluate(() => { window.game.char.level = 10; window.game.refreshStats(); window.game.player.stunT = 1; });
   await page.waitForTimeout(250);
-  expect(await page.evaluate(() => [...document.querySelectorAll('#touch .tbtn.sk')].every((b) => b.classList.contains('blocked')))).toBe(true);
+  expect(await page.evaluate(() => [...document.querySelectorAll('#touch .tbtn.sk')].slice(0, 3).every((b) => b.classList.contains('blocked')))).toBe(true);
   expect(await page.evaluate(() => ['slot-s0', 'slot-s1', 'slot-s2'].every((id) => document.getElementById(id).classList.contains('blocked')))).toBe(true);
   await page.screenshot({ path: 'test-results/icones-bloqueado.png' });
   await page.evaluate(() => { window.game.player.stunT = 0; });

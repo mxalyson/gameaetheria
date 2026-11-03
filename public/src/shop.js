@@ -45,7 +45,7 @@ export function buildShopStock(char, opts = {}) {
 // Preços diferentes da loja da Vila: itens comuns saem mais baratos (×5,2 em vez de ×6), épicos mais caros (×30 em vez de ×25) e o porto paga mais na venda (60%).
 // Mesma convenção do destaque da Vila: `value` já vem inflado (preço/itemMarkup) para a UI exibir valor·itemMarkup; `baseValue` é o valor real, restaurado na compra
 // (main.js › compra). `price` é o preço final em ouro, para quem preferir exibi-lo direto. Ids estáveis `hb-<semente>-<i>`.
-export const HARBOR = { markup: 5.2, epicMarkup: 30, sellRate: 0.6 };
+export const HARBOR = { markup: 5.2, epicMarkup: 30, sellRate: 0.6, discount: 0.15 }; // discount: poções e pergaminhos (harborPrice, no fim do arquivo)
 export const harborSellValue = (it) => Math.max(1, Math.floor(it.value * HARBOR.sellRate));
 export function buildHarborStock(char, { day = Math.floor(Date.now() / 86400000) } = {}) {
   const seed = hashString(`harbor|${char.name}|${char.classId}|${char.created}|${char.level}|${day}`);
@@ -66,4 +66,23 @@ export function buildHarborStock(char, { day = Math.floor(Date.now() / 86400000)
   });
   const owned = new Set([...Object.values(char.equipment ?? {}), ...(char.inventory ?? []), ...(char.bank ?? [])].filter(Boolean).map((i) => i.id));
   return stock.filter((it) => !owned.has(it.id));
+}
+
+// ---------- Porto: desconto e reciclagem (Mercador Bartolomeu) ----------
+// Poções e pergaminhos saem 15% mais baratos no Porto (preço de atacado de cais). A UI do Mercador do Porto deve usar `harborPrice`.
+export const harborPrice = (kind, level) => Math.max(1, Math.round(PRICES[kind](level) * (1 - HARBOR.discount)));
+// Reciclagem: 3 itens COMUNS da mochila viram 1 item RARO da classe do personagem, no nível dele. Determinística (semente = personagem + itens).
+// Só itens da mochila (nada equipado nem no banco); falha sem mudar nada. `rng` opcional (testes).
+export const RECYCLE_COUNT = 3;
+export function recycle(char, ids, rng = null) {
+  if (!Array.isArray(ids) || ids.length !== RECYCLE_COUNT || new Set(ids).size !== RECYCLE_COUNT) return { ok: false, reason: `Entregue exatamente ${RECYCLE_COUNT} itens diferentes.` };
+  const inv = char.inventory ?? [];
+  const picks = ids.map((id) => inv.find((it) => it.id === id));
+  if (picks.some((it) => !it)) return { ok: false, reason: 'Algum item não está na mochila.' };
+  if (picks.some((it) => it.rarity !== 'common')) return { ok: false, reason: 'Só itens comuns podem ser reciclados.' };
+  const r = rng ?? makeRng(hashString(`recycle|${char.name}|${char.created}|${char.level}|${[...ids].sort().join(',')}`));
+  const item = generateItem(r, Math.max(1, char.level), { classId: char.classId, rarityId: 'rare' });
+  char.inventory = inv.filter((it) => !ids.includes(it.id));
+  char.inventory.push(item);
+  return { ok: true, item };
 }

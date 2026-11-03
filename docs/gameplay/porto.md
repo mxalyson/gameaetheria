@@ -3,10 +3,10 @@
 Estado em 2026-11-02. **Implementado e testado**: dados, lógica pura e layout (`tests/layout.test.js`, `tests/harbor.test.js`). **Pendente**: interface dos serviços e ligação do bônus noturno na sim. **Não validado**: o visual no navegador (nenhuma captura feita nesta rodada).
 
 ## Porto de Marfim (`ZONES.harbor`)
-- Cidade neutra nº 2: segura, sem monstros, 2400×1700, `hub: true` (viagem grátis; entra em `visited` ao pisar nela). Ligada só à Vila: **portal sul da Vila** (850,1250) leva ao porto (1500,110); **portal norte do porto** (1500,40) leva à Vila (850,1180).
+- Cidade neutra no MEIO da rota: **Vila → Bosque → Planície → Porto → Ruínas → Cume → Cinzas**. Segura, sem monstros, 2400×1700, `hub: true`. **Sem ligação com a Vila** (nunca duas cidades coladas): portal **oeste** (40,780) volta à Planície (chegada 4490,1400 lá); portal **leste** (2360,780) segue às Ruínas (chegada 110,1400). Entradas a 110 px da borda, na altura da rua principal (y 780, a da praça; o meio exato seria 850). Planície→Porto e Ruínas→Porto são os portais antigos Planície↔Ruínas.
 - Visual próprio (`scenery.kind: 'harbor'`): chão de areia clara (`sand-plains` com tom quente), ruas de lajes (`slabs`), canal norte-sul com **ponte de madeira** (`m_bridge`) na rua oeste, duas baías (`water-lake`), 6 casas Meshy em arco em volta da praça, cerejeiras na moldura, poço, lampiões, cercas do ringue, placa. Névoa leve e partículas quentes.
 - Alcançável a pé (testado por busca em grade): o lado oeste do canal só se alcança pela ponte.
-- Mapa-múndi: `WORLD_ROUTE` inclui `harbor` (depois da Vila); `WORLD_NODES = { id: {x,y} }` (0 a 100) em `data/zones.js`. Porto em (14,72), abaixo da Vila (14,36). `isHub(id)` e `teleportCost` (cidades são de graça).
+- Mapa-múndi: `WORLD_ROUTE` inclui `harbor` (depois da Vila); `WORLD_NODES = { id: {x,y} }` (0 a 100) em `data/zones.js`. Porto em (63,66), entre a Planície (53,50) e as Ruínas (72,36). `teleportCost`: só a Vila é grátis; o **Porto custa 1 pergaminho** e só vale se `visited`. Saves antigos: `visited.ruins` implica `visited.harbor` (`core/savedoc.js`).
 
 ## Serviços (NPCs com `role` novo; `DIALOGS[id].service.panel` diz o painel)
 | NPC (`id`) | `role` | `service.panel` | Dados e lógica prontos |
@@ -28,3 +28,20 @@ Estoque rotativo diário (semente = personagem + nível + dia UTC): 6 itens, de 
 - Desenho: `render/sky.js › drawDayNight`, chamado uma vez em `renderer.draw` (antes das barras e nomes). Véu de cor por hora (aurora laranja, entardecer rosado, noite azul-marinho com vinheta; Ruínas e Cume mais escuros), buracos de luz no véu em volta do herói (lanterna), lampiões, braseiros e portais (brilho aditivo), vaga-lumes e estrelas à noite, rio de lava e brasas mais vivos nas Cinzas. Arenas (círculo) têm luz fixa. Qualidade baixa: só um retângulo e o halo do herói; média: sem estrelas e com menos vaga-lumes.
 - Opção "Dia e noite: automático / sempre dia": `setDayNightMode('auto' | 'day')` de `render/sky.js` (salva em `localStorage`, chave `aetheria_daynight`).
 - Bônus de risco (**ainda não ligado à sim**): `NIGHT = { aggroMul: 1.1, rewardMul: 1.15 }` em `data/mobs.js` e `nightMods(hora)` em `core/daycycle.js`. Para ligar: na sim ou no servidor, `const m = nightMods(hourFromMs(Date.now()))`, e usar `aggro * m.aggroMul` e `XP/ouro/drop * m.rewardMul` só em zonas com `zoneHasCycle(zone)`. No servidor de zona, usar o relógio do servidor (não o do cliente).
+
+## Missões do Porto (`data/quests.js`)
+| Id | Giver | Objetivo | Nível |
+|---|---|---|---|
+| `porto_chegada` Cofre de Marfim | Capitã Maré | `bank`: guardar 1 item | 10 |
+| `porto_contrato` Palavra de Contrato | Capitã Maré | `daily`: entregar 1 contrato | 10 (após chegada) |
+| `porto_carga` Cargas Perdidas | Capitã Maré | matar 8 na Planície + 7 nas Ruínas | 12 |
+| `porto_gelo` Carga de Gelo | Bartolomeu | abrir 3 baús no Cume | 22 |
+| `porto_duelo` Duelo de Cais | Kael | `friendlyDuel`: vencer 1 amistoso (**só offline**, `OFFLINE_TYPES`) | 10 |
+Contadores novos em `stats`: `deposits`, `contracts`, `friendlyWins`, `harborVisits` (em `STAT_KEYS_PROGRESS`; o servidor limita o salto). Conquistas: **Marinheiro** (chegar ao Porto) e **Cliente do Cais** (5 contratos). Eventos que o jogo emite: `bank` (após depósito), `friendlyDuel` (vitória), `visit` (ao entrar no Porto); `daily` sai de `claimDaily`.
+
+## Utilidades (`shop.js`)
+- `harborPrice('potion'|'scroll', nível)`: −15% (`HARBOR.discount`). A UI do Mercador deve usá-lo.
+- `recycle(char, [3 ids])`: 3 itens comuns da mochila viram 1 raro da classe (determinístico). Sem UI ainda (Bartolomeu, `services.recycle`).
+
+## Servidor
+Cidade neutra não tem sala: portal Planície/Ruínas→Porto faz `zone_exit { to: 'harbor', x, y }` e o servidor guarda `s.hubAt`; de lá `zone_enter` (portal leste/oeste) entra na zona vizinha. Teletransporte ao Porto (`zone_teleport`) cobra 1 pergaminho e responde com o mesmo `zone_exit`. `markVisited` grava o Porto.

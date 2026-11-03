@@ -65,7 +65,7 @@ test('preferências: limites, valores inválidos e qualidade automática', () =>
   assert.ok(['medium', 'high'].includes(resolveQuality({ quality: 'auto' }, true)), 'celular: média ou alta conforme o aparelho (≥ 6 núcleos = alta)');
   assert.equal(resolveQuality({ quality: 'auto' }, false), 'high');
   assert.equal(resolveQuality({ quality: 'low' }, false), 'low');
-  assert.equal(loadPrefs().scale, 100, 'sem localStorage usa o padrão');
+  assert.equal(loadPrefs().scale, 'auto', 'sem localStorage usa o padrão');
 });
 
 test('interagir: NPC tem prioridade, depois baú; longe devolve null', () => {
@@ -90,4 +90,17 @@ test('barra de chefe: o chefe tem prioridade sobre elites, e elite só vale pert
   assert.equal(pickBossTarget([elite], p), elite);
   assert.equal(pickBossTarget([{ boss: true, x: 900, y: 0 }], p), null, 'fora do raio');
   assert.equal(pickBossTarget([{ boss: true, dead: true, x: 10, y: 0 }], p), null, 'morto não conta');
+});
+
+test('escala automática da interface: acompanha a viewport (piso 70%, teto 100%) e o valor manual é preservado', async () => {
+  const { autoScale, resolveScale, changePref: cp, loadPrefs: lp } = await import('../public/src/prefs.js');
+  assert.equal(autoScale(874, 402), 84, 'iPhone deitado');
+  assert.equal(autoScale(1280, 720), 100);
+  assert.equal(autoScale(1920, 1080), 100, 'teto');
+  assert.equal(autoScale(400, 200), 70, 'piso');
+  assert.equal(resolveScale({ scale: 'auto' }, 874, 402), 84);
+  assert.equal(resolveScale({ scale: 120 }, 874, 402), 120, 'prefs antigas mantêm o valor escolhido');
+  assert.equal(cp({ scale: 'auto', quality: 'auto', controls: 'auto' }, 'scale:+10', 874, 402).scale, 90, 'ajuste manual parte do valor automático (84+10, arredondado ao passo de 10)');
+  assert.equal(cp({ scale: 90, quality: 'auto', controls: 'auto' }, 'scale:auto').scale, 'auto');
+  assert.equal(lp().scale, 'auto', 'padrão inicial');
 });

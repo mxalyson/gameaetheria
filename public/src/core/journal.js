@@ -14,6 +14,7 @@ import { MOBS, MOBS_EXTRA } from '../data/mobs.js';
 import { makeRng, hashString } from './rng.js';
 
 export const SERVER_TYPES = new Set(['pvp', 'coop']); // objetivos que só o servidor soma
+export const OFFLINE_TYPES = new Set(['friendlyDuel']); // objetivos que só existem no jogo solo (o duelo amistoso não roda online)
 export const MAX_ACTIVE = 5;
 export const CHEST_COOLDOWN_MS = 10 * 60 * 1000;
 
@@ -40,7 +41,7 @@ export function requirementsMet(doc, q) {
   return doc.level >= q.level && (!q.after || doc.quests.done[q.after] != null);
 }
 // `server:false` (jogo offline) esconde as missões que só o servidor consegue completar (PvP/cooperativo reais).
-export const offeredBy = (doc, npcId, { server = true } = {}) => Object.values(QUESTS).filter((q) => isGiver(doc, q, npcId) && doc.quests.done[q.id] == null && !doc.quests.active[q.id] && requirementsMet(doc, q) && (server || !q.objectives.some((o) => SERVER_TYPES.has(o.type))));
+export const offeredBy = (doc, npcId, { server = true } = {}) => Object.values(QUESTS).filter((q) => isGiver(doc, q, npcId) && doc.quests.done[q.id] == null && !doc.quests.active[q.id] && requirementsMet(doc, q) && (server ? !q.objectives.some((o) => OFFLINE_TYPES.has(o.type)) : !q.objectives.some((o) => SERVER_TYPES.has(o.type))));
 export const isComplete = (doc, id) => { const a = doc.quests.active[id], q = QUESTS[id]; return !!a && q.objectives.every((o, i) => (a.p[i] ?? 0) >= (o.count ?? 1)); };
 export const readyFor = (doc, npcId) => Object.keys(doc.quests.active).filter((id) => isGiver(doc, QUESTS[id], npcId, QUESTS[id].turnIn ?? QUESTS[id].giver) && isComplete(doc, id));
 export const activeFor = (doc, npcId) => Object.keys(doc.quests.active).filter((id) => isGiver(doc, QUESTS[id], npcId, QUESTS[id].turnIn ?? QUESTS[id].giver) && !isComplete(doc, id));
@@ -90,6 +91,9 @@ function matches(o, ev, doc) {
     case 'coop': return ev.type === 'coop' && ev.victory;
     case 'teleport': return ev.type === 'teleport';
     case 'upgrade': return ev.type === 'upgrade';
+    case 'bank': return ev.type === 'bank';                       // guardar 1 item no banco do Porto
+    case 'daily': return ev.type === 'daily';                     // entregar 1 contrato do Quadro
+    case 'friendlyDuel': return ev.type === 'friendlyDuel' && !!ev.won; // vencer um duelo amistoso (só offline)
     default: return false;
   }
 }
@@ -106,6 +110,10 @@ export function recordEvent(doc, ev, now = Date.now()) {
   else if (ev.type === 'coop' && ev.victory) st.coopClears++;
   else if (ev.type === 'teleport') st.teleports++;
   else if (ev.type === 'upgrade') st.upgrades++;
+  else if (ev.type === 'bank') st.deposits++;
+  else if (ev.type === 'daily') st.contracts++;
+  else if (ev.type === 'friendlyDuel') { if (ev.won) st.friendlyWins++; }
+  else if (ev.type === 'visit' && ev.zoneId === 'harbor') st.harborVisits++;
   for (const [id, a] of Object.entries(doc.quests.active)) {
     const q = QUESTS[id]; let changed = false;
     q.objectives.forEach((o, i) => {
@@ -296,6 +304,7 @@ export function claimDaily(doc, id, now = Date.now()) {
   doc.gold += c.reward.gold;
   const levels = addXp(doc, c.reward.xp);
   doc.potions = Math.min(999, doc.potions + c.reward.potions);
+  const ev = recordEvent(doc, { type: 'daily' }, now); // missão `porto_contrato` e contador de contratos
   const out = recordEvent(doc, { type: 'level', level: doc.level }, now);
-  return { ok: true, reward: { ...c.reward }, levels, achievements: out.achievements, quests: out.quests };
+  return { ok: true, reward: { ...c.reward }, levels, achievements: [...ev.achievements, ...out.achievements], quests: [...ev.quests, ...out.quests] };
 }

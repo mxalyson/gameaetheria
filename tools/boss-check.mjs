@@ -15,7 +15,8 @@ import { specsOf, SPEC_LEVEL } from '../public/src/core/specs.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const N = Number(arg('n', 4)), DODGE = Number(arg('dodge', 0.6)), ONLY = arg('only', ''), DT = 1 / 60, MAXT = 240;
-const JSON_OUT = process.argv.includes('--json');
+const MASTERY = process.argv.includes('--mastery');
+const JSON_OUT =process.argv.includes('--json');
 
 // Perfis de equipamento plausíveis por nível: raridade típica e aprimoramento (+N) que o ouro do nível costuma pagar.
 export const PROFILES = {
@@ -31,6 +32,7 @@ export function buildHero(classId, level, profileId, seed) {
   const P = PROFILES[profileId], rng = makeRng(seed);
   const c = newCharacter('Bot', classId, rng);
   c.level = level;
+  if (MASTERY && level >= 25) { c.quests ??= { active: {}, done: {} }; c.quests.done.maestria = 1; } // --mastery: herói com a 4ª habilidade (e o bônus de atributo da Maestria)
   if (level >= SPEC_LEVEL) { const ids = Object.keys(specsOf(classId)); c.spec = ids[seed % ids.length]; }
   const cls = CLASSES[classId], pts = POINTS_PER_LEVEL * (level - 1);
   c.alloc[cls.primary] += Math.round(pts * 0.6); c.alloc.vit += Math.round(pts * 0.3); c.alloc.agi += pts - Math.round(pts * 0.6) - Math.round(pts * 0.3);
@@ -73,6 +75,7 @@ export function fight(char, foes, seed, { zoneId = 'arena', dodge = DODGE, maxT 
     for (const a of hid) a.untargetable = false;
     // esquiva: depois de ~0,35 s de reação, sai de dentro do golpe marcado
     for (const tg of w.telegraphs) {
+      if (tg.src === hero) continue; // o próprio Meteoro do herói não é perigo
       if (!decided.has(tg)) decided.set(tg, rng.chance(dodge));
       const d = Math.hypot(hero.x - tg.x, hero.y - tg.y);
       if (decided.get(tg) && tg.t >= 0.35 && d < tg.r + hero.r + 25) { it.mx = hero.x - tg.x || 1; it.my = hero.y - tg.y; it.spd = 1; break; }

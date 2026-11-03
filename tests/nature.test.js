@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, statSync } from 'node:fs';
-import { SET } from '../public/src/render/nature-sprites.js';
+import { SET, hdWanted, hdKey, bridgeSegments } from '../public/src/render/nature-sprites.js';
 import { ZONES } from '../public/src/data/zones.js';
 
 // Cenário em sprites: todo sprite usado existe no atlas, o atlas é leve e os tipos mapeados são tipos que o layout realmente gera.
@@ -20,11 +20,36 @@ test('todo sprite citado nas zonas existe no atlas, com tamanho e âncora válid
     }
   }
 });
-test('atlas leves (cabem na memória de qualquer celular): arquivos < 200 KB e área decodificada < 6 MiB cada; juntos < 10 MiB (passar disso fez o desenho do Bosque custar 5× mais)', () => {
+// Teto somado 14 MiB (antes 10): o de 10 MiB foi medido em CPU/swiftshader e o Bosque custou 5× mais; aparelho de alta densidade tem GPU com folga, e o HD (<= 4 MiB) só carrega com DPR >= 2,5 e tier alto ou ?hd=1.
+const hd = JSON.parse(readFileSync('public/assets/nature/hd.json', 'utf8'));
+test('atlas leves (cabem na memória de qualquer celular): arquivos < 200 KB e área decodificada < 6 MiB cada; juntos < 14 MiB; HD <= 4 MiB', () => {
   assert.ok(statSync('public/assets/nature/atlas.webp').size < 200_000 && statSync('public/assets/nature/meshy.webp').size < 200_000);
   assert.ok(atlas.size[0] * atlas.size[1] * 4 < 6 * 1048576, 'atlas grande demais: ' + atlas.size);
   assert.ok(meshy.size[0] * meshy.size[1] * 4 < 6 * 1048576, 'atlas do Meshy grande demais: ' + meshy.size);
-  assert.ok((atlas.size[0] * atlas.size[1] + meshy.size[0] * meshy.size[1]) * 4 < 10 * 1048576);
+  assert.ok(statSync('public/assets/nature/hd.webp').size < 400_000);
+  assert.ok(hd.size[0] * hd.size[1] * 4 <= 4 * 1048576, 'HD acima de 4 MiB: ' + hd.size);
+  assert.ok((atlas.size[0] * atlas.size[1] + meshy.size[0] * meshy.size[1] + hd.size[0] * hd.size[1]) * 4 < 14 * 1048576);
+});
+test('atlas HD: peças hd_* de árvores, casas e ponte existem, cabem no atlas e têm mais pixels que a versão normal', () => {
+  for (const n of ['CommonTree_1', 'CommonTree_2', 'CommonTree_3', 'Pine_1', 'Pine_2', 'm_cherry_1', 'm_cherry_2', 'm_cherry_3', 'm_house_thatch', 'm_house_tile', 'm_house_big', 'm_house_porch', 'm_bridge']) {
+    const h = hd.sprites[hdKey(n)], [base] = find(n);
+    assert.ok(h, 'falta ' + hdKey(n));
+    assert.ok(h.x + h.w <= hd.size[0] && h.y + h.h <= hd.size[1] && h.ax >= 0 && h.ax <= h.w && h.ay >= 0 && h.ay <= h.h, 'medidas de ' + hdKey(n));
+    assert.ok(h.w * h.h > base.w * base.h * 1.3, hdKey(n) + ' deveria ter bem mais pixels');
+    assert.ok(Math.abs(h.w / h.h - base.w / base.h) / (base.w / base.h) < 0.06 || n === 'm_bridge', 'proporção de ' + hdKey(n)); // mesma janela do bake: cobre o mesmo retângulo do mundo
+  }
+  assert.equal(hdKey('m_house_tile'), 'hd_house_tile'); assert.equal(hdKey('Pine_1'), 'hd_Pine_1');
+});
+test('HD só com alta densidade e aparelho forte (ou ?hd=1); ?hd=0 desliga; ponte longa usa segmentos em vez de esticar', () => {
+  assert.equal(hdWanted('', 3, 'high'), true);
+  assert.equal(hdWanted('', 3, 'medium'), false);
+  assert.equal(hdWanted('', 2, 'high'), false);
+  assert.equal(hdWanted('?hd=1', 1, 'low'), true);
+  assert.equal(hdWanted('?hd=0', 3, 'high'), false);
+  assert.equal(bridgeSegments(276), 1); assert.equal(bridgeSegments(285), 1); assert.ok(bridgeSegments(600) >= 3);
+});
+test('sem o HD carregado o desenho cai nos atlases normais (nenhum SET depende de hd_*)', () => {
+  for (const tipos of Object.values(SET)) for (const cfg of Object.values(tipos)) assert.ok(cfg.v.every((n) => !n.startsWith('hd_')) && cfg.vh === undefined);
 });
 test('poço, cercas e ponte do Meshy existem no atlas e a Vila e as zonas vivas os usam', () => {
   for (const n of ['well', 'fence_1', 'fence_2', 'bridge']) assert.ok(meshy.sprites[n], 'falta m_' + n);

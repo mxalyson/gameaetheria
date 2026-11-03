@@ -33,7 +33,7 @@ export class ZoneRoom {
     this.matchId = randomBytes(9).toString('base64url');
     this.rng = makeRng(seed);
     this.bossState = {}; // ritual e recarga do chefe valem para a instância inteira (sobrevivem enquanto houver gente)
-    this.world = new World(zoneId, { seed, visuals: false, bossState: this.bossState });
+    this.world = new World(zoneId, { seed, visuals: false, bossState: this.bossState, night: true });
     this.populated = false;
     this.state = 'fight'; this.countdown = 0; this.winner = 0; this.reason = null; this.closed = false;
     this.clock = 0; this.tick = 0; this.events = []; this.enc = new DeltaEncoder();
@@ -120,13 +120,14 @@ export class ZoneRoom {
   // ---- recompensas: o servidor sorteia tudo ----
   onMobKilled(m) {
     const M = MOBS[m.mobId];
-    const mul = M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1);
+    const rm = this.world.nightMods?.rewardMul ?? 1; // bônus noturno (relógio do servidor), só em zonas com ciclo
+    const mul = M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1) * rm;
     for (const p of this.alive()) {
       const a = p.actor;
       if (Math.hypot(a.x - m.x, a.y - m.y) > SHARE_RADIUS) continue;
       if (!m.summoned) p.pend.xp += mobXp(m.level, a.level, mul); // esbirros de chefe não dão XP nem loot
       p.pend.kills.push({ mobId: m.mobId, boss: !!m.boss, mini: !!m.miniboss, spiritType: this.spiritTypeOf(p) });
-      for (const d of rollMobLoot(this.rng, m, p.classId, p.pity)) {
+      for (const d of rollMobLoot(this.rng, m, p.classId, p.pity, rm)) {
         if (d.kind === 'gold') p.pend.gold += d.amount;
         else if (d.kind === 'potion') p.pend.potions += d.amount;
         else if (d.kind === 'item') p.pend.items.push({ ...d.item, id: 'i' + randomBytes(9).toString('base64url') });
@@ -165,7 +166,7 @@ export class ZoneRoom {
   syncLevel(p, doc) {
     const fresh = makeHeroActor(doc, p.actor.x, p.actor.y, 'player', 1);
     const levelUp = fresh.level !== p.actor.level;
-    Object.assign(p.actor, { level: fresh.level, stats: fresh.stats, maxHp: fresh.maxHp, hp: levelUp ? fresh.maxHp : Math.min(p.actor.hp, fresh.maxHp) });
+    Object.assign(p.actor, { level: fresh.level, mastery: fresh.mastery, stats: fresh.stats, maxHp: fresh.maxHp, hp: levelUp ? fresh.maxHp : Math.min(p.actor.hp, fresh.maxHp) });
   }
 
   leave(p, reason = 'left') {
@@ -189,7 +190,7 @@ export class ZoneRoom {
   statics(list) { return list.map((p) => ({ id: p.actor.id, name: p.name, classId: p.classId, level: p.actor.level, maxHp: p.actor.maxHp })); }
   meJson(p) {
     const a = p.actor;
-    return JSON.stringify({ spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), c: [r1(a.cds.basic), r1(a.cds.s0), r1(a.cds.s1), r1(a.cds.s2)] });
+    return JSON.stringify({ spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), c: [r1(a.cds.basic), r1(a.cds.s0), r1(a.cds.s1), r1(a.cds.s2), r1(a.cds.s3 ?? 0)] });
   }
   frameFor(commit) {
     const tuples = [...this.players.values()].filter((p) => !p.left).map((p) => actorTuple(p.actor, !!p.session?.ws));

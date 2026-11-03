@@ -1,10 +1,29 @@
 // Cenário em SPRITES: árvores, pinheiros, pedras, arbustos, samambaias, cogumelos e capim fotografados de modelos 3D do "Stylized Nature MegaKit"
 // (Quaternius, licença CC0) por tools/nature-bake.mjs → atlas único public/assets/nature/atlas.webp (88 KB, ~4 MB descomprimido).
 // SÓ DESENHO: posição, tamanho (`d.s`) e colisão continuam vindo de game/layout.js; sem o atlas (ou com ?cenario=original) o desenho antigo por código segue valendo.
+import { deviceTier } from '../prefs.js';
 const KEY = 'aetheria_cenario';
 let atlas = null, meta = null, loading = null, on = null;
+let hdAtlas = null, hdMeta = null; // atlas HD (hd.webp, nomes hd_*): árvores, casas e ponte com o dobro de pixels, só em aparelho de alta densidade
 let gAtlas = null, gMeta = null; // atlas de CHÃO (flores, trevos, pedrinhas, pedras de trilha): carimbado no cache do terreno, não a cada quadro
 export const stats = { drawn: 0, sprites: 0 }; // diagnóstico/testes (window.natureStats)
+
+// Tier HD: tela de alta densidade (DPR >= 2,5, iPhone) com aparelho forte, ou ?hd=1 (força) / ?hd=0 (desliga). Nos demais valem os atlases normais (menos memória de GPU).
+export function hdWanted(search = '', dpr = 1, tier = 'medium') {
+  const q = new URLSearchParams(search).get('hd');
+  return q === '1' || (q !== '0' && dpr >= 2.5 && tier === 'high');
+}
+// hd_X substitui X (Quaternius) e m_X (Meshy)
+export const hdKey = (n) => 'hd_' + (n.startsWith('m_') ? n.slice(2) : n);
+export const hdReady = () => !!hdAtlas;
+// com o HD carregado, tipos de árvore passam a sortear só entre as variantes que têm versão HD (se houver 2+); árvores secas ficam como estão
+function applyHdVariants() {
+  for (const tipos of Object.values(SET)) for (const cfg of Object.values(tipos)) {
+    if (cfg.house || cfg.vh !== undefined) continue;
+    const hdv = cfg.v.filter((n) => hdMeta[hdKey(n)]);
+    cfg.vh = new Set(hdv).size >= 2 && /Tree|Pine|cherry/.test(cfg.v[0]) ? cfg.v.filter((n) => hdMeta[hdKey(n)] || /^DeadTree/.test(n)) : null;
+  }
+}
 
 export function natureEnabled() {
   if (on !== null) return on;
@@ -39,6 +58,13 @@ export function loadNature() {
       if (meta) for (const [k, v] of Object.entries(m.sprites)) meta['m_' + k] = { ...v, im: img }; // peças do Meshy (CC BY 4.0): casas, estátuas, ruínas, cerejeiras, cristais...
       stats.meshy = Object.keys(m.sprites).length;
     } catch { /* sem o atlas do Meshy: valem o Quaternius e o desenho antigo */ }
+    try {
+      if (meta && hdWanted(location.search, devicePixelRatio || 1, deviceTier())) {
+        const [m, img] = await loadAtlas('hd');
+        await img.decode?.();
+        hdMeta = m.sprites; hdAtlas = img; stats.hd = Object.keys(hdMeta).length; applyHdVariants();
+      }
+    } catch { hdAtlas = null; hdMeta = null; } // sem o HD (ou falha de carga): ficam os atlases normais
     try {
       const [m, img] = await loadAtlas('ground');
       await img.decode?.();
@@ -107,14 +133,22 @@ SET.harbor = {
 };
 let zoneSet = null;
 // Ponte de madeira pintada no terreno: a peça do Meshy (m_bridge) esticada pela travessia (b.len de largura, ~3,5 × hw de altura); pontes de pedra seguem em scenery.js.
+// Com o HD (hd_bridge): proporção uniforme e, se a travessia pedir mais que ~1,3× o tamanho natural da peça, vários segmentos repetidos com emenda em vez de esticar.
 export const bridgeArtReady = () => !!(atlas && gAtlas && meta?.m_bridge);
+const BRIDGE_W0 = 225, BRIDGE_MAX_STRETCH = 1.3; // largura natural da peça HD no mundo e esticada máxima
+export const bridgeSegments = (len) => Math.max(1, Math.ceil(len / (BRIDGE_W0 * BRIDGE_MAX_STRETCH)));
 export function drawBridgeSprite(g, b) {
-  const sp = meta.m_bridge, kx = (b.len * 0.92) / sp.w, ky = (b.hw * 3.5) / sp.h;
+  const hs = hdMeta?.hd_bridge, sp = hs ?? meta.m_bridge;
   // sombra na água suave (V15): gradiente radial que some nas bordas, em vez da elipse escura chapada
   g.save(); g.translate(b.x + 6, b.y + 14); g.scale(1, (b.hw * 0.9) / (b.len * 0.5));
   const sh = g.createRadialGradient(0, 0, 0, 0, 0, b.len * 0.5); sh.addColorStop(0, 'rgba(8,16,36,0.30)'); sh.addColorStop(0.7, 'rgba(8,16,36,0.14)'); sh.addColorStop(1, 'rgba(8,16,36,0)');
   g.fillStyle = sh; g.beginPath(); g.arc(0, 0, b.len * 0.5, 0, Math.PI * 2); g.fill(); g.restore();
-  g.drawImage(sp.im, sp.x, sp.y, sp.w, sp.h, b.x - sp.ax * kx, b.y + 10 - sp.ay * ky, sp.w * kx, sp.h * ky);
+  if (!hs) { const kx = (b.len * 0.92) / sp.w, ky = (b.hw * 3.5) / sp.h; g.drawImage(sp.im, sp.x, sp.y, sp.w, sp.h, b.x - sp.ax * kx, b.y + 10 - sp.ay * ky, sp.w * kx, sp.h * ky); return; }
+  const total = b.len * 0.92, n = bridgeSegments(total), over = 0.06, segW = total / (n - (n - 1) * over), k = segW / sp.w; // segmentos se sobrepõem 6% (emenda)
+  for (let i = 0; i < n; i++) {
+    const left = b.x - total / 2 + i * segW * (1 - over);
+    g.drawImage(hdAtlas, sp.x, sp.y, sp.w, sp.h, left, b.y + 10 - sp.ay * k, segW, sp.h * k);
+  }
 }
 // os troncos que faziam de guarda-corpo (layout.js) ficam escondidos: a ponte pintada já tem o seu
 export function hideBridgeRails(world) {
@@ -139,7 +173,7 @@ export function drawNature(g, d, player) {
   if (d.hidden) return true;
   const cfg = zoneSet?.[d.type];
   if (!cfg) return false;
-  const name = cfg.v[cfg.pick ? cfg.pick(d) : Math.min(cfg.v.length - 1, Math.floor((d.v ?? 0) * cfg.v.length))], sp = meta[name];
+  const vs = cfg.vh ?? cfg.v, name = vs[cfg.pick ? cfg.pick(d) : Math.min(vs.length - 1, Math.floor((d.v ?? 0) * vs.length))], sp = meta[name];
   if (!sp) return false;
   if (cfg.ref === 0 && !cfg._ref) { const vs = cfg.v.map((n) => meta[n]).filter(Boolean); cfg._ref = vs.reduce((a, b) => a + (cfg.h ? b.my : b.mx), 0) / vs.length; } // ref 0: tamanho médio das variantes (peças do Meshy vêm sem escala própria)
   // tamanho: pela altura (árvores, capim) ou pela largura (pedras, arbustos...), relativo ao tamanho típico do tipo para as variantes terem proporção própria
@@ -149,7 +183,9 @@ export function drawNature(g, d, player) {
   let fade = false;
   if (cfg.behind && player) fade = Math.abs(player.x - d.x) < w * 0.35 && player.y < d.y && player.y > d.y - h * 0.9; // o herói atrás da copa a deixa translúcida
   if (fade) g.globalAlpha = 0.45;
-  g.drawImage(sp.im ?? atlas, sp.x, sp.y, sp.w, sp.h, x, y, w, h); stats.drawn++;
+  const hs = hdMeta?.[hdKey(name)]; // mesmo retângulo do mundo, mais pixels de origem
+  if (hs) g.drawImage(hdAtlas, hs.x, hs.y, hs.w, hs.h, x, y, w, h); else g.drawImage(sp.im ?? atlas, sp.x, sp.y, sp.w, sp.h, x, y, w, h);
+  stats.drawn++;
   if (fade) g.globalAlpha = 1;
   return true;
 }

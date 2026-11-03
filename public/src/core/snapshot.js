@@ -38,7 +38,7 @@ export class SnapshotDecoder {
     const actors = [...this.actors.values()];
     // só o próprio jogador recebe velocidade e recargas (o resto da tela não precisa)
     const mine = this.actors.get(this.you);
-    if (mine && msg.me) { mine.spd = msg.me.spd; mine.cds = { basic: msg.me.c[0], s0: msg.me.c[1], s1: msg.me.c[2], s2: msg.me.c[3] }; }
+    if (mine && msg.me) { mine.spd = msg.me.spd; mine.cds = { basic: msg.me.c[0], s0: msg.me.c[1], s1: msg.me.c[2], s2: msg.me.c[3], ...(msg.me.c.length > 4 ? { s3: msg.me.c[4] } : {}) }; }
     const out = { ...msg, actors: actors.map((a) => ({ ...a })) };
     delete out.a; delete out.m; delete out.n; delete out.g; delete out.pj; delete out.pl;
     out.mobs = [...this.mobs.values()].map(({ _seen, ...m }) => ({ ...m })); // vazio nas partidas sem monstros

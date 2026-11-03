@@ -136,7 +136,7 @@ test('painéis cabem na tela horizontal; opções mudam escala, qualidade e pers
   await page.locator('[data-arg="scale:+10"]').tap();
   const after = await page.evaluate(() => document.getElementById('hud-player').getBoundingClientRect().width);
   expect(after).toBeGreaterThan(before * 1.2);
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui').trim())).toBe('1.3');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui').trim())).toBe('1.1'); // padrão automático (84% em 844×390) + 3 toques de +10, arredondado ao passo de 10: 90, 100, 110
   expect(await fits('.p-options')).toBe(true);
   await page.locator('[data-arg="quality:low"]').tap();
   expect(await page.evaluate(() => window.game.renderer.quality)).toBe(0);
@@ -144,7 +144,7 @@ test('painéis cabem na tela horizontal; opções mudam escala, qualidade e pers
 
   await page.reload();
   await page.waitForFunction(() => window.game);
-  expect(await page.evaluate(() => ({ s: window.game.prefs.scale, q: window.game.prefs.quality }))).toEqual({ s: 130, q: 'low' });
+  expect(await page.evaluate(() => ({ s: window.game.prefs.scale, q: window.game.prefs.quality }))).toEqual({ s: 110, q: 'low' });
   expect(await page.evaluate(() => window.game.renderer.quality)).toBe(0);
 });
 
@@ -154,7 +154,7 @@ test('item no inventário: 1º toque mostra detalhes, 2º toque equipa', async (
     const { generateItem } = await import('/src/core/loot.js');
     const { makeRng } = await import('/src/core/rng.js');
     const g = window.game;
-    const it = generateItem(makeRng(5), 1, { slot: 'armor', rarityId: 'rare' });
+    const it = generateItem(makeRng(5), 1, { classId: g.char.classId, slot: 'armor', rarityId: 'rare' }); // itens são por classe: só equipa o da própria classe
     g.char.inventory.push(it);
     g.ui.open.add('inventory'); g.ui.render();
     return it.id;

@@ -137,7 +137,7 @@ export class MatchRoom {
   // dados só do dono: velocidade e recargas (os outros jogadores não precisam deles)
   meJson(p) {
     const a = p.actor;
-    return JSON.stringify({ spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), c: [r1(a.cds.basic), r1(a.cds.s0), r1(a.cds.s1), r1(a.cds.s2)] });
+    return JSON.stringify({ spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), c: [r1(a.cds.basic), r1(a.cds.s0), r1(a.cds.s1), r1(a.cds.s2), r1(a.cds.s3 ?? 0)] });
   }
   frameFor(commit) {
     const tuples = [...this.players.values()].map((p) => actorTuple(p.actor, p.bot || !!p.session?.ws));

@@ -321,7 +321,7 @@ test('teletransporte: custo em pergaminhos e só para mapas visitados (save anti
   const v = validate(c).char.visited;
   assert.ok(v.forest && v.plains && !v.ruins, 'nível 8 já alcança Bosque e Planície, não Ruínas');
   c.visited = { ruins: 1, arena: 1, naoexiste: 1 };
-  assert.deepEqual(validate(c).char.visited, { ruins: 1 }, 'só zonas de farm válidas');
+  assert.deepEqual(validate(c).char.visited, { ruins: 1, harbor: 1 }, 'só zonas válidas; quem visitou as Ruínas passou pelo Porto');
 });
 
 // ---------------- dificuldade, habilidades por nível, chefes, loot (docs/gameplay/dificuldade.md) ----------------
@@ -910,8 +910,8 @@ test('Mestres de Classe: 4 NPCs lado a lado na Vila; cada um só dá missões e 
   const town = ZONES.town.npcs;
   const row = CLASS_IDS.map((cid) => town.find((n) => n.id === masterNpcId(cid)));
   assert.ok(row.every(Boolean), 'os 4 mestres existem');
-  assert.ok(row.every((n) => n.x >= 900 && n.x <= 1300 && n.y >= 900 && n.y <= 960), 'praça dos mestres');
-  assert.equal(new Set(row.map((n) => n.y)).size, 1, 'mesma fileira');
+  assert.ok(row.every((n) => n.x >= 880 && n.x <= 1300 && n.y >= 900 && n.y <= 1100), 'praça dos mestres');
+  assert.ok(Math.max(...row.map((n) => n.y)) - Math.min(...row.map((n) => n.y)) <= 15, 'mesma fileira (o Clérigo desvia 10 px de um obstáculo)');
   for (const cid of CLASS_IDS) {
     const c = mkHero(cid, 14);
     for (const other of CLASS_IDS) {
@@ -963,4 +963,120 @@ test('Maestria (nível 25): exige a prova, dá bônus permanente pequeno e o tí
 
 test('PvP: sem teto por hora (nenhum resquício de "10 partidas por hora" nos parâmetros de XP)', () => {
   assert.equal(PVP_XP.fullPerHour, undefined); assert.equal(PVP_XP.afterFull, undefined);
+});
+
+// ---------- Habilidade de Maestria (s3): nível 25 + missão `maestria` ----------
+import { isSkillUnlocked as isUnl, skillIdAt, masteryUnlock } from '../public/src/core/unlocks.js';
+import { SKILLS as SK } from '../public/src/data/skills.js';
+import { parseClientMessage, PROTOCOL_VERSION as PV } from '../public/src/core/protocol.js';
+import { rivalIntent as rivalAi } from '../public/src/game/ai.js';
+
+const masteryHero = (classId, level, done) => { const c = newCharacter('M', classId, makeRng(5)); c.level = level; if (done) c.quests.done.maestria = 1; return c; };
+const mw = (hero, mobs = []) => {
+  const w = new World('arena', { seed: 9, visuals: false });
+  const a = w.add(makeHeroActor(hero, 550, 700, 'player', 1));
+  const es = mobs.map(([dx, dy, hp]) => { const m = w.add(makeMobActor('wolf', 25, 550 + dx, 700 + dy)); m.hostile = false; m.ai.state = 'idle'; m.stats.moveSpeed = 0; m.stats.power = 0; if (hp) m.hp = m.maxHp = hp; return m; });
+  return { w, a, es, run: (s, intent = {}) => { for (let t = 0; t < s; t += 1 / 60) w.update(1 / 60, { [a.id]: { mx: 0, my: 0, aimX: a.x, aimY: a.y - 100, attack: false, ...intent } }); } };
+};
+
+test('Maestria: matriz classe × desbloqueio (nv 24 sem; nv 25 sem missão sem; nv 25 com missão com)', () => {
+  for (const id of Object.keys(CLASSES)) {
+    assert.equal(SK[CLASSES[id].mastery].cd >= 30 && SK[CLASSES[id].mastery].cd <= 45, true, id + ' recarga 30-45 s');
+    assert.equal(skillIdAt(id, 3), CLASSES[id].mastery); assert.equal(masteryUnlock(id).id, CLASSES[id].mastery);
+    const a24 = masteryHero(id, 24, true), a25 = masteryHero(id, 25, false), ok = masteryHero(id, 25, true);
+    assert.equal(isUnl(a24, 3), false, id + ' nv24 mesmo com missão');
+    assert.equal(isUnl(a25, 3), false, id + ' nv25 sem missão');
+    assert.equal(isUnl(ok, 3), true, id + ' nv25 com missão');
+    assert.equal(isUnl(25, 3), false, 'só o nível (número) nunca basta');
+    assert.equal(unlockedSkills(a25).length, 3); assert.equal(unlockedSkills(ok).length, 4); assert.equal(unlockedSkills(ok)[3], CLASSES[id].mastery);
+    // o ator da simulação lê a missão do documento
+    assert.equal(makeHeroActor(ok, 0, 0).mastery, true); assert.equal(makeHeroActor(a25, 0, 0).mastery, false);
+  }
+});
+
+test('Maestria: cast válido só com desbloqueio; recarga; cast inválido não gasta recarga', () => {
+  for (const id of Object.keys(CLASSES)) {
+    const locked = mw(masteryHero(id, 25, false));
+    assert.equal(locked.w.castSkill(locked.a, 3, 550, 600), false); assert.equal(locked.a.cds.s3, 0);
+    const { w, a } = mw(masteryHero(id, 25, true));
+    assert.equal(w.castSkill(a, 3, 550, 600), true);
+    assert.equal(a.cds.s3, SK[CLASSES[id].mastery].cd);
+    assert.equal(w.castSkill(a, 3, 550, 600), false, 'em recarga');
+    assert.equal(w.events.filter((e) => e.type === 'cast' && e.skill === CLASSES[id].mastery).length, 1);
+  }
+});
+
+test('Maestria: o protocolo aceita cast 0..3 e rejeita 4', () => {
+  const m = (cast) => parseClientMessage({ v: PV, t: 'input', seq: 1, mx: 0, my: 0, aimX: 10, aimY: 10, attack: false, cast });
+  assert.equal(m(3).ok, true); assert.equal(m(3).msg.cast, 3); assert.equal(m(4).ok, false); assert.equal(m(-1).ok, false);
+});
+
+test('Fúria do Colosso: investida + impacto em área com atordoamento e +35% de dano por 6 s', () => {
+  const { w, a, es, run } = mw(masteryHero('warrior', 25, true), [[0, -200, 99999], [60, -230, 99999], [400, 300, 99999]]);
+  const hp0 = es.map((e) => e.hp);
+  assert.equal(w.castSkill(a, 3, a.x, a.y - 300), true);
+  assert.equal(w.buffVal(a, 'dmg'), 0.2);
+  run(0.6, { aimY: a.y - 300 });
+  assert.ok(es[0].hp < hp0[0] && es[1].hp < hp0[1], 'o impacto fere quem está perto do destino');
+  assert.equal(es[2].hp, hp0[2], 'quem está longe não é atingido');
+  assert.ok(es[0].stunT > 0.1, 'atordoado pelo impacto (0,8 s)');
+  run(6.5);
+  assert.equal(w.buffVal(a, 'dmg'), 0, 'o reforço acaba em 6 s');
+});
+
+test('Meteoro Arcano: aviso de 1 s, depois dano alto em área, atordoamento e queimadura que renova sem acumular', () => {
+  const { w, a, es, run } = mw(masteryHero('mage', 25, true), [[0, -300, 99999], [0, -700, 99999]]);
+  w.castSkill(a, 3, a.x, a.y - 300);
+  assert.equal(w.telegraphs.length, 1); assert.equal(w.telegraphs[0].delay, 1.0);
+  assert.ok(w.events.some((e) => e.type === 'telegraph'));
+  const hp0 = es[0].hp;
+  run(0.9); assert.equal(es[0].hp, hp0, 'nada antes do impacto');
+  run(0.2);
+  const afterHit = es[0].hp; assert.ok(afterHit < hp0, 'impacto');
+  assert.ok(es[0].stunT > 0 && es[0].burn, 'atordoado e queimando');
+  assert.equal(es[1].hp, es[1].maxHp, 'fora da área');
+  run(2.2); assert.ok(es[0].hp < afterHit, 'a queimadura continua ferindo');
+  run(2.5); assert.equal(es[0].burn, null, 'a queimadura acaba');
+  // o meteoro cai mesmo que o herói morra antes
+  const t = mw(masteryHero('mage', 25, true), [[0, -300, 99999]]);
+  t.w.castSkill(t.a, 3, t.a.x, t.a.y - 300); t.a.dead = true; t.run(1.2);
+  assert.ok(t.es[0].hp < t.es[0].maxHp);
+});
+
+test('Tempestade de Flechas Ardentes: 12 rajadas em 3 s na área e lentidão de 40%', () => {
+  const { w, a, es, run } = mw(masteryHero('archer', 25, true), [[0, -300, 999999]]);
+  w.castSkill(a, 3, a.x, a.y - 300);
+  assert.equal(w.areas.length, 1); assert.equal(w.areas[0].ticks, 12);
+  let hits = 0; run(0.5); for (const ev of w.events) if (ev.type === 'hit') hits++;
+  assert.ok(hits >= 1 && es[0].slowT > 0 && es[0].slowAmt === 0.4, 'lentidão aplicada');
+  w.events.length = 0; run(3.2); hits = w.events.filter((e) => e.type === 'hit').length;
+  assert.ok(hits >= 9 && hits <= 12, 'rajadas: ' + hits);
+});
+
+test('Intervenção Divina: cura grande, escudo, remove atordoamento/lentidão e pode ser usada atordoado; PvE cura só o herói', () => {
+  const { w, a, run } = mw(masteryHero('cleric', 25, true));
+  const ally = w.add(makeHeroActor(masteryHero('warrior', 20, false), 600, 700, 'player', 1));
+  ally.hp = ally.maxHp * 0.2; ally.stunT = 2; a.hp = a.maxHp * 0.2; a.stunT = 3; a.slowT = 2; a.slowAmt = 0.5;
+  run(0.05, { cast: 3 }); // atordoado, mas a Intervenção rompe
+  assert.ok(a.cds.s3 > 30, 'lançada atordoado');
+  assert.equal(a.stunT, 0); assert.equal(a.slowT, 0); assert.equal(ally.stunT, 0);
+  assert.ok(a.hp >= a.maxHp * 0.74, 'cura de 55%'); assert.ok(a.shield >= a.maxHp * 0.29, 'escudo de 30%');
+  assert.ok(ally.hp > ally.maxHp * 0.2 + ally.maxHp * 0.4, 'aliado perto recebe 80% da cura'); assert.ok(ally.shield > 0);
+  // outra habilidade não rompe o atordoamento
+  const b = mw(masteryHero('cleric', 25, true)); b.a.stunT = 2; b.run(0.05, { cast: 0 }); assert.equal(b.a.cds.s0, 0);
+  // sem aliados: cura só o herói e não falha
+  const c = mw(masteryHero('cleric', 25, true)); c.a.hp = c.a.maxHp * 0.3; assert.equal(c.w.castSkill(c.a, 3, 0, 0), true); assert.ok(c.a.hp > c.a.maxHp * 0.8);
+});
+
+test('Maestria: a IA do rival só usa s3 se tiver a Maestria (e usa quando tem)', () => {
+  const w0 = new World('arena', { seed: 3, visuals: false });
+  const r = w0.add(makeHeroActor(masteryHero('mage', 30, false), 550, 700, 'rival', 2)), t = w0.add(makeHeroActor(masteryHero('warrior', 30, false), 550, 500, 'player', 1));
+  let used = false;
+  for (let i = 0; i < 300; i++) { const it = rivalAi(r, w0, 1 / 60); if (it?.cast === 3) used = true; w0.update(1 / 60, { [r.id]: it ?? {}, [t.id]: {} }); }
+  assert.equal(used, false);
+  const w1 = new World('arena', { seed: 3, visuals: false });
+  const r1 = w1.add(makeHeroActor(masteryHero('mage', 30, true), 550, 700, 'rival', 2)); w1.add(makeHeroActor(masteryHero('warrior', 30, false), 550, 500, 'player', 1));
+  let used1 = false;
+  for (let i = 0; i < 300; i++) { const it = rivalAi(r1, w1, 1 / 60); if (it?.cast === 3) used1 = true; w1.update(1 / 60, { [r1.id]: it ?? {} }); }
+  assert.equal(used1, true);
 });

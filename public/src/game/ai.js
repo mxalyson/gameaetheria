@@ -2,7 +2,7 @@
 import { CLASSES } from '../data/classes.js';
 import { skillOf } from '../core/specs.js';
 import { MOBS, BOSS_PHASES } from '../data/mobs.js';
-import { isSkillUnlocked } from '../core/unlocks.js';
+import { isSkillUnlocked, skillIdAt } from '../core/unlocks.js';
 import { riverX } from './layout.js';
 
 // Rio: a água bloqueia o movimento (não os projéteis). Se a reta até (tx, ty) cruza um rio, devolve o próximo ponto de passagem
@@ -40,7 +40,7 @@ export function mobIntent(m, w, dt) {
     else return toward(m, m.home.x, m.home.y, 1.3, w);
   }
   if (!tgt && !w.zone.safe && m.hostile !== false) { // passivo: só reage depois de apanhar (ver World.damage)
-    const e = w.nearestEnemy(m, M.aggro);
+    const e = w.nearestEnemy(m, M.aggro * (w.nightMods?.aggroMul ?? 1));
     if (e) { ai.target = e.id; tgt = e; ai.state = 'chase'; }
   }
   // a trela é maior quando a casa fica do outro lado de um rio: o desvio pela ponte alonga o caminho
@@ -175,12 +175,18 @@ function steerAround(r, w, mx, my) {
   return [mx, my];
 }
 
+const CHOOSE_ORDER = [3, 0, 1, 2];
 function chooseSkill(r, tgt, d, w) {
-  const ids = CLASSES[r.classId].skills;
-  for (let i = 0; i < ids.length; i++) {
-    if (r.cds['s' + i] > 0 || !isSkillUnlocked(r.level ?? 30, i)) continue;
-    const s = skillOf(r.classId, r.spec, ids[i]);
+  for (const i of CHOOSE_ORDER) { // a Maestria (s3, se o rival a tem) vem primeiro: é a jogada decisiva
+    if (r.cds['s' + i] > 0 || !isSkillUnlocked(r.level == null ? 30 : r, i)) continue;
+    const s = skillOf(r.classId, r.spec, skillIdAt(r.classId, i));
     switch (s.kind) {
+      case 'meteor':
+        if (d < s.range * 0.9) return { idx: i };
+        break;
+      case 'divine':
+        if (r.hp < r.maxHp * 0.45 || r.stunT > 0.5) return { idx: i };
+        break;
       case 'aoe_self':
         if (s.heal ? r.hp < r.maxHp * 0.6 || d < s.radius * 0.8 || w.alliesOf(r, s.radius).some((al) => al.hp < al.maxHp * 0.5) : d < s.radius * 0.9) return { idx: i };
         break;

@@ -170,3 +170,76 @@ test('loja do porto: estoque diário rotativo, até épico, preços próprios e 
   assert.deepEqual(buildHarborStock(c, { day }).map((i) => i.id), s1.slice(2).map((i) => i.id));
   assert.ok(buildShopStock(hero(12)).every((i) => i.id.startsWith('shop-')), 'a loja da Vila não muda');
 });
+
+// ---------- bônus noturno ligado à simulação ----------
+test('World com night:true segue o relógio; zona sem ciclo e dia ficam em 1; padrão (sem night) nunca muda', async () => {
+  const { World } = await import('../public/src/game/sim.js');
+  const at = (hour) => () => hour * 30; // relógio em s: 30 s por "hora" (daycycle.js)
+  const noite = new World('forest', { seed: 1, visuals: false, night: true, clock: at(23) });
+  noite.update(0.05);
+  assert.deepEqual(noite.nightMods, { aggroMul: NIGHT.aggroMul, rewardMul: NIGHT.rewardMul });
+  const dia = new World('forest', { seed: 1, visuals: false, night: true, clock: at(12) });
+  dia.update(0.05);
+  assert.deepEqual(dia.nightMods, { aggroMul: 1, rewardMul: 1 });
+  const vila = new World('arena', { seed: 1, visuals: false, night: true, clock: at(23) });
+  vila.update(0.05);
+  assert.equal(vila.nightMods.rewardMul, 1, 'arena (círculo): sem ciclo');
+  const sem = new World('forest', { seed: 1, visuals: false, clock: at(23) });
+  sem.update(0.05);
+  assert.equal(sem.nightMods.rewardMul, 1, 'simulações e testes não dependem da hora');
+});
+
+test('nightMods: aggro cresce e ouro/XP/itens rendem mais à noite (rollMobLoot rewardMul)', async () => {
+  const { rollMobLoot } = await import('../public/src/core/loot.js');
+  const { makeRng } = await import('../public/src/core/rng.js');
+  const mob = { level: 10, boss: false, mobId: 'wolf' };
+  let g1 = 0, g2 = 0, i1 = 0, i2 = 0;
+  for (let s = 1; s <= 400; s++) {
+    const a = rollMobLoot(makeRng(s), mob, 'warrior'), b = rollMobLoot(makeRng(s), mob, 'warrior', null, NIGHT.rewardMul);
+    g1 += a.find((l) => l.kind === 'gold').amount; g2 += b.find((l) => l.kind === 'gold').amount;
+    i1 += a.filter((l) => l.kind === 'item').length; i2 += b.filter((l) => l.kind === 'item').length;
+  }
+  assert.ok(g2 > g1 * 1.1 && g2 < g1 * 1.2, `ouro ${g1} → ${g2}`);
+  assert.ok(i2 >= i1, 'itens não diminuem');
+});
+
+test('prefs: daynight só aceita auto/day', async () => {
+  const { changePref } = await import('../public/src/prefs.js');
+  assert.equal(changePref({ scale: 100, quality: 'auto', controls: 'auto', daynight: 'auto' }, 'daynight:day').daynight, 'day');
+  assert.equal(changePref({ scale: 100, quality: 'auto', controls: 'auto', daynight: 'day' }, 'daynight:lixo').daynight, 'auto');
+});
+
+// ---------- Porto no meio da rota: desconto e reciclagem ----------
+import { harborPrice, recycle, RECYCLE_COUNT } from '../public/src/shop.js';
+
+test('Porto: poção e pergaminho 15% mais baratos que na Vila', () => {
+  for (const lv of [1, 10, 25]) for (const k of ['potion', 'scroll']) {
+    assert.ok(harborPrice(k, lv) < PRICES[k](lv)); assert.equal(harborPrice(k, lv), Math.round(PRICES[k](lv) * 0.85));
+  }
+});
+
+test('reciclagem: 3 comuns viram 1 raro da classe; recusa mistura, duplicatas e itens fora da mochila; é determinística', () => {
+  const r = makeRng(3), c = hero(10, 'mage');
+  const commons = [1, 2, 3, 4].map(() => generateItem(r, 10, { classId: 'mage', rarityId: 'common' }));
+  const epic = generateItem(r, 10, { classId: 'mage', rarityId: 'epic' });
+  c.inventory = [...commons, epic];
+  const ids = commons.slice(0, 3).map((i) => i.id);
+  assert.equal(RECYCLE_COUNT, 3);
+  assert.equal(recycle(c, ids.slice(0, 2)).ok, false);
+  assert.equal(recycle(c, [ids[0], ids[0], ids[1]]).ok, false);
+  assert.equal(recycle(c, [ids[0], ids[1], epic.id]).ok, false, 'só comuns');
+  assert.equal(recycle(c, [ids[0], ids[1], 'nao-existe']).ok, false);
+  assert.equal(c.inventory.length, 5, 'falhas não mudam nada');
+  const copy = structuredClone(c);
+  const out = recycle(c, ids);
+  assert.equal(out.ok, true); assert.equal(out.item.rarity, 'rare');
+  assert.equal(c.inventory.length, 3); assert.ok(c.inventory.includes(out.item) && !c.inventory.some((i) => ids.includes(i.id)));
+  const { id: _a, ...again } = recycle(copy, ids).item, { id: _b, ...first } = out.item;
+  assert.deepEqual(again, first, 'mesma semente, mesmo item (o id é único por geração)');
+});
+
+test('Porto: as zonas vizinhas têm portal de ida e volta e o Porto só liga Planície e Ruínas', () => {
+  assert.deepEqual(ZONES.harbor.portals.map((p) => p.to), ['plains', 'ruins']);
+  const back = (a, b) => ZONES[a].portals.some((p) => p.to === b);
+  for (const [a, b] of [['plains', 'harbor'], ['harbor', 'ruins']]) assert.ok(back(a, b) && back(b, a), `${a} <-> ${b}`);
+});

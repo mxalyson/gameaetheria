@@ -3,16 +3,19 @@
 // ao servidor no multiplayer — e produz estado + eventos.
 import { makeRng } from '../core/rng.js';
 import { computeHit } from '../core/combat.js';
-import { computeStats } from '../core/stats.js';
+import { computeStats, hasMastery } from '../core/stats.js';
 import { spiritPower } from '../core/progression.js';
 import { CLASSES } from '../data/classes.js';
 import { skillOf, activeSpec } from '../core/specs.js';
 import { MOBS, MOB_CURVE, LEVEL_GAP, BOSS_SPAWN, BOSS_REPEAT, CAMP_RESPAWN } from '../data/mobs.js';
-import { skillUnlockLevel } from '../core/unlocks.js';
+import { isSkillUnlocked, skillIdAt } from '../core/unlocks.js';
 import { ZONES } from '../data/zones.js';
 import { SPIRITS } from '../data/spirits.js';
 import { buildLayout, campSpawns, minibossSpawn } from './layout.js';
 import { mobIntent, rivalIntent } from './ai.js';
+import { nightMods, hourFromMs, zoneHasCycle } from '../core/daycycle.js';
+
+const DAY_MODS = { aggroMul: 1, rewardMul: 1 };
 
 const TAU = Math.PI * 2;
 // Spirit coletor: fora de combate busca o drop mais próximo (até `range` px do dono) e o traz; `hand` = distância em que entrega ao dono.
@@ -40,7 +43,8 @@ export function makeHeroActor(char, x, y, kind = 'player', team = 1) {
   const st = computeStats(char);
   return baseActor({
     kind, team, name: char.name, classId: char.classId, level: char.level, spec: activeSpec(char), x, y, r: 15,
-    stats: st, hp: st.maxHp, maxHp: st.maxHp, cds: { basic: 0, s0: 0, s1: 0, s2: 0 },
+    stats: st, hp: st.maxHp, maxHp: st.maxHp, cds: { basic: 0, s0: 0, s1: 0, s2: 0, s3: 0 },
+    mastery: hasMastery(char), // Maestria concluída: libera a habilidade s3 (nível 25 + missão); o servidor lê isto do documento
   });
 }
 
@@ -72,10 +76,14 @@ export class World {
   // visuals:false (servidor, simulador de balanceamento): nada de partículas/textos/efeitos é criado — só estado de jogo e eventos.
   // bossState: objeto de quem chama que sobrevive à troca de mundo (contador do ritual e recarga do chefe) — sem ele, cada visita recomeça.
   // clock: relógio absoluto em s (injetável nos testes) para recargas que sobrevivem à recriação do mundo (bossState.coolUntil / respawnUntil).
-  constructor(zoneId, { seed, visuals = true, bossState, clock } = {}) {
+  constructor(zoneId, { seed, visuals = true, bossState, clock, night = false } = {}) {
     this.bossState = bossState ?? {};
     this.clock = clock ?? (() => Date.now() / 1000);
     this.visuals = visuals;
+    // night: liga o bônus de risco noturno (aggro e recompensa); fica desligado por padrão para simulações/testes não dependerem da hora real. world.nightMods pode ser fixado nos testes.
+    this.night = night;
+    this.nightT = 0;
+    this.nightMods = DAY_MODS;
     this.zoneId = zoneId;
     this.zone = ZONES[zoneId];
     this.layout = buildLayout(zoneId);
@@ -252,6 +260,7 @@ export class World {
 
   // ---------- loop ----------
   update(dt, intents = {}) {
+    if (this.night && (this.nightT -= dt) <= 0) { this.nightT = 5; this.nightMods = zoneHasCycle(this.zone) ? nightMods(hourFromMs(this.clock() * 1000)) : DAY_MODS; }
     this.time += dt;
     if (this.frozen > 0) { this.frozen -= dt; this.updateVisuals(dt); return; }
     let prune = false;
@@ -278,12 +287,23 @@ export class World {
     if (a.shieldT > 0) { a.shieldT -= dt; if (a.shieldT <= 0) a.shield = 0; }
     a.slowT = Math.max(0, a.slowT - dt);
     a.stunT = Math.max(0, a.stunT - dt);
+    const bn = a.burn;
+    if (bn) { // queimadura do Meteoro Arcano
+      bn.t -= dt; bn.next -= dt;
+      if (bn.next <= 0) { bn.next += bn.every; this.damage(bn.src, a, bn.mult); }
+      if (bn.t <= 0 || a.dead) a.burn = null;
+    }
     a.hitFlash = Math.max(0, a.hitFlash - dt);
     a.swing = Math.max(0, a.swing - dt);
   }
 
   applyIntent(a, it, dt) {
-    if (a.stunT > 0) { a.moving = false; return; }
+    if (a.stunT > 0) {
+      a.moving = false;
+      // só a Intervenção Divina (`castStunned`) rompe o atordoamento: remove o efeito e é lançada na hora
+      if (it.cast === 3 && a.cds.s3 <= 0 && isSkillUnlocked(a, 3) && skillOf(a.classId, a.spec, skillIdAt(a.classId, 3)).castStunned) this.castSkill(a, 3, it.aimX ?? a.x, it.aimY ?? a.y);
+      return;
+    }
     if (a.dash) { this.stepDash(a, dt); return; }
     if (it.aimX != null) a.facing = Math.atan2(it.aimY - a.y, it.aimX - a.x);
     let mx = it.mx ?? 0, my = it.my ?? 0;
@@ -442,8 +462,9 @@ export class World {
   castSkill(a, idx, ax, ay) {
     const key = 's' + idx;
     if (a.cds[key] > 0 || a.dash) return false;
-    if ((a.level ?? 1) < skillUnlockLevel(idx)) return false; // habilidade ainda não aprendida: a intenção é ignorada (vale para cliente, servidor e rival)
-    const id = CLASSES[a.classId].skills[idx];
+    if (!isSkillUnlocked(a, idx)) return false; // habilidade ainda não aprendida (a de Maestria exige nível 25 + missão): a intenção é ignorada (vale para cliente, servidor e rival)
+    const id = skillIdAt(a.classId, idx);
+    if (!id) return false;
     const s = skillOf(a.classId, a.spec, id); // com os ajustes da especialização
     a.cds[key] = s.cd;
     a.swing = 0.3;
@@ -465,8 +486,33 @@ export class World {
         this.burst(a.x, a.y, s.color, 22, 220);
         break;
       case 'dash':
-        a.dash = { vx: cos * s.speed, vy: sin * s.speed, t: s.dist / s.speed, mult: s.mult, stun: s.stun, hit: new Set(), invuln: !!s.invuln, color: s.color };
+        a.dash = { vx: cos * s.speed, vy: sin * s.speed, t: s.dist / s.speed, mult: s.mult, stun: s.stun, hit: new Set(), invuln: !!s.invuln, color: s.color, slam: s.slam ?? null };
+        if (s.buff) { // Fúria do Colosso: o reforço de dano dura desde o lançamento
+          a.buffs.push({ id, t: s.dur, ...s.buff });
+          this.events.push({ type: 'status', actor: a, kind: 'buff', dur: s.dur, skill: id, t: this.time });
+        }
         break;
+      case 'meteor': { // área telegrafada: o impacto cai depois de `delay` s e queima (resolvido em updateTelegraphs)
+        const d = Math.min(s.range, Math.hypot(ax - a.x, ay - a.y));
+        castTarget = { x: a.x + cos * d, y: a.y + sin * d };
+        this.telegraphs.push({ x: castTarget.x, y: castTarget.y, r: s.radius, t: 0, delay: s.delay, src: a, mult: s.mult, color: s.color, stun: s.stun, burn: s.burn ?? null, always: true });
+        this.events.push({ type: 'telegraph', x: castTarget.x, y: castTarget.y, r: s.radius, delay: s.delay, color: s.color });
+        break;
+      }
+      case 'divine': { // cura grande + escudo em quem está perto e remove atordoamento/lentidão (em PvE só o herói)
+        const who = [a, ...this.alliesOf(a, s.radius)];
+        for (const t of who) {
+          const self = t === a;
+          t.stunT = 0; t.slowT = 0;
+          this.heal(t, t.maxHp * s.heal * (self ? 1 : s.allyHeal));
+          t.shield = Math.max(t.shield, t.maxHp * s.shieldPct * (self ? 1 : s.allyHeal)); t.shieldT = Math.max(t.shieldT, s.dur);
+          this.events.push({ type: 'status', actor: t, kind: 'shield', dur: s.dur, skill: id, t: this.time });
+          if (!self) this.addFx({ type: 'ring', x: t.x, y: t.y, r: 50, color: s.color, t: 0, life: 0.6, follow: t });
+        }
+        this.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius, color: s.color, t: 0, life: 0.7 });
+        this.burst(a.x, a.y, s.color, 30, 240);
+        break;
+      }
       case 'buff':
         a.buffs.push({ id, t: s.dur, ...s.buff });
         if (s.buff.shieldPct) { a.shield = a.maxHp * s.buff.shieldPct; a.shieldT = s.dur; }
@@ -489,7 +535,7 @@ export class World {
       case 'ground_aoe': {
         const d = Math.min(s.range, Math.hypot(ax - a.x, ay - a.y));
         castTarget = { x: a.x + cos * d, y: a.y + sin * d };
-        this.areas.push({ x: a.x + cos * d, y: a.y + sin * d, r: s.radius, ticks: s.ticks, interval: s.interval, next: 0.2, src: a, mult: s.mult, color: s.color, t: 0 });
+        this.areas.push({ x: a.x + cos * d, y: a.y + sin * d, r: s.radius, ticks: s.ticks, interval: s.interval, next: 0.2, src: a, mult: s.mult, color: s.color, t: 0, slow: s.slow, slowDur: s.slowDur });
         break;
       }
       case 'blink': {
@@ -520,7 +566,15 @@ export class World {
       }
     }
     if (this.particles.length < 700) this.addParticle({ x: a.x, y: a.y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: d.color, size: 7 });
-    if (d.t <= 0) a.dash = null;
+    if (d.t <= 0) {
+      a.dash = null;
+      const sl = d.slam;
+      if (sl) { // Fúria do Colosso: impacto em área ao chegar
+        this.addFx({ type: 'ring', x: a.x, y: a.y, r: sl.radius, color: d.color, t: 0, life: 0.5 });
+        this.burst(a.x, a.y, d.color, 30, 260);
+        for (const e of this.enemiesOf(a)) if (Math.hypot(e.x - a.x, e.y - a.y) <= sl.radius + e.r) this.damage(a, e, sl.mult, { stun: sl.stun });
+      }
+    }
   }
 
   // ---------- dano / cura ----------
@@ -644,7 +698,7 @@ export class World {
         ar.next = ar.interval;
         for (const e of this.actors) {
           if (e.dead || e.untargetable || e.team === ar.src.team) continue;
-          if (Math.hypot(e.x - ar.x, e.y - ar.y) <= ar.r + e.r) this.damage(ar.src, e, ar.mult);
+          if (Math.hypot(e.x - ar.x, e.y - ar.y) <= ar.r + e.r) this.damage(ar.src, e, ar.mult, ar.slow ? { slow: ar.slow, slowDur: ar.slowDur } : undefined);
         }
         for (let i = 0; this.visuals && i < 8; i++) {
           const ang = this.vrng.next() * TAU, d = this.vrng.next() * ar.r;
@@ -660,11 +714,17 @@ export class World {
       tg.t += dt;
       if (tg.t >= tg.delay && !tg.done) {
         tg.done = true;
-        if (!tg.src.dead) {
+        if (!tg.src.dead || tg.always) { // `always`: o meteoro do herói cai mesmo que ele morra no meio
           this.addFx({ type: 'ring', x: tg.x, y: tg.y, r: tg.r, color: tg.color, t: 0, life: 0.4 });
           this.burst(tg.x, tg.y, tg.color, 30, 260);
           for (const e of this.enemiesOf(tg.src)) {
-            if (Math.hypot(e.x - tg.x, e.y - tg.y) <= tg.r + e.r) this.damage(tg.src, e, tg.mult, { stun: 0.5 });
+            if (Math.hypot(e.x - tg.x, e.y - tg.y) <= tg.r + e.r) {
+              this.damage(tg.src, e, tg.mult, { stun: tg.stun ?? 0.5 });
+              if (tg.burn && !e.dead) { // queimadura: dano periódico (renova, não acumula)
+                e.burn = { t: tg.burn.dur, every: tg.burn.every, next: tg.burn.every, mult: tg.burn.mult, src: tg.src };
+                this.events.push({ type: 'status', actor: e, kind: 'burn', dur: tg.burn.dur, t: this.time });
+              }
+            }
           }
         }
       }

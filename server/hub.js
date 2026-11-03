@@ -296,13 +296,15 @@ export class Hub {
 
   // ---------- exploração no servidor (P11) ----------
   // Instância por grupo (ou por jogador, se solo) e por zona: quem do mesmo grupo entra depois cai na mesma sala (até MAX_PARTY).
-  // O servidor sabe onde o jogador está: na sala de zona, a zona dela; fora de sala, a vila. O `from` do cliente é IGNORADO.
+  // O servidor sabe onde o jogador está: na sala de zona, a zona dela; fora de sala, a vila (ou o Porto, se acabou de sair dele: `s.hubAt`). O `from` do cliente é IGNORADO.
+  // Cidades neutras (hub: vila e Porto) não têm sala: o jogador sai da instância (zone_exit com `to`) e anda sozinho nelas, sem monstros.
   // Só vale o portal real (zona atual → destino) e, dentro da sala, só com o ator a ≤ PORTAL_REACH do portal.
   zoneEnter(s, zoneId, _from, no) {
     if (s.queued) return no(REJECT.ALREADY_QUEUED);
     if (s.room && s.room.mode !== 'zone') return no(REJECT.IN_MATCH);
-    const cur = s.room ? s.room.zoneId : 'town';
-    const at = entryPoint(zoneId, cur);
+    // fora de sala: vale o hub de onde saiu (Porto) e, se o cliente voltou à vila por conta própria, a vila
+    const cur = s.room ? s.room.zoneId : [s.hubAt, 'town'].find((f) => f && entryPoint(zoneId, f));
+    const at = cur && entryPoint(zoneId, cur);
     if (!at || !ZONES[zoneId].mobs) return no(REJECT.BAD_ZONE);
     if (s.room) {
       const portal = ZONES[cur].portals.find((q) => q.to === zoneId), a = s.player?.actor;
@@ -329,6 +331,7 @@ export class Hub {
     }
     this.refreshChar(s);
     room.join(s, at);
+    s.hubAt = null;
     this.markVisited(s, zoneId);
     this.sendZoneJoined(s, room, extra);
   }
@@ -351,7 +354,8 @@ export class Hub {
     if (!this.db || !s.charId) return no(REJECT.BAD_CHARACTER);
     if (s.queued) return no(REJECT.ALREADY_QUEUED);
     const toTown = zoneId === 'town';
-    if (!toTown && !ZONES[zoneId]?.mobs) return no(REJECT.BAD_ZONE);
+    const toHub = !toTown && !!ZONES[zoneId]?.hub && !ZONES[zoneId].mobs; // Porto: custa 1 pergaminho, mas não tem sala
+    if (!toTown && !toHub && !ZONES[zoneId]?.mobs) return no(REJECT.BAD_ZONE);
     const room = s.room;
     if (room && room.mode !== 'zone') return no(REJECT.IN_MATCH); // partida em andamento não permite viajar
     if (room) {
@@ -363,9 +367,10 @@ export class Hub {
     const row = this.db.character(s.charId);
     if (!row) return no(REJECT.BAD_CHARACTER);
     const doc = row.doc;
-    if (!toTown && !doc.visited?.[zoneId]) return no(REJECT.NOT_VISITED);
+    const seen = doc.visited?.[zoneId] || (zoneId === 'harbor' && doc.visited?.ruins); // quem já chegou às Ruínas passou pelo Porto
+    if (!toTown && !seen) return no(REJECT.NOT_VISITED);
     if (!toTown && (doc.scrolls ?? 0) < 1) return no(REJECT.NO_SCROLL);
-    if (!toTown && this.zoneRoomFor(s, zoneId).room?.size >= MAX_PARTY) return no(REJECT.ROOM_FULL); // antes de cobrar
+    if (!toTown && !toHub && this.zoneRoomFor(s, zoneId).room?.size >= MAX_PARTY) return no(REJECT.ROOM_FULL); // antes de cobrar
     let scrolls = doc.scrolls ?? 0;
     if (!toTown) {
       try {
@@ -379,7 +384,8 @@ export class Hub {
       } catch { return no(REJECT.NO_SCROLL); }
     }
     if (room) room.leave(s.player, 'teleport'); // grava o lote pendente de recompensas antes de trocar de lugar
-    if (toTown) return this.out.send(s, { t: 'zone_exit', to: 'town' });
+    if (toTown) { s.hubAt = null; return this.out.send(s, { t: 'zone_exit', to: 'town' }); }
+    if (toHub) { s.hubAt = zoneId; this.markVisited(s, zoneId); return this.out.send(s, { t: 'zone_exit', to: zoneId, x: ZONES[zoneId].spawn.x, y: ZONES[zoneId].spawn.y }); }
     this.joinZoneRoom(s, zoneId, { ...(ZONES[zoneId].spawn ?? TELEPORT_ENTRY) }, { scrolls });
   }
   sendZoneJoined(s, room, extra = null) {
@@ -395,12 +401,20 @@ export class Hub {
     // B15: sair da instância em luta (ou morto) devolveria o herói com vida cheia; mesmo critério do teletransporte
     if (a && (a.dead || room.world.time - a.lastCombat < TELEPORT_COMBAT_SEC)) return this.out.send(s, { t: 'reject', code: REJECT.IN_COMBAT });
     room.leave(s.player, 'left');
+    s.hubAt = null;
     this.out.send(s, { t: 'zone_exit', to: 'town' });
   }
   zonePortal(room, p, pt) {
     const s = p.session;
     if (!s) return;
-    if (pt.to === 'town') { room.leave(p, 'portal'); this.out.send(s, { t: 'zone_exit', to: 'town', x: pt.tx, y: pt.ty }); return; }
+    const dest = ZONES[pt.to];
+    if (pt.to === 'town' || (dest.hub && !dest.mobs)) { // cidade neutra: sai da instância; o cliente anda no mapa local
+      room.leave(p, 'portal');
+      s.hubAt = pt.to === 'town' ? null : pt.to;
+      if (s.hubAt) this.markVisited(s, pt.to);
+      this.out.send(s, { t: 'zone_exit', to: pt.to, x: pt.tx, y: pt.ty });
+      return;
+    }
     this.zoneEnter(s, pt.to, room.zoneId, (code) => this.out.send(s, { t: 'reject', code }));
   }
 

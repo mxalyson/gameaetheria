@@ -63,5 +63,13 @@ Busto em círculo, **rosto 3/4**, estilo anime-fantasia, expressão decidida; **
 ## E. Retratos de NPC (o diálogo pintado tem um **oval** à esquerda esperando o rosto)
 Guarda Ren (guarda de elmo cinza), Mestre Doran (veterano de armadura vermelha), Herbalista Mel (senhora de capuz verde e halo de folhas), Mercadora Lia (jovem ruiva de avental), Sábia Yun (maga de chapéu azul pontudo), Ferreiro. Busto 3/4, mesmo estilo da seção D, fundo verde.
 
+## F. Habilidades de Maestria (4 ícones, 256x256, moldura dourada de "mestre")
+Hoje são recolores provisórios dos ícones existentes (`tools/skill-icon-gold.py`). Estilo dos 12 ícones atuais, quadrado arredondado com moldura dourada ornamentada, fundo escuro com brilho.
+- Fúria do Colosso (Guerreiro): punho/armadura colossal em brasa golpeando o chão, onda de choque dourada.
+- Meteoro Arcano (Mago): meteoro arcano em chamas violeta-laranja caindo, círculo rúnico no chão.
+- Tempestade de Flechas Ardentes (Arqueiro): dezenas de flechas em chamas caindo em chuva diagonal.
+- Intervenção Divina (Clérigo): coluna de luz dourada descendo sobre mãos em prece, asas translúcidas.
+> Prompt-base: "game skill icon, rounded square, ornate gold master frame, [descrição], hand-painted anime fantasy, saturated luminous colors, dark vignette background, no text"
+
 ## Como me devolver
 Mande as imagens (ou salve em `docs/art-direction/fontes-icones/`). Eu recorto o fundo, reduzo para o peso de celular (WebP, ≤ 256 px), monto um **atlas de itens** e troco os emojis por imagem (se uma imagem faltar, o jogo volta ao emoji daquele item), mantendo a moldura de raridade por trás. A ordem de prioridade que sugiro: **A (equipamentos) → B (poção, essência, moeda) → C (spirits) → D/E (retratos)**.

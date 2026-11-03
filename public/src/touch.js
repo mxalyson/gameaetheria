@@ -2,7 +2,7 @@
 // Mira automática no inimigo mais próximo; arrastar um botão de skill mira na mão. Usa Pointer Events (multi-toque).
 import { CLASSES } from './data/classes.js';
 import { SKILLS } from './data/skills.js';
-import { isSkillUnlocked, skillUnlockLevel } from './core/unlocks.js';
+import { isSkillUnlocked, skillUnlockLevel, skillIdAt } from './core/unlocks.js';
 import { skillOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { asset } from './assets-version.js';
@@ -27,7 +27,7 @@ export class TouchControls {
     this.refresh();
   }
 
-  get scale() { return (this.game.prefs?.scale ?? 100) / 100; }
+  get scale() { return this.game.uiScale ?? 1; }
 
   setMode(mode) { this.mode = mode; this.refresh(); }
 
@@ -59,6 +59,7 @@ export class TouchControls {
         <div class="tbtn slot sk sk0" data-t="skill" data-i="0"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot sk sk1" data-t="skill" data-i="1"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot sk sk2" data-t="skill" data-i="2"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
+        <div class="tbtn slot sk sk3" data-t="skill" data-i="3"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot pot" data-t="potion"><span class="icon">🧪</span><span class="count"></span><div class="cd"></div></div>
         <div class="tbtn slot act hidden" data-t="interact"><span class="icon"></span></div>
       </div>`;
@@ -137,7 +138,7 @@ export class TouchControls {
   setup(char) {
     const cls = CLASSES[char.classId];
     $('t-atk-icon').innerHTML = attackImg(char.classId, cls.icon);
-    cls.skills.forEach((s, i) => {
+    [...cls.skills, cls.mastery].forEach((s, i) => { // o 4º é a habilidade de Maestria
       const b = this.root.querySelector(`.sk${i}`), c = skillCategory(skillOf(char.classId, null, s));
       b.querySelector('.icon').innerHTML = skillImg(s, SKILLS[s].icon);
       b.querySelector('.cat')?.remove(); b.insertAdjacentHTML('beforeend', `<i class="cat cat-${c}" title="${CATEGORIES[c]}"></i>`);
@@ -151,7 +152,7 @@ export class TouchControls {
     const q = this.castQueue.shift();
     let cast = null, aim;
     if (q) {
-      const skill = skillOf(player.classId, player.spec, CLASSES[player.classId].skills[q.i]);
+      const skill = skillOf(player.classId, player.spec, skillIdAt(player.classId, q.i));
       cast = q.i;
       aim = pickAim({ player, enemies, move: this.move, override: q.aim, mode: aimModeFor(skill), reach: skill.dist ?? 260 });
     } else aim = pickAim({ player, enemies, move: this.move });
@@ -164,19 +165,19 @@ export class TouchControls {
     this.root.classList.toggle('hidden', !show);
     if (!show) { if (this.attack || this.stickId !== null) this.reset(); return; }
     const p = game.player, cls = CLASSES[p.classId];
-    const cdOf = [p.cds.s0, p.cds.s1, p.cds.s2];
+    const cdOf = [p.cds.s0, p.cds.s1, p.cds.s2, p.cds.s3 ?? 0];
     const setCd = (el, cd, max, text) => {
       el.style.setProperty('--p', cd > 0 ? Math.min(1, cd / max).toFixed(3) : '0');
       const t = el.querySelector('.cdt');
       if (t) t.textContent = text && cd > 0 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
     };
     const blocked = p.stunT > 0 || p.dead; // sem a investida (dash): durava ~0,3 s e parecia erro (V19)
-    cls.skills.forEach((s, i) => {
-      const b = this.root.querySelector(`.sk${i}`), lk = !isSkillUnlocked(p, i);
-      setCd(b, lk ? 0 : cdOf[i], skillOf(p.classId, p.spec, s).cd, true);
-      b.classList.toggle('blocked', blocked && !lk);
-      b.classList.toggle('locked', lk); // cadeado + "Nv N" (ver style.css)
-      if (lk) b.style.setProperty('--lv', `"${skillUnlockLevel(i)}"`);
+    [...cls.skills, cls.mastery].forEach((s, i) => {
+      const b = this.root.querySelector(`.sk${i}`), lk = !isSkillUnlocked(p, i), sk = skillOf(p.classId, p.spec, s);
+      setCd(b, lk ? 0 : cdOf[i], sk.cd, true);
+      b.classList.toggle('blocked', blocked && !lk && !sk.castStunned); // a Intervenção Divina rompe o atordoamento
+      b.classList.toggle('locked', lk); // cadeado + "Nv N" (ver style.css); a Maestria mostra "Nv 25" e, passado o nível, "Maestria" (falta a missão)
+      if (lk) b.style.setProperty('--lv', i === 3 && p.level >= skillUnlockLevel(3) ? '"25\\A Maestria"' : `"${skillUnlockLevel(i)}"`);
     });
     setCd(this.root.querySelector('.atk'), p.cds.basic, cls.basic.cd / p.stats.atkSpeed, false);
     const pot = this.root.querySelector('.pot');

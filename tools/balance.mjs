@@ -11,13 +11,15 @@ import { specsOf, SPEC_LEVEL } from '../public/src/core/specs.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const LEVEL = arg('level', 10), N = arg('n', 30), MAXT = 90, DT = 1 / 60; // mesmo passo fixo do jogo
-const SPEC_IDX = arg('spec', -1); // --spec 0|1 fixa a especialização (índice) de todas as classes; padrão: alterna
+const MASTERY = process.argv.includes('--mastery'); // nível >= 25: concede a Maestria (skill s3) aos duelistas
+const SPEC_IDX =arg('spec', -1); // --spec 0|1 fixa a especialização (índice) de todas as classes; padrão: alterna
 
 // Com nível >= SPEC_LEVEL a especialização alterna pela semente: o resultado é a média das duas escolhas de cada classe.
 function build(classId, level, seed) {
   const rng = makeRng(seed);
   const c = newCharacter('B', classId, rng);
   c.level = level;
+  if (MASTERY && level >= 25) { c.quests ??= { active: {}, done: {} }; c.quests.done.maestria = 1; } // --mastery: ambos usam a 4ª habilidade (a IA a escolhe primeiro)
   if (level >= SPEC_LEVEL) { const ids = Object.keys(specsOf(classId)); c.spec = SPEC_IDX >= 0 ? ids[SPEC_IDX] : ids[seed % ids.length]; }
   const cls = CLASSES[classId], pts = POINTS_PER_LEVEL * (level - 1);
   c.alloc[cls.primary] += Math.round(pts * 0.6); c.alloc.vit += Math.round(pts * 0.3); c.alloc.agi += pts - Math.round(pts * 0.6) - Math.round(pts * 0.3);

@@ -85,7 +85,7 @@ test('baús: abrem com E, pagam, contam, recarregam em 10 min e o mapa e o diár
   await page.screenshot({ path: 'test-results/bau.png' });
   await page.keyboard.press('m');
   await expect(page.locator('.panel')).toContainText('Bosque Verdejante');
-  await expect(page.locator('.panel')).toContainText('você está aqui');
+  await expect(page.locator('.panel')).toContainText('Você está aqui'); // cartão do mapa-múndi: a zona atual vem selecionada
   await page.keyboard.press('j');
   await expect(page.locator('.panel')).toContainText('Baús abertos: 2');
   expect(errors).toEqual([]);
@@ -120,8 +120,14 @@ test('NPC sem missão abre o serviço direto (como antes); missões de arena rea
 test('mapa: zonas não visitadas mostram o cadeado (sem "${...}" literal)', async ({ page }) => {
   const errors = await criar(page);
   await page.evaluate(() => window.game.ui.openPanel('map'));
+  // mapa real: nós `.mp-node`; só a Vila vem liberada, o resto mostra o cadeado e, ao tocar, o cartão explica como chegar
+  await expect(page.locator('.mp-node')).toHaveCount(7);
+  await expect(page.locator('.mp-node.locked')).toHaveCount(6);
+  expect(await page.locator('.mp-node:not(.locked)').getAttribute('data-arg')).toBe('town');
+  await page.locator('.mp-node[data-arg="ruins"]').click();
+  await expect(page.locator('.mp-card')).toContainText('Ainda não visitado');
+  await expect(page.locator('.mp-card [data-action="teleport"]')).toHaveCount(0);
   const txt = await page.locator('.panel').first().innerText();
-  expect(txt).toContain('não visitado');
   expect(txt).not.toContain('${');
   await page.evaluate(() => window.game.ui.closeAll?.());
   expect(errors).toEqual([]);

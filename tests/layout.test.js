@@ -264,10 +264,14 @@ test('Porto: zona segura e neutra (hub), sem monstros, com ligação de ida e vo
   assert.ok(h.safe && h.hub && !h.mobs && !h.boss, 'segura, sem mobs');
   assert.equal(h.w, 2400); assert.equal(h.h, 1700);
   assert.ok(isHub('town') && isHub('harbor') && !isHub('forest'));
-  assert.equal(teleportCost('harbor'), 0); assert.equal(teleportCost('town'), 0); assert.equal(teleportCost('forest'), 1);
-  assert.deepEqual(ZONES.town.portals.map((p) => p.to).sort(), ['forest', 'harbor']);
-  assert.deepEqual(h.portals.map((p) => p.to), ['town'], 'só Vila ↔ Porto');
-  assert.ok(WORLD_ROUTE.includes('harbor'));
+  assert.equal(teleportCost('harbor'), 1, 'o Porto custa 1 pergaminho como as zonas de farm'); assert.equal(teleportCost('town'), 0); assert.equal(teleportCost('forest'), 1);
+  assert.deepEqual(ZONES.town.portals.map((p) => p.to), ['forest'], 'a Vila não liga ao Porto');
+  assert.deepEqual(h.portals.map((p) => p.to), ['plains', 'ruins'], 'oeste volta à Planície, leste segue às Ruínas');
+  assert.deepEqual(WORLD_ROUTE, ['town', 'forest', 'plains', 'harbor', 'ruins', 'glacier', 'ember'], 'Porto no meio da rota');
+  for (let i = 1; i < WORLD_ROUTE.length; i++) assert.ok(!(isHub(WORLD_ROUTE[i]) && isHub(WORLD_ROUTE[i - 1])), 'duas cidades neutras coladas');
+  assert.ok(ZONES.plains.portals.some((p) => p.to === 'harbor') && !ZONES.plains.portals.some((p) => p.to === 'ruins'));
+  assert.ok(ZONES.ruins.portals.some((p) => p.to === 'harbor') && !ZONES.ruins.portals.some((p) => p.to === 'plains'));
+  assert.equal(h.portals[0].y, h.portals[1].y, 'portais do Porto na mesma altura');
   for (const id of WORLD_ROUTE) { const n = WORLD_NODES[id]; assert.ok(n && n.x >= 0 && n.x <= 100 && n.y >= 0 && n.y <= 100, `nó de ${id} no mapa`); }
   const pts = WORLD_ROUTE.map((id) => WORLD_NODES[id]);
   for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) assert.ok(Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) > 8, 'nós separados');
@@ -279,16 +283,14 @@ test('Porto: spawn, portais, chegadas e NPCs livres de obstáculos e de água; 5
   const clear = (Lx, p, m, what) => assert.ok(!Lx.obstacles.some((o) => distTo(o, p) < m) && !Lx.rivers.some((rv) => nearRiver(rv, p.x, p.y, 20)), `${what} bloqueado (${p.x},${p.y})`);
   clear(Lh, h.spawn, 60, 'spawn do porto');
   for (const p of h.portals) clear(Lh, p, 40, 'portal do porto');
-  const toHarbor = T.portals.find((p) => p.to === 'harbor');
-  clear(Lh, { x: toHarbor.tx, y: toHarbor.ty }, 60, 'chegada no porto');
-  clear(Lt, toHarbor, 40, 'portal da vila'); clear(Lt, { x: h.portals[0].tx, y: h.portals[0].ty }, 60, 'chegada na vila');
+  for (const from of ['plains', 'ruins']) { const to = ZONES[from].portals.find((p) => p.to === 'harbor'); clear(Lh, { x: to.tx, y: to.ty }, 60, 'chegada no porto vinda de ' + from); }
   for (const n of h.npcs) { clear(Lh, n, 40, 'NPC ' + n.id); assert.ok(n.x > 40 && n.y > 40 && n.x < h.w - 40 && n.y < h.h - 40); }
   assert.deepEqual(h.npcs.map((n) => n.role).sort(), ['bank', 'board', 'duel', 'harborshop', 'quest']);
+  for (let i = 0; i < h.npcs.length; i++) for (let j = i + 1; j < h.npcs.length; j++) assert.ok(Math.hypot(h.npcs[i].x - h.npcs[j].x, h.npcs[i].y - h.npcs[j].y) >= 120, `rótulos de ${h.npcs[i].id} e ${h.npcs[j].id} se sobrepõem`);
   for (const hs of h.houses) for (const q of [[hs.x, hs.y], [hs.x + hs.w, hs.y], [hs.x, hs.y + hs.h], [hs.x + hs.w, hs.y + hs.h]]) assert.ok(!Lh.rivers.some((rv) => nearRiver(rv, q[0], q[1], 20)), 'casa na água');
   for (const p of Lh.ponds) assert.ok(Lh.obstacles.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < p.rx), 'baía tem colisão');
-  // a moldura de árvores abre onde o portal do norte fica (e a da Vila onde fica o portal do sul)
-  assert.ok(!Lh.decor.some((d) => d.type === 'tree' && d.y < 60 && Math.abs(d.x - h.portals[0].x) < 110), 'abertura no norte do porto');
-  assert.ok(!Lt.decor.some((d) => d.type === 'tree' && d.y > T.h - 60 && Math.abs(d.x - toHarbor.x) < 110), 'abertura no sul da vila');
+  // a moldura de árvores abre onde ficam os portais oeste e leste
+  for (const p of h.portals) assert.ok(!Lh.decor.some((d) => d.type === 'tree' && (p.x < 100 ? d.x < 60 : d.x > h.w - 60) && Math.abs(d.y - p.y) < 110), 'abertura no portal ' + p.to);
 });
 
 test('Porto: tudo alcançável a pé a partir da chegada (ponte sobre o canal, baías contornadas, ringue do duelo)', () => {
@@ -299,7 +301,7 @@ test('Porto: tudo alcançável a pé a partir da chegada (ponte sobre o canal, b
   }
   const cell = (p) => Math.floor(p.y / C) * cols + Math.floor(p.x / C);
   const flood = (grid) => {
-    const seen = new Uint8Array(cols * rows), q = [cell({ x: 1500, y: 110 })]; seen[q[0]] = 1;
+    const seen = new Uint8Array(cols * rows), q = [cell({ x: 1500, y: 920 })]; seen[q[0]] = 1;
     for (let h = 0; h < q.length; h++) {
       const i = q[h], x = i % cols, y = (i - x) / cols;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue; const j = ny * cols + nx; if (seen[j] || grid[j]) continue; seen[j] = 1; q.push(j); }
@@ -308,7 +310,7 @@ test('Porto: tudo alcançável a pé a partir da chegada (ponte sobre o canal, b
   };
   const seen = flood(block);
   for (const n of z.npcs) assert.ok(seen[cell(n)], `${n.id} inalcançável`);
-  assert.ok(seen[cell(z.spawn)] && seen[cell(z.portals[0])], 'spawn e portal');
+  assert.ok(seen[cell(z.spawn)] && z.portals.every((p) => seen[cell(p)]), 'spawn e portais'); // a chegada oeste (x=110) já é do lado da Capitã, do outro lado do canal
   assert.ok(seen[cell({ x: 520, y: 780 })], 'o outro lado do canal (Capitã Maré) é alcançável');
   const closed = new Uint8Array(block); // sem a ponte o canal separa o porto: a ponte é o único caminho
   const b = L.bridges[0];

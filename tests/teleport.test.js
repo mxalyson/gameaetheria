@@ -195,3 +195,39 @@ test('B19: reconectar do zero com a sessão antiga ainda na sala encerra a antig
   assert.equal([...srv.hub.zoneRooms.values()].reduce((n, r) => n + r.size, 0), 0, 'a antiga saiu da instância');
   await closeAll(srv, c2);
 });
+
+// ---------- Porto no meio da rota (hub sem sala): atravessar Planície -> Porto -> Ruínas e teletransporte pago ----------
+test('protocolo: zone_teleport e zone_enter aceitam o Porto', () => {
+  assert.equal(decodeClient(JSON.stringify({ v: 4, t: 'zone_teleport', zone: 'harbor' })).ok, true);
+  assert.equal(decodeClient(JSON.stringify({ v: 4, t: 'zone_enter', zone: 'ruins', from: 'harbor' })).ok, true);
+});
+
+test('teleporte ao Porto custa 1 pergaminho, sai da sala (zone_exit to harbor) e de lá o portal leste entra nas Ruínas', async () => {
+  const { db, srv, c, ch } = await setup({ visited: { town: 1, forest: 1, plains: 1, harbor: 1, ruins: 1 } });
+  c.send({ t: 'zone_teleport', zone: 'harbor' });
+  const ex = await c.waitFor((m) => m.t === 'zone_exit');
+  assert.equal(ex.to, 'harbor'); assert.equal(ex.x, 1500); assert.equal(db.character(ch).doc.scrolls, 1);
+  wait(srv);
+  c.send({ t: 'zone_enter', zone: 'ruins', from: 'harbor' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined' && m.zone === 'ruins');
+  assert.equal(j.x, 110); assert.equal(j.y, 1400);
+  await closeAll(srv, c);
+});
+
+test('Porto: sem ter visitado (nem as Ruínas) recusa; quem visitou as Ruínas pode ir; Planície -> Porto sai da instância', async () => {
+  const a = await setup({ visited: { town: 1, forest: 1, plains: 1 } });
+  a.c.send({ t: 'zone_teleport', zone: 'harbor' });
+  await rejected(a.c, 'not_visited');
+  assert.equal(a.db.character(a.ch).doc.scrolls, 2);
+  await closeAll(a.srv, a.c);
+  const b = await setup({ visited: { town: 1, forest: 1, plains: 1, ruins: 1 } });
+  b.c.send({ t: 'zone_teleport', zone: 'plains' });
+  const j = await b.c.waitFor((m) => m.t === 'zone_joined');
+  wait(b.srv);
+  Object.assign(b.srv.actor(j.you), { x: 4560, y: 1400, lastCombat: -99, dead: false, hp: 1 });
+  b.srv.hub.zoneRooms.values().next().value.players.get(j.you).portalCd = 0;
+  b.srv.step(2);
+  const ex = await b.c.waitFor((m) => m.t === 'zone_exit');
+  assert.equal(ex.to, 'harbor'); assert.equal(ex.x, 110); assert.equal(ex.y, 780);
+  await closeAll(b.srv, b.c);
+});

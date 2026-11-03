@@ -24,7 +24,7 @@ test('painel do personagem: especialização travada antes do nível 15 e com 2 
 
 test('escolher Piromante: fica salvo, vale no herói e a Bola de Fogo muda (dica e recarga)', async ({ page }) => {
   const errors = await criar(page);
-  await page.evaluate(() => { window.game.char.level = 15; window.game.ui.openPanel('character'); });
+  await page.evaluate(() => { window.game.char.level = 15; window.game.char.quests.done.prova_do_mestre = Date.now(); window.game.ui.openPanel('character'); }); // exige a Prova do Mestre da classe
   await page.click('[data-action="spec"][data-arg="pyromancer"]');
   const r = await page.evaluate(async () => {
     const g = window.game;
@@ -40,7 +40,7 @@ test('escolher Piromante: fica salvo, vale no herói e a Bola de Fogo muda (dica
 test('trocar de especialização cobra ouro; sem ouro, não troca', async ({ page }) => {
   await criar(page);
   const r = await page.evaluate(() => {
-    const g = window.game; g.char.level = 15; g.char.gold = 1000;
+    const g = window.game; g.char.level = 15; g.char.quests.done.prova_do_mestre = Date.now(); g.char.gold = 1000;
     g.pickSpec('pyromancer'); const g1 = g.char.gold;
     g.pickSpec('cryomancer'); const g2 = g.char.gold; const s2 = g.char.spec;
     g.char.gold = 5; g.pickSpec('pyromancer');

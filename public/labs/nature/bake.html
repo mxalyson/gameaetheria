@@ -16,11 +16,22 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 // luz alegre e legível ao ar livre: a mesma direção do resto do jogo (alto-esquerda-frente), preenchimento forte para não "morrer" nas sombras
 const key = new THREE.DirectionalLight(0xfff1dc, 2.2); key.position.set(-3, 6, 4); scene.add(key);
-scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa890, 1.35));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x9aa890, 1.35); scene.add(hemi);
+// Modo HD (tier de alta densidade, atlas hd.webp): mais contraste (luz principal forte, preenchimento menor) e uma luz de RECORTE fria por trás que dá volume à copa; o modo normal fica como antes.
+const rim = new THREE.DirectionalLight(0xcfe6ff, 0); rim.position.set(4, 5, -5); scene.add(rim);
+const setLook = (hd) => { key.intensity = hd ? 2.8 : 2.2; hemi.intensity = hd ? 0.95 : 1.35; rim.intensity = hd ? 1.1 : 0; };
+// reduz por etapas de no máximo 2× (com 'high' o Canvas só filtra bem até ~2×; com aa 3–4 uma etapa só deixava a folhagem serrilhada)
+function shrink(src, W, H) {
+  let c = src;
+  while (c.width > W * 2) { const n = document.createElement('canvas'); n.width = Math.ceil(c.width / 2); n.height = Math.ceil(c.height / 2); const q = n.getContext('2d'); q.imageSmoothingQuality = 'high'; q.drawImage(c, 0, 0, n.width, n.height); c = n; }
+  const out = document.createElement('canvas'); out.width = W; out.height = H; const g = out.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, W, H);
+  return out;
+}
 const loader = new GLTFLoader();
 const greenLeaf = await new THREE.TextureLoader().loadAsync('../iso-poc/art-local/nature/Leaves_NormalTree_C.png'); greenLeaf.flipY = false; greenLeaf.colorSpace = THREE.SRGBColorSpace; // folha verde para os arbustos (a textura deles é a outonal vermelha)
 
-window.bake = async (name, { ppm = 26, el = 40, aa = 2, pad = 0.08 } = {}) => {
+window.bake = async (name, { ppm = 26, el = 40, aa = 2, pad = 0.08, cap = 235, hd = false } = {}) => {
+  setLook(hd);
   const gltf = await loader.loadAsync(`../iso-poc/art-local/nature/${name}.gltf`);
   const obj = gltf.scene; scene.add(obj);
   // As cores de vértice deste pacote guardam dados de VENTO (máscara), não cor: ignorá-las. As folhas ganham um tom vivo (a textura "_C" é um verde-oliva chapado).
@@ -48,11 +59,10 @@ window.bake = async (name, { ppm = 26, el = 40, aa = 2, pad = 0.08 } = {}) => {
   minX -= pad; maxX += pad; minY -= pad; maxY += pad;
   const origin = new THREE.Vector3(0, 0, 0).applyMatrix4(inv); // pé do objeto (origem do modelo) no plano da câmera
   cam.left = minX; cam.right = maxX; cam.top = maxY; cam.bottom = minY; cam.updateProjectionMatrix();
-  ppm = Math.min(ppm, 235 / (maxY - minY), 235 / (maxX - minX)); // teto de ~235 px por lado: modelos gigantes (árvores retorcidas) não geram sprites pesados
+  ppm = Math.min(ppm, cap / (maxY - minY), cap / (maxX - minX)); // teto de ~235 px por lado (modo HD: `cap`): modelos gigantes (árvores retorcidas) não geram sprites pesados
   const W = Math.ceil((maxX - minX) * ppm), H = Math.ceil((maxY - minY) * ppm);
   renderer.setSize(W * aa, H * aa); renderer.setClearColor(0x000000, 0); renderer.render(scene, cam);
-  const out = document.createElement('canvas'); out.width = W; out.height = H; const g = out.getContext('2d'); g.imageSmoothingQuality = 'high';
-  g.drawImage(renderer.domElement, 0, 0, W, H);
+  const out = shrink(renderer.domElement, W, H);
   scene.remove(obj);
   obj.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
   return { name, png: out.toDataURL('image/png'), w: W, h: H, ax: Math.round((origin.x - minX) / (maxX - minX) * W), ay: Math.round((maxY - origin.y) / (maxY - minY) * H), ppm, size: sz.toArray().map((v) => +v.toFixed(2)) };

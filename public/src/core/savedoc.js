@@ -182,6 +182,7 @@ export function validate(doc) {
   const visited = {};
   for (const id of Object.keys(isObj(doc.visited) ? doc.visited : {})) if (ZONES[id] && (ZONES[id].hub || ZONES[id].mobs)) visited[id] = 1;
   if (!isObj(doc.visited)) for (const [id, z] of Object.entries(ZONES)) if (z.mobs && z.level[0] <= level) visited[id] = 1; // saves antigos: libera o que o nível já alcança
+  if (visited.ruins) visited.harbor = 1; // o Porto fica no caminho das Ruínas: quem já chegou lá passou por ele
 
   const char = {
     version: SAVE_VERSION, visited, name: cleanName(doc.name), quests, stats, achievements, title, chests, daily, classId: doc.classId, level,
