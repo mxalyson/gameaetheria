@@ -63,7 +63,7 @@ test('mapa: Cripta dos Ecos trava por nível/Ruínas/servidor, mostra a espera e
   c.level = 25; assert.match(ui.mapCard('crypt', 'town'), /Ruínas Sombrias a pé/);
   c.visited.ruins = true;
   assert.match(ui.mapCard('crypt', 'town'), /data-action="crypt-enter"[^>]*>Entrar na Cripta dos Ecos — grátis/);
-  assert.match(ui.mapCard('crypt', 'town'), /7 fragmentos · 1 Chave/);
+  assert.match(ui.mapCard('crypt', 'town'), /7 fragmentos · <img[^>]*> 1 Chave/);
   c.echo.entry = Date.now() - 60_000; // entrou há 1 min: espera, mas há Chave
   assert.match(ui.mapCard('crypt', 'town'), /gasta 1 Chave de Eco/);
   c.echo.keys = 0; assert.match(ui.mapCard('crypt', 'town'), /disabled[\s\S]*Chave de Eco/);
