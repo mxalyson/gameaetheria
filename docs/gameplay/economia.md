@@ -23,7 +23,7 @@ Atualizado em 2026-10-31. Os números abaixo saem de `npm run economy` (`tools/e
 | Essência de spirit (selvagem / prismática) | `250 + nível×20` / `1 500 + nível×60` |
 | Itens da loja (até raro) | valor × 6 (`itemMarkup`, G2; era × 4); 1 épico de destaque por nível a valor × 25 (`featuredMarkup`); estoque determinístico por (personagem, nível, criação): recarregar a página não o refaz; item comprado sai do estoque |
 | Trocar de especialização (a 1ª é grátis) | `150 + nível×25` |
-| **Aprimoramento no Ferreiro** (loja): +1 a +8, +6% dos atributos base por nível, sem risco de perder o item | `60 + nível×15 × (1 + 0,25×raridade) × n^1,6` (n = próximo nível), ×0,6 nos passos +6..+8 (G10; 6 lendários +8: 543 mil → ≈ 396 mil de ouro); a venda **não** devolve o ouro gasto |
+| **Aprimoramento no Ferreiro** (loja): +1 a +8, +8% dos atributos base por nível, sem risco de perder o item | `60 + nível×15 × (1 + 0,25×raridade) × n^1,6` (n = próximo nível), ×0,6 nos passos +6..+8 (G10; 6 lendários +8: 543 mil → ≈ 396 mil de ouro); a venda **não** devolve o ouro gasto |
 | Morte no PvE | −10% do ouro |
 | Itens extras com a mochila cheia | viram ouro (nada some, mas a mochila é o limite: 30) |
 

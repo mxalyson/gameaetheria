@@ -291,7 +291,7 @@ function buildGround(world, ox = 0, oy = 0, tw = world.zone.w, th = world.zone.h
       for (const [ax, ay, bx, by] of z.paths ?? []) { g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke(); }
     }
   };
-  if (z.scenery) paintGroundScenery(g, world, rng, streets); else streets();
+  if (z.scenery) paintGroundScenery(g, world, rng, streets, { x0: ox, y0: oy, x1: ox + tw, y1: oy + th }); else streets();
 
   const stamped = stampGround(g, world, rng, { x0: ox, y0: oy, x1: ox + tw, y1: oy + th }); // flores, trevos, pedrinhas e pedras de trilha em sprites (atlas de chão)
   const tuft = shade(P.ground, -0.12);

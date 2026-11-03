@@ -24,7 +24,7 @@ export const SPECS = {
     pyromancer: {
       name: 'Piromante', icon: '🔥', desc: 'Explosão de dano: a Bola de Fogo é maior e muito mais forte, porém recarrega mais devagar.',
       skills: {
-        fireball: { mult: 3.3, explode: 115, cd: 4.0, desc: 'Projétil que explode em área grande, com dano elevado.' },
+        fireball: { mult: 3.0, explode: 115, cd: 4.0, desc: 'Projétil que explode em área grande, com dano elevado.' },
       },
     },
     cryomancer: {
@@ -56,7 +56,7 @@ export const SPECS = {
       name: 'Guardião', icon: '🛡️', desc: 'Protetor do grupo: o Escudo Divino dura mais, alcança aliados mais longe e protege quase tanto quanto você.',
       skills: {
         divineshield: { dur: 8, cd: 15, allyShield: 0.95, allyRange: 340, desc: 'Escudo de 28% da vida máxima por 8s; o aliado mais próximo (até 340) recebe 95% dele.' },
-        holylight: { allyHeal: 1.0, desc: 'Cura 18% da vida (aliados próximos recebem o mesmo) e fere inimigos próximos.' },
+        holylight: { allyHeal: 1.0, mult: 1.5, desc: 'Cura 18% da vida (aliados próximos recebem o mesmo) e fere inimigos próximos.' },
       },
     },
     inquisitor: {

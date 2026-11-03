@@ -75,17 +75,21 @@ import { trailPattern, waterPattern, groundTexReady } from './ground-textures.js
 import { bridgeArtReady, drawBridgeSprite, hideBridgeRails } from './nature-sprites.js';
 
 // `streets` (renderer.js) desenha praça e ruas ANTES dos rios e pontes: depois deles a rua cobria a água e a ponte pintada.
-export function paintGroundScenery(g, world, rng, streets) {
+// `bounds` {x0,y0,x1,y1} (opcional) = bloco sendo pintado: pula só os DESENHOS fora dele; o rng é consumido igual, então o resultado no bloco é idêntico.
+const inb = (b, x, y, m = 24) => !b || (x > b.x0 - m && x < b.x1 + m && y > b.y0 - m && y < b.y1 + m);
+export function paintGroundScenery(g, world, rng, streets, bounds) {
   const z = world.zone, L = world.layout, P = z.palette, sc = z.scenery;
   if (sc.kind === 'ruins' || sc.kind === 'ember') paintRuinsGround(g, world, rng);
-  else paintNatureGround(g, world, rng, STYLE[sc.kind] ?? STYLE.forest);
-  if (sc.kind === 'plains') paintCrystalDust(g, z, rng);
-  if (sc.kind === 'town' || sc.kind === 'harbor') paintTownCobbles(g, z, rng);
+  else paintNatureGround(g, world, rng, STYLE[sc.kind] ?? STYLE.forest, bounds);
+  if (sc.kind === 'plains') paintCrystalDust(g, z, rng, bounds);
+  if (sc.kind === 'town' || sc.kind === 'harbor') paintTownCobbles(g, z, rng, bounds);
   if (sc.kind === 'ember') paintLavaCracks(g, z, rng);
   // Seixos soltos para quebrar áreas lisas.
   for (let i = 0; i < Math.round(z.w * z.h / 40000); i++) {
     const x = rng.range(30, z.w - 30), y = rng.range(30, z.h - 30);
-    g.fillStyle = tone(P.ground2, -0.1); ellipse(g, x, y, rng.range(2, 4.5), rng.range(1.5, 3)); g.fill();
+    const rx = rng.range(2, 4.5), ry = rng.range(1.5, 3);
+    if (!inb(bounds, x, y)) continue;
+    g.fillStyle = tone(P.ground2, -0.1); ellipse(g, x, y, rx, ry); g.fill();
     g.fillStyle = tone(P.ground, 0.07); ellipse(g, x - 0.8, y - 0.8, 1.4, 0.9); g.fill();
   }
   // Rios, marcas de acampamento e, por cima, as pontes (o terreno é desenhado em blocos: tudo aqui é por coordenada de mundo).
@@ -220,7 +224,7 @@ function paintIceDetail(g, z) {
   }
 }
 
-function paintNatureGround(g, world, rng, S) {
+function paintNatureGround(g, world, rng, S, bounds) {
   const z = world.zone, L = world.layout;
   const blobs = S.blobs;
   for (let i = 0; i < Math.round(z.w * z.h / 80000); i++) {
@@ -248,7 +252,8 @@ function paintNatureGround(g, world, rng, S) {
     for (let i = 0; i < L.trail.length * 5; i++) {
       const p = L.trail[Math.floor(rng.range(0, L.trail.length))], a = rng.range(0, TAU), d = rng.range(18, 44);
       g.fillStyle = rng.chance(0.5) ? S.specks[0] : S.specks[1];
-      ellipse(g, p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, rng.range(1.5, 3.5), rng.range(1, 2.2)); g.fill();
+      const sx = p.x + Math.cos(a) * d, sy = p.y + Math.sin(a) * d, sw = rng.range(1.5, 3.5), sh = rng.range(1, 2.2);
+      if (inb(bounds, sx, sy)) { ellipse(g, sx, sy, sw, sh); g.fill(); }
     }
   }
   // Lagoas com margem, água em duas cores e vitórias-régias.
@@ -272,28 +277,33 @@ function paintNatureGround(g, world, rng, S) {
 }
 
 // Planície: poeira de cristal (brilhos de quatro pontas) espalhada pelo chão.
-function paintCrystalDust(g, z, rng) {
+function paintCrystalDust(g, z, rng, bounds) {
   for (let i = 0; i < Math.round(z.w * z.h / 26000); i++) {
     const x = rng.range(20, z.w - 20), y = rng.range(20, z.h - 20), r = rng.range(2.5, 5.5);
     g.fillStyle = rng.chance(0.5) ? 'rgba(255,255,255,0.75)' : 'rgba(170,225,255,0.65)';
+    if (!inb(bounds, x, y)) continue;
     g.beginPath(); g.moveTo(x, y - r); g.lineTo(x + r * 0.28, y - r * 0.28); g.lineTo(x + r, y); g.lineTo(x + r * 0.28, y + r * 0.28);
     g.lineTo(x, y + r); g.lineTo(x - r * 0.28, y + r * 0.28); g.lineTo(x - r, y); g.lineTo(x - r * 0.28, y - r * 0.28); g.closePath(); g.fill();
   }
 }
 
 // Vila: pedrinhas de calçamento ao longo dos caminhos e da praça.
-function paintTownCobbles(g, z, rng) {
+function paintTownCobbles(g, z, rng, bounds) {
   const stone = () => { g.fillStyle = rng.chance(0.5) ? 'rgba(150,130,100,0.35)' : 'rgba(255,255,255,0.35)'; };
   for (const [x1, y1, x2, y2] of z.paths ?? []) {
     const len = Math.hypot(x2 - x1, y2 - y1), nx = -(y2 - y1) / len, ny = (x2 - x1) / len;
     for (let i = 0; i < len / 7; i++) {
       const u = rng.next(), off = rng.range(-28, 28);
-      stone(); ellipse(g, x1 + (x2 - x1) * u + nx * off, y1 + (y2 - y1) * u + ny * off, rng.range(2.5, 5), rng.range(1.8, 3.2), rng.range(0, 3)); g.fill();
+      stone();
+      const cx = x1 + (x2 - x1) * u + nx * off, cy = y1 + (y2 - y1) * u + ny * off, ca = rng.range(2.5, 5), cb = rng.range(1.8, 3.2), cr = rng.range(0, 3);
+      if (inb(bounds, cx, cy)) { ellipse(g, cx, cy, ca, cb, cr); g.fill(); }
     }
   }
   if (z.plaza) for (let i = 0; i < 160; i++) {
     const a = rng.range(0, TAU), d = Math.sqrt(rng.next()) * (z.plaza.r - 18);
-    stone(); ellipse(g, z.plaza.x + Math.cos(a) * d, z.plaza.y + Math.sin(a) * d, rng.range(2.5, 5), rng.range(1.8, 3.2), rng.range(0, 3)); g.fill();
+    stone();
+    const cx = z.plaza.x + Math.cos(a) * d, cy = z.plaza.y + Math.sin(a) * d, ca = rng.range(2.5, 5), cb = rng.range(1.8, 3.2), cr = rng.range(0, 3);
+    if (inb(bounds, cx, cy)) { ellipse(g, cx, cy, ca, cb, cr); g.fill(); }
   }
 }
 

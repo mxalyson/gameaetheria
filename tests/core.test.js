@@ -216,7 +216,7 @@ test('aprimorar: cobra ouro, soma 6% por nível aos atributos, para no máximo e
   assert.equal(enhance(c, w.id).ok, false, 'sem ouro');
   assert.equal(w.plus, 0); assert.equal(c.gold, 0);
   assert.ok(totalEnhanceCost(w) > 10 * w.value, 'é um ralo grande em comparação ao valor do item');
-  assert.equal(PLUS_BONUS, 0.06);
+  assert.equal(PLUS_BONUS, 0.08);
 });
 
 test('aprimorar: o save mantém +N dentro do limite; servidor recusa item novo aprimorado e saltos grandes', () => {
@@ -1060,12 +1060,12 @@ test('Intervenção Divina: cura grande, escudo, remove atordoamento/lentidão e
   run(0.05, { cast: 3 }); // atordoado, mas a Intervenção rompe
   assert.ok(a.cds.s3 > 30, 'lançada atordoado');
   assert.equal(a.stunT, 0); assert.equal(a.slowT, 0); assert.equal(ally.stunT, 0);
-  assert.ok(a.hp >= a.maxHp * 0.74, 'cura de 55%'); assert.ok(a.shield >= a.maxHp * 0.29, 'escudo de 30%');
-  assert.ok(ally.hp > ally.maxHp * 0.2 + ally.maxHp * 0.4, 'aliado perto recebe 80% da cura'); assert.ok(ally.shield > 0);
+  assert.ok(a.hp >= a.maxHp * 0.58, 'cura de 40%'); assert.ok(a.shield >= a.maxHp * 0.29, 'escudo de 30%');
+  assert.ok(ally.hp > ally.maxHp * 0.2 + ally.maxHp * 0.3, 'aliado perto recebe 80% da cura'); assert.ok(ally.shield > 0);
   // outra habilidade não rompe o atordoamento
   const b = mw(masteryHero('cleric', 25, true)); b.a.stunT = 2; b.run(0.05, { cast: 0 }); assert.equal(b.a.cds.s0, 0);
   // sem aliados: cura só o herói e não falha
-  const c = mw(masteryHero('cleric', 25, true)); c.a.hp = c.a.maxHp * 0.3; assert.equal(c.w.castSkill(c.a, 3, 0, 0), true); assert.ok(c.a.hp > c.a.maxHp * 0.8);
+  const c = mw(masteryHero('cleric', 25, true)); c.a.hp = c.a.maxHp * 0.3; assert.equal(c.w.castSkill(c.a, 3, 0, 0), true); assert.ok(c.a.hp > c.a.maxHp * 0.65);
 });
 
 test('Maestria: a IA do rival só usa s3 se tiver a Maestria (e usa quando tem)', () => {

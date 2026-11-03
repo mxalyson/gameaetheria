@@ -40,17 +40,17 @@ Relatórios completos com tabelas e correções sugeridas: `auditoria-visual.md`
 - [ ] O 1º bloco do terreno por zona ainda leva 35–85 ms (`paintNatureGround`/rios/seixos refazem o mapa inteiro por bloco, só recortados): passar `bounds` a `paintGroundScenery`; pré-aquecer o layout do Bosque na Vila (70–87 ms a frio).
 - [ ] Ritual do chefe final invisível no HUD da instância online (exige protocolo); mini-chefes/acampamentos online só testados em Node.
 - [ ] Exports sem uso (tools/dead-code.mjs): `ACHIEVEMENT_IDS`, `QUEST_IDS`, `BOSS_MOBS`, `natureReady`, `spriteNames`, `prepareProps`, `clearChar`; `url(assets/...)`/imagens do HTML já com `?v=` via bump-assets.
-- [ ] Duelos fora de 45–55% (Nv10 Mago 44/Arqueiro 57; Nv20 Clérigo 57; Nv30 Guerreiro 43, Mago 39, Clérigo 67).
+- [x] Duelos (2026-11-03, n=100): Nv10 47/53/47/45, Nv20 46/53/48/45, Nv30 com Maestria 50/46/47/51 (Guerreiro/Mago/Arqueiro/Clérigo); sobra Clérigo Nv20 em 45% (borda) e duelos do Guerreiro/Arqueiro < 20 s. Ver dificuldade.md.
 - [ ] Tudo segue **sem teste em celular real e sem GPU**; comparar os efeitos de habilidade do laboratório isométrico (depende de o dono dizer quais).
 
 ### P1 — importantes
 - [ ] **B5** `frame()` sem try/finally (uma exceção congela o jogo). **B6** reconexão infinita com token vencido. **B7** soft-lock com sala cheia. **B8** `flushAll()` nunca chamado (perde até 10 s de recompensa). **B9** exceção numa sala derruba o servidor. **B10** `cloud.attach` desfaz a pausa na instância. **B11** mobs travam na margem do rio e morrem a tiros (IA/colisão no rio). **B12** botão de spec mostra `${COIN}` literal. **B13** atlas com JSON novo e imagem velha pelo service worker. **B14** chefe reaparece na hora ao reentrar (e o log mente). **B16** sem botão de voltar à vila por toque na instância online. **B17** drops no chão nunca expiram. **B18** `separate()` O(n²) custa 35% da sala do servidor.
 - [ ] **S1/S2/S3/S4** história: fechar o cânone (3 guardiões + 2 reflexos), epílogo de `ecos_unidos`, pistas de lore nos níveis 1–19, introdução narrativa do ritual; **S7/S9/S10** missões da Lia e do Brok, falas condicionais, onboarding de 6 passos.
-- [ ] **G5** farm de chefe a cada 90–150 s rende ~15 épicos/h; **G6/G7** Guerreiro e Clérigo iniciais sofrem no Bosque e contra grupos (robô corpo a corpo fraco: ai.js); **G9/G10** Ferreiro +8 rende pouco (+16% por 90 mil) e o opalino só +8–18% sobre um lendário comum.
+- [x] **G5** (respawn 420–900 s + BOSS_REPEAT), **G6/G7** (Clérigo vence 2 lobos Nv4 100%, perde 64% da vida), **G9/G10** (PLUS_BONUS 0,08, +6..+8 com 60% do custo, opalino ×1,5). Falta calibrar com jogadores.
 - [ ] V5, V6, V8–V12, V14–V21, V23–V30 (ver tabela visual): baú saqueado igual ao fechado, item opalino sem moldura, painel do Ferreiro com título "Mercadora Lia", faixas laranja ao fim do ritual, chefes/ponte borrados.
 
 ### P2 — melhorias
-- [ ] S5/S6/S11–S20 (tom, textos longos, conquistas narrativas, lore coletável, fala do Doran offline). B15, B19–B30 (código morto, `case 'zone_teleport'` duplicado em core/protocol.js:70-75, comentários que mentem). G11–G13 (ritual 25 min de recarga só dentro das Cinzas; hostilidade das zonas; venda de itens paga 100% e a doc diz 50%).
+- [x] S5/S6/S11–S20 feitos (S18: Rumo ao Topo exige também um baú nas Ruínas). Pendente só B-itens restantes e G13 (venda 100% × doc 50%).
 - [ ] Primeira entrada em cada mapa dá picos de 100–270 ms (blocos de terreno); medir com GPU (`npm run perf:poc`) e num celular real.
 - [ ] Comparar os efeitos de habilidade do laboratório isométrico com os do jogo (pedido do proprietário): precisa dizer quais habilidades.
 
@@ -235,3 +235,10 @@ Relatórios completos com tabelas e correções sugeridas: `auditoria-visual.md`
 - [ ] Servidor de zona: `p.actor.mastery` só atualiza no próximo lote (`syncLevel`); se a missão for entregue pela API com o jogador já na zona, a s3 vale após o próximo flush ou ao reentrar. Salas 1x1/coop leem o documento ao iniciar.
 - [ ] Escolha de classe (ui.js `cc-skills`) ainda lista só as 3 habilidades; mostrar a Maestria com "Nv 25 + missão". Validar no celular o botão `sk3` (style.css) e o cadeado "Nv 25 / Maestria"; e2e da barra com 4 botões não rodado.
 
+
+## Robustez (2026-11-03)
+- [x] `frame()` com try/finally e `guard()`; reconexão para com token vencido (`authLost` volta ao login); mob desconhecido ignorado em `updateNet`; teleport online conta via `fireTeleportEvent`; `zone_teleport` único em `protocol.js`.
+- [x] Sala cheia: a recusa do portal agora espera 4 s (`portalCd`) em vez de reenviar o pedido a cada quadro.
+- [x] Salvar ao esconder/fechar a página (`pagehide` + `visibilitychange` no cliente; o `flushAll()` do servidor já roda no desligamento e a sala grava ao sair).
+- [ ] B28: ritual do chefe no HUD online exige incluir `ritual` no snapshot/`zone_joined` (mudança de protocolo); não feito.
+- [ ] Duelo amistoso sem Elo/ouro/XP exige novo modo/flag no servidor e na fila; não feito.

@@ -78,6 +78,8 @@ test('missão: tipos de objetivo (lobo específico, chefe, baú, spirit, nível)
   assert.equal(isComplete(d, 'primeiro_spirit'), true);
   assert.equal(acceptQuest(d, 'rumo_ao_topo').ok, true);
   d.level = 20; recordEvent(d, { type: 'level', level: 20 });
+  assert.equal(isComplete(d, 'rumo_ao_topo'), false, 'S18: só o nível não basta');
+  recordEvent(d, { type: 'chest', zoneId: 'ruins' });
   assert.equal(isComplete(d, 'rumo_ao_topo'), true);
   // limite: 5 ativas
   assert.equal(Object.keys(d.quests.active).length, 4);

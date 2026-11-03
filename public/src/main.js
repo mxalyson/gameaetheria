@@ -91,6 +91,10 @@ class Game {
       this.reportLoad();
     }
     addEventListener('beforeunload', () => { if (this.online) { this.cloud?.flush({ keepalive: true }); } else this.save(); });
+    // celular não dispara beforeunload: grava ao esconder/fechar a página (recompensa pendente não se perde)
+    const flushHide = () => { if (this.online) this.cloud?.flush({ keepalive: true }); else if (this.char) this.save(); };
+    addEventListener('pagehide', flushHide);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushHide(); });
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
   }
@@ -428,7 +432,7 @@ class Game {
         queue: () => { refresh(); },
         invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (botão 👥)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
-        reject: (m) => { this.zoneBusy = false; this.teleportPending = false; this.portalCd = 0; if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
+        reject: (m) => { this.zoneBusy = false; this.teleportPending = false; this.portalCd = 4; /* recusa (ex.: sala cheia): espera antes de tentar o portal de novo, sem laço de pedidos */ if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),

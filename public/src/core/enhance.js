@@ -3,7 +3,7 @@
 import { RARITY, SLOTS } from '../data/items.js';
 
 export const MAX_PLUS = 8;
-export const PLUS_BONUS = 0.06;
+export const PLUS_BONUS = 0.08; // G9/G10: era 0,06 (+48% em +8); +8 agora rende +64% dos atributos base
 export const LATE_FROM = 6, LATE_MUL = 0.6;
 
 export const plusMul = (item) => 1 + PLUS_BONUS * (item?.plus ?? 0);

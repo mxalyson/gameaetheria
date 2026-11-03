@@ -258,7 +258,7 @@ test('ponto de controle: o time que o segura pontua e vence por pontos; recompen
   const cs = [];
   for (const w of who) { const c = await connect(srv); c.send({ t: 'hello', session: w.session, characterId: w.charId }); await c.waitFor((m) => m.t === 'welcome'); cs.push(c); }
   for (const c of cs) c.send({ t: 'queue', mode: '4v4' });
-  await sync(...cs); srv.step(31);
+  await sync(...cs); srv.step(31 + 60 * 12); // a janela de poder do pareamento abre com a espera (o Arqueiro nv 10 fica ~20% abaixo do Guerreiro)
   const found = await Promise.all(cs.map((c) => c.waitFor((m) => m.t === 'match_found')));
   const room = srv.room;
   srv.step(60 * 4);

@@ -74,8 +74,8 @@ export const QUESTS = {
   },
   rumo_ao_topo: {
     id: 'rumo_ao_topo', name: 'Rumo ao Topo', giver: 'herbalist', level: 10, after: null,
-    text: { offer: 'Cada região tem uma flor que só abre para quem não desiste. Siga em frente, alcance o nível 20 e volte: vou lhe mostrar o que colhi pelo caminho.', progress: 'Continue evoluindo: missões, chefes e arena dão experiência.', done: 'Você chegou longe! As flores abriram para você. Esta bolsa é por sua perseverança.' },
-    objectives: [{ type: 'level', count: 20, label: 'Alcance o nível 20' }],
+    text: { offer: 'Cada região tem uma flor que só abre para quem não desiste. Alcance o nível 20 e traga a flor que cresce entre as Ruínas, num baú esquecido.', progress: 'Continue evoluindo: missões, chefes e arena dão experiência.', done: 'Você chegou longe! As flores abriram para você. Esta bolsa é por sua perseverança.' },
+    objectives: [{ type: 'level', count: 20, label: 'Alcance o nível 20' }, { type: 'chest', zone: 'ruins', count: 1, label: 'Abra um baú nas Ruínas Sombrias (a flor está lá)' }],
     reward: { gold: 800, xp: 0, items: [{ rarity: 'epic' }] },
   },
   // ---- Tutoriais dos comerciantes (Lia e Brok) ----

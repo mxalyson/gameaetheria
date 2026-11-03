@@ -44,25 +44,25 @@ Números medidos em 2026-11-02 com `node tools/boss-check.mjs --n 4` (simulaçã
 Leitura: herói normal com nível ≤ chefe−8 perde sempre; good no nível do chefe vence em 25–40 s (Treant/Colosso/Guardião/Ancião) com poções; o Cavaleiro Rubro (Nv 31) exige nível 30 + épico/lendário aprimorado (good Nv 30 ≈ 56%, best Nv 30 ≈ 81%; Nv 25 good 0%, best 13%; Nv ≤ 19 nunca). O Carvalho ficou mais fácil para o herói normal Nv 5–7 (44% / 69%; era 0% / 38%) porque o bônus de iniciante agora some mais devagar (ver "Rampa de iniciante").
 
 ## Mobs comuns (herói normal do mesmo nível, sem poção)
-Medido pelo mesmo comando (perda média de vida, tempo, derrotas):
+Medido pelo mesmo comando (`node tools/boss-check.mjs --only mobs`, 2026-11-03: perda média de vida, tempo, derrotas):
 
-      forest   Nv4 x1: perde   4% da vida · 3s · derrotas 0%
-      forest   Nv4 x2: perde   8% da vida · 5s · derrotas 0%
-      forest   Nv4 x3: perde  10% da vida · 7s · derrotas 0%
-      plains   Nv9 x1: perde  14% da vida · 5s · derrotas 0%
-      plains   Nv9 x2: perde  20% da vida · 9s · derrotas 6%
-      plains   Nv9 x3: perde  31% da vida · 11s · derrotas 17%
-      ruins    Nv16 x1: perde  17% da vida · 6s · derrotas 0%
-      ruins    Nv16 x2: perde  20% da vida · 10s · derrotas 13%
-      ruins    Nv16 x3: perde  24% da vida · 13s · derrotas 25%
-      glacier  Nv23 x1: perde  12% da vida · 6s · derrotas 0%
-      glacier  Nv23 x2: perde  18% da vida · 9s · derrotas 6%
-      glacier  Nv23 x3: perde  20% da vida · 13s · derrotas 21%
-      ember    Nv28 x1: perde  15% da vida · 8s · derrotas 0%
-      ember    Nv28 x2: perde  20% da vida · 12s · derrotas 19%
-      ember    Nv28 x3: perde  28% da vida · 17s · derrotas 38%
+    MOBS COMUNS — herói normal do MESMO nível contra 1/2/3 mobs da zona: vida média perdida (%) e tempo para vencer; "L" = derrota
+    forest   Nv4 x1: perde   3% da vida · 3s · derrotas 0%
+    forest   Nv4 x2: perde   6% da vida · 4s · derrotas 0%
+    forest   Nv4 x3: perde  11% da vida · 6s · derrotas 0%
+    plains   Nv9 x1: perde  14% da vida · 4s · derrotas 0%
+    plains   Nv9 x2: perde  21% da vida · 7s · derrotas 4%
+    plains   Nv9 x3: perde  29% da vida · 10s · derrotas 15%
+    ruins    Nv16 x1: perde  17% da vida · 6s · derrotas 0%
+    ruins    Nv16 x2: perde  16% da vida · 9s · derrotas 10%
+    ruins    Nv16 x3: perde  21% da vida · 12s · derrotas 27%
+    glacier  Nv23 x1: perde  10% da vida · 5s · derrotas 0%
+    glacier  Nv23 x2: perde  15% da vida · 8s · derrotas 10%
+    glacier  Nv23 x3: perde  14% da vida · 11s · derrotas 17%
+    ember    Nv28 x1: perde  15% da vida · 6s · derrotas 2%
+    ember    Nv28 x2: perde  23% da vida · 11s · derrotas 13%
 
-Resumo: 1 mob custa 4–17% da vida (Bosque 4%, o resto 12–17%); 2 mobs 8–20%; 3 mobs 10–31% com 0–38% de derrotas (Cinzas Nv 28 x3: 38%).
+Resumo (2026-11-03): 1 mob custa 3–17% da vida (Bosque 3%, o resto 10–17%); 2 mobs 6–23%; 3 mobs 11–29% com 0–31% de derrotas (Cinzas Nv 28 x3: 31%, Ruínas Nv 16 x3: 27%).
 
 ## Habilidades por nível
 Ataque básico no 1; s0 no 1, s1 no 5, s2 no 10 (`SKILL_UNLOCK` em data/skills.js; `core/unlocks.js`). `World.castSkill` ignora intenções de skill bloqueada (jogador, servidor e rival). O PvP abre no nível 10 (`PVP_MIN_LEVEL`), exatamente quando a terceira habilidade é liberada: toda partida usa as 3 (teste "G10" em tests/core.test.js; `npm run balance` roda no nível 10 com as 3).
@@ -70,7 +70,7 @@ Ataque básico no 1; s0 no 1, s1 no 5, s2 no 10 (`SKILL_UNLOCK` em data/skills.j
 ## Aparição do último chefe e reaparição
 Não reaparece por tempo. Contador "Ritual" (`world.bossProgress` = `{have, need, cool, omen, alive}`): mob comum vale 1, elite 4; ao chegar em 40 o chefe surge após 3 s de aviso. Depois da metade, cada elite tem chance crescente (6% × nº de elites, máx. 50%) de adiantar. Ao morrer: **recarga de 1200 s** (tempo absoluto: corre mesmo fora da zona) e contador zerado. A missão `cavaleiro_rubro` ativa libera uma primeira aparição. Configurável em `BOSS_SPAWN` (data/mobs.js).
 
-**Chefes de zona** reaparecem 420 s (Carvalho), 540 s (Colosso), 720 s (Guardião) e 900 s (Ancião) depois de morrer, mesmo recriando o mundo. Abates repetidos na janela de 30 min dão metade e depois um quarto da chance de item (`BOSS_REPEAT`). Acampamentos voltam 300 s depois do último morto (`CAMP_RESPAWN`; era 150 s); mini-chefes (elite maior) a cada 240 s. Eventos: `boss_warn {stage: 'omen'|'arrive', name, x, y}`, `phase {actor, phase}` (fase 3 = "Enfurecido!").
+**Chefes de zona** reaparecem 420 s (Carvalho), 540 s (Colosso), 720 s (Guardião) e 900 s (Ancião) depois de morrer, mesmo recriando o mundo. Abates repetidos na janela de 30 min dão metade e depois um quarto da chance de item (`BOSS_REPEAT`). Acampamentos voltam 300 s depois do último morto (`CAMP_RESPAWN`; era 150 s); mini-chefes (elite maior) a cada 600 s (`miniboss.respawn` em data/zones.js). Eventos: `boss_warn {stage: 'omen'|'arrive', name, x, y}`, `phase {actor, phase}` (fase 3 = "Enfurecido!").
 
 ## Rampa de iniciante (2026-11-02)
 Dois mecanismos; ambos somem até o nível 10 para não tocar nos duelos:
@@ -188,5 +188,19 @@ Não mudou nesta rodada (o bônus de iniciante é 0 no nível 10). Fora da meta,
 
 ## Exploits avaliados (2026-11-02)
 - Acampamentos: uma elite (70% de item, 4% de épico) + grupo a cada 150 s rendia ~24 elites/h por acampamento, perto de 1,3 épico/h parado num ponto (o farm normal rende ~1/h). Corrigido: `CAMP_RESPAWN = 300` em data/mobs.js (teste "G10" em tests/core.test.js). Os baús dos acampamentos já têm recarga própria (`CHEST_COOLDOWN_MS`).
-- Mini-chefe (elite com 4–5× de vida, `zones.js › miniboss.respawn = 240`): ~15 elites/h só dele, ≈ 0,9 épico/h. Sugestão (arquivo de outro agente, `data/zones.js`): subir `respawn` para 600 em todas as zonas.
+- Mini-chefe (elite com 4–5× de vida, `zones.js › miniboss.respawn`, era 240 s): ~15 elites/h só dele, ≈ 0,9 épico/h. Corrigido: `respawn = 600` em todas as zonas.
 - O Alfa da Matilha do Bosque está em nível 8 numa zona 1–6 (LEVEL_GAP o torna intratável abaixo do nível 6, o que protege o iniciante).
+
+## Rodada de duelos (2026-11-03, `npm run balance -- --level N --n 100`)
+Ajustes em dados: Arqueiro (ataque básico 0,7 → 0,6; Tiro Perfurante 2,3 → 2,0; Chuva 0,55 → 0,5; crescimento de Agilidade 1,6 → 1,9; Tempestade de Flechas 1,0 → 2,0 por rajada), Mago (HP base 110 → 150; Inteligência base 10 → 12; crescimento de Int 2,65 → 3,2; Piromante 3,3 → 3,0; Meteoro 12 → 19), Clérigo (crescimento Int 3,4 → 3,5 e Vit 2,8 → 2,7; alcance do ataque 68 → 76; Guardião: Luz Sagrada com dano 1,5; Intervenção cura 55% → 40%), Guerreiro (crescimento de Força 3,0 → 2,9).
+
+| Nível | Guerreiro | Mago | Arqueiro | Clérigo |
+|---|---|---|---|---|
+| 10 antes | 48% | 37% | 63% | 45% |
+| 10 depois | 47% | 53% | 47% | 45% |
+| 20 antes | 54% | 48% | 61% | 33% |
+| 20 depois | 46% | 53% | 48% | 45% (40–45% conforme a semente) |
+| 30 com Maestria antes | 50% | 37% | 49% | 49% |
+| 30 com Maestria depois | 50% | 46% | 47% | 51% |
+
+Duelos de 14 a 28 s (abaixo de 20 s só o Guerreiro e o Arqueiro com Maestria). Início (`node tools/boss-check.mjs --only early`): contra 2 lobos do mesmo nível o Clérigo vence 100% (perde 64% da vida no Nv 4); Guerreiro 80% no Nv 4 (perde 80%), Arqueiro 90%.

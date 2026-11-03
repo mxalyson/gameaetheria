@@ -223,7 +223,7 @@ export class UI {
         <div class="cc-name">${c.name}</div>
         <div class="cc-desc">${c.desc}</div>
         <div class="cc-stat">Atributo principal: <b>${STAT_NAMES[c.primary]}</b></div>
-        <div class="cc-skills">${c.skills.map((s) => `<span title="${esc(SKILLS[s].desc)}">${skillImg(s, SKILLS[s].icon, 'cc-sk')} ${SKILLS[s].name} <small>Nv ${skillUnlockLevel(c.skills.indexOf(s))}</small></span>`).join('')}</div>
+        <div class="cc-skills">${c.skills.map((s) => `<span title="${esc(SKILLS[s].desc)}">${skillImg(s, SKILLS[s].icon, 'cc-sk')} ${SKILLS[s].name} <small>Nv ${skillUnlockLevel(c.skills.indexOf(s))}</small></span>`).join('')}<span class="cc-mastery" title="${esc(SKILLS[c.mastery].desc)} Liberada no Nv ${skillUnlockLevel(3)} com a missão Maestria.">${skillImg(c.mastery, SKILLS[c.mastery].icon, 'cc-sk')} ${SKILLS[c.mastery].name} <small>${LOCK} Nv ${skillUnlockLevel(3)} + Maestria</small></span></div>
       </button>`).join('');
     this.screen.innerHTML = `
       <div class="create-wrap">
@@ -568,7 +568,7 @@ export class UI {
         <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${itemPrice(it)}</button></div>`).join('') || `<p class="empty-msg">${harbor ? 'Estoque do dia esgotado. O cais traz mercadoria nova amanhã.' : 'Estoque esgotado. Volte após subir de nível.'}</p>`;
     const potion = PRICES.potion(char.level);
     return this.frame('shop', harbor ? 'Mercador do Porto' : this.shopAnchor === 'smith' ? 'Ferreiro Brok' : 'Mercadora Lia', `
-      <p class="npc-line">${npcEmblem(harbor ? 'dealer' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e compro seus itens por 60% do valor."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
+      <p class="npc-line">${npcEmblem(harbor ? 'dealer' : this.shopAnchor === 'smith' ? 'smith' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e compro seus itens por 60% do valor."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
       <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="${asset('assets/icons/item/res-potion-health.webp')}" alt="🧪" draggable="false"></span></div>
         <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>
