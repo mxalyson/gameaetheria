@@ -10,7 +10,8 @@ async function criar(page, classe, prefs) {
   await page.click('[data-action="create"]');
   await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
 }
-const carregou = (page, sel) => page.evaluate((s) => [...document.querySelectorAll(s)].map((i) => i.complete && i.naturalWidth > 0), sel);
+// espera as imagens terminarem de carregar (até 10 s) antes de ler o estado: sob carga elas chegavam depois da leitura
+const carregou = async (page, sel) => { await page.waitForFunction((s) => { const l = [...document.querySelectorAll(s)]; return l.length > 0 && l.every((i) => i.complete); }, sel, { timeout: 10000 }).catch(() => {}); return page.evaluate((s) => [...document.querySelectorAll(s)].map((i) => i.complete && i.naturalWidth > 0), sel); };
 
 for (const classe of CLASSES) {
   test(`${classe}: barra de habilidades e botões de toque mostram a arte (não emoji) e a recarga radial gira`, async ({ browser }) => {

@@ -11,14 +11,13 @@ const CLASS_TO_HERO = { warrior: 'paladino', mage: 'aprendiz', archer: 'franco',
 const BASE = new URL('../../labs/iso-poc/art-local/atlas-rig/', import.meta.url).href;
 export const SIZE = 0.9;             // escala do quadro (128 lógico): ≈ 80 px de altura no jogo (o herói antigo tinha ~48)
 const FEET_Y = 12;                    // os pés do herói antigo ficam em a.y + 12
-// GANCHO do "design completo" (arte nova do dono, ainda NÃO existe): devolve o visual de evolução de um personagem ou ator.
-// tier 0 = comum, 1 = especialização (nv 15, aura), 2 = Maestria (nv 25, aura refinada). `atlasVariant` é o id do atlas de variante
-// (ex.: 'paladino-bastion-t2') QUANDO o dono fornecer a arte; hoje é sempre undefined e o herói usa o atlas da classe + aura (render/aura.js).
-// Para ligar: registrar o atlas em VARIANT_ATLASES e fazer drawHeroSprite carregar `atlasVariant` no lugar de CLASS_TO_HERO[classId]. Ver docs/art-direction/aura-evolucao.md.
-const VARIANT_ATLASES = {}; // chave `${classId}:${spec}:${tier}` -> id do atlas (vazio de propósito: não inventar arte)
+// Visual de evolução de um personagem ou ator (arte do dono). tier 0 = comum, 1 = especialização (nv 15, aura), 2 = Maestria (nv 25, aura refinada).
+// `atlasVariant` é o id do atlas de variante (pasta em atlas-rig/) quando existe arte para `classe:spec:tier`; senão undefined e vale o atlas da classe + aura (render/aura.js).
+// Para acrescentar um herói de evolução: gerar o atlas (ver docs/art-direction/personagens-miniatura.md) e registrar aqui. Ver docs/art-direction/aura-evolucao.md.
+const VARIANT_ATLASES = { 'warrior:paladin:2': 'paladin_sun' }; // Paladino com a Maestria (Nv 25): "Cavaleiro do Sol"
 export function heroLook(o) {
   const tier = auraTier(o), spec = tier ? auraSpec(o) : null;
-  return { tier, spec, atlasVariant: VARIANT_ATLASES[`${o?.classId}:${spec}:${tier}`] };
+  return { tier, spec, atlasVariant: spec ? VARIANT_ATLASES[`${o?.classId}:${spec}:${tier}`] : undefined };
 }
 
 export const stats = { drawn: 0, loaded: 0, texBytes: 0, texScale: 1 };
@@ -71,10 +70,14 @@ function load(id) {
 }
 
 // Carrega o herói da classe antes de começar (a tela de carregamento espera por isto).
-export function preloadHero(classId) {
-  const id = CLASS_TO_HERO[classId];
+// Aceita o id da classe ou o personagem/ator (assim já carrega o visual de evolução, se houver).
+export function preloadHero(who) {
+  const classId = typeof who === 'string' ? who : who?.classId;
+  const id = (typeof who === 'object' && heroLook(who).atlasVariant) || CLASS_TO_HERO[classId];
   if (!id) return Promise.resolve();
-  return (atlases.get(id) ?? load(id)).promise;
+  const at = atlases.get(id) ?? load(id);
+  // variante que falhar não trava a tela de carregamento: o desenho cai no atlas da classe
+  return at.promise.then(() => (at.state === 'error' && CLASS_TO_HERO[classId] !== id ? preloadHero(classId) : undefined));
 }
 
 // Tela de carregamento por cima do jogo até o herói estar pronto (nunca mostra o desenho antigo no lugar dele).
@@ -103,11 +106,19 @@ const states = new WeakMap();
 // Desenha o herói `a` com o atlas da sua classe. Retorna true (desenhou), 'wait' (ainda carregando: não desenhar nada,
 // para não "piscar" o desenho antigo) ou false (classe sem herói ou falha ao carregar: o chamador usa o visual antigo).
 export function drawHeroSprite(g, a, t) {
-  const id = CLASS_TO_HERO[a.classId];
-  if (!id) return false;
-  const at = atlases.get(id) ?? load(id);
-  if (at.state === 'loading') return 'wait';
-  if (at.state !== 'ready') return false;
+  const base = CLASS_TO_HERO[a.classId];
+  if (!base) return false;
+  let at = null;
+  const variant = a.spec ? heroLook(a).atlasVariant : undefined; // só quem tem especialização
+  if (variant) { // visual de evolução sob demanda; enquanto carrega ou se faltar, usa o atlas base (nunca fica invisível)
+    const v = atlases.get(variant) ?? load(variant);
+    if (v.state === 'ready') at = v;
+  }
+  if (!at) {
+    at = atlases.get(base) ?? load(base);
+    if (at.state === 'loading') return 'wait';
+    if (at.state !== 'ready') return false;
+  }
   const { meta, sheets } = at, clips = meta.clips;
   let st = states.get(a);
   if (!st) { st = { clip: 'idle', el: 0, lastT: t, prevSwing: 0, prevHit: 0, px: a.x, py: a.y, moveFace: a.facing ?? Math.PI / 2 }; states.set(a, st); }
@@ -135,7 +146,7 @@ export function drawHeroSprite(g, a, t) {
 
   const sheet = sheets[st.clip], rows = meta.rows ?? meta.views, cw = sheet.width / c.frames, ch = sheet.height / rows;
   const flip = meta.mirror && view > 4, row = flip ? meta.views - view : view;
-  const x = a.x, y = a.y + FEET_Y, k = SIZE;
+  const x = a.x, y = a.y + FEET_Y, k = SIZE * (meta.sizeMul ?? 1); // sizeMul: iguala a altura de atlas de variante à do herói base
   g.save();
   g.translate(x, y);
   if (a.dead) { // morto: tomba em torno dos pés, amassa e esmaece (sem textura nova)

@@ -37,7 +37,8 @@ export const rookiePower = (level, mul = 1) => Math.round(ROOKIE.power * mul * r
 // Atributos derivados usados em combate. Mesma função para jogador e rivais da arena.
 export function computeStats(char) {
   const cls = CLASSES[char.classId];
-  const g = gearTotals(char.equipment);
+  const noSh = noShieldSpec(char); // escudo preso no slot (sem vaga na migração) não conta
+  const g = gearTotals(noSh && char.equipment?.offhand ? { ...char.equipment, offhand: undefined } : char.equipment);
   const p = primaryStats(char);
   const out = {
     ...p,
@@ -49,7 +50,7 @@ export function computeStats(char) {
     atkSpeed: Math.min(2, 1 + p.agi * 0.004 + (g.atkSpeed ?? 0) / 100),
     moveSpeed: 200 * (1 + Math.min(40, g.moveSpeed ?? 0) / 100),
     lifesteal: Math.min(15, g.lifesteal ?? 0) / 100,
-    block: char.equipment?.offhand && SHIELD_CLASSES.includes(char.classId) ? Math.min(60, g.block ?? 0) : 0, // % de chance de bloqueio (core/block.js); só o escudo dá
+    block: char.equipment?.offhand && SHIELD_CLASSES.includes(char.classId) && !noShieldSpec(char) ?Math.min(60, g.block ?? 0) : 0, // % de chance de bloqueio (core/block.js); só o escudo dá
   };
   // Especialização (nível 15): ajustes de atributos de combate (data/specs.js › mods.stats); sem especialização nada muda
   const sm = char.level >= SPEC_LEVEL ? SPECS[char.classId]?.[char.spec]?.mods?.stats : null;
@@ -72,12 +73,17 @@ export const itemClassId = (item) => item.classId ?? (item.slot === 'weapon' ? W
 // Texto legível da restrição ("Mago"), para tooltips e células da mochila/loja. '' se o item é de legado sem classe.
 export const itemClassName = (item) => CLASSES[itemClassId(item)]?.name ?? '';
 
+// Especialização que luta sem escudo (Berserker): o escudo não equipa e não dá bloqueio nem defesa
+export const noShieldSpec = (char) => char.level >= SPEC_LEVEL && !!SPECS[char.classId]?.[char.spec]?.noOffhand;
+export const NO_SHIELD_REASON = 'O Berserker luta sem escudo.';
+
 export function canEquip(char, item) {
   if (item.kind !== 'gear') return { ok: false, reason: 'Não é equipável.' };
   if (char.level < item.reqLevel) return { ok: false, reason: `Requer nível ${item.reqLevel}.` };
   const cid = itemClassId(item);
   if (cid && cid !== char.classId) return { ok: false, reason: `Apenas para ${itemClassName(item)}.` };
   if (item.slot === 'offhand' && !SHIELD_CLASSES.includes(char.classId)) return { ok: false, reason: 'Só Guerreiro e Clérigo usam escudo.' };
+  if (item.slot === 'offhand' && noShieldSpec(char)) return { ok: false, reason: NO_SHIELD_REASON };
   return { ok: true };
 }
 

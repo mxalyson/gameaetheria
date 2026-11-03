@@ -15,6 +15,7 @@ import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from './vendor/three/examples/jsm/environments/RoomEnvironment.js';
 const q = new URLSearchParams(location.search);
 const model = q.get('model') || 'paladino', size = +(q.get('size') || 192), aa = +(q.get('aa') || 2);
+const bri = +(q.get('bri') || 1), sat = +(q.get('sat') || 1);
 const EL = THREE.MathUtils.degToRad(+(q.get('el') || 30));
 const out = (window.render3d = { ready: false, views: [], sheets: {}, meta: null, info: {} });
 
@@ -87,7 +88,9 @@ function shoot(P, deg, dst, dx, dy) {
     renderer.clippingPlanes[0].setFromNormalAndCoplanarPoint(n, anim.localToWorld(new THREE.Vector3(0, clip * h, 0)));
   }
   renderer.render(scene, cam);
-  wg.globalCompositeOperation = 'source-over'; wg.clearRect(0, 0, size, size); wg.drawImage(renderer.domElement, 0, 0, size, size);
+  wg.globalCompositeOperation = 'source-over'; wg.clearRect(0, 0, size, size);
+  if (bri !== 1 || sat !== 1) wg.filter = `brightness(${bri}) saturate(${sat})`; // ?bri=1.25&sat=1.1: realça GLB escuro (ex.: Paladino Sol)
+  wg.drawImage(renderer.domElement, 0, 0, size, size); wg.filter = 'none';
   if (P.tint > 0) { wg.globalCompositeOperation = 'source-atop'; wg.fillStyle = `rgba(255,255,255,${P.tint})`; wg.fillRect(0, 0, size, size); wg.globalCompositeOperation = 'source-over'; }
   dst.drawImage(work, dx, dy);
 }

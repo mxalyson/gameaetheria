@@ -3,6 +3,7 @@
 // `desc` substitui o texto da habilidade nas dicas (os números mudam); `name`/`icon`/`color` podem renomear a habilidade para combinar com o estilo.
 // `mods` (opcional) mexe nos atributos de combate: stats { hpMul, powerMul, defMul, critAdd, critMultAdd, lifesteal, block, moveMul }, basic (ataque básico:
 // cd, range, mult, speed) e lowHp { below, max } (dano extra que cresce de `below` da vida até 0). Quem interpreta: core/stats.js, core/specs.js e game/sim.js.
+// `noOffhand: true` (Berserker): não usa escudo; core/stats.js (canEquip/computeStats), core/specs.js (chooseSpec devolve o escudo à mochila) e core/savedoc.js aplicam.
 export const SPEC_LEVEL = 15;
 
 // Reespecialização (decisão do dono): a PRIMEIRA escolha é grátis; trocar depois consome 1 Selo de Reespecialização, vendido pelo Mestre de Classe.
@@ -25,15 +26,15 @@ export const SPECS = {
         warcry: { dur: 12, buff: { dmg: 0.15, dr: 0.28 }, allyBuff: 300, desc: '+15% de dano e -28% de dano recebido por 12s, também para aliados num raio de 300.' },
         charge: { dist: 200, cd: 5, mult: 1.1, stun: 1.0, aegis: { range: 260, shield: 0.12 }, desc: 'Avanço curto que atordoa e dá escudo de 12% da vida a aliados num raio de 260.' },
       },
-      mods: { stats: { defMul: 1.08, powerMul: 1.02, block: 8, lifesteal: 0.03 } },
+      mods: { stats: { defMul: 1.08, powerMul: 1.02, block: 8, lifesteal: 0.02 } },
     },
     berserker: {
-      name: 'Berserker', icon: '🪓', desc: 'Fúria ofensiva: Golpe Giratório e Investida muito mais fortes; quanto menos vida, mais dano. Defesa menor.',
+      name: 'Berserker', icon: '🪓', noOffhand: true, desc: 'Arma de duas mãos, sem escudo: Golpe Giratório e Investida muito mais fortes; quanto menos vida, mais dano. Sem bloqueio e com defesa menor.',
       skills: {
-        whirlwind: { mult: 2.9, radius: 120, cd: 3.6, desc: 'Gira a lâmina com força total, ferindo todos ao redor.' },
-        charge: { mult: 2.2, cd: 6.5, desc: 'Avança até o cursor com golpe pesado, atordoando quem atingir.' },
+        whirlwind: { mult: 3.0, radius: 120, cd: 3.5, desc: 'Gira a lâmina com força total, ferindo todos ao redor.' },
+        charge: { mult: 2.4, cd: 6.5, desc: 'Avança até o cursor com golpe pesado, atordoando quem atingir.' },
       },
-      mods: { stats: { powerMul: 1.12, defMul: 0.96 }, lowHp: { below: 0.5, max: 0.5 } },
+      mods: { stats: { powerMul: 1.03, defMul: 0.97 }, basic: { mult: 1.12 }, lowHp: { below: 0.5, max: 0.7 } },
     },
   },
   mage: {

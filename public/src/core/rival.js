@@ -36,7 +36,7 @@ export function generateRival(rng, player, { classId: forced, rating: forcedRati
   }
   const spirit = createSpirit(rng, { level: Math.max(1, gearLevel - rng.int(0, 3)), luck });
   if (strength >= 0.15) { char.spirits = [spirit]; char.activeSpirit = spirit.id; } // rival muito fraco vai sem spirit (piso de poder mais baixo)
-  if (level >= SPEC_LEVEL) { const ids = Object.keys(specsOf(classId)); char.spec = forcedSpec ?? ids[rng.int(0, ids.length - 1)]; }
+  if (level >= SPEC_LEVEL) { const ids = Object.keys(specsOf(classId)); char.spec = forcedSpec ?? ids[rng.int(0, ids.length - 1)]; if (specsOf(classId)[char.spec]?.noOffhand) delete char.equipment.offhand; } // Berserker: sem escudo (o item já foi sorteado, o rng não muda)
   char.arena.rating = rating;
   return char;
 }

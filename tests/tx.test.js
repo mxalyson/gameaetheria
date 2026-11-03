@@ -579,3 +579,22 @@ test('servidor: respec_buy e respec gravam no banco; trocar sem Selo é recusado
   assert.equal(doc.spec, 'berserker'); assert.equal(doc.seals, 0); assert.equal(doc.specChanges, 1);
   await closeAll(srv, c);
 });
+
+test('Berserker sem escudo: respec devolve o escudo à mochila, equip de escudo é recusado e mochila cheia bloqueia a troca', () => {
+  const ctx = { rng: makeRng(2), now: Date.now() };
+  const doc = newOfficialCharacter('Sem Escudo', 'warrior'); doc.level = 20; doc.gold = 30000; doc.quests.done.prova_do_mestre = 1;
+  const sh = generateItem(makeRng(9), 10, { classId: 'warrior', slot: 'offhand', rarityId: 'uncommon' }); sh.id = 'esc1';
+  doc.spec = 'paladin'; doc.seals = 1; doc.equipment.offhand = sh; doc.inventory = [];
+  const r = runTx(doc, { op: 'respec', id: 'berserker' }, ctx);
+  assert.equal(r.doc.spec, 'berserker'); assert.equal(r.doc.equipment.offhand, undefined);
+  assert.ok(r.doc.inventory.some((i) => i.id === 'esc1')); assert.equal(r.doc.seals, 0); assert.equal(r.summary.shieldStored, true);
+  assert.throws(() => runTx(r.doc, { op: 'equip', id: 'esc1' }, ctx), /Berserker luta sem escudo/);
+  // mochila cheia: nada muda e o Selo não é gasto
+  const full = structuredClone(doc);
+  full.inventory = Array.from({ length: 30 }, (_, i) => ({ ...generateItem(makeRng(50 + i), 5, { classId: 'warrior', slot: 'helm' }), id: 'cheio' + i }));
+  assert.throws(() => runTx(full, { op: 'respec', id: 'berserker' }, ctx), /Mochila cheia/);
+  // voltar ao Paladino (com outro Selo) permite equipar o escudo de novo
+  const back = structuredClone(r.doc); back.seals = 1;
+  const pal = runTx(back, { op: 'respec', id: 'paladin' }, ctx).doc;
+  assert.equal(runTx(pal, { op: 'equip', id: 'esc1' }, ctx).doc.equipment.offhand.id, 'esc1');
+});

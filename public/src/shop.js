@@ -1,7 +1,7 @@
 import { generateItem, rollRarity } from './core/loot.js';
 import { makeRng, hashString } from './core/rng.js';
 import { CLASSES } from './data/classes.js';
-import { SLOTS, SHIELD_CLASSES } from './data/items.js';
+import { SLOTS, SHIELD_CLASSES, RARITY } from './data/items.js';
 
 // Espaços sortáveis na loja (sem arma): o escudo só aparece para quem o equipa.
 const gearSlots = (classId) => (SHIELD_CLASSES.includes(classId) ? SLOTS.slice(1) : SLOTS.slice(1, 6));
@@ -17,6 +17,10 @@ export const PRICES = {
   featuredMarkup: 25,   // item épico de destaque (1 por nível)
   sellRate: 0.5,        // G13: venda paga 50% do valor (economia.md)
 };
+
+// Venda que pede confirmação: épico ou melhor (épico, lendário), opala e qualquer item Eco/forjado. Abaixo disso vende direto.
+export const EPIC_INDEX = 3;
+export const needsSellConfirm = (it) => !!it && (RARITY[it.rarity]?.index >= EPIC_INDEX || !!it.opal || !!it.eco || !!it.forged);
 
 // Quanto a loja paga por um item (50%, mínimo 1).
 export const sellValue = (it) => Math.max(1, Math.floor(it.value * PRICES.sellRate));

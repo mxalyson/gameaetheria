@@ -1,4 +1,5 @@
 import { SKILLS } from '../data/skills.js';
+import { INVENTORY_SIZE } from '../data/items.js';
 import { CLASSES } from '../data/classes.js';
 import { SPECS, SPEC_LEVEL, SEAL_PRICE, SEAL_MAX, SPEC_ALIASES } from '../data/specs.js';
 
@@ -59,14 +60,18 @@ export function chooseSpec(char, spec) {
   // a escolha exige a Prova do Mestre da sua classe (praça dos mestres na Vila); saves que já tinham spec a mantêm (savedoc), mas trocar também exige a prova
   if (char.quests?.done?.prova_do_mestre == null) return { ok: false, reason: 'Conclua a Prova do Mestre da sua classe na Vila.' };
   if (char.spec === spec) return { ok: false, reason: 'Você já tem esta especialização.' };
+  // sem escudo (Berserker): o escudo equipado volta para a mochila; mochila cheia bloqueia a troca (nada é gasto nem perdido)
+  const dropShield = !!SPECS[char.classId][spec].noOffhand && !!char.equipment?.offhand;
+  if (dropShield && char.inventory.length >= INVENTORY_SIZE) return { ok: false, reason: 'Mochila cheia: abra espaço para guardar o escudo antes de virar Berserker.' };
   const paid = needsSeal(char);
+  if (dropShield) { char.inventory.push(char.equipment.offhand); delete char.equipment.offhand; }
   if (paid) {
     if (sealsOf(char) < 1) return { ok: false, reason: 'Trocar de especialização exige um Selo de Reespecialização (o Mestre de Classe vende).' };
     char.seals = sealsOf(char) - 1;
     char.specChanges = (char.specChanges ?? 0) + 1;
   }
   char.spec = spec;
-  return { ok: true, paid, seals: sealsOf(char) };
+  return dropShield ? { ok: true, paid, seals: sealsOf(char), shieldStored: true } : { ok: true, paid, seals: sealsOf(char) };
 }
 
 export function buySeal(char) {

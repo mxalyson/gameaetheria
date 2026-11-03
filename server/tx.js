@@ -206,7 +206,7 @@ export function runTx(doc, m, ctx) {
     case 'respec': { // escolher (1ª vez grátis) ou trocar de especialização: o Selo só existe no documento oficial e é gasto aqui
       const r = chooseSpec(c, m.id);
       if (!r.ok) fail(r.reason);
-      Object.assign(s, { spec: m.id, paid: r.paid, seals: r.seals, specChanges: c.specChanges ?? 0 });
+      Object.assign(s, { spec: m.id, paid: r.paid, seals: r.seals, specChanges: c.specChanges ?? 0, ...(r.shieldStored ? { shieldStored: true } : null) });
       break;
     }
     case 'recycle': {

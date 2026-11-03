@@ -102,6 +102,8 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
     const okFirst = !oldSpec && SPECS[neu.classId]?.[neuSpec] && neu.level >= SPEC_LEVEL && neu.quests?.done?.prova_do_mestre != null;
     if (!okFirst) return { ok: false, reason: 'spec_forged' };
   }
+  // Berserker não usa escudo: o documento não pode vir com escudo equipado (a troca de spec o devolve à mochila)
+  if (neu.level >= SPEC_LEVEL && SPECS[neu.classId]?.[neuSpec]?.noOffhand && neu.equipment?.offhand) return { ok: false, reason: 'berserker_shield' };
   if (neu.level < old.level) return { ok: false, reason: 'level_decreased' };
   if (neu.level > old.level + LIMITS.levelJump) return { ok: false, reason: 'level_jump' };
   if (neu.gold - old.gold > LIMITS.goldBase + LIMITS.goldPerLevel * neu.level) return { ok: false, reason: 'gold_jump' };

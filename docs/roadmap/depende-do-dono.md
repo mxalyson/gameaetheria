@@ -69,7 +69,7 @@ Conceito: místico errante que tece "ecos" (invocações/controle). Especializa�
 A aura de evolução já existe (procedural). O visual final do Nv25 (Maestria) precisa de arte sua: um herói por especialização, mesma silhueta/proporção chibi da classe, mais elaborado (armadura/robe refinado, detalhes dourados/prata, sem exagero). Gere no Meshy a partir do herói base da classe e me traga o GLB; eu faço atlas e ligo no gancho `heroLook` (`docs/art-direction/aura-evolucao.md`).
 Prompts (base: *"chibi fantasy {classe} hero, anime style, hand-painted, full body, neutral standing pose, refined elite version"*):
 1. Paladino (antigo Bastião): *"... paladin, heavy gold-and-steel plate, tower shield with engraved crest, short cape, calm radiant look"*
-2. Berserker (antigo Carrasco): *"... berserker warrior, dark crimson armor with ember-lit cracks, huge two-handed axe, horned helm"*
+2. Berserker (antigo Carrasco): *"... berserker warrior, dark crimson armor with ember-lit cracks, huge two-handed axe held in both hands, NO shield, horned helm"*
 3. Arcano (antigo Piromante): *"... arcane mage, deep violet and blue robes with silver runes, floating prism crystal, staff with a faceted arcane gem"*
 4. Bruxo (antigo Criomante): *"... warlock mage, dark green and black robes, toxic green glow, skull-topped staff, hanging vials and tattered hem"*
 5. Franco-atirador (antigo Atirador): *"... sniper archer, teal leather coat with silver fittings, long precision bow with scope-like rune, hooded cape"*

@@ -117,3 +117,12 @@ test('especialização: o resultado de respec/respec_buy do servidor é aceito c
   const withSeal = runTx(cur, { op: 'respec_buy' }, ctx).doc;
   assert.equal(strict(cur, withSeal).doc.seals, cur.seals, 'o cliente não ganha Selo sozinho');
 });
+
+test('Berserker com escudo equipado no salvamento do cliente é recusado (a troca de spec o devolve à mochila no servidor)', () => {
+  const old = base(); old.level = 20; old.quests.done.prova_do_mestre = 1;
+  const sh = generateItem(makeRng(9), 10, { classId: 'warrior', slot: 'offhand', rarityId: 'uncommon' }); sh.id = 'esc2';
+  const neu = structuredClone(old); neu.spec = 'berserker'; neu.equipment.offhand = sh; neu.inventory = [];
+  assert.equal(loose(old, neu).reason, 'berserker_shield');
+  const moved = structuredClone(neu); delete moved.equipment.offhand; moved.inventory = [sh]; // como o cliente envia depois de escolher: escudo na mochila
+  const ok = loose(old, moved); assert.notEqual(ok.reason, 'berserker_shield');
+});

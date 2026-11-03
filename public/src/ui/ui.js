@@ -4,7 +4,7 @@ import { isSkillUnlocked, skillUnlockLevel } from '../core/unlocks.js';
 import { skillOf, specsOf, specInfo, activeSpec, basicOf, sealsOf, SPEC_LEVEL, SEAL_PRICE } from '../core/specs.js';
 import { SHIELD_CLASSES, SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
-import { computeStats, canEquip, itemScore, itemClassId, itemClassName } from '../core/stats.js';
+import { computeStats, canEquip, noShieldSpec, NO_SHIELD_REASON, itemScore, itemClassId, itemClassName } from '../core/stats.js';
 import { BANK_SIZE, ensureBank } from '../core/bank.js';
 import { xpToNext, spiritXpToNext, spiritPower, MAX_LEVEL, EVOLVE_LEVEL, evolveCost } from '../core/progression.js';
 import { tierFor } from '../core/combat.js';
@@ -12,7 +12,7 @@ import { MODES, getRating } from '../core/match.js';
 import { MOBS } from '../data/mobs.js';
 import { mobPortrait } from '../render/mob-sprites.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
-import { PRICES, harborPrice } from '../shop.js';
+import { PRICES, harborPrice, needsSellConfirm } from '../shop.js';
 import { pickBossTarget } from './boss-target.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, preloadSkillIcons, skillCategory, CATEGORIES } from '../render/skill-icons.js';
 import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
@@ -105,6 +105,9 @@ export const itemIcon = (it) => (it.eco && ecoIcon(it)) || (it.slot === 'offhand
 const ghostIcon = (s, cls) => (s === 'offhand' ? shieldImg('common') : s === 'weapon' ? itemImg(cls.weapon, WEAPON_TYPES[cls.weapon].icon) : itemImg(s, SLOT_ICONS[s]));
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
 
+// Ordem do equipamento na grade única: o escudo vem logo depois da arma (some para classes sem escudo, sem deixar buraco).
+const EQUIP_ORDER = ['weapon', 'offhand', 'helm', 'armor', 'boots', 'ring', 'amulet'];
+
 export class UI {
   constructor(game) {
     this.game = game;
@@ -128,12 +131,21 @@ export class UI {
       this.hideTooltip();
       game.act(el.dataset.action, el.dataset.arg);
     });
+    // No toque o navegador ainda dispara mouseover/mouseout "emulados" depois do toque e o tooltip ficava preso na tela: ignorados no celular.
+    const touchy = () => game.touch?.active || Date.now() - (this.lastTouchAt ?? 0) < 1200;
+    document.addEventListener('touchstart', () => { this.lastTouchAt = Date.now(); }, { passive: true, capture: true });
+    document.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') this.lastTouchAt = Date.now();
+      if (!e.target.closest?.('[data-tip]')) this.hideTooltip(); // tocar fora de um item some com os detalhes
+    }, true);
     document.addEventListener('mouseover', (e) => {
+      if (touchy()) return;
       const el = e.target.closest('[data-tip]');
       if (el) this.showTooltip(el.dataset.tip, e);
     });
-    document.addEventListener('mousemove', (e) => { if (!this.tooltip.classList.contains('hidden')) this.placeTooltip(e); });
+    document.addEventListener('mousemove', (e) => { if (!touchy() && !this.tooltip.classList.contains('hidden')) this.placeTooltip(e); });
     document.addEventListener('mouseout', (e) => {
+      if (touchy()) return;
       const el = e.target.closest('[data-tip]');
       if (el && !el.contains(e.relatedTarget)) this.hideTooltip();
     });
@@ -446,22 +458,26 @@ export class UI {
   // 'painel:âncora' (ex.: 'shop:smith') abre o painel e rola até o elemento #<âncora>-section
   openPanel(spec) {
     const [id, anchor] = String(spec).split(':');
+    this.hideTooltip();
     if (['shop', 'bank', 'board', 'arena', 'sage', 'party', 'dialog', 'journal', 'map'].includes(id)) for (const p of ['shop', 'bank', 'board', 'arena', 'sage', 'party', 'dialog', 'journal', 'map', 'spirits', 'character', 'options']) this.open.delete(p);
     if (id === 'options') this.open.clear();
     if (id === 'character') this.specMaster = anchor === 'master'; // aberto pelo Mestre de Classe: o Selo de Reespecialização está à venda
     if (id === 'map') this.mapSel = null; // o mapa sempre abre selecionando onde você está
     this.open.add(id);
-    if (id === 'shop') { this.open.add('inventory'); this.shopAnchor = anchor ?? null; } // título: Ferreiro Brok (anchor 'smith') ou Mercador do Porto ('harbor')
+    if (id === 'shop') { this.shopAnchor = anchor ?? null; this.shopTab = 'buy'; if (anchor === 'smith') this.open.delete('inventory'); else this.open.add('inventory'); } // Ferreiro só aprimora: sem mochila ao lado (tocar nela venderia) // título: Ferreiro Brok (anchor 'smith') ou Mercador do Porto ('harbor')
     if (id === 'bank') this.open.add('inventory'); // mochila ao lado: tocar nela deposita
     this.render();
-    if (anchor) { const go = () => this.layer.querySelector(`#${anchor}-section`)?.scrollIntoView({ block: 'start' }); go(); requestAnimationFrame(go); }
+    if (anchor && anchor !== 'smith') { const go = () => this.layer.querySelector(`#${anchor}-section`)?.scrollIntoView({ block: 'start' }); go(); requestAnimationFrame(go); }
   }
   close(id) {
+    this.hideTooltip();
     this.open.delete(id);
     if (id === 'inventory') { this.open.delete('shop'); this.open.delete('bank'); }
     this.render();
   }
-  closePanels() { this.open.clear(); this.render(); }
+  closePanels() { this.hideTooltip(); this.open.clear(); this.render(); }
+  // Modo venda: loja da Vila ou do Porto aberta (o Ferreiro não compra nem vende itens)
+  sellMode() { return this.isOpen('shop') && this.shopAnchor !== 'smith'; }
 
   render() {
     this.hideTooltip();
@@ -498,7 +514,7 @@ export class UI {
       const it = char.inventory[i];
       cells.push(it ? this.itemCell(it, 'item', it.id) : '<div class="cell empty"></div>');
     }
-    const hint = this.isOpen('shop') ? 'Toque em um item para <b>vender</b>.' : this.isOpen('bank') ? 'Toque em um item para <b>guardar no banco</b>.' : 'Toque para equipar · atributos em Personagem.';
+    const hint = this.sellMode() ? 'Toque em um item para <b>vender</b>.' : this.isOpen('bank') ? 'Toque em um item para <b>guardar no banco</b>.' : 'Toque para equipar · atributos em Personagem.';
     return this.frame('inventory', `Inventário <small>${char.inventory.length}/${INVENTORY_SIZE}</small>`, `
       <div class="inv-grid">${cells.join('')}</div>
       <div class="inv-foot"><span class="inv-gold" title="Ouro (vai direto para a mochila)">${COIN}<b>${char.gold}</b></span><span class="inv-res">${POT} ${char.potions}</span><span class="inv-res">${SCROLL} ${char.scrolls ?? 0}</span><span class="hint">${hint}</span></div>
@@ -510,9 +526,10 @@ export class UI {
     const cls = CLASSES[char.classId];
     const st = computeStats(char);
     const tier = tierFor(char.arena.rating);
-    const equip = SLOTS.filter((s) => s !== 'offhand' || SHIELD_CLASSES.includes(char.classId)).map((s) => `
+    const lockedShield = noShieldSpec(char);
+    const equip = EQUIP_ORDER.filter((s) => s !== 'offhand' || SHIELD_CLASSES.includes(char.classId)).map((s) => `
       <div class="eq-slot"><label>${SLOT_NAMES[s]}</label>
-        ${char.equipment[s] ? this.itemCell(char.equipment[s], 'unequip', s) : `<div class="cell empty ghost">${ghostIcon(s, cls)}</div>`}
+        ${s === 'offhand' && lockedShield ? `<div class="cell empty ghost" title="${NO_SHIELD_REASON}">${ghostIcon(s, cls)}</div><div class="sub">${NO_SHIELD_REASON}</div>` : char.equipment[s] ? this.itemCell(char.equipment[s], 'unequip', s) : `<div class="cell empty ghost">${ghostIcon(s, cls)}</div>`}
       </div>`).join('');
     const stats = STAT_KEYS.map((k) => `
       <div class="stat-row ${k === cls.primary ? 'prim' : ''}"><span class="sn">${STAT_NAMES[k]}</span><b>${st[k]}</b>
@@ -582,8 +599,19 @@ export class UI {
       <div class="sp-list">${list}</div>`);
   }
 
+  // Lojas de itens (Mercadora Lia na Vila, Mercador do Porto): abas Comprar / Vender. O Ferreiro Brok não vende nem compra (panel_smith).
   panel_shop() {
-    const { char } = this.game, harbor = this.shopAnchor === 'harbor';
+    if (this.shopAnchor === 'smith') return this.panel_smith();
+    const harbor = this.shopAnchor === 'harbor', sell = this.shopTab === 'sell';
+    const tab = (id, label) => `<button class="btn small ${(sell ? 'sell' : 'buy') === id ? 'primary' : ''}" data-action="shop-tab" data-arg="${id}">${label}</button>`;
+    return this.frame('shop', harbor ? 'Mercador do Porto' : 'Mercadora Lia', `
+      <p class="npc-line">${npcEmblem(harbor ? 'dealer' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e compro seus itens por 60% do valor."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
+      <div class="shop-tabs">${tab('buy', 'Comprar')}${tab('sell', 'Vender')}</div>
+      ${sell ? this.sellTab(harbor) : this.buyTab(harbor)}`);
+  }
+
+  buyTab(harbor) {
+    const { char } = this.game;
     const shopStock = harbor ? this.game.harborStock : this.game.shopStock; // Porto: estoque do dia (shop.js buildHarborStock), preços próprios, venda a 60%
     const stock = shopStock.map((it, i) => `
       <div class="shop-item">${this.itemCell(it, 'buy-item', i)}
@@ -591,8 +619,7 @@ export class UI {
         <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${itemPrice(it)}</button></div>`).join('') || `<p class="empty-msg">${harbor ? 'Estoque do dia esgotado. O cais traz mercadoria nova amanhã.' : 'Estoque esgotado. Volte após subir de nível.'}</p>`;
     const price = (k) => (harbor ? harborPrice(k, char.level) : PRICES[k](char.level)); // Porto: -15% em poções e pergaminhos (o servidor cobra assim)
     const potion = price('potion');
-    return this.frame('shop', harbor ? 'Mercador do Porto' : this.shopAnchor === 'smith' ? 'Ferreiro Brok' : 'Mercadora Lia', `
-      <p class="npc-line">${npcEmblem(harbor ? 'dealer' : this.shopAnchor === 'smith' ? 'smith' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e compro seus itens por 60% do valor."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
+    return `<h3>Materiais</h3>
       <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="${asset('assets/icons/item/res-potion-health.webp')}" alt="🧪" draggable="false"></span></div>
         <div><div class="nm">Poção de Vida</div><div class="sub">Cura 35% da vida · botão ${POT}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-potion" data-arg="1">1 · ${COIN} ${potion}</button>
@@ -601,11 +628,36 @@ export class UI {
         <div><div class="nm">Pergaminho de Viagem</div><div class="sub">Teletransporte a mapa visitado · tem ${char.scrolls ?? 0}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-scroll" data-arg="1">1 · ${COIN} ${price('scroll')}</button>
         <button class="btn small" data-action="buy-scroll" data-arg="3">3 · ${COIN} ${price('scroll') * 3}</button></div></div>
-      <h3>${harbor ? 'Estoque do dia' : 'Equipamentos'}</h3>${stock}
-      ${harbor ? '' : this.smithSection()}
-      <h3>Vender em lote${harbor ? ' <span class="pts">60%</span>' : ''}</h3>
-      <div class="row-btns"><button class="btn small" data-action="sell-bulk" data-arg="0">Todos Comuns</button>
-      <button class="btn small" data-action="sell-bulk" data-arg="1">Comuns + Incomuns</button></div>`);
+      <h3>${harbor ? 'Estoque do dia' : 'Equipamentos'}</h3>${stock}`;
+  }
+
+  // Aba Vender: seção Itens (preço e botão Vender em cada linha), Materiais (só informativo: não se vendem) e venda em massa por raridade.
+  sellTab(harbor) {
+    const { char } = this.game, inv = char.inventory;
+    const rows = inv.map((it) => {
+      const ask = needsSellConfirm(it);
+      return `<div class="shop-item sell-row">${this.itemCell(it, 'sell', it.id)}
+        <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level} · ${COIN} <b>${this.game.sellPrice(it)}</b>${ask ? ' · pede confirmação' : ''}</div></div>
+        <button class="btn small" data-action="sell" data-arg="${it.id}">Vender</button></div>`;
+    }).join('') || '<p class="empty-msg">Sua mochila está vazia.</p>';
+    const mat = (icon, name, n) => `<div class="shop-item"><div class="cell r-common"><span class="ic">${icon}</span></div><div><div class="nm">${name}</div><div class="sub">Você tem ${n}</div></div><span class="tag dim">Não se vende</span></div>`;
+    const img = (f, alt) => `<img class="it-img" src="${asset(`assets/icons/item/${f}.webp`)}" alt="${alt}" draggable="false">`;
+    const bulk = (n, label) => {
+      const list = inv.filter((i) => RARITY[i.rarity].index <= n), gold = list.reduce((t, i) => t + this.game.sellPrice(i), 0);
+      return `<button class="btn small" data-action="sell-bulk" data-arg="${n}" ${list.length ? '' : 'disabled'}>${label}${list.length ? ` · ${list.length} · ${COIN} ${gold}` : ''}</button>`;
+    };
+    return `<h3>Itens <span class="pts">${inv.length}/${INVENTORY_SIZE}${harbor ? ' · 60%' : ' · 50%'}</span></h3>${rows}
+      <h3>Materiais</h3>${mat(img('res-potion-health', '🧪'), 'Poção de Vida', char.potions)}${mat(img('res-scroll', '📜'), 'Pergaminho de Viagem', char.scrolls ?? 0)}${mat(img('res-eco-fragment', ''), 'Fragmento de Eco', char.echo?.frags ?? 0)}
+      <h3>Vender em massa</h3><div class="row-btns">${bulk(0, 'Todos Comuns')}${bulk(1, 'Comuns + Incomuns')}</div>
+      <p class="hint">Épico ou melhor (e itens Opala/Eco) sempre pedem confirmação.</p>`;
+  }
+
+  // Ferreiro Brok: SÓ fortalece (aprimorar +N) e forja o Eco. Não vende nem compra itens (isso é da Lia e do Mercador do Porto).
+  panel_smith() {
+    return this.frame('shop', 'Ferreiro Brok', `
+      <p class="npc-line">${npcEmblem('smith')}"Metal bom lembra de quem o forjou. Traga o que veste: o martelo deixa mais forte. Ouro, preço justo."</p>
+      <p class="hint inv-gold-line">Seu ouro: ${COIN} <b>${this.game.char.gold}</b></p>
+      ${this.smithSection()}`);
   }
 
   // Forja do Eco (Ferreiro Brok): 1 arma e 1 armadura Eco por personagem, gastando Fragmentos de Eco (só a Cripta dos Ecos rende) + ouro. O servidor valida (tx `craft`).
@@ -626,11 +678,11 @@ export class UI {
     const { char } = this.game;
     const rows = SLOTS.map((sl) => char.equipment[sl]).filter(Boolean).map((it) => {
       const max = (it.plus ?? 0) >= MAX_PLUS, cost = enhanceCost(it);
-      return `<div class="shop-item">${this.itemCell(it, 'unequip', it.slot)}
+      return `<div class="shop-item">${this.itemCell(it, 'noop', it.slot)}
         <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${it.plus ?? 0} de ${MAX_PLUS} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
         ${max ? `<span class="tag">Máx +${MAX_PLUS}</span>` : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
     }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
-    return `${this.echoForge()}<h3 id="smith-section">${this.shopAnchor === 'smith' ? 'Aprimorar equipado' : 'Ferreiro Brok · aprimorar equipado'} <span class="pts">máx +${MAX_PLUS}</span></h3>${rows}`;
+    return `${this.echoForge()}<h3 id="smith-section">Aprimorar equipado <span class="pts">máx +${MAX_PLUS}</span></h3>${rows}`;
   }
 
   panel_arena() {
@@ -860,8 +912,10 @@ export class UI {
     this.tooltip.innerHTML = html;
     this.tooltip.classList.remove('hidden');
     this.placeTooltip(e);
+    clearTimeout(this.tipTimer);
+    if (this.game.touch?.active) this.tipTimer = setTimeout(() => this.hideTooltip(), 5000); // no toque não há mouseout: some sozinho
   }
-  hideTooltip() { this.armedTip = null; this.tooltip.classList.add('hidden'); }
+  hideTooltip() { this.armedTip = null; clearTimeout(this.tipTimer); this.tooltip?.classList.add('hidden'); }
   placeTooltip(e) {
     const r = this.tooltip.getBoundingClientRect();
     let x = e.clientX + 16, y = e.clientY + 16;
@@ -922,12 +976,13 @@ export class UI {
     const again = this.game.touch?.active ? 'Toque de novo' : 'Clique';
     if (inShop) action = `Preço: ${COIN} ${itemPrice(it)}`;
     else if (this.isOpen('bank')) action = this.game.char.bank?.some((b) => b.id === it.id) ? `${again} para retirar` : `${again} para guardar no banco`;
+    else if (this.isOpen('shop') && this.shopAnchor === 'smith') action = ''; // no Ferreiro o item equipado só é aprimorado
     else if (equipped) action = `${again} para desequipar`;
-    else if (this.isOpen('shop')) action = `${again} para vender por ${COIN} ${this.game.sellPrice(it)}`;
+    else if (this.sellMode()) action = `${again} para vender por ${COIN} ${this.game.sellPrice(it)}`;
     else if (ok.ok) action = `${again} para equipar`;
     return `<div class="tt-name${it.opal ? ' opal-name' : ''}" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}
       ${cid ? `<div class="${wrongClass ? 'tt-req' : 'tt-sub'}">Apenas para ${esc(itemClassName(it))}</div>` : ''}${ok.ok || wrongClass && ok.reason.startsWith('Apenas') ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
-      <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? `${action ? ' · ' : ''}vale ${COIN} ${this.game.sellPrice(it)}` : ''}</div>`;
+      <div class="tt-foot">${action}${!inShop && !this.sellMode() ? `${action ? ' · ' : ''}vale ${COIN} ${this.game.sellPrice(it)}` : ''}</div>`;
   }
 }
 

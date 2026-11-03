@@ -55,10 +55,14 @@ test('código de rede: ida e volta para os 8 specs x 2 tiers, 0 sem aura', () =>
   assert.deepEqual(decodeLook(63), { spec: null, tier: 0 });
 });
 
-test('heroLook: gancho do design completo (atlasVariant ainda indefinido)', () => {
+test('heroLook: atlas de variante só para Paladino com Maestria (Nv 25); demais seguem o atlas da classe', () => {
   assert.deepEqual(heroLook(hero('archer', 10, null)), { tier: 0, spec: null, atlasVariant: undefined });
   const l = heroLook(hero('archer', 25, 'gunslinger', true));
   assert.equal(l.tier, 2); assert.equal(l.spec, 'gunslinger'); assert.equal(l.atlasVariant, undefined);
+  assert.equal(heroLook(hero('warrior', 25, 'paladin', true)).atlasVariant, 'paladin_sun');
+  assert.equal(heroLook(hero('warrior', 20, 'paladin', false)).atlasVariant, undefined, 'tier 1 (só especialização) usa o atlas base');
+  assert.equal(heroLook({ classId: 'warrior', spec: 'paladin', mastery: true }).atlasVariant, 'paladin_sun', 'ator (jogo/rede) também');
+  assert.equal(heroLook(hero('warrior', 25, 'berserker', true)).atlasVariant, undefined);
 });
 
 test('snapshot: aura viaja no 8º elemento da tupla e só quando existe', () => {

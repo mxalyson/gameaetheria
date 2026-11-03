@@ -115,6 +115,7 @@ for i, (name, parent, hd, tl, r) in enumerate(bones):
         if not wp.get('rigid'): inside &= RAW[:, i] < body_raw * 0.8   # rigid: tudo dentro da cápsula é 100% do adereço (sem 'mole')
         if 'ymax' in wp: inside &= co[:, 1] <= yb_ + wp['ymax']          # corte por profundidade (ex.: escudo só a parte à frente do peito)
         if 'ymin' in wp: inside &= co[:, 1] >= yb_ + wp['ymin']
+        if 'xmin_px' in wp: inside &= co[:, 0] >= cx + (wp['xmin_px'] - 400) / S   # corte lateral (pixel da vista frontal): ex.: escudo não pega o ombro do mesmo lado
         Wt[inside] = 0; Wt[inside, i] = 1.0
 keep = np.argsort(-Wt, axis=1)[:, :4]
 mask = np.zeros_like(Wt, dtype=bool); np.put_along_axis(mask, keep, True, axis=1)

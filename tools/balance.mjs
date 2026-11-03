@@ -9,6 +9,7 @@ import { CLASSES } from '../public/src/data/classes.js';
 import { SLOTS, SHIELD_CLASSES } from '../public/src/data/items.js';
 import { World, makeHeroActor } from '../public/src/game/sim.js';
 import { specsOf, SPEC_LEVEL } from '../public/src/core/specs.js';
+import { SPECS } from '../public/src/data/specs.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const LEVEL = arg('level', 10), N = arg('n', 30), MAXT = 90, DT = 1 / 60; // mesmo passo fixo do jogo
@@ -24,7 +25,9 @@ function build(classId, level, seed) {
   if (level >= SPEC_LEVEL) { const ids = Object.keys(specsOf(classId)); c.spec = SPEC_IDX >= 0 ? ids[SPEC_IDX] : ids[seed % ids.length]; }
   const cls = CLASSES[classId], pts = POINTS_PER_LEVEL * (level - 1);
   c.alloc[cls.primary] += Math.round(pts * 0.6); c.alloc.vit += Math.round(pts * 0.3); c.alloc.agi += pts - Math.round(pts * 0.6) - Math.round(pts * 0.3);
-  for (const slot of SLOTS) if ((slot !== 'offhand' || (SHIELD_CLASSES.includes(classId) && !process.env.NOSHIELD))) c.equipment[slot] = generateItem(rng, level, { classId, slot, weaponType: slot === 'weapon' ? cls.weapon : undefined, rarityId: 'uncommon' });
+  // Berserker luta sem escudo (data/specs.js › noOffhand); KEEPSHIELD=1 só serve para medir a regra antiga
+  const noShield = !process.env.KEEPSHIELD && c.spec && SPECS[classId]?.[c.spec]?.noOffhand;
+  for (const slot of SLOTS) if ((slot !== 'offhand' || (SHIELD_CLASSES.includes(classId) && !process.env.NOSHIELD && !noShield))) c.equipment[slot] = generateItem(rng, level, { classId, slot, weaponType: slot === 'weapon' ? cls.weapon : undefined, rarityId: 'uncommon' });
   return c;
 }
 
@@ -41,6 +44,7 @@ const ids = Object.keys(CLASSES);
 console.log(`Balanceamento: nível ${LEVEL}, ${N} duelos por par (equipamento incomum, atributos 60/30/10).`);
 const pw = Object.fromEntries(ids.map((i) => [i, playerPower(build(i, LEVEL, 1))]));
 console.log('PWR:', ids.map((i) => `${i}=${pw[i]}`).join('  '));
+const bySpec = {};
 const total = Object.fromEntries(ids.map((i) => [i, { w: 0, g: 0, t: 0 }]));
 console.log('\nTaxa de vitória (linha vence coluna) · tempo médio de duelo');
 console.log(''.padEnd(10) + ids.map((i) => i.padStart(9)).join(''));
@@ -50,9 +54,11 @@ for (const x of ids) {
     if (x === y) { row += '        -'; continue; }
     let wins = 0, tsum = 0;
     for (let s = 0; s < N; s++) {
-      const r = duel(build(x, LEVEL, 100 + s), build(y, LEVEL, 500 + s), 7 + s);
-      if (r.winner === 1) wins++; else if (r.winner === 0) wins += 0.5;
-      tsum += r.t;
+      const ca = build(x, LEVEL, 100 + s), r = duel(ca, build(y, LEVEL, 500 + s), 7 + s);
+      const sw = r.winner === 1 ? 1 : r.winner === 0 ? 0.5 : 0;
+      wins += sw; tsum += r.t;
+      const sk = x + (ca.spec ? ':' + ca.spec : ''); // por especialização (ex.: warrior:berserker vs warrior:paladin)
+      const e = (bySpec[sk] ??= { w: 0, g: 0 }); e.w += sw; e.g++;
     }
     total[x].w += wins; total[x].g += N; total[x].t += tsum;
     row += (`${Math.round((wins / N) * 100)}%`).padStart(9);
@@ -66,5 +72,9 @@ for (const i of ids) {
   const flag = rate < 45 || rate > 55 ? '  <- fora da meta' : '';
   if (flag) bad++;
   console.log(`${i.padEnd(10)} ${rate.toFixed(0)}% · ${avg.toFixed(0)} s${flag}`);
+}
+if (LEVEL >= SPEC_LEVEL) {
+  console.log('\nPor especialização (meta 45–55%):');
+  for (const [k, e] of Object.entries(bySpec)) { const r = (e.w / e.g) * 100; console.log(`${k.padEnd(20)} ${r.toFixed(0)}%${r < 45 || r > 55 ? '  <- fora da meta' : ''}`); }
 }
 process.exitCode = 0;

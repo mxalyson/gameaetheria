@@ -6,7 +6,11 @@ test('aprimorar equipamento na loja: cobra ouro, aparece +1 e o poder sobe', asy
   await page.goto('/?api=');
   await page.click('[data-action="new-char"]'); await page.click('[data-action="create"]');
   await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
-  const before = await page.evaluate(() => { const g = window.game; g.char.gold = 5000; g.ui.openPanel('shop'); return { power: g.player.power ?? null, plus: g.char.equipment.weapon.plus ?? 0, gold: g.char.gold }; });
+  const before = await page.evaluate(() => { const g = window.game; g.char.gold = 5000; g.ui.openPanel('shop:smith'); return { power: g.player.power ?? null, plus: g.char.equipment.weapon.plus ?? 0, gold: g.char.gold }; });
+  // Ferreiro só aprimora: sem compra, venda nem mochila ao lado
+  await expect(page.locator('.p-shop h2')).toHaveText('Ferreiro Brok');
+  await expect(page.locator('.p-shop [data-action="buy-item"], .p-shop [data-action="buy-potion"], .p-shop [data-action="sell-bulk"], .p-shop [data-action="sell"]')).toHaveCount(0);
+  await expect(page.locator('.p-inventory')).toHaveCount(0);
   const btn = page.locator('[data-action="enhance"]').first();
   await expect(btn).toBeVisible();
   await btn.click();

@@ -235,3 +235,70 @@ test('atributos exibidos têm no máximo 1 casa decimal (crescimento fracionári
     for (const v of Object.values(p)) assert.equal(Math.round(v * 10) / 10, v, `${classId} nv ${level}: ${v}`);
   }
 });
+
+// ---- Berserker luta sem escudo (decisão do dono) ----
+import { canEquip, noShieldSpec } from '../public/src/core/stats.js';
+import { generateItem } from '../public/src/core/loot.js';
+import { INVENTORY_SIZE } from '../public/src/data/items.js';
+const shieldFor = (lvl = 10) => generateItem(makeRng(9), lvl, { classId: 'warrior', slot: 'offhand', rarityId: 'uncommon' });
+
+test('Berserker: o escudo não equipa (motivo claro), não bloqueia; Paladino e sem spec continuam equipando', () => {
+  const sh = shieldFor();
+  const c = withProva(hero('warrior', 20));
+  assert.equal(canEquip(c, sh).ok, true, 'sem spec equipa');
+  c.spec = 'paladin'; assert.equal(canEquip(c, sh).ok, true);
+  c.spec = 'berserker';
+  const r = canEquip(c, sh);
+  assert.equal(r.ok, false); assert.equal(r.reason, 'O Berserker luta sem escudo.');
+  assert.ok(noShieldSpec(c));
+  const low = withProva(hero('warrior', 10)); low.spec = 'berserker';
+  assert.equal(canEquip(low, shieldFor(8)).ok, true, 'abaixo do nível 15 a spec ainda não vale');
+  // escudo preso no slot (save sem vaga) não dá bloqueio nem defesa
+  const stuck = hero('warrior', 20); stuck.spec = 'berserker'; const d0 = computeStats(stuck).def;
+  stuck.equipment.offhand = sh;
+  assert.equal(computeStats(stuck).block, 0); assert.equal(computeStats(stuck).def, d0);
+  assert.equal(canEquip(c, { ...sh, slot: 'helm' }).ok, true, 'só o escudo é recusado');
+});
+
+test('escolher Berserker devolve o escudo equipado à mochila; mochila cheia bloqueia sem gastar Selo; voltar ao Paladino equipa de novo', () => {
+  const c = withProva(hero('warrior', 20)); c.spec = 'paladin'; c.seals = 1;
+  const sh = shieldFor(); c.equipment.offhand = sh; c.inventory = [];
+  const r = chooseSpec(c, 'berserker');
+  assert.equal(r.ok, true); assert.equal(r.shieldStored, true);
+  assert.equal(c.equipment.offhand, undefined); assert.equal(c.inventory.at(-1).id, sh.id); assert.equal(c.seals, 0);
+  // mochila cheia: bloqueia e não mexe em nada
+  const f = withProva(hero('warrior', 20)); f.spec = 'paladin'; f.seals = 1; f.equipment.offhand = sh;
+  f.inventory = Array.from({ length: INVENTORY_SIZE }, (_, i) => ({ id: 'x' + i }));
+  const b = chooseSpec(f, 'berserker');
+  assert.equal(b.ok, false); assert.match(b.reason, /Mochila cheia/);
+  assert.equal(f.spec, 'paladin'); assert.equal(f.seals, 1); assert.ok(f.equipment.offhand);
+  // volta ao Paladino (outro Selo) e equipa de novo
+  c.seals = 1; assert.equal(chooseSpec(c, 'paladin').ok, true);
+  assert.equal(canEquip(c, sh).ok, true);
+  // primeira escolha (grátis) também devolve o escudo
+  const g = withProva(hero('warrior', 20)); g.equipment.offhand = sh; g.inventory = [];
+  assert.equal(chooseSpec(g, 'berserker').paid, false); assert.equal(g.inventory.length, 1);
+});
+
+test('savedoc: Berserker com escudo salvo migra o escudo para a mochila (ou o banco) e Paladino o mantém', () => {
+  const mk = (spec) => { const c = hero('warrior', 20); c.spec = spec; c.equipment.offhand = shieldFor(); c.inventory = []; c.bank = []; return c; };
+  const v = validate(mk('berserker'));
+  assert.equal(v.ok, true); assert.equal(v.char.equipment.offhand, undefined); assert.equal(v.char.inventory.length, 1); assert.equal(v.char.inventory[0].slot, 'offhand');
+  const full = mk('berserker'); full.inventory = Array.from({ length: INVENTORY_SIZE }, (_, i) => generateItem(makeRng(100 + i), 5, { classId: 'warrior', slot: 'helm' })).map((it, i) => ({ ...it, id: 'h' + i }));
+  const vf = validate(full);
+  assert.equal(vf.char.equipment.offhand, undefined); assert.equal(vf.char.inventory.length, INVENTORY_SIZE); assert.equal(vf.char.bank.length, 1);
+  assert.ok(validate(mk('paladin')).char.equipment.offhand);
+});
+
+test('rival Berserker nasce sem escudo; a spec é mais forte em dano físico (poder, ataque básico e habilidades) que a do Paladino', () => {
+  for (let s = 1; s <= 8; s++) {
+    const r = generateRival(makeRng(s), { level: 20, arena: { rating: 1000 } }, { classId: 'warrior', spec: 'berserker', exactLevel: true });
+    assert.equal(r.equipment.offhand, undefined);
+  }
+  const st = (spec) => { const c = hero('warrior', 20); c.spec = spec; return computeStats(c); };
+  assert.ok(st('berserker').power > st('paladin').power);
+  assert.ok(basicOf('warrior', 'berserker').mult > basicOf('warrior', 'paladin').mult);
+  assert.ok(skillOf('warrior', 'berserker', 'whirlwind').mult > skillOf('warrior', 'paladin', 'whirlwind').mult * 1.4);
+  assert.ok(skillOf('warrior', 'berserker', 'charge').mult > skillOf('warrior', 'paladin', 'charge').mult * 1.8);
+  assert.ok(st('berserker').def < st('paladin').def);
+});

@@ -30,7 +30,7 @@ import { claimDaily, ensureJournal, recordEvent, offeredBy, readyFor, activeFor,
 import { TIPS } from './data/dialogs.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
-import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue, harborPrice } from './shop.js';
+import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue, harborPrice, needsSellConfirm } from './shop.js';
 import { TouchControls } from './touch.js';
 import { interactTarget } from './touch-logic.js';
 import { QualityGovernor } from './quality-governor.js';
@@ -205,7 +205,7 @@ class Game {
       }
       case 'close': this.ui.close(arg); break;
       case 'toggle': this.togglePanel(arg); document.getElementById('menu-btns')?.classList.remove('open'); break;
-      case 'item': this.ui.isOpen('shop') ? this.sell(arg) : this.ui.isOpen('bank') ? this.bankPut(arg) : this.equip(arg); break;
+      case 'item': this.ui.sellMode() ? this.sell(arg) : this.ui.isOpen('bank') ? this.bankPut(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
       case 'enhance': this.enhanceItem(arg); break;
       case 'crypt-enter': this.enterCrypt(); break;
@@ -220,6 +220,8 @@ class Game {
       case 'buy-scroll': this.buyScroll(Number(arg)); break;
       case 'buy-item': this.buyItem(Number(arg)); break;
       case 'sell-bulk': this.sellBulk(Number(arg)); break;
+      case 'sell': this.sell(arg); break;
+      case 'shop-tab': this.ui.shopTab = arg === 'sell' ? 'sell' : 'buy'; this.ui.render(); break;
       case 'buy-essence': this.buyEssence(arg); break;
       case 'spirit-on': this.setSpirit(arg); break;
       case 'spirit-free': this.freeSpirit(arg); break;
@@ -256,7 +258,7 @@ class Game {
     this.ui.hideScreen();
     this.ui.setupHud(char);
     this.touch.setup(char);
-    if (heroSpritesEnabled()) showHeroLoading(preloadHero(char.classId)); // visual novo: espera o herói carregar
+    if (heroSpritesEnabled()) showHeroLoading(preloadHero(char)); // visual novo: espera o herói carregar
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
       setTimeout(() => this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Fale com a Guarda Ren (marca ❗) para receber sua primeira missão', 'gold'), 2600); // depois da tela "Preparando seu herói" (antes o toast expirava escondido)
@@ -1422,7 +1424,15 @@ class Game {
   // preço de venda: 50% na Vila (G13), 60% no Mercador do Porto
   sellPrice(it) { return this.ui.shopAnchor === 'harbor' && this.ui.isOpen('shop') ? harborSellValue(it) : sellValue(it); }
 
+  // Vender: épico ou melhor (opala, Eco/forjado) pede confirmação do próprio jogo (ui.confirm); abaixo disso vende direto.
   sell(id) {
+    const it = this.char.inventory.find((i) => i.id === id);
+    if (!it) return;
+    if (needsSellConfirm(it)) return this.ui.confirm(`Vender ${it.name}${it.plus ? ` +${it.plus}` : ''} (${RARITY[it.rarity].name}) por ${this.sellPrice(it)} de ouro?`, () => this.sellNow(id), 'Vender');
+    this.sellNow(id);
+  }
+
+  sellNow(id) {
     if (this.serverTx({ op: 'sell', id, shop: this.shopKind() }, (m) => this.ui.log(`Vendido (+${m.pay} ouro)`, '#ffd34d'))) return;
     const c = this.char, idx = c.inventory.findIndex((i) => i.id === id);
     if (idx < 0) return;
@@ -1435,6 +1445,13 @@ class Game {
   }
 
   sellBulk(maxRarity) {
+    const list = this.char.inventory.filter((i) => RARITY[i.rarity].index <= maxRarity), risky = list.filter(needsSellConfirm);
+    if (!list.length) return;
+    if (risky.length) return this.ui.confirm(`Vender ${list.length} itens por ${list.reduce((t, i) => t + this.sellPrice(i), 0)} de ouro? Inclui: ${risky.map((i) => i.name).join(', ')}.`, () => this.sellBulkNow(maxRarity), 'Vender');
+    this.sellBulkNow(maxRarity);
+  }
+
+  sellBulkNow(maxRarity) {
     if (this.serverTx({ op: 'sell_bulk', n: maxRarity, shop: this.shopKind() }, (m) => this.ui.log(`${m.count} itens vendidos (+${m.pay} ouro)`, '#ffd34d'))) return;
     const c = this.char;
     const sold = c.inventory.filter((i) => RARITY[i.rarity].index <= maxRarity);
@@ -1469,7 +1486,7 @@ class Game {
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
     this.player.spec = activeSpec(this.char);
     this.refreshStats();
-    this.ui.toast('Especialização', specInfo(this.char.classId, id).name + (r.paid ? ' · -1 Selo' : ''), 'gold');
+    this.ui.toast('Especialização', specInfo(this.char.classId, id).name + (r.paid ? ' · -1 Selo' : '') + (r.shieldStored ? ' · escudo guardado na mochila' : ''), 'gold');
     this.ui.render();
     this.save();
   }

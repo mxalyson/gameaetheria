@@ -25,6 +25,7 @@ async function conta(email, nome, classe) {
 }
 
 test('portal da vila → instância do servidor; abater monstro paga XP/ouro gravados no servidor; H volta à vila', async ({ browser }) => {
+  test.setTimeout(90_000); // sob CPU disputada (outras suítes em paralelo) o fluxo leva 25-40 s; o limite padrão de 30 s fazia o teste oscilar
   const who = await conta('zona@teste.com', 'Zona', 'warrior');
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 760 } });
   const page = await ctx.newPage();
@@ -53,11 +54,11 @@ test('portal da vila → instância do servidor; abater monstro paga XP/ouro gra
   const antes = db.character(who.id).doc;
   // mira sempre no monstro (ele se mexe): o clique do mouse é o do jogo real
   await page.evaluate((id) => { const g = window.game; window.__aim = setInterval(() => { const m = g.netMobs.get(id); if (!m) return; g.input.mouse.x = (m.x - g.cam.x) * g.renderer.zoom; g.input.mouse.y = (m.y - g.cam.y) * g.renderer.zoom; g.input.mouse.down = true; }, 40); }, mob.id);
-  await expect.poll(() => mob.dead, { timeout: 15000 }).toBe(true);
+  await expect.poll(() => mob.dead, { timeout: 30000 }).toBe(true);
   await page.evaluate(() => { clearInterval(window.__aim); window.game.input.mouse.down = false; });
   expect(me.pend.kills.length).toBeGreaterThanOrEqual(1);
   room.flush(me); // o servidor grava o lote (sem esperar 10 s)
-  await page.waitForFunction(() => window.game.char.xp > 0 || window.game.char.level > 1, null, { timeout: 8000 });
+  await page.waitForFunction(() => window.game.char.xp > 0 || window.game.char.level > 1, null, { timeout: 20000 });
   const depois = db.character(who.id).doc;
   expect(depois.xp > antes.xp || depois.level > antes.level).toBe(true);
   expect(await page.evaluate(() => window.game.char.level)).toBe(depois.level);

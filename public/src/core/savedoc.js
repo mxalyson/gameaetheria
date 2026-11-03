@@ -159,6 +159,12 @@ export function validate(doc) {
   const specIn = SPEC_ALIASES[doc.spec] ?? doc.spec; // ids antigos (Bastião, Carrasco, Piromante...) migram para os atuais
   const spec = specIn && SPECS[doc.classId]?.[specIn] && level >= SPEC_LEVEL ? specIn : null;
   if (doc.spec && !spec) warnings.push('especialização inválida removida');
+  // Migração: Berserker luta sem escudo; o escudo salvo vai para a mochila (ou o banco, se cheia). Sem vaga em nenhum, fica no slot e computeStats o ignora.
+  if (spec && SPECS[doc.classId][spec].noOffhand && equipment.offhand) {
+    const sh = equipment.offhand;
+    if (inventory.length < INVENTORY_SIZE) { inventory.push(sh); delete equipment.offhand; warnings.push('escudo do Berserker movido para a mochila'); }
+    else if (bank.length < BANK_SIZE) { bank.push(sh); delete equipment.offhand; warnings.push('escudo do Berserker movido para o banco'); }
+  }
 
   // ---- diário (v3): tudo é reconstruído a partir de listas brancas ----
   const quests = { active: {}, done: {} };
