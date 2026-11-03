@@ -13,12 +13,16 @@ export function gearTotals(equipment) {
   return t;
 }
 
+// Maestria (missão do Mestre de Classe, nível 25): bônus permanente pequeno no atributo principal e em Vitalidade.
+export const MASTERY = { primary: 4, vit: 3 };
+export const hasMastery = (char) => char.quests?.done?.maestria != null;
+
 export function primaryStats(char) {
   const cls = CLASSES[char.classId];
   const g = gearTotals(char.equipment);
   const out = {};
   // 1 casa decimal: o crescimento por nível é fracionário e a soma em ponto flutuante aparecia como 48.1999999 na tela
-  for (const k of STAT_KEYS) out[k] = Math.round((cls.base[k] + cls.growth[k] * (char.level - 1) + (char.alloc?.[k] ?? 0) + (g[k] ?? 0)) * 10) / 10;
+  for (const k of STAT_KEYS) out[k] = Math.round((cls.base[k] + cls.growth[k] * (char.level - 1) + (char.alloc?.[k] ?? 0) + (g[k] ?? 0) + (hasMastery(char) ? (k === cls.primary ? MASTERY.primary : k === 'vit' ? MASTERY.vit : 0) : 0)) * 10) / 10;
   return out;
 }
 
@@ -47,12 +51,19 @@ export function computeStats(char) {
   };
 }
 
+// Classe dona do item: `classId` do item; arma antiga sem o campo usa a do tipo de arma. Item antigo SEM classe (armadura/joia genérica de
+// save antigo) devolve null: core/savedoc.js (validate) o carimba com a classe do personagem dono ao carregar; até lá, vale para a classe corrente.
+export const itemClassId = (item) => item.classId ?? (item.slot === 'weapon' ? WEAPON_TYPES[item.weaponType]?.classId ?? null : null);
+// Texto legível da restrição ("Mago"), para tooltips e células da mochila/loja. '' se o item é de legado sem classe.
+export const itemClassName = (item) => CLASSES[itemClassId(item)]?.name ?? '';
+// "Apenas para Mago" (ou '' se sem restrição conhecida).
+export const reqClass = (item) => (itemClassId(item) ? `Apenas para ${itemClassName(item)}` : '');
+
 export function canEquip(char, item) {
   if (item.kind !== 'gear') return { ok: false, reason: 'Não é equipável.' };
   if (char.level < item.reqLevel) return { ok: false, reason: `Requer nível ${item.reqLevel}.` };
-  if (item.slot === 'weapon' && WEAPON_TYPES[item.weaponType].classId !== char.classId) {
-    return { ok: false, reason: `Apenas ${WEAPON_TYPES[item.weaponType].name} para ${CLASSES[WEAPON_TYPES[item.weaponType].classId].name}.` };
-  }
+  const cid = itemClassId(item);
+  if (cid && cid !== char.classId) return { ok: false, reason: `Apenas para ${itemClassName(item)}.` };
   return { ok: true };
 }
 

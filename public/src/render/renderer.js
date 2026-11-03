@@ -5,10 +5,11 @@ import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
 import { drawChestSprite } from './prop-sprites.js';
-import { GroundCache } from './ground-tiles.js';
+import { GroundCache, quantScale } from './ground-tiles.js';
 import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-textures.js';
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
 import { drawNpcSprite, preloadNpcs, npcTop } from './npc-sprites.js';
+import { drawDayNight } from './sky.js';
 import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite, drawNatureNamed } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
@@ -20,7 +21,7 @@ import { paintGroundScenery, drawGroundLife, drawAtmosphere, drawTreeRich, drawP
 
 const TAU = Math.PI * 2;
 const SKIN = '#f3d2b3';
-const NPC_LOOK = { shop: 'archer', arena: 'warrior', spirit: 'mage', guard: 'warrior', herbalist: 'cleric' };
+const NPC_LOOK = { shop: 'archer', arena: 'warrior', spirit: 'mage', guard: 'warrior', herbalist: 'cleric', master_warrior: 'warrior', master_mage: 'mage', master_archer: 'archer', master_cleric: 'cleric', bank: 'mage', board: 'archer', harborshop: 'archer', duel: 'warrior', quest: 'warrior' }; // roles do Porto de Marfim (sem arte própria ainda)
 
 export function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
@@ -35,7 +36,7 @@ export class Renderer {
     this.c = canvas;
     loadNature(); preloadSpirits(); preloadNpcs(); loadGroundTextures(); // atlas do cenário em sprites (assíncrono: até carregar, vale o desenho antigo)
     this.g = canvas.getContext('2d');
-    this.groundCache = new GroundCache((w, ox, oy, tw, th) => buildGround(w, ox, oy, tw, th)); // terreno em blocos (mapas de 4600×2800 não cabem num canvas só no celular)
+    this.groundCache = new GroundCache((w, ox, oy, tw, th, s) => buildGround(w, ox, oy, tw, th, s)); // terreno em blocos (mapas de 4600×2800 não cabem num canvas só no celular)
     this.dprCap = 2;
     this.quality = 2; // 0 baixa, 1 média, 2 alta
     this.resize();
@@ -54,16 +55,19 @@ export class Renderer {
     this.c.width = Math.round(this.vw * this.dpr);
     this.c.height = Math.round(this.vh * this.dpr);
     this.vignettes = {};
+    this.groundCache.setScale(quantScale(Math.min(this.zoom * this.dpr, 2))); // terreno na resolução da tela (celular 3×: 2 px por unidade do mundo), não ampliado de 1 px
     // áreas cobertas pela interface (px de tela): cartão do herói/ouro, minimapa, fileira de menu e botões de toque. Etiquetas de monstros sob elas não são desenhadas (V21)
     const u = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1, vw = this.vw, vh = this.vh;
-    this.hud = [[0, 0, 240 * u, 130 * u], [vw - 150 * u, 0, vw, 140 * u], [vw - 540 * u, 0, vw, 60 * u], [vw - 280 * u, vh - 250 * u, vw, vh]];
+    // as áreas seguras do iPhone (entalhe/barra inicial) deslocam o HUD: somam-se aos recuos
+    const { l: sal, r: sar, t: sat, b: sab } = safeInsets();
+    this.hud = [[0, 0, 240 * u + sal, 130 * u + sat], [vw - 150 * u - sar, 0, vw, 140 * u + sat], [vw - 540 * u - sar, 0, vw, 60 * u + sat], [vw - 280 * u - sar, vh - 250 * u - sab, vw, vh]];
     this.labels = [];
   }
 
   // Qualidade gráfica: limita a resolução e corta efeitos de atmosfera mais caros (para celulares).
   setQuality(level) {
     this.quality = { low: 0, medium: 1, high: 2 }[level] ?? 2;
-    this.dprCap = [1, 1.5, 2][this.quality];
+    this.dprCap = [1, 2, 3][this.quality]; // alta usa a densidade real da tela (iPhone = 3×); antes o teto de 2 deixava o celular borrado
     this.resize();
   }
 
@@ -131,6 +135,7 @@ export class Renderer {
     for (const f of world.fx) drawFx(g, f);
     drawSkillVfx(g, world, this.quality === 0); // efeitos próprios das 12 habilidades (só apresentação)
     trackActors(world);
+    drawDayNight(g, world, cam, this.ww, this.wh, this.zoom, view.player, this.quality); // dia e noite (render/sky.js): ar da hora, luzes e halo do herói; barras e nomes ficam por cima
 
     // Barras e nomes por cima de tudo.
     this.labels.length = 0;
@@ -210,12 +215,24 @@ export class Renderer {
   }
 }
 
+// Áreas seguras (px) lidas por uma sonda: var(--sal) com env() não resolve em getPropertyValue, mas em padding calculado sim.
+let probe = null;
+function safeInsets() {
+  try {
+    if (!probe) { probe = document.createElement('div'); probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding:var(--sat,0px) var(--sar,0px) var(--sab,0px) var(--sal,0px)'; document.body.appendChild(probe); }
+    const cs = getComputedStyle(probe);
+    return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
+  } catch { return { t: 0, r: 0, b: 0, l: 0 }; }
+}
+
 // ---------------- chão ----------------
-function buildGround(world, ox = 0, oy = 0, tw = world.zone.w, th = world.zone.h) {
+function buildGround(world, ox = 0, oy = 0, tw = world.zone.w, th = world.zone.h, s = 1) {
   const z = world.zone, L = world.layout;
   const cv = document.createElement('canvas');
-  cv.width = tw; cv.height = th;
+  cv.width = Math.ceil(tw * s); cv.height = Math.ceil(th * s);
   const g = cv.getContext('2d');
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; // o bloco é feito uma vez e guardado: a melhor reamostragem das texturas de chão sai de graça
+  if (s !== 1) g.scale(s, s); // tudo abaixo desenha em unidades do mundo; os pixels do bloco acompanham a tela
   if (ox || oy || tw !== z.w || th !== z.h) { g.translate(-ox, -oy); g.beginPath(); g.rect(ox, oy, tw, th); g.clip(); } // bloco: desenha em coordenadas de mundo
   const rng = makeRng(hashString(world.zoneId + ':ground'));
   const P = z.palette;

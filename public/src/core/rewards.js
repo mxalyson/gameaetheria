@@ -10,14 +10,13 @@ import { hashString } from './rng.js';
 
 // Aplica o resultado de uma partida (1×1, 2×2 ou 4×4) a UM personagem. `result`: 'win' | 'loss' | 'draw'.
 // Rating separado por modo; times maiores pagam um pouco mais (mesma regra do cliente). Devolve { doc, summary } sem alterar o original.
-// XP de PvP (G3): vitória 6% / derrota 2% de um nível (×mul do modo); 10 partidas por hora a 100%, depois 25%; 0 se o MESMO adversário
+// XP de PvP (G3): vitória 6% / derrota 2% de um nível (×mul do modo), SEM teto por hora (decisão do dono); 0 se o MESMO adversário
 // aparece pela 3ª vez seguida em 30 min. Contadores em `stats` (minutos desde 1970 para caber no limite de 1e8 do savedoc).
-export const PVP_XP = { win: 0.06, loss: 0.02, fullPerHour: 10, afterFull: 0.25, windowMin: 60, foeMax: 2, foeWindowMin: 30 };
+// `pvpHour`/`pvpHourN` ficaram sem uso (eram o teto por hora); as chaves seguem em STAT_KEYS_PROGRESS só por compatibilidade de saves.
+export const PVP_XP = { win: 0.06, loss: 0.02, foeMax: 2, foeWindowMin: 30 };
 export function pvpXpFactor(stats, foeId, now) {
   const min = Math.floor(now / 60000);
-  if (!(stats.pvpHour > 0) || min - stats.pvpHour >= PVP_XP.windowMin) { stats.pvpHour = min; stats.pvpHourN = 0; }
-  let f = stats.pvpHourN >= PVP_XP.fullPerHour ? PVP_XP.afterFull : 1;
-  stats.pvpHourN++;
+  let f = 1;
   if (foeId != null) {
     const h = (hashString(String(foeId)) % 99999989) + 1;
     if (stats.pvpFoe === h && min - stats.pvpFoeMin <= PVP_XP.foeWindowMin) stats.pvpFoeN++;
@@ -92,7 +91,8 @@ export function applyZoneBatch(doc, batch) {
   if (batch.pity) c.pity = batch.pity; // azar acumulado (validate limita os valores)
   ensureJournal(c);
   const ach = [], quests = [];
-  for (const k of batch.kills ?? []) { const r = recordEvent(c, { type: 'kill', mobId: k.mobId, zoneId: batch.zoneId, boss: !!k.boss }); ach.push(...r.achievements); quests.push(...r.quests.filter((q) => q.complete).map((q) => q.id)); }
+  for (const k of batch.kills ?? []) { const r = recordEvent(c, { type: 'kill', mobId: k.mobId, zoneId: batch.zoneId, boss: !!k.boss, mini: !!k.mini, spiritType: k.spiritType }); ach.push(...r.achievements); quests.push(...r.quests.filter((q) => q.complete).map((q) => q.id)); }
+  for (const skillId of batch.skills ?? []) { const r = recordEvent(c, { type: 'skill', skillId }); ach.push(...r.achievements); quests.push(...r.quests.filter((q) => q.complete).map((q) => q.id)); }
   if (levels) recordEvent(c, { type: 'level', level: c.level });
   if (c.spirits.length) recordEvent(c, { type: 'spirit', count: c.spirits.length });
   const v = validate(c);

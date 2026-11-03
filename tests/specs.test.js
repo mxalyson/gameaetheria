@@ -39,6 +39,8 @@ test('escolha: só a partir do nível 15, primeira grátis, troca custa ouro, va
   const c = hero('mage', SPEC_LEVEL - 1); c.gold = 1000;
   assert.equal(chooseSpec(c, 'pyromancer').ok, false);
   c.level = SPEC_LEVEL;
+  assert.equal(chooseSpec(c, 'pyromancer').ok, false, 'sem a Prova do Mestre não escolhe');
+  c.quests = { active: {}, done: { prova_do_mestre: 1 } }; // a escolha exige a missão do Mestre de Classe
   assert.equal(chooseSpec(c, 'inexistente').ok, false);
   assert.equal(respecCost(c), 0);
   assert.deepEqual(chooseSpec(c, 'pyromancer'), { ok: true, cost: 0 });

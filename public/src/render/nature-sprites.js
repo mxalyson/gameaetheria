@@ -98,6 +98,13 @@ const FENCE = { w: 4.0, ref: 0, v: ['m_fence_1', 'm_fence_2'] };
 for (const k of ['forest', 'plains', 'glacier']) SET[k].fence = FENCE;
 SET.town.well = { h: 5, ref: 0, v: ['m_well'] }; SET.town.fence = FENCE;
 SET.town = { ...SET.town, tree: SET.forest.tree, rock: SET.forest.rock, bush: SET.forest.bush }; // a vila usa as mesmas árvores, pedras e arbustos do Bosque (um único estilo)
+// Porto de Marfim: as mesmas casas do Meshy em outra disposição (modelo escolhido por `art` em data/zones.js), lampiões, poço, cercas, placa,
+// cerejeiras no lugar das árvores verdes e as pedras/arbustos da Planície. Sem arte de barril, caixa, barco, cais nem farol (prompts em docs/art-direction/prompts-cenario.md).
+SET.harbor = {
+  house: { house: true, v: ['m_house_tile', 'm_house_big', 'm_house_thatch', 'm_house_porch'], pick: (d) => d.art ?? 0 },
+  lantern: SET.town.lantern, signpost: SET.town.signpost, well: SET.town.well, fence: FENCE, log: { w: 4.1, ref: 0, v: ['m_log'] },
+  tree: SET.plains.tree, rock: SET.forest.rock, bush: SET.plains.bush,
+};
 let zoneSet = null;
 // Ponte de madeira pintada no terreno: a peça do Meshy (m_bridge) esticada pela travessia (b.len de largura, ~3,5 × hw de altura); pontes de pedra seguem em scenery.js.
 export const bridgeArtReady = () => !!(atlas && gAtlas && meta?.m_bridge);
@@ -166,6 +173,7 @@ const GROUND_SET = {
   ruins: [{ v: PEB, n: 40, ppm: 22 }, { v: ['Grass_Wispy_Short'], n: 6, ppm: 14 }, { v: ['Plant_7'], n: 4, ppm: 16 }],
   glacier: [{ v: PEB, n: 34, ppm: 20 }, { v: G('Petal', 1, 5), n: 3, ppm: 12 }], // neve: só seixos e pétalas esparsas (sem trevos nem capim verde)
   ember: [{ v: PEB, n: 50, ppm: 22 }], // basalto: seixos
+  harbor: [{ v: PEB, n: 30, ppm: 20 }, { v: G('Petal', 1, 5), n: 3, ppm: 12 }, { v: ['Grass_Wispy_Short'], n: 3, ppm: 14 }], // areia: seixos, pétalas e raro capim
 };
 const STONES = [...G('RockPath_Round_Small', 1, 3), ...G('RockPath_Square_Small', 1, 3)];
 const BORDER = STONES; // só as pedras pequenas: as largas/finas pareciam pilhas de entulho

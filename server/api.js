@@ -34,6 +34,7 @@ function reId(doc) {
   const fresh = (old) => { const n = 'i' + newToken(9); map.set(old, n); return n; };
   for (const k of Object.keys(doc.equipment)) doc.equipment[k] = { ...doc.equipment[k], id: fresh(doc.equipment[k].id) };
   doc.inventory = doc.inventory.map((it) => ({ ...it, id: fresh(it.id) }));
+  doc.bank = (doc.bank ?? []).map((it) => ({ ...it, id: fresh(it.id) })); // banco do Porto também ganha ids do servidor
   doc.spirits = doc.spirits.map((sp) => ({ ...sp, id: fresh(sp.id) }));
   doc.activeSpirit = map.get(doc.activeSpirit) ?? doc.spirits[0]?.id ?? null;
   return doc;

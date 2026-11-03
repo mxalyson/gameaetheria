@@ -32,6 +32,8 @@ export const respecCost = (char) => (char.spec ? 150 + char.level * 25 : 0);
 export function chooseSpec(char, spec) {
   if (char.level < SPEC_LEVEL) return { ok: false, reason: `Disponível a partir do nível ${SPEC_LEVEL}.` };
   if (!specInfo(char.classId, spec)) return { ok: false, reason: 'Especialização inválida.' };
+  // a escolha exige a Prova do Mestre da sua classe (praça dos mestres na Vila); saves que já tinham spec a mantêm (savedoc), mas trocar também exige a prova
+  if (char.quests?.done?.prova_do_mestre == null) return { ok: false, reason: 'Conclua a Prova do Mestre da sua classe na Vila.' };
   if (char.spec === spec) return { ok: false, reason: 'Você já tem esta especialização.' };
   const cost = respecCost(char);
   if (char.gold < cost) return { ok: false, reason: `Faltam ${cost - char.gold} de ouro.` };

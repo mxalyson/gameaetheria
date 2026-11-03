@@ -53,6 +53,12 @@ const STYLE = {
     blobs: [['#c9e2a4', 0.34], ['#86c27f', 0.24], ['#e6dca8', 0.20]], glade: '255,248,210',
     trail: [], specks: ['#a79d78', '#efe4c0'], shore: [], water: [],
   },
+  // Porto de Marfim: areia clara, margem de areia molhada, água de baía (a textura de lago cobre quando carregou)
+  harbor: {
+    blobs: [['#f2e4bd', 0.34], ['#e6d2a2', 0.26], ['#f7eed0', 0.30], ['#d9c28f', 0.16]], glade: '255,240,205',
+    trail: [], specks: ['#b8a272', '#fff3d2'],
+    shore: ['rgba(120,96,60,0.32)', '#eadfbc', '#cdb98a'], water: ['#8fdbe8', '#3f9fc4'],
+  },
   // Cume Gélido: neve, trilha de gelo batido, lagos congelados
   glacier: {
     blobs: [['#f4f9fd', 0.40], ['#c9deef', 0.30], ['#b3cfe6', 0.22], ['#ffffff', 0.30]], glade: '235,248,255',
@@ -73,7 +79,7 @@ export function paintGroundScenery(g, world, rng) {
   if (sc.kind === 'ruins' || sc.kind === 'ember') paintRuinsGround(g, world, rng);
   else paintNatureGround(g, world, rng, STYLE[sc.kind] ?? STYLE.forest);
   if (sc.kind === 'plains') paintCrystalDust(g, z, rng);
-  if (sc.kind === 'town') paintTownCobbles(g, z, rng);
+  if (sc.kind === 'town' || sc.kind === 'harbor') paintTownCobbles(g, z, rng);
   if (sc.kind === 'ember') paintLavaCracks(g, z, rng);
   // Seixos soltos para quebrar áreas lisas.
   for (let i = 0; i < Math.round(z.w * z.h / 40000); i++) {
@@ -253,7 +259,7 @@ function paintNatureGround(g, world, rng, S) {
     gr.addColorStop(0, S.water[0]); gr.addColorStop(1, S.water[1]);
     g.fillStyle = waterPattern(g, z.scenery.kind) ?? gr; ellipse(g, 0, 0, p.rx, p.ry); g.fill();
     g.fillStyle = 'rgba(255,255,255,0.22)'; ellipse(g, -p.rx * 0.25, -p.ry * 0.35, p.rx * 0.5, p.ry * 0.22); g.fill();
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < (z.scenery.kind === 'harbor' ? 0 : 5); i++) { // baía do porto: água limpa, sem vitórias-régias
       const a = rng.range(0, TAU), d = rng.range(0.15, 0.7), x = Math.cos(a) * p.rx * d, y = Math.sin(a) * p.ry * d, r = rng.range(8, 13);
       g.fillStyle = '#58a85a'; ellipse(g, x, y, r, r * 0.6); g.fill();
       g.fillStyle = '#4a9550'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + r, y - r * 0.2); g.lineTo(x + r, y + r * 0.2); g.closePath(); g.fill();

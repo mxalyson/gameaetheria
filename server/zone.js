@@ -19,7 +19,7 @@ export const RESPAWN_AFTER = 4;  // s morto até renascer na entrada da zona
 const SHARE_RADIUS = 900;        // quem está longe do abate não ganha nada dele
 const r1 = (n) => Math.round(n * 10) / 10;
 const idle = () => ({ mx: 0, my: 0, aimX: 0, aimY: 0, attack: false, cast: null });
-const emptyBatch = () => ({ xp: 0, gold: 0, potions: 0, items: [], essences: [], kills: [], deaths: 0 });
+const emptyBatch = () => ({ xp: 0, gold: 0, potions: 0, items: [], essences: [], kills: [], skills: [], deaths: 0 });
 
 // Ponto de entrada numa zona vindo de `from` (o portal de lá aponta para cá). null = portal inexistente (movimento ilegal).
 export function entryPoint(zoneId, from) {
@@ -86,6 +86,7 @@ export class ZoneRoom {
     for (const ev of this.world.events.splice(0)) {
       if (ev.type === 'death' && ev.actor.kind === 'mob') this.onMobKilled(ev.actor);
       else if (ev.type === 'death' && ev.actor.kind === 'player') this.onPlayerDeath(ev.actor);
+      else if (ev.type === 'cast' && ev.actor.kind === 'player') this.players.get(ev.actor.id)?.pend.skills.push(ev.skill); // Prova do Mestre / Maestria (skillUse)
       const w = wire(ev); if (w) this.events.push(w);
     }
     for (const p of this.players.values()) {
@@ -124,7 +125,7 @@ export class ZoneRoom {
       const a = p.actor;
       if (Math.hypot(a.x - m.x, a.y - m.y) > SHARE_RADIUS) continue;
       if (!m.summoned) p.pend.xp += mobXp(m.level, a.level, mul); // esbirros de chefe não dão XP nem loot
-      p.pend.kills.push({ mobId: m.mobId, boss: !!m.boss });
+      p.pend.kills.push({ mobId: m.mobId, boss: !!m.boss, mini: !!m.miniboss, spiritType: this.spiritTypeOf(p) });
       for (const d of rollMobLoot(this.rng, m, p.classId, p.pity)) {
         if (d.kind === 'gold') p.pend.gold += d.amount;
         else if (d.kind === 'potion') p.pend.potions += d.amount;
@@ -134,10 +135,13 @@ export class ZoneRoom {
     }
   }
 
+  // Tipo do spirit ativo do personagem (a sala de zona não tem o ator do spirit; vale o do documento): conta para a missão de evolução.
+  spiritTypeOf(p) { const c = p.session?.char; return c?.spirits?.find((s) => s.id === c.activeSpirit)?.type; }
+
   // Grava o lote pendente do jogador (operação idempotente). Devolve o resumo ou null.
   flush(p) {
     const b = p.pend;
-    if (!p.charId || !this.db || !(b.xp || b.gold || b.potions || b.items.length || b.essences.length || b.kills.length || b.deaths)) return null;
+    if (!p.charId || !this.db || !(b.xp || b.gold || b.potions || b.items.length || b.essences.length || b.kills.length || b.skills.length || b.deaths)) return null;
     b.pity = { ...p.pity }; p.pend = emptyBatch();
     const opId = `zone:${this.matchId}:${p.charId}:${++this.flushSeq}`;
     try {
@@ -152,7 +156,7 @@ export class ZoneRoom {
       // a operação reverteu (nada foi gravado): devolve o lote ao pendente para a próxima tentativa, em vez de perder a recompensa
       const n = p.pend;
       n.xp += b.xp; n.gold += b.gold; n.potions += b.potions; n.deaths += b.deaths;
-      n.items.unshift(...b.items); n.essences.unshift(...b.essences); n.kills.unshift(...b.kills);
+      n.items.unshift(...b.items); n.essences.unshift(...b.essences); n.kills.unshift(...b.kills); n.skills.unshift(...b.skills);
       try { this.db.audit('zone_reward_error', { accountId: p.accountId, detail: e.message }); } catch { /* sem auditoria */ }
       return null;
     }

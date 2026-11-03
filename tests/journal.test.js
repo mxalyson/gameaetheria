@@ -20,8 +20,8 @@ const kill = (doc, n, extra = {}) => { for (let i = 0; i < n; i++) recordEvent(d
 test('dados: toda missão é coerente (giver/after/objetivos/recompensa) e o encadeamento não tem ciclo', () => {
   const npcs = new Set(Object.values(ZONES).flatMap((z) => (z.npcs ?? []).map((n) => n.id)));
   for (const q of Object.values(QUESTS)) {
-    assert.ok(npcs.has(q.giver), `${q.id}: NPC ${q.giver} não existe`);
-    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage'].includes(o.type)));
+    assert.ok(npcs.has(q.giver) || (q.giver === 'master' && ['warrior', 'mage', 'archer', 'cleric'].every((c) => npcs.has('master_' + c))), `${q.id}: NPC ${q.giver} não existe`);
+    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage', 'miniboss', 'skillUse', 'spiritKill'].includes(o.type)));
     assert.ok(q.text.offer && q.text.progress && q.text.done);
     // coerência de nível ↔ zona: ninguém pede para caçar numa zona muito acima do nível da missão
     for (const o of q.objectives) if (o.zone && o.zone !== 'any') assert.ok(q.level >= ZONES[o.zone].level[0] - 2, `${q.id}: nível ${q.level} baixo demais para ${o.zone}`);
@@ -292,7 +292,7 @@ test('dicas de onboarding: cada uma aparece 1× e o servidor não perde os bits'
 test('diário: a lista de NPCs vem dos givers das missões (todos existem na Vila)', () => {
   const givers = [...new Set(Object.values(QUESTS).map((q) => q.giver))];
   assert.ok(givers.includes('merchant') && givers.includes('smith'));
-  for (const g of givers) assert.ok(ZONES.town.npcs.some((n) => n.id === g), g);
+  for (const g of givers.filter((x) => x !== 'master')) assert.ok(ZONES.town.npcs.some((n) => n.id === g), g);
 });
 
 // ---------- lore coletável (S17) ----------

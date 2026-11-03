@@ -31,3 +31,12 @@ Documento do personagem versionado (v2), validado e com backup; exportar/importa
 
 ## Mundo e progressão (P8)
 Missões (12), diálogos, baús, mapa (M), diário (J), conquistas e títulos: ver decisão 0012. Economia: `docs/gameplay/economia.md`.
+
+
+## Rodada 2026-11-02 (equipamento por classe, spirit coletor, mestres)
+- **Equipamento por classe:** todo item (arma, elmo, armadura, botas, anel, amuleto) tem `classId` e só a classe dele equipa (`canEquip`: "Apenas para Mago."). Armadura por tipo: Guerreiro placas, Arqueiro couro, Mago e Clérigo tecido (conjuntos de nomes distintos, `GEAR_NAMES`). Anel/amuleto sempre trazem o atributo principal da classe. Loot de mob/baú/loja/kit inicial usa sempre a classe do jogador. **Saves antigos:** item sem `classId` é carimbado com a classe do personagem dono em `validate` (equipado de outra classe é removido); armas antigas derivam a classe do tipo. API para a UI: `itemClassName(item)`, `reqClass(item)`, `itemClassId(item)` em `core/stats.js`.
+- **Ouro** cai direto na mochila (texto flutuante "+N"); não existe mais drop de ouro no chão. O servidor já creditava no lote.
+- **Spirit coletor** (`game/sim.js` `updateSpiritFetch`, `SPIRIT_FETCH`): fora de combate o spirit busca o drop mais próximo (até 260 px do dono, 320 px/s), traz ao herói e emite `pickup`; mochila cheia vira ouro. Só heróis; o ouro nunca é buscado.
+- **Evolução do spirit** exige a missão do elemento com a Sábia Yun (`evolucao_do_spirit_fogo|agua|terra|vento`: 40 abates com o spirit ativo + 2 baús; spirit nível 10). `spiritEvoStatus(doc, sp)` (`core/journal.js`) descreve o estado para a UI.
+- **Mestres de Classe** (Vila, fileira em y 950, x 950–1130): `prova_do_mestre` (nv 14; 1 mini-chefe + 10 usos da habilidade assinatura = 1ª da classe) libera a escolha de especialização; `maestria` (nv 25; 3 chefes + 50 habilidades) dá +4 atributo principal, +3 Vitalidade permanentes (`MASTERY`) e o título "Mestre". Objetivos novos: `miniboss`, `skillUse`, `spiritKill`. Arte própria dos mestres é pendência (hoje reutilizam o herói em miniatura da classe).
+- **PvP** sem teto por hora (decisão do dono); resta só a regra do mesmo adversário 3x em 30 min.

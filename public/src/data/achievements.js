@@ -21,6 +21,7 @@ export const ACHIEVEMENTS = [
   { id: 'primeiro_sussurro', name: 'Primeiro Sussurro', desc: 'Derrube o Carvalho Ancestral e ouça suas últimas palavras.', quest: 'carvalho_ancestral', min: 1, title: 'Ouvinte de Sussurros' },
   { id: 'dono_do_gelo', name: 'Dono do Gelo', desc: 'Liberte o Ancião Gélido no Cume.', quest: 'anciao_gelido', min: 1, title: 'Dono do Gelo' },
   { id: 'brasa_adormecida', name: 'Brasa Adormecida', desc: 'Apague o Cavaleiro Rubro nas Cinzas Ardentes.', quest: 'cavaleiro_rubro', min: 1, title: 'Brasa Adormecida' },
+  { id: 'mestre_de_classe', name: 'Mestre de Classe', desc: 'Conclua a Maestria com o Mestre da sua classe.', quest: 'maestria', min: 1, title: 'Mestre' },
   { id: 'viajante', name: 'Viajante', desc: 'Use o teletransporte do mapa 5 vezes.', stat: 'teleports', min: 5, title: 'Viajante' },
   { id: 'mao_de_ferro', name: 'Mão de Ferro', desc: 'Aprimore equipamentos 10 vezes com o Ferreiro.', stat: 'upgrades', min: 10, title: 'Mão de Ferro' },
   { id: 'voz_dos_ecos', name: 'Voz dos Ecos', desc: 'Conclua o arco final: Os Ecos Unidos.', quest: 'ecos_unidos', min: 1, title: 'Voz dos Ecos' },
@@ -30,7 +31,7 @@ export const ACHIEVEMENTS = [
 export const ACHIEVEMENT_IDS = ACHIEVEMENTS.map((a) => a.id);
 export const ACH = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 // Contadores do personagem. `SERVER_STATS` só o servidor altera (vêm de partidas decididas lá).
-export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin', 'teleports', 'upgrades', 'tips', 'lore'];
+export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin', 'teleports', 'upgrades', 'tips', 'lore', 'spiritKills', 'skillUses'];
 // `tips` e `lore` não são contadores: são máscaras de bits (dicas já mostradas, core/journal.js TIP_BITS; inscrições lidas, LORE_ZONES); o servidor une os bits em vez de limitar o salto.
 export const FLAG_STATS = ['tips', 'lore'];
 export const SERVER_STATS = ['pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin']; // os 5 últimos limitam o XP de PvP (core/rewards.js)

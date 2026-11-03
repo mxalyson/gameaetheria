@@ -1,6 +1,7 @@
 import { CLASSES } from '../data/classes.js';
 import { SPIRITS, SPIRIT_RARITY_MUL } from '../data/spirits.js';
 import { generateItem, rollRarity, uid } from './loot.js';
+import { SPIRIT_EVO_QUEST, QUESTS } from '../data/quests.js';
 
 export const MAX_LEVEL = 30;
 export const POINTS_PER_LEVEL = 5;
@@ -43,7 +44,7 @@ export function newCharacter(name, classId, rng) {
     created: Date.now(),
   };
   char.equipment.weapon = generateItem(rng, 1, { slot: 'weapon', rarityId: 'common', weaponType: CLASSES[classId].weapon });
-  char.equipment.armor = generateItem(rng, 1, { slot: 'armor', rarityId: 'common' });
+  char.equipment.armor = generateItem(rng, 1, { slot: 'armor', classId, rarityId: 'common' });
   return char;
 }
 
@@ -59,7 +60,7 @@ export function spiritPower(sp) {
   return Math.round((6 + sp.level * 3.2) * SPIRIT_RARITY_MUL[sp.rarity] * (sp.stage === 2 ? EVOLVED_MUL : 1));
 }
 
-// Evolução (forma 2): nível mínimo e ouro; o spirit evoluído tem 50% mais poder e a arte da forma evoluída.
+// Evolução (forma 2): nível mínimo, missão do elemento e ouro; o spirit evoluído tem 50% mais poder e a arte da forma evoluída.
 export const EVOLVE_LEVEL = 10;
 export const EVOLVED_MUL = 1.5;
 export const evolveCost = (sp) => Math.round(80 * sp.level * SPIRIT_RARITY_MUL[sp.rarity]);
@@ -68,6 +69,9 @@ export function evolveSpirit(char, id) {
   if (!sp) return { ok: false, reason: 'Spirit não encontrado.' };
   if (sp.stage === 2) return { ok: false, reason: 'Já está na forma evoluída.' };
   if (sp.level < EVOLVE_LEVEL) return { ok: false, reason: `Precisa do nível ${EVOLVE_LEVEL} (está no ${sp.level}).` };
+  // exige a missão de evolução do elemento (Sábia Yun; core/journal.js spiritEvoStatus mostra o andamento)
+  const qid = SPIRIT_EVO_QUEST[sp.type];
+  if (char.quests?.done?.[qid] == null) return { ok: false, reason: `Conclua a missão "${QUESTS[qid].name}" com a Sábia Yun.` };
   const cost = evolveCost(sp);
   if (char.gold < cost) return { ok: false, reason: `Faltam ${cost - char.gold} de ouro.` };
   char.gold -= cost; sp.stage = 2;

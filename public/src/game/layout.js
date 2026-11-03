@@ -103,7 +103,7 @@ export function buildLayout(zoneId) {
     const [pa, pb] = z.portals ?? [];
     const a = pa ? { x: pa.x + 70, y: pa.y } : null;
     const b = pb && !sc.trailToBoss ? { x: pb.x - 70, y: pb.y } : z.boss ? { x: z.boss.x - 130, y: z.boss.y } : null;
-    if (a && b) {
+    if (a && b && !sc.noTrail) { // cidades (`noTrail`) usam ruas em `paths`, não a trilha automática
       // A trilha passa pela 1ª ponte de cada rio: pontos de controle 190 antes e depois, em linha reta (sem ondulação) para atravessar na horizontal.
       const amp = sc.trailAmp ?? 230, ctrl = [a];
       for (const rv of [...rivers].sort((p, q) => p.x - q.x)) { const bg = rv.bridges[0]; ctrl.push({ x: bg.x - 190, y: bg.y }, { x: bg.x + 190, y: bg.y }); }
@@ -124,6 +124,15 @@ export function buildLayout(zoneId) {
       && pathSegs.every(([x1, y1, x2, y2]) => segDist(x, y, x1, y1, x2, y2) > r + 50)
       && ponds.every((p) => Math.hypot(x - p.x, y - p.y) > p.rx + r + 40)
       && runes.every((p) => Math.hypot(x - p.x, y - p.y) > p.r + r + 40);
+    // Lagoas/baías em posição fixa (cidades): mesma colisão e juncos das aleatórias.
+    for (const p of sc.fixedPonds ?? []) {
+      ponds.push({ ...p });
+      for (const u of [-0.55, 0, 0.55]) obstacles.push({ x: p.x + Math.cos(p.rot) * p.rx * u, y: p.y + Math.sin(p.rot) * p.rx * u, r: p.ry * 0.95 });
+      for (let k = 0; k < 7; k++) {
+        const ang = srng.range(0, 6.28);
+        decor.push({ type: 'reeds', x: p.x + Math.cos(ang) * (p.rx + 6), y: p.y + Math.sin(ang) * (p.ry + 6) + 6, s: srng.range(9, 14), v: srng.next() });
+      }
+    }
     for (let i = 0, tries = 0; i < (sc.ponds ?? 0) && tries < 200; tries++) {
       const rx = srng.range(90, 150), ry = srng.range(55, 85), x = srng.range(260, z.w - 260), y = srng.range(260, z.h - 260);
       if (!clear(x, y, rx)) continue;
@@ -156,9 +165,13 @@ export function buildLayout(zoneId) {
       decor.push({ type, x, y, s, v });
       obstacles.push({ x, y, r: s * 0.45, block: true });
     };
+    // Portal no norte/sul: abertura na moldura (só zonas com portal em y<100 ou y>h-100; as demais não pulam nada, o sorteio não muda).
+    const nearPortalNS = (x, north) => (z.portals ?? []).some((p) => (north ? p.y < 100 : p.y > z.h - 100) && Math.abs(p.x - x) < 120);
     for (let x = 0; x <= z.w; x += rng.range(55, 80)) {
-      ring(x + rng.range(-10, 10), rng.range(-8, 18));
-      ring(x + rng.range(-10, 10), z.h - rng.range(-8, 18));
+      const x1 = x + rng.range(-10, 10), y1 = rng.range(-8, 18); // mesma ordem de sorteio de antes: x, y, corpo de ring(), x, y, corpo
+      if (!nearPortalNS(x1, true)) ring(x1, y1); else { rng.range(30, 44); rng.next(); } // pulado: gasta o mesmo sorteio (a vila não muda de lugar)
+      const x2 = x + rng.range(-10, 10), y2 = z.h - rng.range(-8, 18);
+      if (!nearPortalNS(x2, false)) ring(x2, y2); else { rng.range(30, 44); rng.next(); }
     }
     // Deixa uma abertura na moldura onde há portal.
     const nearPortal = (west, y) => (z.portals ?? []).some((p) => (west ? p.x < 100 : p.x > z.w - 100) && Math.abs(p.y - y) < 120);

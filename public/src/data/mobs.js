@@ -71,6 +71,8 @@ export const BOSS_PHASES = {
 export const BOSS_REPEAT = { window: 1800, mul: 0.5, floor: 0.25 };
 // Acampamentos (elite + grupo) voltam depois do último morto; 150 s dava ~1,3 épico/h só de elites parado num acampamento (o farm normal rende ~1/h).
 export const CAMP_RESPAWN = 300;
+// Bônus de risco da noite (core/daycycle.js › nightMods): mobs enxergam 10% mais longe (aggro) e dão +15% de XP/drops. Só ao ar livre.
+export const NIGHT = { aggroMul: 1.1, rewardMul: 1.15 };
 export const BOSS_SPAWN = {
   // G5: reaparição longa (7–15 min) + abates repetidos do mesmo chefe em `repeatWindow` s valem `repeatMul` da chance de item a cada vez (World.onMobDeath).
   default: { respawn: 420 },

@@ -41,9 +41,9 @@ for (const lvl of [8, 12, 20]) for (const crew of [1, 4]) {
   console.log(`  coop nv ${String(lvl).padStart(2)} × ${crew} jogador(es): ouro ${plan.gold} · XP ${plan.xp} (${((plan.xp / xpToNext(lvl)) * 100).toFixed(0)}% de um nível) · poções ${plan.potions}`);
 }
 for (const lvl of [10, 20]) {
-  // premissa: partida de 3 min (20/h), metade de vitórias, adversários variados; as 10 primeiras da hora a 100%, as demais a 25%
+  // premissa: partida de 3 min (20/h), metade de vitórias, adversários variados; sem teto por hora
   const win = Math.round(xpToNext(lvl) * PVP_XP.win), loss = Math.round(xpToNext(lvl) * PVP_XP.loss), avg = (win + loss) / 2;
-  const perHour = avg * PVP_XP.fullPerHour + avg * (20 - PVP_XP.fullPerHour) * PVP_XP.afterFull;
+  const perHour = avg * 20;
   console.log(`  PvP 1×1 nv ${lvl}: vitória ${40 + lvl * 8} ouro, derrota ${10 + lvl * 2}; XP ${win} / ${loss}; ≈ ${Math.round(perHour)} XP/h (${(perHour / xpToNext(lvl)).toFixed(2)} nível/h); antes (12%/4% sem teto): ${Math.round(((xpToNext(lvl) * 0.16) / 2) * 20)} XP/h`);
 }
 

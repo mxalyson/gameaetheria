@@ -6,6 +6,7 @@ import { deathPose } from './hero-death.js';
 import { MOBS } from '../data/mobs.js';
 
 const KEY = 'aetheria_monstros';
+const HD = typeof devicePixelRatio === 'number' && devicePixelRatio >= 2.5; // tela 3×: as criaturas são ampliadas pouco, mas lidas de perto; leve realce de nitidez ao carregar
 let on = null, index = null, indexLoading = null, indexFailed = false;
 const items = new Map(); // id -> { state: 'loading'|'ready'|'none', img, meta }
 export const stats = { drawn: 0, loaded: 0 };
@@ -32,12 +33,22 @@ function loadIndex() {
 // Quanto o desenho da célula (com margem) é mais alto que o raio de colisão da criatura; ajustável por criatura.
 // criaturas grandes (chefes), ampliadas ~2× na tela: realce de nitidez leve ao carregar; o orçamento de textura (tests/mobs-art.test.js, 8 MiB por zona) não deixa subir os px do bake
 const BIG = new Set(['treant', 'colossus', 'guardian', 'golem']);
-const ART = { default: { h: 3.4 }, slime: { h: 3.0 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
+const ART = { default: { h: 3.4 }, slime: { h: 3.8 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
 
 // Recolore uma vez ao carregar (hue em graus, sat/bri multiplicadores, mul = multiplicador por canal): as variantes de cor reaproveitam a arte da criatura de base.
 // V16: a cor nova vem do matiz/mul, mas a LUMINÂNCIA é a da pintura original (sombras e brilhos intactos) em vez de multiplicar o canal (que achatava tudo numa cor só);
 // brilhos que estouram dessaturam em direção ao branco, como luz de verdade. `sharp` (0–1) aplica um realce leve de nitidez (criaturas grandes ampliadas, V15/V16).
-function tint(img, t, sharp = 0) {
+// Contorno escuro fino cozido no atlas ao carregar (sem custo por quadro nem memória extra): mobs claros sobre piso roxo, azuis sobre neve ou lavanda sobre grama
+// perdiam a silhueta. A silhueta (alfa) é carimbada em 8 deslocamentos de `px` pixels do atlas, tingida de escuro, e o sprite vai por cima.
+function outline(c, px) {
+  const o = document.createElement('canvas'); o.width = c.width; o.height = c.height;
+  const g = o.getContext('2d');
+  for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; g.drawImage(c, Math.round(Math.cos(a) * px), Math.round(Math.sin(a) * px)); }
+  g.globalCompositeOperation = 'source-in'; g.fillStyle = 'rgba(14,10,22,0.78)'; g.fillRect(0, 0, o.width, o.height);
+  g.globalCompositeOperation = 'source-over'; g.drawImage(c, 0, 0);
+  return o;
+}
+function tint(img, t, sharp = 0, ol = 0, cell = null) {
   const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, c.width, c.height), p = d.data, W = c.width, H = c.height;
@@ -76,6 +87,7 @@ function tint(img, t, sharp = 0) {
     }
   }
   g.putImageData(d, 0, 0);
+  if (ol > 0) { const o = outline(c, ol); return typeof createImageBitmap === 'function' ? createImageBitmap(o) : o; }
   return typeof createImageBitmap === 'function' ? createImageBitmap(c) : c; // bitmap (GPU) em vez de canvas de CPU
 }
 
@@ -93,7 +105,8 @@ function load(id) {
       const meta = await fetch(`assets/mobs/${art}.json`).then((r) => r.json());
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/mobs/${art}.webp?v=${meta.v ?? 0}`; });
       if (img.naturalWidth !== meta.cell[0] * meta.cols || img.naturalHeight !== meta.cell[1] * meta.rows) { it.state = 'none'; return; } // imagem e medidas não combinam: desenho antigo em vez de sprite quebrado
-      await img.decode?.(); it.meta = meta; it.img = V?.tint || BIG.has(art) ? await tint(img, V?.tint, BIG.has(art) ? 0.55 : 0) : img; it.state = 'ready'; stats.loaded++;
+      await img.decode?.(); it.meta = meta; const glow = AIRY.has(art); // fantasmas e fogos-fátuos são translúcidos e brilhantes: contorno escuro os suja
+      it.img = await tint(img, V?.tint, BIG.has(art) ? 0.55 : HD ? 0.3 : 0, glow ? 0 : meta.cell[0] > 170 ? 2 : 1.5, meta.cell); it.state = 'ready'; stats.loaded++;
     } catch { retryLater(); }
   });
   return it;

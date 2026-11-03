@@ -62,7 +62,7 @@ test('preferências: limites, valores inválidos e qualidade automática', () =>
   assert.equal(changePref({ scale: 100, quality: 'auto', controls: 'auto' }, 'quality:low').quality, 'low');
   assert.equal(changePref({ scale: 100, quality: 'auto', controls: 'auto' }, 'quality:ultra').quality, 'auto', 'valor inválido volta ao padrão');
   assert.equal(changePref({ scale: 100, quality: 'auto', controls: 'auto' }, 'controls:touch').controls, 'touch');
-  assert.equal(resolveQuality({ quality: 'auto' }, true), 'medium');
+  assert.ok(['medium', 'high'].includes(resolveQuality({ quality: 'auto' }, true)), 'celular: média ou alta conforme o aparelho (≥ 6 núcleos = alta)');
   assert.equal(resolveQuality({ quality: 'auto' }, false), 'high');
   assert.equal(resolveQuality({ quality: 'low' }, false), 'low');
   assert.equal(loadPrefs().scale, 100, 'sem localStorage usa o padrão');

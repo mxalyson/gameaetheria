@@ -2,11 +2,16 @@
 // e pelo servidor (partidas PvP/cooperativas e plausibilidade do salvamento). Estado no documento do personagem (v3):
 //   doc.quests = { active: { id: { p: [progresso por objetivo], at } }, done: { id: ts } }, doc.stats = {...}, doc.achievements = { id: ts },
 //   doc.title = id de conquista | null, doc.chests = { idDoBaú: instante da última abertura }
-import { QUESTS } from '../data/quests.js';
+import { QUESTS, SPIRIT_EVO_QUEST } from '../data/quests.js';
+import { CLASSES } from '../data/classes.js';
+import { SPIRITS } from '../data/spirits.js';
 import { ACHIEVEMENTS, ACH, STAT_KEYS_PROGRESS } from '../data/achievements.js';
 import { INVENTORY_SIZE } from '../data/items.js';
 import { addXp } from './progression.js';
 import { generateItem, rollRarity } from './loot.js';
+import { ZONES } from '../data/zones.js';
+import { MOBS, MOBS_EXTRA } from '../data/mobs.js';
+import { makeRng, hashString } from './rng.js';
 
 export const SERVER_TYPES = new Set(['pvp', 'coop']); // objetivos que só o servidor soma
 export const MAX_ACTIVE = 5;
@@ -23,14 +28,38 @@ export function ensureJournal(doc) { // documentos antigos/incompletos ganham os
 }
 
 // ---------- missões ----------
+// Mestres de Classe: a missão com `giver: 'master'` é do mestre da classe do jogador (npc `master_<classId>`).
+export const masterNpcId = (classId) => 'master_' + classId;
+export const isMasterNpc = (npcId) => typeof npcId === 'string' && npcId.startsWith('master_');
+// Id do NPC que oferece/recebe a missão PARA este personagem (a UI do diário usa isto em vez de `q.giver`).
+export const questGiverId = (doc, q) => (q.giver === 'master' ? masterNpcId(doc.classId) : q.giver);
+// O NPC é o "dono" (oferece/recebe) da missão para este personagem?
+const isGiver = (doc, q, npcId, role = q.giver) => role === npcId || (role === 'master' && npcId === masterNpcId(doc.classId));
 export function requirementsMet(doc, q) {
+  if (q.spirit && !(doc.spirits ?? []).some((s) => s.type === q.spirit.type && s.level >= q.spirit.level)) return false;
   return doc.level >= q.level && (!q.after || doc.quests.done[q.after] != null);
 }
 // `server:false` (jogo offline) esconde as missões que só o servidor consegue completar (PvP/cooperativo reais).
-export const offeredBy = (doc, npcId, { server = true } = {}) => Object.values(QUESTS).filter((q) => q.giver === npcId && doc.quests.done[q.id] == null && !doc.quests.active[q.id] && requirementsMet(doc, q) && (server || !q.objectives.some((o) => SERVER_TYPES.has(o.type))));
+export const offeredBy = (doc, npcId, { server = true } = {}) => Object.values(QUESTS).filter((q) => isGiver(doc, q, npcId) && doc.quests.done[q.id] == null && !doc.quests.active[q.id] && requirementsMet(doc, q) && (server || !q.objectives.some((o) => SERVER_TYPES.has(o.type))));
 export const isComplete = (doc, id) => { const a = doc.quests.active[id], q = QUESTS[id]; return !!a && q.objectives.every((o, i) => (a.p[i] ?? 0) >= (o.count ?? 1)); };
-export const readyFor = (doc, npcId) => Object.keys(doc.quests.active).filter((id) => (QUESTS[id].turnIn ?? QUESTS[id].giver) === npcId && isComplete(doc, id));
-export const activeFor = (doc, npcId) => Object.keys(doc.quests.active).filter((id) => (QUESTS[id].turnIn ?? QUESTS[id].giver) === npcId && !isComplete(doc, id));
+export const readyFor = (doc, npcId) => Object.keys(doc.quests.active).filter((id) => isGiver(doc, QUESTS[id], npcId, QUESTS[id].turnIn ?? QUESTS[id].giver) && isComplete(doc, id));
+export const activeFor = (doc, npcId) => Object.keys(doc.quests.active).filter((id) => isGiver(doc, QUESTS[id], npcId, QUESTS[id].turnIn ?? QUESTS[id].giver) && !isComplete(doc, id));
+
+// Estado da missão de evolução de um spirit (a UI de spirits mostra `text`): locked (falta nível) | available (fale com a Sábia Yun) |
+// active (em andamento; `progress`) | ready (missão feita; falta evoluir) | evolved. `ok` = evolveSpirit pode funcionar.
+export function spiritEvoStatus(doc, sp) {
+  const qid = SPIRIT_EVO_QUEST[sp.type], q = QUESTS[qid], S = SPIRITS[sp.type];
+  const mk = (state, text, extra = {}) => ({ state, questId: qid, ok: state === 'ready', text, ...extra });
+  if (sp.stage === 2) return mk('evolved', 'Já está na forma evoluída.');
+  if (doc.quests?.done?.[qid] != null) return mk('ready', 'Missão de evolução concluída: pronto para evoluir.');
+  const a = doc.quests?.active?.[qid];
+  if (a) {
+    const progress = q.objectives.map((o, i) => ({ label: o.label, value: Math.min(o.count ?? 1, a.p[i] ?? 0), count: o.count ?? 1 }));
+    return mk('active', `Missão de evolução (${S.element}): ` + progress.map((p) => `${p.value}/${p.count} ${p.label}`).join(' · '), { progress });
+  }
+  if (sp.level < q.spirit.level) return mk('locked', `Missão de evolução: suba ${S.name} ao nível ${q.spirit.level} (está no ${sp.level}).`);
+  return mk('available', `Missão de evolução: fale com a Sábia Yun na Vila para aceitar "${q.name}".`);
+}
 
 export const evolvedSpirits = (doc) => (doc.spirits ?? []).filter((s) => s.stage === 2).length;
 
@@ -49,8 +78,11 @@ export function acceptQuest(doc, id, now = Date.now()) {
 }
 export function abandonQuest(doc, id) { delete doc.quests.active[id]; }
 
-function matches(o, ev) {
+function matches(o, ev, doc) {
   switch (o.type) {
+    case 'miniboss': return ev.type === 'kill' && !!ev.mini;
+    case 'spiritKill': return ev.type === 'kill' && ev.spiritType === o.spirit;
+    case 'skillUse': return ev.type === 'skill' && (o.skill !== 'signature' || ev.skillId === CLASSES[doc.classId]?.skills[0]);
     case 'kill': return ev.type === 'kill' && (o.mob === 'any' || o.mob === ev.mobId) && (o.zone === 'any' || o.zone === ev.zoneId);
     case 'boss': return ev.type === 'kill' && ev.boss && (o.mob === 'any' || o.mob === ev.mobId);
     case 'chest': return ev.type === 'chest' && (o.zone === 'any' || o.zone === ev.zoneId);
@@ -67,7 +99,8 @@ export function recordEvent(doc, ev, now = Date.now()) {
   ensureJournal(doc);
   const out = { quests: [], achievements: [] };
   const st = doc.stats;
-  if (ev.type === 'kill') { st.kills++; if (ev.boss) st.bossKills++; }
+  if (ev.type === 'kill') { st.kills++; if (ev.boss) st.bossKills++; if (ev.spiritType) st.spiritKills++; }
+  else if (ev.type === 'skill') st.skillUses++;
   else if (ev.type === 'chest') st.chests++;
   else if (ev.type === 'pvp') { st.pvpGames++; if (ev.won) st.pvpWins++; }
   else if (ev.type === 'coop' && ev.victory) st.coopClears++;
@@ -81,11 +114,12 @@ export function recordEvent(doc, ev, now = Date.now()) {
       if (o.type === 'level' && ev.type === 'level') v = Math.max(before, Math.min(max, ev.level));
       else if (o.type === 'spirit' && ev.type === 'spirit') v = Math.max(before, Math.min(max, ev.count));
       else if (o.type === 'spiritStage' && ev.type === 'spiritStage') v = Math.max(before, Math.min(max, ev.count));
-      else if (matches(o, ev)) v = Math.min(max, before + 1);
+      else if (matches(o, ev, doc)) v = Math.min(max, before + 1);
       if (v !== before) { a.p[i] = v; changed = true; }
     });
     if (changed) out.quests.push({ id, complete: isComplete(doc, id), progress: [...a.p] });
   }
+  dailyProgress(doc, ev, now); // Quadro de Contratos do Porto (abaixo): kills e baús avançam os contratos do dia
   out.achievements = checkAchievements(doc, now);
   return out;
 }
@@ -155,16 +189,20 @@ export function readLore(doc, zoneId) { // true se for a primeira leitura (marca
 
 // ---------- falas condicionais dos NPCs ----------
 // `greet` = texto ou lista de { when, text }; vale a primeira entrada cuja `when` bate (sem `when` = padrão).
-// Condições (todas precisam valer): level (>=), bossKills (>=), bossKillsMax (<=), done (missão concluída, id ou lista), offline (true = só sem servidor).
+// Condições (todas precisam valer): classId / notClassId (classe do personagem), level (>=), bossKills (>=), bossKillsMax (<=), done (missão concluída, id ou lista), offline (true = só sem servidor).
 export function greetMatches(doc, when = {}, { online = false } = {}) {
   if (when.level != null && doc.level < when.level) return false;
   const bk = doc.stats?.bossKills ?? 0;
   if (when.bossKills != null && bk < when.bossKills) return false;
   if (when.bossKillsMax != null && bk > when.bossKillsMax) return false;
+  if (when.classId != null && doc.classId !== when.classId) return false;
+  if (when.notClassId != null && doc.classId === when.notClassId) return false;
   for (const id of [].concat(when.done ?? [])) if (doc.quests?.done?.[id] == null) return false;
   if (when.offline != null && when.offline !== !online) return false;
   return true;
 }
+// Serviço do botão do NPC para ESTE personagem: o dos Mestres de Classe só aparece para a própria classe (`service.classId`).
+export const serviceFor = (doc, dialog) => (dialog?.service && (!dialog.service.classId || dialog.service.classId === doc.classId) ? dialog.service : null);
 export function greetFor(doc, greet, opts) {
   if (typeof greet === 'string') return greet;
   return (greet ?? []).find((g) => greetMatches(doc, g.when, opts))?.text ?? '…';
@@ -188,4 +226,76 @@ export function openChest(doc, chest, zoneId, rng, now = Date.now()) {
   }
   const out = recordEvent(doc, { type: 'chest', zoneId }, now);
   return { ok: true, gold, item, quests: out.quests, achievements: out.achievements };
+}
+
+// ---------- Quadro de Contratos do Porto (missões diárias determinísticas) ----------
+// 3 contratos por dia UTC, sorteados por semente do dia (todos os jogadores do mesmo nível veem o mesmo quadro): "derrote N de X numa zona",
+// "derrote N criaturas numa zona" e "abra N baús". Progresso e entregas em doc.daily = { day, p: { idDoContrato: n }, done: { idDoContrato: 1 } }.
+// Quem soma o progresso é recordEvent (acima); quem paga é claimDaily. A interface do Quadro (Mestra de Caça Vesna) só lista dailyBoard e chama claimDaily.
+export const DAILY_COUNT = 3;
+export const dayUTC = (ms = Date.now()) => Math.floor(ms / 86400000);
+export const blankDaily = () => ({ day: 0, p: {}, done: {} });
+
+// Zonas de farm elegíveis para o nível: já liberadas (nível mínimo ≤ nível+1) e não obsoletas (teto ≥ nível-8); sempre pelo menos a mais alta liberada.
+function dailyZones(level) {
+  const farm = Object.entries(ZONES).filter(([, z]) => z.mobs && z.level).sort((a, b) => a[1].level[0] - b[1].level[0]);
+  const open = farm.filter(([, z]) => z.level[0] <= level + 1);
+  const fresh = open.filter(([, z]) => z.level[1] >= level - 8);
+  return (fresh.length ? fresh : open.slice(-1).length ? open.slice(-1) : farm.slice(0, 1)).map(([id]) => id);
+}
+
+export function dailyBoard(doc, day = dayUTC()) {
+  const lvl = Math.max(1, doc.level ?? 1), zones = dailyZones(lvl), rng = makeRng(hashString(`board|${day}`));
+  const pickZone = () => zones[Math.floor(rng.next() * zones.length)];
+  const killXp = Math.round((12 + lvl * 6) * 0.35);
+  const board = [];
+  // 1) um tipo de criatura específico (N entre 8 e 14)
+  { const zone = pickZone(), mobs = ZONES[zone].mobs.map((m) => m[0]), mob = mobs[Math.floor(rng.next() * mobs.length)], count = 8 + Math.floor(rng.next() * 7);
+    board.push({ id: `d${day}-0-${zone}-${mob}`, slot: 0, kind: 'kill', zone, mob, count, label: `Derrote ${count}× ${(MOBS[mob] ?? MOBS_EXTRA[mob]).name} (${ZONES[zone].name})`,
+      reward: { gold: Math.round(count * (3 + lvl * 1.2)), xp: count * killXp, potions: 1 } }); }
+  // 2) qualquer criatura de uma zona (N entre 15 e 25)
+  { const zone = pickZone(), count = 15 + Math.floor(rng.next() * 11);
+    board.push({ id: `d${day}-1-${zone}-any`, slot: 1, kind: 'kill', zone, mob: 'any', count, label: `Derrote ${count} criaturas (${ZONES[zone].name})`,
+      reward: { gold: Math.round(count * (2.5 + lvl)), xp: count * killXp, potions: 1 } }); }
+  // 3) baús em qualquer zona (2 ou 3; cada baú recarrega em 10 min)
+  { const count = 2 + Math.floor(rng.next() * 2);
+    board.push({ id: `d${day}-2-any-chest`, slot: 2, kind: 'chest', zone: 'any', mob: null, count, label: `Abra ${count} baús em qualquer zona`,
+      reward: { gold: Math.round(count * lvl * 8), xp: Math.round(count * lvl * 10), potions: 2 } }); }
+  return board;
+}
+
+// Estado do dia (zera quando o dia UTC muda). Cria doc.daily se faltar.
+export function dailyState(doc, day = dayUTC()) {
+  if (!doc.daily || doc.daily.day !== day) doc.daily = { ...blankDaily(), day };
+  doc.daily.p ??= {}; doc.daily.done ??= {};
+  return doc.daily;
+}
+export const dailyProgressOf = (doc, c) => Math.min(c.count, doc.daily?.p?.[c.id] ?? 0);
+export const dailyComplete = (doc, c) => dailyProgressOf(doc, c) >= c.count;
+
+// Soma 1 ao progresso dos contratos do dia que o evento cumpre (kill: mob/zona; chest). Chamada por recordEvent; devolve os contratos que mudaram.
+export function dailyProgress(doc, ev, now = Date.now()) {
+  if (ev.type !== 'kill' && ev.type !== 'chest') return [];
+  const day = dayUTC(now), st = dailyState(doc, day), changed = [];
+  for (const c of dailyBoard(doc, day)) {
+    if (st.done[c.id] || (st.p[c.id] ?? 0) >= c.count) continue;
+    const hit = c.kind === 'kill' ? ev.type === 'kill' && !ev.boss && (c.mob === 'any' || c.mob === ev.mobId) && c.zone === ev.zoneId : ev.type === 'chest';
+    if (hit) { st.p[c.id] = (st.p[c.id] ?? 0) + 1; changed.push(c.id); }
+  }
+  return changed;
+}
+
+// Entrega um contrato completo: ouro, XP e poções. Idempotente (done). Devolve { ok, reward, levels } ou { ok:false, reason }.
+export function claimDaily(doc, id, now = Date.now()) {
+  const day = dayUTC(now), c = dailyBoard(doc, day).find((x) => x.id === id);
+  if (!c) return { ok: false, reason: 'Contrato indisponível hoje.' };
+  const st = dailyState(doc, day);
+  if (st.done[id]) return { ok: false, reason: 'Contrato já entregue hoje.' };
+  if (!dailyComplete(doc, c)) return { ok: false, reason: 'O contrato ainda não está completo.' };
+  st.done[id] = 1;
+  doc.gold += c.reward.gold;
+  const levels = addXp(doc, c.reward.xp);
+  doc.potions = Math.min(999, doc.potions + c.reward.potions);
+  const out = recordEvent(doc, { type: 'level', level: doc.level }, now);
+  return { ok: true, reward: { ...c.reward }, levels, achievements: out.achievements, quests: out.quests };
 }

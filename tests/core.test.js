@@ -8,6 +8,7 @@ import { addXp, xpToNext, newCharacter, createSpirit, addSpiritXp, MAX_LEVEL } f
 import { generateRival } from '../public/src/core/rival.js';
 import { CLASSES } from '../public/src/data/classes.js';
 import { SLOTS } from '../public/src/data/items.js';
+import { itemClassName, itemClassId } from '../public/src/core/stats.js';
 import { World, makeHeroActor, makeMobActor, makeSpiritActor, DROP_MAX } from '../public/src/game/sim.js';
 import { riverX } from '../public/src/game/layout.js';
 
@@ -265,6 +266,9 @@ test('spirit evolui só no nível 10, paga ouro e fica 50% mais forte', async ()
   assert.equal(evolveSpirit(c, sp.id).ok, false);
   sp.level = EVOLVE_LEVEL;
   const p0 = spiritPower(sp), cost = evolveCost(sp);
+  sp.type = 'ember';
+  c.gold = cost; assert.equal(evolveSpirit(c, sp.id).ok, false, 'sem a missão de evolução do elemento não evolui');
+  c.quests.done.evolucao_do_spirit_fogo = 1;
   c.gold = cost - 1; assert.equal(evolveSpirit(c, sp.id).ok, false);
   c.gold = cost; assert.equal(evolveSpirit(c, sp.id).ok, true);
   assert.equal(c.gold, 0); assert.equal(sp.stage, 2);
@@ -553,7 +557,7 @@ test('G2/G13: loja só vende até raro + 1 épico de destaque, estoque estável 
   assert.equal(sellValue({ value: 101 }), 50); assert.equal(sellValue({ value: 1 }), 1);
 });
 
-test('G3: XP de PvP — vitória 6%, derrota 2%, 10 partidas/hora a 100% depois 25%, 3º duelo seguido contra o mesmo adversário = 0', () => {
+test('G3: XP de PvP — vitória 6%, derrota 2%, sem teto por hora, 3º duelo seguido contra o mesmo adversário = 0', () => {
   const base = () => { const d = newCharacter('Duelista', 'warrior', makeRng(5)); d.level = 10; return validate(d).char; };
   const T0 = 1.8e12, need = xpToNext(10);
   const w = applyMatchResult(base(), { mode: '1v1', result: 'win', foeRating: 1000, now: T0 });
@@ -563,7 +567,7 @@ test('G3: XP de PvP — vitória 6%, derrota 2%, 10 partidas/hora a 100% depois 
   assert.equal(applyMatchResult(base(), { mode: '4v4', result: 'win', foeRating: 1000, now: T0 }).summary.xp, Math.round(need * 0.06 * 1.6));
   let d = base(); const xps = [];
   for (let i = 0; i < 12; i++) { const r = applyMatchResult(d, { mode: '1v1', result: 'loss', foeRating: 1000, now: T0 + i * 60000, foeId: 'rival' + i }); d = r.doc; d.level = 10; d.xp = 0; xps.push(r.summary.xp); }
-  assert.ok(xps.slice(0, 10).every((x) => x === xps[0]) && xps[10] === Math.round(xps[0] * 0.25), 'depois de 10/hora paga 25%: ' + xps);
+  assert.ok(xps.slice(0, 12).every((x) => x === xps[0]), 'sem teto por hora: todas as partidas pagam igual: ' + xps);
   d = base(); const rep = [];
   for (let i = 0; i < 4; i++) { const r = applyMatchResult(d, { mode: '1v1', result: 'win', foeRating: 1000, now: T0 + i * 60000, foeId: 'mesmo' }); d = r.doc; d.level = 10; d.xp = 0; rep.push(r.summary.xp); }
   assert.ok(rep[0] > 0 && rep[1] > 0 && rep[2] === 0 && rep[3] === 0, 'repetição: ' + rep);
@@ -713,4 +717,250 @@ test('G10: acampamento só volta CAMP_RESPAWN s depois do último morto (não 15
   assert.equal(alive(), 0, 'aos 200 s ainda vazio');
   for (let t = 0; t < CAMP_RESPAWN; t += 1) w.updateSpawns(1, hero);
   assert.ok(alive() > 0, 'depois de CAMP_RESPAWN o acampamento volta');
+});
+
+// ---- Rodada: equipamento por classe, ouro direto, spirit coletor, missões de evolução e Mestres de Classe ----
+import { WEAPON_TYPES } from '../public/src/data/items.js';
+import { parseSave, exportSave } from '../public/src/core/savedoc.js';
+import { SPIRIT_EVO_QUEST } from '../public/src/data/quests.js';
+import { acceptQuest, recordEvent, turnInQuest, offeredBy, readyFor, spiritEvoStatus, ensureJournal, greetFor, serviceFor, masterNpcId } from '../public/src/core/journal.js';
+import { chooseSpec } from '../public/src/core/specs.js';
+import { evolveSpirit } from '../public/src/core/progression.js';
+import { DIALOGS } from '../public/src/data/dialogs.js';
+import { ZONES } from '../public/src/data/zones.js';
+import { sanitizeImport, itemCeiling } from '../server/plausible.js';
+import { applyZoneBatch } from '../public/src/core/rewards.js';
+
+const CLASS_IDS = Object.keys(CLASSES);
+
+test('equipamento por classe: todo espaço nasce com classId da classe pedida e só ela equipa (matriz classe x item)', () => {
+  const rng = makeRng(11);
+  for (const owner of CLASS_IDS) {
+    for (const slot of SLOTS) {
+      const it = generateItem(rng, 10, { classId: owner, slot, rarityId: 'rare' });
+      assert.equal(it.classId, owner, `${owner}/${slot}`);
+      assert.equal(itemClassId(it), owner);
+      for (const other of CLASS_IDS) {
+        const c = newCharacter('T', other, makeRng(1)); c.level = 30;
+        const r = canEquip(c, it);
+        assert.equal(r.ok, other === owner, `${owner}/${slot} em ${other}`);
+        if (!r.ok) assert.equal(r.reason, `Apenas para ${CLASSES[owner].name}.`);
+      }
+    }
+  }
+  assert.equal(itemClassName(generateItem(rng, 5, { classId: 'mage', slot: 'ring' })), 'Mago');
+});
+
+test('equipamento por classe: arma deriva a classe do tipo; mago e clérigo têm nomes distintos; joia foca o atributo principal', () => {
+  const rng = makeRng(3);
+  assert.equal(generateItem(rng, 5, { slot: 'weapon', weaponType: 'bow' }).classId, 'archer');
+  for (const t of Object.keys(WEAPON_TYPES)) assert.equal(generateItem(rng, 5, { slot: 'weapon', weaponType: t }).classId, WEAPON_TYPES[t].classId);
+  const names = (cid) => new Set(SLOTS.filter((s) => s !== 'weapon').map((s) => generateItem(makeRng(1), 1, { classId: cid, slot: s, rarityId: 'common' }).name));
+  const m = names('mage'), cl = names('cleric');
+  assert.ok([...m].every((n) => !cl.has(n)), 'nomes de mago e clérigo não se repetem');
+  for (const cid of CLASS_IDS) for (const slot of ['ring', 'amulet']) for (let i = 0; i < 30; i++) {
+    const it = generateItem(rng, 12, { classId: cid, slot, rarityId: ['common', 'rare', 'epic'][i % 3] });
+    assert.ok(it.stats[CLASSES[cid].primary] > 0, `${cid}/${slot} sem o atributo principal`);
+  }
+  assert.ok(CLASSES[generateItem(rng, 5, { slot: 'armor' }).classId], 'sem classe informada o gerador sorteia uma');
+});
+
+test('equipamento por classe: loot de mob/baú/loja e personagem novo vêm sempre da classe do jogador', () => {
+  for (const cid of CLASS_IDS) {
+    const c = newCharacter('T', cid, makeRng(2));
+    assert.ok(Object.values(c.equipment).every((i) => i.classId === cid), 'kit inicial');
+    const drops = []; const rng = makeRng(9);
+    for (let i = 0; i < 400; i++) drops.push(...rollMobLoot(rng, { level: 10, boss: i % 5 === 0 }, cid).filter((l) => l.kind === 'item'));
+    assert.ok(drops.length > 30 && drops.every((l) => l.item.classId === cid), 'drops de mob');
+    c.level = 12; c.name = 'Lojista' + cid;
+    const stock = buildShopStock(c);
+    assert.ok(stock.length >= 4 && stock.every((i) => i.classId === cid), 'estoque da loja');
+  }
+});
+
+test('equipamento por classe: save antigo sem classId ganha a classe do personagem; item de outra classe equipado sai', () => {
+  const c = newCharacter('Velho', 'mage', makeRng(4)); c.level = 10;
+  const legacy = (seed, o) => { const it = generateItem(makeRng(seed), 8, { rarityId: 'rare', ...o }); delete it.classId; return it; };
+  c.equipment = { weapon: legacy(7, { classId: 'mage', slot: 'weapon' }), armor: legacy(5, { classId: 'mage', slot: 'armor' }) };
+  c.inventory = [legacy(6, { classId: 'mage', slot: 'ring' })];
+  const r = validate(c);
+  assert.ok(r.ok);
+  assert.equal(r.char.equipment.armor.classId, 'mage'); assert.equal(r.char.inventory[0].classId, 'mage'); assert.equal(r.char.equipment.weapon.classId, 'mage');
+  assert.equal(parseSave(exportSave(r.char)).char.inventory[0].classId, 'mage', 'exportar/importar mantém');
+  const bad = structuredClone(r.char); bad.equipment.helm = generateItem(makeRng(8), 5, { classId: 'warrior', slot: 'helm' });
+  const v = validate(bad);
+  assert.equal(v.char.equipment.helm, undefined); assert.ok(v.warnings.some((w) => /outra classe/.test(w)));
+});
+
+test('equipamento por classe (servidor): item novo de outra classe é rejeitado; save antigo sem classId passa; teto continua valendo', () => {
+  const d0 = newCharacter('Srv', 'archer', makeRng(3)); d0.level = 10;
+  const old = validate(d0).char, neu = structuredClone(old);
+  neu.inventory.push(generateItem(makeRng(1), 10, { classId: 'archer', slot: 'boots', rarityId: 'rare' }));
+  assert.equal(checkSave(old, neu).ok, true);
+  const forged = structuredClone(old); forged.inventory.push(generateItem(makeRng(1), 10, { classId: 'warrior', slot: 'boots', rarityId: 'rare' }));
+  assert.deepEqual(checkSave(old, forged), { ok: false, reason: 'item_wrong_class' });
+  const dbOld = structuredClone(old); delete dbOld.equipment.armor.classId; delete dbOld.equipment.weapon.classId; // o banco ainda guarda sem classId
+  assert.equal(checkSave(dbOld, structuredClone(old)).ok, true);
+  const swap = structuredClone(old); swap.equipment.armor.classId = 'mage';
+  assert.equal(checkSave(dbOld, swap).ok, false);
+  const rng = makeRng(77);
+  for (let i = 0; i < 1500; i++) {
+    const it = generateItem(rng, 1 + (i % 30), { classId: CLASS_IDS[i % 4], rarityId: ['common', 'uncommon', 'rare', 'epic', 'legendary'][i % 5], slot: SLOTS[i % 6] });
+    const cap = itemCeiling(it.slot, it.rarity, it.level);
+    for (const [k, v] of Object.entries(it.stats)) assert.ok(v <= cap.stats[k], `${it.slot} ${k}`);
+    assert.ok(Object.keys(it.stats).length <= cap.maxKeys);
+  }
+  const imp = { ...old, equipment: { ...old.equipment, helm: generateItem(makeRng(2), 5, { classId: 'mage', slot: 'helm' }) } };
+  assert.equal(sanitizeImport(structuredClone(imp), old).equipment.helm, undefined, 'import: item de outra classe sai');
+});
+
+test('ouro cai direto: o loot ainda sorteia ouro (o servidor credita no lote), mas o cliente não cria drop de ouro', async () => {
+  const loot = rollMobLoot(makeRng(1), { level: 5, mobId: 'wolf' }, 'warrior');
+  assert.ok(loot.some((l) => l.kind === 'gold' && l.amount > 0));
+  const src = (await import('node:fs')).readFileSync(new URL('../public/src/main.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(l\.kind === 'gold'\) \{[^}]*this\.char\.gold \+= l\.amount/s, 'onMobKilled credita o ouro direto');
+  assert.doesNotMatch(src, /d\.kind === 'gold'/, 'collectDrops não coleta mais ouro do chão');
+});
+
+test('spirit coletor: fora de combate busca o drop mais próximo (até 260 px do dono), traz ao herói e emite pickup', () => {
+  const w = new World('arena', { seed: 3 });
+  const p = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 550, 550));
+  const sp = w.add(makeSpiritActor(createSpirit(makeRng(2), { type: 'zephyr', level: 5 }), p));
+  const longe = { kind: 'item', item: generateItem(makeRng(3), 5, { classId: 'warrior' }), x: 950, y: 550, vx: 0, vy: 0, t: 1 };
+  const perto = { kind: 'potion', amount: 1, x: 750, y: 550, vx: 0, vy: 0, t: 1 };
+  const perto2 = { kind: 'item', item: generateItem(makeRng(4), 5, { classId: 'warrior' }), x: 550, y: 790, vx: 0, vy: 0, t: 1 };
+  const ouro = { kind: 'gold', amount: 5, x: 560, y: 560, vx: 0, vy: 0, t: 1 };
+  w.drops.push(longe, perto, perto2, ouro);
+  const got = []; let tFirst = null;
+  for (let i = 0; i < 60 * 8; i++) {
+    w.update(1 / 60, {});
+    for (const e of w.events.splice(0)) if (e.type === 'pickup') { got.push(e.drop); tFirst ??= w.time; assert.equal(e.actor, p); assert.equal(e.spirit, sp); }
+  }
+  assert.equal(got.length, 2, 'dois drops dentro do alcance foram trazidos, um de cada vez');
+  assert.ok(got.includes(perto) && got.includes(perto2) && perto.fetched && perto2.fetched);
+  assert.ok(!longe.fetched && !longe.carried, 'fora de 260 px do dono não é buscado');
+  assert.ok(!ouro.fetched && !ouro.carried, 'ouro nunca é buscado');
+  assert.ok(tFirst > 0.4 && tFirst < 3, 'a 320 px/s leva ~1 s: ' + tFirst);
+});
+
+test('spirit coletor: em combate larga o drop e a simulação é determinística', () => {
+  const run = () => {
+    const w = new World('arena', { seed: 3 });
+    const p = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 550, 550));
+    const sp = w.add(makeSpiritActor(createSpirit(makeRng(2), { type: 'undine', level: 5 }), p));
+    const d = { kind: 'potion', amount: 1, x: 700, y: 550, vx: 0, vy: 0, t: 1 };
+    w.drops.push(d);
+    for (let i = 0; i < 40; i++) w.update(1 / 60, {});
+    const pos = [sp.x, sp.y], midCarry = !!d.carried;
+    p.lastDealt = w.time;
+    for (let i = 0; i < 60; i++) w.update(1 / 60, {});
+    return { pos, midCarry, carried: d.carried, fetched: d.fetched, fetch: sp.fetch };
+  };
+  const a = run(), b = run();
+  assert.deepEqual(a, b);
+  assert.ok(!a.fetched && !a.carried && !a.fetch, 'em combate o spirit larga o que buscava');
+});
+
+const mkHero = (classId, level = 14) => { const d = newCharacter('Aluno' + classId, classId, makeRng(5)); d.level = level; return ensureJournal(validate(d).char); };
+
+test('evolução do spirit: missão por elemento (40 abates com o spirit ativo + 2 baús) libera evolveSpirit; status para a UI', () => {
+  assert.deepEqual(Object.keys(SPIRIT_EVO_QUEST).sort(), ['ember', 'terra', 'undine', 'zephyr']);
+  for (const type of Object.keys(SPIRIT_EVO_QUEST)) {
+    const c = mkHero('mage', 12); const sp = createSpirit(makeRng(2), { type, level: 9, rarity: 'common' }); c.spirits.push(sp); c.activeSpirit = sp.id; c.gold = 1e6;
+    const qid = SPIRIT_EVO_QUEST[type];
+    assert.equal(spiritEvoStatus(c, sp).state, 'locked');
+    assert.equal(acceptQuest(c, qid).ok, false, 'spirit abaixo do nível 10 não aceita');
+    sp.level = 10;
+    assert.equal(spiritEvoStatus(c, sp).state, 'available');
+    assert.ok(offeredBy(c, 'sage').some((q) => q.id === qid), 'a Sábia Yun oferece');
+    assert.equal(evolveSpirit(c, sp.id).ok, false);
+    assert.ok(acceptQuest(c, qid).ok);
+    for (let i = 0; i < 39; i++) recordEvent(c, { type: 'kill', mobId: 'slime', zoneId: 'forest', spiritType: type });
+    for (let i = 0; i < 50; i++) recordEvent(c, { type: 'kill', mobId: 'slime', zoneId: 'forest' }); // sem spirit não conta
+    const other = Object.keys(SPIRIT_EVO_QUEST).find((t) => t !== type);
+    recordEvent(c, { type: 'kill', mobId: 'slime', zoneId: 'forest', spiritType: other }); // spirit de outro elemento não conta
+    recordEvent(c, { type: 'chest', zoneId: 'forest' }); recordEvent(c, { type: 'chest', zoneId: 'forest' });
+    assert.equal(spiritEvoStatus(c, sp).state, 'active');
+    assert.deepEqual(spiritEvoStatus(c, sp).progress.map((p) => p.value), [39, 2]);
+    recordEvent(c, { type: 'kill', mobId: 'slime', zoneId: 'forest', spiritType: type });
+    assert.ok(readyFor(c, 'sage').includes(qid));
+    assert.equal(evolveSpirit(c, sp.id).ok, false, 'concluir os objetivos não basta: precisa entregar');
+    assert.ok(turnInQuest(c, qid, makeRng(1)).ok);
+    assert.equal(spiritEvoStatus(c, sp).state, 'ready');
+    assert.equal(evolveSpirit(c, sp.id).ok, true);
+    assert.equal(spiritEvoStatus(c, sp).state, 'evolved');
+    assert.ok(c.stats.spiritKills >= 40);
+  }
+});
+
+test('Prova do Mestre/evolução (servidor): lote de zona soma abates com spirit, mini-chefes e usos de habilidade; limite de skillUses', () => {
+  const d = mkHero('archer', 14); const sp = createSpirit(makeRng(2), { type: 'ember', level: 10 }); d.spirits.push(sp); d.activeSpirit = sp.id;
+  acceptQuest(d, SPIRIT_EVO_QUEST.ember); acceptQuest(d, 'prova_do_mestre');
+  const r = applyZoneBatch(d, { zoneId: 'forest', kills: [{ mobId: 'wolf', spiritType: 'ember', mini: true }, { mobId: 'wolf', spiritType: 'ember' }], skills: [CLASSES.archer.skills[0], CLASSES.archer.skills[0], CLASSES.archer.skills[1]] });
+  assert.equal(r.doc.quests.active.evolucao_do_spirit_fogo.p[0], 2);
+  assert.deepEqual(r.doc.quests.active.prova_do_mestre.p, [1, 2], 'mini-chefe 1; 2 usos da assinatura; a outra habilidade não conta');
+  assert.equal(r.doc.stats.skillUses, 3);
+  const neu = structuredClone(r.doc); neu.stats.skillUses += 1501;
+  assert.equal(checkSave(r.doc, neu).reason, 'stat_jump_skillUses');
+  neu.stats.skillUses = r.doc.stats.skillUses + 1000;
+  assert.equal(checkSave(r.doc, neu).ok, true);
+});
+
+test('Mestres de Classe: 4 NPCs lado a lado na Vila; cada um só dá missões e serviço à própria classe', () => {
+  const town = ZONES.town.npcs;
+  const row = CLASS_IDS.map((cid) => town.find((n) => n.id === masterNpcId(cid)));
+  assert.ok(row.every(Boolean), 'os 4 mestres existem');
+  assert.ok(row.every((n) => n.x >= 900 && n.x <= 1300 && n.y >= 900 && n.y <= 960), 'praça dos mestres');
+  assert.equal(new Set(row.map((n) => n.y)).size, 1, 'mesma fileira');
+  for (const cid of CLASS_IDS) {
+    const c = mkHero(cid, 14);
+    for (const other of CLASS_IDS) {
+      assert.deepEqual(offeredBy(c, masterNpcId(other)).map((q) => q.id), other === cid ? ['prova_do_mestre'] : [], `${cid} falando com o mestre de ${other}`);
+      assert.equal(!!serviceFor(c, DIALOGS[masterNpcId(other)]), other === cid, 'serviço só da própria classe');
+      assert.ok(greetFor(c, DIALOGS[masterNpcId(other)].greet).length > 20, 'fala em português');
+    }
+  }
+});
+
+test('Prova do Mestre: mini-chefe + 10 usos da habilidade assinatura liberam a especialização (que antes era livre)', () => {
+  const c = mkHero('mage', 15); c.gold = 1000;
+  assert.equal(chooseSpec(c, 'pyromancer').ok, false, 'sem a prova não escolhe');
+  assert.equal(offeredBy(mkHero('mage', 13), 'master_mage').length, 0, 'nível 14 mínimo');
+  assert.ok(acceptQuest(c, 'prova_do_mestre').ok);
+  for (let i = 0; i < 20; i++) recordEvent(c, { type: 'skill', skillId: 'frostnova' }); // não é a assinatura
+  for (let i = 0; i < 9; i++) recordEvent(c, { type: 'skill', skillId: CLASSES.mage.skills[0] });
+  recordEvent(c, { type: 'kill', mobId: 'wolf', zoneId: 'forest', mini: false });
+  assert.equal(readyFor(c, 'master_mage').length, 0);
+  recordEvent(c, { type: 'kill', mobId: 'wolf', zoneId: 'forest', mini: true });
+  recordEvent(c, { type: 'skill', skillId: CLASSES.mage.skills[0] });
+  assert.deepEqual(readyFor(c, 'master_mage'), ['prova_do_mestre']);
+  assert.deepEqual(readyFor(c, 'master_warrior'), [], 'outro mestre não recebe');
+  assert.ok(turnInQuest(c, 'prova_do_mestre', makeRng(1)).ok);
+  assert.equal(chooseSpec(c, 'pyromancer').ok, true);
+  assert.equal(c.spec, 'pyromancer');
+});
+
+test('Maestria (nível 25): exige a prova, dá bônus permanente pequeno e o título Mestre', async () => {
+  const { primaryStats, MASTERY } = await import('../public/src/core/stats.js');
+  const { setTitle, titleText } = await import('../public/src/core/journal.js');
+  const c = mkHero('warrior', 25);
+  assert.equal(offeredBy(c, 'master_warrior').some((q) => q.id === 'maestria'), false, 'antes da prova não aparece');
+  c.quests.done.prova_do_mestre = 1;
+  assert.deepEqual(offeredBy(c, 'master_warrior').map((q) => q.id), ['maestria']);
+  const before = primaryStats(c);
+  assert.ok(acceptQuest(c, 'maestria').ok);
+  for (let i = 0; i < 3; i++) recordEvent(c, { type: 'kill', mobId: 'treant', zoneId: 'forest', boss: true });
+  for (let i = 0; i < 50; i++) recordEvent(c, { type: 'skill', skillId: 'charge' });
+  assert.ok(turnInQuest(c, 'maestria', makeRng(1)).ok);
+  const after = primaryStats(c);
+  assert.equal(Math.round((after.str - before.str) * 10) / 10, MASTERY.primary);
+  assert.equal(Math.round((after.vit - before.vit) * 10) / 10, MASTERY.vit);
+  assert.ok(c.achievements.mestre_de_classe, 'conquista da maestria');
+  assert.ok(setTitle(c, 'mestre_de_classe')); assert.equal(titleText(c), 'Mestre');
+  assert.ok(MASTERY.primary <= 5 && MASTERY.vit <= 5, 'bônus pequeno');
+  assert.equal(primaryStats(validate(c).char).str, after.str, 'o save mantém o bônus');
+});
+
+test('PvP: sem teto por hora (nenhum resquício de "10 partidas por hora" nos parâmetros de XP)', () => {
+  assert.equal(PVP_XP.fullPerHour, undefined); assert.equal(PVP_XP.afterFull, undefined);
 });

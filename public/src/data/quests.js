@@ -1,6 +1,7 @@
 // Missões (dados). Cada objetivo tem um `type`:
 //   kill  {mob:'any'|id, zone:'any'|id}   boss {mob:'any'|id}   chest {zone:'any'|id}   spirit (ter N spirits)   level (alcançar o nível N)
 //   pvp {mode:'any'|1v1|2v2|4v4}   coop   ← estes dois são do SERVIDOR (só o servidor soma progresso; o cliente não consegue marcá-los)
+//   miniboss (abater mini-chefe)   skillUse {skill:'signature'|'any'}   spiritKill {spirit:id} (abates com aquele spirit ativo)
 //   teleport (usar o teletransporte do mapa)   upgrade (aprimorar um equipamento no Ferreiro)   spiritStage (ter N spirits evoluídos, forma 2)
 // Cânone do arco final: 3 guardiões originais (Carvalho, Colosso, Guardião) e 2 reflexos (Ancião Gélido = gelo, Cavaleiro Rubro = brasa). `text.done` pode ser lista de falas (epílogo).
 // `giver` = NPC que oferece (e recebe a entrega, salvo `turnIn`). `after` = missão exigida antes. Recompensa: ouro, xp (×2,5 depois da curva de XP mais lenta), potions, items [{rarity}].
@@ -132,5 +133,47 @@ export const QUESTS = {
     reward: { gold: 8000, xp: 0, potions: 10, items: [{ rarity: 'legendary' }] },
   },
 };
+
+// ---- Mestres de Classe (praça dos mestres na Vila) ----
+// `giver: 'master'` = o mestre da CLASSE do jogador (npc `master_<classId>`, ver core/journal.js masterNpcId); as quatro praças têm a mesma missão.
+// skillUse {skill:'signature'|'any'}: usos da habilidade assinatura (a 1ª da classe) ou de qualquer habilidade. miniboss: abates de mini-chefes.
+Object.assign(QUESTS, {
+  prova_do_mestre: {
+    id: 'prova_do_mestre', name: 'Prova do Mestre', giver: 'master', level: 14, after: null,
+    text: { offer: 'Quem ensina a si mesmo tem um tolo por mestre. Prove-se: derrube um mini-chefe e mostre domínio da sua habilidade assinatura, dez vezes. Então falaremos de especialização.', progress: 'Um mini-chefe e dez usos da habilidade assinatura. Sem atalhos.', done: 'Está feito. Seu estilo agora tem nome e caminho. Abra o painel do personagem e escolha a especialização, com orgulho.' },
+    objectives: [{ type: 'miniboss', mob: 'any', count: 1, label: 'Derrote 1 mini-chefe' }, { type: 'skillUse', skill: 'signature', count: 10, label: 'Use a habilidade assinatura 10 vezes' }],
+    reward: { gold: 500, xp: 3000, potions: 3 },
+  },
+  maestria: {
+    id: 'maestria', name: 'Maestria', giver: 'master', level: 25, after: 'prova_do_mestre',
+    text: { offer: 'Poucos chegam até aqui. Domínio de verdade é repetição sem pressa: derrube três chefes e use suas habilidades cinquenta vezes. Entrego o que merece quem o faz.', progress: 'Três chefes e cinquenta habilidades. A maestria não tem pressa.', done: 'Mestre, então. Este vigor é seu para sempre, e o título também. Use-os bem.' },
+    objectives: [{ type: 'boss', mob: 'any', count: 3, label: 'Derrote 3 chefes' }, { type: 'skillUse', skill: 'any', count: 50, label: 'Use habilidades 50 vezes' }],
+    reward: { gold: 2000, xp: 12000, items: [{ rarity: 'epic' }] }, // + bônus permanente de maestria (core/stats.js MASTERY) e o título
+  },
+});
+
+// ---- Evolução do spirit (Sábia Yun): uma missão por elemento; só então evolveSpirit (core/progression.js) funciona ----
+// `spirit` = { type, level }: exige ter um spirit desse tipo no nível indicado para aceitar. spiritKill: abates feitos COM um spirit ativo desse tipo.
+const EVO = [
+  ['ember', 'Fagulha', 'Fogo', 'fogo', 'A chama só cresce onde há com o que queimar.'],
+  ['undine', 'Ondina', 'Água', 'agua', 'A maré só sobe depois de muita onda.'],
+  ['terra', 'Rochedo', 'Terra', 'terra', 'A rocha só endurece sob peso.'],
+  ['zephyr', 'Zéfiro', 'Vento', 'vento', 'O vento só ganha corpo correndo longe.'],
+];
+for (const [type, name, element, key, line] of EVO) {
+  const id = 'evolucao_do_spirit_' + key;
+  QUESTS[id] = {
+    id, name: `Evolução: ${name}`, giver: 'sage', level: 10, after: null, spirit: { type, level: 10 },
+    text: {
+      offer: `${line} Com ${name} ao seu lado, derrote 40 criaturas e abra 2 baús. Ele aprende o que você vive.`,
+      progress: `Mantenha ${name} como seu spirit ativo (🔮) ao derrotar criaturas, e abra os baús que encontrar.`,
+      done: `${name} brilha diferente agora. Ele está pronto: abra 🔮 e evolua-o.`,
+    },
+    objectives: [{ type: 'spiritKill', spirit: type, count: 40, label: `Derrote 40 criaturas com ${name} (${element}) ativo` }, { type: 'chest', zone: 'any', count: 2, label: 'Abra 2 baús' }],
+    reward: { gold: 300, xp: 1500 },
+  };
+}
+// Missão de evolução de cada tipo de spirit (core/progression.js, core/journal.js spiritEvoStatus).
+export const SPIRIT_EVO_QUEST = Object.fromEntries(EVO.map(([type, , , key]) => [type, 'evolucao_do_spirit_' + key]));
 
 export const QUEST_IDS = Object.keys(QUESTS);

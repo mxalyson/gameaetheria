@@ -200,6 +200,7 @@ class Game {
       case 'spirit-free': this.freeSpirit(arg); break;
       case 'spirit-evolve': this.evolveSpirit(arg); break;
       case 'teleport': this.teleport(arg); break;
+      case 'map-sel': this.ui.mapSel = arg; this.ui.render(); break; // toque num nó do mapa-múndi: mostra o cartão de viagem
       case 'alloc-auto': this.allocAuto(); break;
       case 'duel': this.startMatch('1v1'); break;
       case 'match': this.startMatch(arg); break;
@@ -237,7 +238,7 @@ class Game {
       // o tutorial segue o modo de controle (toque é o padrão; teclado e mouse só se escolhido nas opções)
       if (this.touch?.active) this.ui.log('Arraste à esquerda para andar · botão grande ataca · círculos menores são as habilidades', '#cfe8ff');
       else this.ui.log('Mover: arraste o botão esquerdo do mouse ou use as setas · clique ataca · habilidades nos botões', '#cfe8ff');
-      this.ui.log('💬 conversa com NPCs · 🧪 poção · 🏠 volta à vila · 🎒 mochila · 🧙 personagem · 🔮 spirits · 📖 diário', '#cfe8ff');
+      this.ui.log('Menu no alto: Mochila, Personagem, Spirits, Diário e Mapa (o Mapa leva de volta à Vila, de graça).', '#cfe8ff');
       this.ui.log('Missões dão ouro, XP e itens: fale com a Guarda Ren e, depois, siga o portal a leste.', '#ffd34d');
       const sp = SPIRITS[char.spirits[0].type];
       this.ui.log(`Um spirit te acompanha: <b style="color:${sp.color}">${sp.name}</b> (${sp.element}).`, sp.color);
@@ -264,7 +265,7 @@ class Game {
     if (bs.bossT != null) this.world.bossT = bs.bossT;
     if (bs.miniT != null) this.world.miniT = bs.miniT;
     this.mode = mode;
-    if (ZONES[zoneId].mobs || zoneId === 'town') (this.char.visited ??= {})[zoneId] = 1; // desbloqueia o teletransporte para este mapa
+    if (ZONES[zoneId].mobs || ZONES[zoneId].hub) (this.char.visited ??= {})[zoneId] = 1; // desbloqueia o teletransporte para este mapa
     this.player = this.world.add(makeHeroActor(this.char, x, y));
     if (!this.world.zone.safe && mode === 'explore') this.player.hp = Math.max(1, Math.round(this.player.maxHp * ratio));
     this.spawnSpirit(this.player, this.char);
@@ -450,9 +451,9 @@ class Game {
   inNetZone() { return this.mode === 'net' && this.netInfo?.mode === 'zone'; }
   // equipamento/atributos/spirits mudam o personagem no cliente; na instância o servidor é o dono do personagem (transações de loja/equipar: P11.4)
   togglePanel(id) {
-    if ((id === 'journal' || id === 'map') && this.mode !== 'explore') return; // diário e mapa só no mundo normal
+    if ((id === 'journal' || id === 'map') && this.mode !== 'explore' && !(id === 'map' && this.inNetZone())) return; // diário e mapa só no mundo normal (o mapa também abre na instância online: lá o nó da Vila é o retorno)
     if (id === 'party' && !this.online) return;
-    if (this.inNetZone() && ['inventory', 'character', 'spirits'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à vila (botão 🏠) para mexer no equipamento e nos atributos.', '');
+    if (this.inNetZone() && ['inventory', 'character', 'spirits'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à Vila pelo Mapa para mexer no equipamento e nos atributos.', '');
     this.ui.toggle(id);
   }
   async enterZoneOnline(zone, from) {
@@ -503,7 +504,7 @@ class Game {
     if (r.potions) parts.push(`+${r.potions} 🧪`);
     if (parts.length) this.ui.log(parts.join(' · '), '#ffd27a');
     if (r.deaths) this.ui.log('Você caiu: −10% do ouro.', '#ffb4a8');
-    if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos na vila (🧙).', 'gold');
+    if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos em Personagem.', 'gold');
     for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     for (const id of r.achievements ?? []) this.announceAchievements([id]);
     try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char, { paused: true }); } } catch { /* tenta no próximo lote */ }
@@ -897,7 +898,7 @@ class Game {
   handleEvents() {
     const events = this.world.events.splice(0);
     for (const ev of events) {
-      if (ev.type === 'cast') { spawnSkillVfx(this.world, ev); continue; } // efeito visual da habilidade (a simulação já decidiu tudo)
+      if (ev.type === 'cast') { if (ev.actor === this.player) this.gameEvent({ type: 'skill', skillId: ev.skill }); spawnSkillVfx(this.world, ev); continue; } // efeito visual da habilidade (a simulação já decidiu tudo)
       if (ev.type === 'hit' || ev.type === 'heal') { spawnEventVfx(this.world, ev); continue; } // crítico, absorção e cura
       if (ev.type === 'phase' && ev.phase === 3) { this.ui.toast('Enfurecido!', `${ev.actor.name} entrou em fúria`, 'gold'); continue; }
       if (ev.type === 'phase') { this.ui.log(`${ev.actor.name} acelera!`, '#ffb4a8'); continue; }
@@ -912,10 +913,12 @@ class Game {
 
   // Teletransporte para um mapa já visitado (pelo painel do mapa): a Vila é de graça; os outros custam ouro e exigem estar fora de combate.
   teleport(id) {
+    if (id === 'town' && this.inNetZone()) { this.ui.closePanels(); return this.hearth(); } // instância online: o nó da Vila do mapa sai da instância (zone_leave)
     const c = this.char, z = ZONES[id];
-    if (this.mode !== 'explore' || !z || !(id === 'town' || c.visited?.[id])) return;
+    if (this.mode !== 'explore' || !z || !(z.hub || c.visited?.[id])) return;
     if (id === this.world.zoneId) return this.ui.toast('Você já está aqui', z.name, '');
     if (this.world.time - this.player.lastCombat < 8) return this.ui.toast('Em combate', 'Espere uns segundos para viajar.', '');
+    if (this.online && this.net?.joined && z.hub && id !== 'town') return this.ui.toast(z.name, 'Online, siga o portal sul da Vila de Lúmen.', ''); // cidades além da Vila são locais (o servidor só teletransporta para a Vila e zonas de farm)
     if (this.online && this.net?.joined) return this.teleportOnline(id); // o servidor confere visitado, pergaminho e combate, e debita o pergaminho
     const cost = teleportCost(id);
     if (cost > (c.scrolls ?? 0)) return this.ui.toast('Sem pergaminho', 'Compre um Pergaminho de Teletransporte com a Mercadora Lia.', '');
@@ -1039,8 +1042,8 @@ class Game {
     const r = openChest(this.char, chest, this.world.zoneId, this.rng);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
     this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
-    this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${r.gold} 🪙`, size: 15, color: '#ffd34d' });
-    this.ui.toast('Baú aberto!', r.item ? `+${r.gold} 🪙 e ${r.item.name}${r.item.converted ? ' (virou ouro: mochila cheia)' : ''}` : `+${r.gold} 🪙`, 'gold');
+    this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${r.gold}`, size: 15, color: '#ffd34d' });
+    this.ui.chestReward(r); // cartão por cima de tudo (fila); abrir o baú nunca abre a mochila
     for (const q of r.quests) if (q.complete) this.ui.toast('Missão pronta!', QUESTS[q.id].name, 'gold');
     this.announceAchievements(r.achievements);
     this.tip('chest');
@@ -1074,13 +1077,21 @@ class Game {
     const M = MOBS[m.mobId];
     this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1)));
     for (const l of rollMobLoot(this.rng, m, this.char.classId, (this.char.pity ??= { epic: 0, legendary: 0, opal: 0 }))) {
+      if (l.kind === 'gold') { // ouro vai direto para a mochila (sem drop no chão), com texto flutuante
+        this.char.gold += l.amount;
+        this.world.addText({ x: this.player.x, y: this.player.y - 34, t: 0, life: 0.8, text: `+${l.amount}`, size: 13, color: '#ffd34d' });
+        continue;
+      }
       this.dropAt(m.x, m.y, l);
       if (l.kind === 'item' && (l.item.opal || l.item.rarity === 'epic' || l.item.rarity === 'legendary')) { // aviso e brilho para drop raro
         this.world.burst(m.x, m.y, l.item.opal ? '#bfe9ff' : l.item.rarity === 'legendary' ? '#ffa53d' : '#b77cff', 30, 260);
         this.ui.toast(l.item.opal ? 'Item de Ópalo!' : l.item.rarity === 'legendary' ? 'Item lendário!' : 'Item épico!', l.item.name, 'gold');
       }
     }
-    this.gameEvent({ type: 'kill', mobId: m.mobId, zoneId: this.world.zoneId, boss: !!m.boss });
+    // spiritType: tipo do spirit ativo que acompanhava o herói (missão de evolução do spirit); mini: mini-chefe (Prova do Mestre)
+    const sp = this.char.spirits.find((s) => s.id === this.char.activeSpirit);
+    const spiritType = sp && this.world.actors.some((a) => a.kind === 'spirit' && a.owner === this.player.id && !a.hidden) ? sp.type : undefined;
+    this.gameEvent({ type: 'kill', mobId: m.mobId, zoneId: this.world.zoneId, boss: !!m.boss, mini: !!m.miniboss, spiritType });
     if (m.boss) {
       this.ui.toast(`${M.name} derrotado!`, 'Tesouros caíram no chão', 'gold');
       this.ui.log(`Você derrotou <b>${M.name}</b>! Ele só reaparece depois de um tempo.`, '#ffd27a');
@@ -1105,7 +1116,7 @@ class Game {
     p.hp = p.maxHp;
     this.world.addFx({ type: 'ring', x: p.x, y: p.y, r: 120, color: '#ffd34d', t: 0, life: 0.8, follow: p });
     this.world.burst(p.x, p.y, '#ffd34d', 40, 260);
-    this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o personagem (🧙)`, 'gold');
+    this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o Personagem`, 'gold');
     this.ui.log(`Você alcançou o nível <b>${this.char.level}</b>.`, '#ffd34d');
     this.tip('level');
     for (const u of newlyUnlocked(this.char.classId, this.skillLv ?? this.char.level - 1, this.char.level)) { // habilidades aprendidas neste nível
@@ -1129,22 +1140,24 @@ class Game {
     if (p.dead) return;
     let changed = false;
     for (const d of w.drops) {
-      if (d.t < 0.4 || Math.hypot(d.x - p.x, d.y - p.y) > 44) continue;
-      if (d.kind === 'gold') {
-        c.gold += d.amount;
-        w.addText({ x: p.x, y: p.y - 34, t: 0, life: 0.8, text: `+${d.amount} 🪙`, size: 13, color: '#ffd34d' });
-      } else if (d.kind === 'potion') {
+      // d.fetched: o spirit trouxe até o herói (sim.js updateSpiritFetch), vale de qualquer distância
+      if (!d.fetched && (d.t < 0.4 || Math.hypot(d.x - p.x, d.y - p.y) > 44)) continue;
+      if (d.kind === 'potion') {
         c.potions += d.amount;
         this.ui.log(`+${d.amount} 🧪 Poção de Vida`, '#ff9aa8');
       } else if (d.kind === 'item') {
-        if (c.inventory.length >= INVENTORY_SIZE) {
+        if (c.inventory.length >= INVENTORY_SIZE && d.fetched) { // o spirit trouxe com a mochila cheia: vira ouro
+          c.gold += d.item.value;
+          w.addText({ x: p.x, y: p.y - 34, t: 0, life: 0.8, text: `+${d.item.value}`, size: 13, color: '#ffd34d' });
+        } else if (c.inventory.length >= INVENTORY_SIZE) {
           if (!d.warned) { this.ui.log('Inventário cheio! Venda itens na vila.', '#ffb4a8'); d.warned = true; }
           continue;
+        } else {
+          c.inventory.push(d.item);
+          const R = RARITY[d.item.rarity];
+          this.ui.log(`Obtido: <b style="color:${R.color}">${d.item.name}</b> (${R.name})`, '#e8e6f0');
+          if (R.index >= 3) this.ui.toast(d.item.name, `Item ${R.name}!`, 'gold');
         }
-        c.inventory.push(d.item);
-        const R = RARITY[d.item.rarity];
-        this.ui.log(`Obtido: <b style="color:${R.color}">${d.item.name}</b> (${R.name})`, '#e8e6f0');
-        if (R.index >= 3) this.ui.toast(d.item.name, `Item ${R.name}!`, 'gold');
       } else if (d.kind === 'essence') {
         this.gainSpirit(createSpirit(this.rng, { luck: d.luck, level: Math.max(1, c.level - 2) }));
       }
@@ -1168,7 +1181,7 @@ class Game {
     this.gameEvent({ type: 'spirit', count: c.spirits.length });
     const S = SPIRITS[sp.type], R = RARITY[sp.rarity];
     this.ui.toast(`Novo spirit: ${S.name}`, `${R.name} · ${S.element} · ${S.role}`, 'gold');
-    this.ui.log(`Essência despertou <b style="color:${S.color}">${S.name}</b> (${R.name})! Veja em 🔮.`, S.color);
+    this.ui.log(`Essência despertou <b style="color:${S.color}">${S.name}</b> (${R.name})! Veja em Spirits.`, S.color);
     this.tip('spirit');
     if (!c.activeSpirit) this.setSpirit(sp.id);
     this.save();

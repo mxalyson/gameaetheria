@@ -244,7 +244,7 @@ test('memória do terreno: teto de blocos < 40 MiB para qualquer mapa (inteiro s
   for (const [id, z] of Object.entries(ZONES)) {
     const b = groundBudget(z);
     assert.ok(b.bytes < 40 * MIB, `${id}: ${(b.bytes / MIB).toFixed(1)} MiB`);
-    assert.equal(b.mode, FARM.includes(id) ? 'tiles' : 'whole', id);
+    assert.equal(b.mode, FARM.includes(id) || id === 'harbor' ? 'tiles' : 'whole', id); // o Porto (2400×1700) passa de 14 MiB e vai em blocos
   }
   assert.ok(4600 * 2800 * 4 > 40 * MIB, 'sem blocos o mapa novo estouraria o teto');
   assert.ok(BUDGET_MIB <= 36);
@@ -254,4 +254,85 @@ test('memória do terreno: teto de blocos < 40 MiB para qualquer mapa (inteiro s
 test('layouts novos são determinísticos (glacial e brasa também)', async () => {
   const fresh = await import('../public/src/game/layout.js?recalculo2');
   for (const id of FARM) assert.deepEqual(fresh.buildLayout(id), LF[id], id);
+});
+
+// ---------------- Porto de Marfim (cidade neutra nº 2) ----------------
+import { WORLD_NODES, WORLD_ROUTE, isHub, teleportCost } from '../public/src/data/zones.js';
+
+test('Porto: zona segura e neutra (hub), sem monstros, com ligação de ida e volta com a Vila e posição no mapa-múndi', () => {
+  const h = ZONES.harbor;
+  assert.ok(h.safe && h.hub && !h.mobs && !h.boss, 'segura, sem mobs');
+  assert.equal(h.w, 2400); assert.equal(h.h, 1700);
+  assert.ok(isHub('town') && isHub('harbor') && !isHub('forest'));
+  assert.equal(teleportCost('harbor'), 0); assert.equal(teleportCost('town'), 0); assert.equal(teleportCost('forest'), 1);
+  assert.deepEqual(ZONES.town.portals.map((p) => p.to).sort(), ['forest', 'harbor']);
+  assert.deepEqual(h.portals.map((p) => p.to), ['town'], 'só Vila ↔ Porto');
+  assert.ok(WORLD_ROUTE.includes('harbor'));
+  for (const id of WORLD_ROUTE) { const n = WORLD_NODES[id]; assert.ok(n && n.x >= 0 && n.x <= 100 && n.y >= 0 && n.y <= 100, `nó de ${id} no mapa`); }
+  const pts = WORLD_ROUTE.map((id) => WORLD_NODES[id]);
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) assert.ok(Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) > 8, 'nós separados');
+  assert.ok(h.arenaFriendly && h.arenaFriendly.rated === false && h.arenaFriendly.mode === '1v1' && h.npcs.some((n) => n.id === h.arenaFriendly.npc));
+});
+
+test('Porto: spawn, portais, chegadas e NPCs livres de obstáculos e de água; 5 serviços e casas fora da água', () => {
+  const h = ZONES.harbor, T = ZONES.town, Lh = buildLayout('harbor'), Lt = buildLayout('town');
+  const clear = (Lx, p, m, what) => assert.ok(!Lx.obstacles.some((o) => distTo(o, p) < m) && !Lx.rivers.some((rv) => nearRiver(rv, p.x, p.y, 20)), `${what} bloqueado (${p.x},${p.y})`);
+  clear(Lh, h.spawn, 60, 'spawn do porto');
+  for (const p of h.portals) clear(Lh, p, 40, 'portal do porto');
+  const toHarbor = T.portals.find((p) => p.to === 'harbor');
+  clear(Lh, { x: toHarbor.tx, y: toHarbor.ty }, 60, 'chegada no porto');
+  clear(Lt, toHarbor, 40, 'portal da vila'); clear(Lt, { x: h.portals[0].tx, y: h.portals[0].ty }, 60, 'chegada na vila');
+  for (const n of h.npcs) { clear(Lh, n, 40, 'NPC ' + n.id); assert.ok(n.x > 40 && n.y > 40 && n.x < h.w - 40 && n.y < h.h - 40); }
+  assert.deepEqual(h.npcs.map((n) => n.role).sort(), ['bank', 'board', 'duel', 'harborshop', 'quest']);
+  for (const hs of h.houses) for (const q of [[hs.x, hs.y], [hs.x + hs.w, hs.y], [hs.x, hs.y + hs.h], [hs.x + hs.w, hs.y + hs.h]]) assert.ok(!Lh.rivers.some((rv) => nearRiver(rv, q[0], q[1], 20)), 'casa na água');
+  for (const p of Lh.ponds) assert.ok(Lh.obstacles.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < p.rx), 'baía tem colisão');
+  // a moldura de árvores abre onde o portal do norte fica (e a da Vila onde fica o portal do sul)
+  assert.ok(!Lh.decor.some((d) => d.type === 'tree' && d.y < 60 && Math.abs(d.x - h.portals[0].x) < 110), 'abertura no norte do porto');
+  assert.ok(!Lt.decor.some((d) => d.type === 'tree' && d.y > T.h - 60 && Math.abs(d.x - toHarbor.x) < 110), 'abertura no sul da vila');
+});
+
+test('Porto: tudo alcançável a pé a partir da chegada (ponte sobre o canal, baías contornadas, ringue do duelo)', () => {
+  const z = ZONES.harbor, L = buildLayout('harbor'), C = 20, R = 15, cols = Math.ceil(z.w / C), rows = Math.ceil(z.h / C), block = new Uint8Array(cols * rows);
+  for (const o of L.obstacles) {
+    const x0 = o.w ? o.x : o.x - o.r, x1 = o.w ? o.x + o.w : o.x + o.r, y0 = o.w ? o.y : o.y - o.r, y1 = o.w ? o.y + o.h : o.y + o.r;
+    for (let cy = Math.max(0, Math.floor((y0 - R) / C)); cy <= Math.min(rows - 1, Math.floor((y1 + R) / C)); cy++) for (let cx = Math.max(0, Math.floor((x0 - R) / C)); cx <= Math.min(cols - 1, Math.floor((x1 + R) / C)); cx++) if (distTo(o, { x: cx * C + C / 2, y: cy * C + C / 2 }) < R) block[cy * cols + cx] = 1;
+  }
+  const cell = (p) => Math.floor(p.y / C) * cols + Math.floor(p.x / C);
+  const flood = (grid) => {
+    const seen = new Uint8Array(cols * rows), q = [cell({ x: 1500, y: 110 })]; seen[q[0]] = 1;
+    for (let h = 0; h < q.length; h++) {
+      const i = q[h], x = i % cols, y = (i - x) / cols;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue; const j = ny * cols + nx; if (seen[j] || grid[j]) continue; seen[j] = 1; q.push(j); }
+    }
+    return seen;
+  };
+  const seen = flood(block);
+  for (const n of z.npcs) assert.ok(seen[cell(n)], `${n.id} inalcançável`);
+  assert.ok(seen[cell(z.spawn)] && seen[cell(z.portals[0])], 'spawn e portal');
+  assert.ok(seen[cell({ x: 520, y: 780 })], 'o outro lado do canal (Capitã Maré) é alcançável');
+  const closed = new Uint8Array(block); // sem a ponte o canal separa o porto: a ponte é o único caminho
+  const b = L.bridges[0];
+  for (let cy = Math.floor((b.y - b.hw) / C); cy <= Math.floor((b.y + b.hw) / C); cy++) for (let cx = Math.floor((b.x - b.w / 2 - 20) / C); cx <= Math.floor((b.x + b.w / 2 + 20) / C); cx++) closed[cy * cols + cx] = 1;
+  assert.ok(!flood(closed)[cell({ x: 520, y: 780 })], 'sem a ponte, o oeste fica isolado');
+});
+
+test('Porto: visual próprio (sprites, textura de chão e luz), diferente da Vila', async () => {
+  const L = buildLayout('harbor'), types = new Set(L.decor.map((d) => d.type));
+  for (const t of ['house', 'lantern', 'well', 'fence', 'signpost', 'log']) assert.ok(types.has(t), 'decor ' + t);
+  assert.equal(L.decor.filter((d) => d.type === 'house').length, ZONES.harbor.houses.length);
+  const kit = SET.harbor;
+  for (const t of types) if (['house', 'lantern', 'well', 'fence', 'signpost', 'log', 'tree', 'rock', 'bush'].includes(t)) assert.ok(kit[t], 'sprite de ' + t);
+  assert.ok(kit.house.v.length === 4 && ZONES.harbor.houses.every((h) => h.art >= 0 && h.art < 4));
+  assert.ok(new Set(ZONES.harbor.houses.map((h) => h.art)).size >= 3, 'casas variadas');
+  assert.notEqual(ZONES.harbor.scenery.kind, ZONES.town.scenery.kind);
+  assert.notEqual(ZONES.harbor.palette.ground, ZONES.town.palette.ground);
+  assert.ok(SET.harbor.tree !== SET.town.tree, 'cerejeiras no porto, árvores do Bosque na vila');
+  const { dayPhase } = await import('../public/src/core/daycycle.js');
+  assert.equal(dayPhase(12).name, 'day');
+});
+
+test('Vila: a trilha automática não corta a vila (noTrail) e o layout da vila segue determinístico', async () => {
+  assert.equal(L.town.trail.length, 0);
+  const fresh = await import('../public/src/game/layout.js?recalculo3');
+  assert.deepEqual(fresh.buildLayout('harbor'), buildLayout('harbor'));
 });

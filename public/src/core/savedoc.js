@@ -9,6 +9,7 @@ import { MAX_LEVEL, POINTS_PER_LEVEL, SAVE_VERSION } from './progression.js';
 import { SPECS, SPEC_LEVEL } from '../data/specs.js';
 import { QUESTS } from '../data/quests.js';
 import { ZONES } from '../data/zones.js';
+import { BANK_SIZE } from './bank.js';
 import { ACH, STAT_KEYS_PROGRESS } from '../data/achievements.js';
 
 export { SAVE_VERSION };
@@ -76,7 +77,7 @@ function cleanItem(it) {
   const id = str(it.id, 48).replace(/[^\w-]/g, '');
   if (!id) return null;
   return {
-    id, kind: 'gear', name: cleanText(it.name, 60) || 'Item', slot: it.slot, weaponType, rarity: it.rarity,
+    id, kind: 'gear', name: cleanText(it.name, 60) || 'Item', slot: it.slot, classId: it.slot === 'weapon' ? WEAPON_TYPES[weaponType].classId : (CLASSES[it.classId] ? it.classId : null), weaponType, rarity: it.rarity,
     level: int(it.level, 1, 60, 1), reqLevel: int(it.reqLevel, 1, 60, 1), stats, value: int(it.value, 0, 1e6, 0),
     ...(it.opal === true ? { opal: true } : {}), // exclusivo do último chefe
     ...(int(it.plus, 0, MAX_PLUS, 0) > 0 ? { plus: int(it.plus, 0, MAX_PLUS, 0) } : {}),
@@ -119,6 +120,9 @@ export function validate(doc) {
       if (it && it.slot === slot) equipment[slot] = it; else warnings.push(`item inválido em ${slot} removido`);
     }
   }
+  // Migração (itens por classe): armadura/joia de save antigo não tem classe; pertence ao personagem que a carrega (equipada ou na mochila).
+  const own = (it) => { if (!it.classId) it.classId = doc.classId; return it; };
+  for (const k of Object.keys(equipment)) { own(equipment[k]); if (equipment[k].classId !== doc.classId) { delete equipment[k]; warnings.push(`item de outra classe em ${k} removido`); } }
   const seen = new Set(Object.values(equipment).map((i) => i.id));
   const inventory = [];
   for (const raw of Array.isArray(doc.inventory) ? doc.inventory : []) {
@@ -126,7 +130,16 @@ export function validate(doc) {
     if (!it) { warnings.push('item inválido removido do inventário'); continue; }
     if (seen.has(it.id)) { warnings.push('item duplicado removido'); continue; } // proteção contra duplicação por edição do save
     if (inventory.length >= INVENTORY_SIZE) { warnings.push('inventário acima do limite'); break; }
-    seen.add(it.id); inventory.push(it);
+    seen.add(it.id); inventory.push(own(it));
+  }
+  // Banco do Porto (core/bank.js): mesma limpeza e mesma proteção contra duplicação do inventário, no máximo BANK_SIZE vagas.
+  const bank = [];
+  for (const raw of Array.isArray(doc.bank) ? doc.bank : []) {
+    const it = cleanItem(raw);
+    if (!it) { warnings.push('item inválido removido do banco'); continue; }
+    if (seen.has(it.id)) { warnings.push('item duplicado removido'); continue; }
+    if (bank.length >= BANK_SIZE) { warnings.push('banco acima do limite'); break; }
+    seen.add(it.id); bank.push(it);
   }
   const spirits = [];
   const sids = new Set();
@@ -160,15 +173,21 @@ export function validate(doc) {
   const chests = {};
   for (const [id, v] of Object.entries(isObj(doc.chests) ? doc.chests : {}).slice(0, 200)) if (/^[a-z0-9_:-]{1,40}$/.test(id)) chests[id] = int(v, 0, 4e12, 0);
 
+  // Quadro de Contratos do dia (core/journal.js): dia UTC, progresso e entregas por id de contrato (formato d<dia>-<slot>-<zona>-<mob>), poucos registros.
+  const daily = { day: int(isObj(doc.daily) ? doc.daily.day : 0, 0, 1e6, 0), p: {}, done: {} };
+  for (const k of ['p', 'done']) {
+    for (const [id, v] of Object.entries(isObj(doc.daily) && isObj(doc.daily[k]) ? doc.daily[k] : {}).slice(0, 12)) if (/^d\d{1,7}-\d-[a-z]+-[a-z]+$/.test(id)) daily[k][id] = int(v, 0, 99, 0);
+  }
+
   const visited = {};
-  for (const id of Object.keys(isObj(doc.visited) ? doc.visited : {})) if (ZONES[id] && (id === 'town' || ZONES[id].mobs)) visited[id] = 1;
+  for (const id of Object.keys(isObj(doc.visited) ? doc.visited : {})) if (ZONES[id] && (ZONES[id].hub || ZONES[id].mobs)) visited[id] = 1;
   if (!isObj(doc.visited)) for (const [id, z] of Object.entries(ZONES)) if (z.mobs && z.level[0] <= level) visited[id] = 1; // saves antigos: libera o que o nível já alcança
 
   const char = {
-    version: SAVE_VERSION, visited, name: cleanName(doc.name), quests, stats, achievements, title, chests, classId: doc.classId, level,
+    version: SAVE_VERSION, visited, name: cleanName(doc.name), quests, stats, achievements, title, chests, daily, classId: doc.classId, level,
     xp: int(doc.xp, 0, 1e9, 0), statPoints, alloc,
     gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0), scrolls: int(doc.scrolls, 0, 99, 0),
-    equipment, inventory, spirits, activeSpirit, spec,
+    equipment, inventory, bank, spirits, activeSpirit, spec,
     arena: { rating: int(a.rating, 0, 5000, 1000), wins: int(a.wins, 0, 1e6, 0), losses: int(a.losses, 0, 1e6, 0), bestWave: int(a.bestWave, 0, 1e4, 0), ratings },
     pity: { epic: int(doc.pity?.epic, 0, 9999, 0), legendary: int(doc.pity?.legendary, 0, 9999, 0), opal: int(doc.pity?.opal, 0, 99, 0) }, // proteção de azar do loot
     created: int(doc.created, 0, 4e12, Date.now()),

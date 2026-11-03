@@ -23,6 +23,8 @@ import { offeredBy, readyFor, activeFor, titleText, achievementProgress, ensureJ
 import { SCALE_MIN, SCALE_MAX } from '../prefs.js';
 import { asset } from '../assets-version.js';
 
+// posições (%) dos nós no mapa-múndi: zigue-zague seguindo WORLD_ROUTE (serve para qualquer número de zonas)
+const mapPos = (id) => { const n = WORLD_ROUTE.length, i = Math.max(0, WORLD_ROUTE.indexOf(id)); return [n > 1 ? 9 + (82 * i) / (n - 1) : 50, i % 2 ? 38 : 66]; };
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -44,11 +46,10 @@ export const noticeText = (n) => {
 const itemImg = (type, emoji) => `<img class="it-img" src="${asset(`assets/icons/item/item-${type}.webp`)}" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
 const SCROLL = `<img class="coin" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false">`;
-// ícones de zona pintados (recortes dos sprites 3D: tools/ui-icon-from-atlas.py); sem arte (ember: falta brasa) ou com o arquivo ausente, vale o emoji
-const ZONE_EMOJI = { town: '🏠', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
-const ZONE_ART = new Set(['town', 'forest', 'plains', 'ruins', 'glacier']);
+// ícones de zona pintados (recortes dos sprites 3D: tools/ui-icon-from-atlas.py); com o arquivo ausente, vale o emoji
+const ZONE_EMOJI = { town: '🏠', harbor: '⚓', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
+const ZONE_ART = new Set(['town', 'forest', 'plains', 'ruins', 'glacier', 'ember', 'harbor']); // ember/harbor = recortes tingidos (tools/ui-tint.py)
 const zoneIcon = (id) => (ZONE_ART.has(id) ? `<img class="zone-ic" src="${asset(`assets/icons/ui/zone-${id}.webp`)}" alt="${ZONE_EMOJI[id]}" draggable="false" onerror="this.replaceWith(this.alt)">` : ZONE_EMOJI[id] ?? '🗺️');
-const HOME_IMG = `<img class="art" src="${asset('assets/icons/ui/home.webp')}" alt="🏠" draggable="false" onerror="this.replaceWith(this.alt)">`;
 const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${asset(spiritUrl(type, stage))}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
 // Retratos pintados (busto): classes no cartão do herói, no painel do personagem e na criação; NPCs no oval do diálogo. Sem a imagem, volta ao emblema/emoji.
 const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src="${asset(`assets/portraits/class-${classId}.webp`)}" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
@@ -69,6 +70,14 @@ const ARENA = (cls = 'coin') => sign('assets/icons/attack/atk-warrior.webp', '�
 const TROPHY = sign('assets/icons/menu/menu-journal.webp', '🏆', 'ic-img');
 const LOCK_CELL = sign('assets/icons/item/res-key.webp', '🔒', 'ic-img');
 const POT = `<img class="coin" src="${asset('assets/icons/item/res-potion-health.webp')}" alt="🧪" draggable="false">`;
+// sinais da arena e do grupo (antes emojis ⚡ 🌊 🌐 🤝 👥 🔎): espada, spirit de água, grupo e mapa pintados
+const POWER = (cls = 'coin') => sign('assets/icons/attack/atk-warrior.webp', '⚡', cls);
+const WAVES = sign('assets/icons/spirit/spirit-undine.webp', '🌊');
+const PARTY = sign('assets/icons/menu/menu-party.webp', '👥');
+const SEARCH = sign('assets/icons/menu/menu-map.webp', '🔎');
+const ESSENCE = sign('assets/icons/item/res-essence.webp', '🔮', 'ic-img');
+// Selo dourado de aprimoramento no canto da célula: +1…+5 dourado, +6/+7 laranja, +8 (máximo) "MAX" vermelho
+export const plusBadge = (it) => (it?.plus ? `<span class="plus-b ${it.plus >= MAX_PLUS ? 'max' : it.plus >= 6 ? 'hi' : ''}" title="Aprimorado +${it.plus} de ${MAX_PLUS}">${it.plus >= MAX_PLUS ? 'MAX' : '+' + it.plus}</span>` : '');
 export const itemIcon = (it) => (it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
 const ghostIcon = (s, cls) => (s === 'weapon' ? itemImg(cls.weapon, WEAPON_TYPES[cls.weapon].icon) : itemImg(s, SLOT_ICONS[s]));
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
@@ -248,7 +257,6 @@ export class UI {
       { key: 'LMB', id: 'basic', icon: attackImg(char.classId, '🖱️'), art: true, tip: 'skill:basic' },
       ...cls.skills.map((s, i) => ({ key: String(i + 1), id: 's' + i, icon: skillImg(s, SKILLS[s].icon), art: true, cat: skillCategory(skillOf(char.classId, null, s)), tip: 'skill:' + s })),
       { key: 'Q', id: 'potion', icon: iconImg(POTION_ICON, '🧪'), art: true, tip: 'potion' },
-      { key: 'H', id: 'hearth', icon: HOME_IMG, art: true, medal: true, tip: 'hearth' },
     ];
     $('skillbar').innerHTML = slots.map((s) => `
       <div class="slot${s.art ? ' art' : ''}${s.medal ? ' medal' : ''}" id="slot-${s.id}" data-tip="${s.tip}">
@@ -291,12 +299,13 @@ export class UI {
     const need = xpToNext(char.level);
     this.set('hud-xp', 'width', char.level >= MAX_LEVEL ? '100%' : `${(100 * char.xp) / need}%`);
     this.set('hud-xp-bar', '--v', String(char.level >= MAX_LEVEL ? 1 : Math.max(0, Math.min(1, char.xp / need)).toFixed(3)));
-    this.set('hud-xp-text', 'text', char.level >= MAX_LEVEL ? 'Nível máximo' : `${char.xp} / ${need} XP`);
-    this.set('hud-gold', 'html', `<span>${COIN} ${char.gold}</span>${char.statPoints ? `<span class="pts" data-action="toggle" data-arg="character">+${char.statPoints} pontos</span>` : ''}`);
+    this.set('hud-xp-text', 'text', char.level >= MAX_LEVEL ? 'XP máximo' : `XP ${char.xp} / ${need}`);
+    // o ouro agora fica no rodapé da mochila; no HUD sobra só o aviso de pontos livres
+    this.set('hud-gold', 'html', char.statPoints ? `<span class="pts" data-action="toggle" data-arg="character">+${char.statPoints} pontos</span>` : '');
     this.set('zone-name', 'text', world.zone.name);
 
-    const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, potion: game.potionCd, hearth: 0 };
-    const maxOf = { basic: CLASSES[char.classId].basic.cd / player.stats.atkSpeed, potion: 8, hearth: 1 };
+    const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, potion: game.potionCd };
+    const maxOf = { basic: CLASSES[char.classId].basic.cd / player.stats.atkSpeed, potion: 8 };
     CLASSES[char.classId].skills.forEach((s, i) => { maxOf['s' + i] = skillOf(char.classId, activeSpec(char), s).cd; });
     for (const id of Object.keys(cdOf)) {
       const cd = cdOf[id];
@@ -355,6 +364,33 @@ export class UI {
     setTimeout(() => el.remove(), ms + 600);
   }
 
+  // Cartão de recompensa (baú): fica ~3,5 s por cima de tudo (até dos painéis); vários na fila aparecem um depois do outro, sem se sobrepor.
+  reward({ title, rows = [], ms = 3500 }) {
+    (this.rewardQ ??= []).push({ title, rows, ms });
+    if (!this.rewardBusy) this.rewardNext();
+  }
+  rewardNext() {
+    const it = this.rewardQ?.shift(), layer = $('reward-layer');
+    if (!it || !layer) { this.rewardBusy = false; return; }
+    this.rewardBusy = true;
+    const el = document.createElement('div');
+    el.className = 'reward-card';
+    el.innerHTML = `<div class="rw-t">${it.title}</div>${it.rows.map((r) => `<div class="rw-row">${r.icon}<div class="rw-tx"><div class="rw-nm" ${r.color ? `style="color:${r.color}"` : ''}>${r.text}</div>${r.sub ? `<div class="rw-sub">${r.sub}</div>` : ''}</div></div>`).join('')}`;
+    layer.appendChild(el);
+    setTimeout(() => el.classList.add('out'), it.ms);
+    setTimeout(() => { el.remove(); this.rewardNext(); }, it.ms + 350);
+  }
+  // Recompensa de baú: ícone pintado do item (moldura da raridade) + nome na cor da raridade + ouro; o item já está na mochila.
+  chestReward(r) {
+    const rows = [];
+    if (r.item) {
+      const R = RARITY[r.item.rarity];
+      rows.push({ icon: `<span class="cell r-${r.item.rarity}${r.item.opal ? ' opal' : ''}"><span class="ic">${itemIcon(r.item)}</span>${plusBadge(r.item)}</span>`, text: esc(r.item.name), color: R.color, sub: `${R.name} · Nv ${r.item.level}${r.item.converted ? ' · mochila cheia: virou ouro' : ' · está na mochila'}` });
+    }
+    rows.push({ icon: `<span class="rw-coin">${COIN}</span>`, text: `+${r.gold} ouro`, color: '#ffd34d' });
+    this.reward({ title: 'Baú aberto!', rows });
+  }
+
   banner(text) {
     const b = $('arena-banner');
     if (!text) { b.classList.add('hidden'); return; }
@@ -371,6 +407,7 @@ export class UI {
     const [id, anchor] = String(spec).split(':');
     if (['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map'].includes(id)) for (const p of ['shop', 'arena', 'sage', 'party', 'dialog', 'journal', 'map', 'spirits', 'character', 'options']) this.open.delete(p);
     if (id === 'options') this.open.clear();
+    if (id === 'map') this.mapSel = null; // o mapa sempre abre selecionando onde você está
     this.open.add(id);
     if (id === 'shop') { this.open.add('inventory'); this.shopAnchor = anchor ?? null; } // título: Ferreiro Brok quando aberto pelo NPC dele
     this.render();
@@ -406,7 +443,7 @@ export class UI {
   itemCell(it, action, arg) {
     if (!it) return '<div class="cell empty"></div>';
     return `<div class="cell r-${it.rarity}${it.opal ? ' opal' : ''}" data-action="${action}" data-arg="${arg}" data-tip="item:${it.id}">
-      <span class="ic">${itemIcon(it)}</span><span class="lv">${it.level}</span></div>`;
+      <span class="ic">${itemIcon(it)}</span><span class="lv">${it.level}</span>${plusBadge(it)}</div>`;
   }
 
   panel_inventory() {
@@ -416,10 +453,10 @@ export class UI {
       const it = char.inventory[i];
       cells.push(it ? this.itemCell(it, 'item', it.id) : '<div class="cell empty"></div>');
     }
-    const hint = this.isOpen('shop') ? 'Toque em um item para <b>vender</b>.' : 'Toque para equipar · Atributos no 🧙.';
+    const hint = this.isOpen('shop') ? 'Toque em um item para <b>vender</b>.' : 'Toque para equipar · atributos em Personagem.';
     return this.frame('inventory', `Inventário <small>${char.inventory.length}/${INVENTORY_SIZE}</small>`, `
       <div class="inv-grid">${cells.join('')}</div>
-      <div class="inv-foot"><span>${COIN} ${char.gold}</span><span>${POT} ${char.potions}</span><span>${SCROLL} ${char.scrolls ?? 0}</span><span class="hint">${hint}</span></div>
+      <div class="inv-foot"><span class="inv-gold" title="Ouro (vai direto para a mochila)">${COIN}<b>${char.gold}</b></span><span class="inv-res">${POT} ${char.potions}</span><span class="inv-res">${SCROLL} ${char.scrolls ?? 0}</span><span class="hint">${hint}</span></div>
       <div class="row-btns"><button class="btn small" data-action="sort-inv">Ordenar</button></div>`);
   }
 
@@ -522,10 +559,10 @@ export class UI {
     const rows = SLOTS.map((sl) => char.equipment[sl]).filter(Boolean).map((it) => {
       const max = (it.plus ?? 0) >= MAX_PLUS, cost = enhanceCost(it);
       return `<div class="shop-item">${this.itemCell(it, 'unequip', it.slot)}
-        <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
-        ${max ? '<span class="tag">Máximo</span>' : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
+        <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${it.plus ?? 0} de ${MAX_PLUS} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
+        ${max ? `<span class="tag">Máx +${MAX_PLUS}</span>` : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
     }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
-    return `<h3 id="smith-section">${this.shopAnchor === 'smith' ? 'Aprimorar equipado' : 'Ferreiro Brok · aprimorar equipado'}</h3>${rows}`;
+    return `<h3 id="smith-section">${this.shopAnchor === 'smith' ? 'Aprimorar equipado' : 'Ferreiro Brok · aprimorar equipado'} <span class="pts">máx +${MAX_PLUS}</span></h3>${rows}`;
   }
 
   panel_arena() {
@@ -535,26 +572,26 @@ export class UI {
       <p class="npc-line">${npcEmblem('arena')}"A arena guarda os ecos de todos que lutaram aqui. Prove seu valor!"</p>
       <div class="arena-badge" style="--tc:${tier.color}"><div class="tier">${tier.name}</div><div class="rt">${char.arena.rating}</div>
         <div class="wl">${char.arena.wins}V · ${char.arena.losses}D · Melhor onda: ${char.arena.bestWave}</div></div>
-      <div class="arena-badge"><div class="wl">⚡ Seu poder: <b>${playerPower(char)}</b></div></div>
+      <div class="arena-badge"><div class="wl">${POWER()} Seu poder: <b>${playerPower(char)}</b></div></div>
       ${pvpUnlocked(char) ? Object.entries(MODES).map(([id, md]) => `<button class="btn primary wide" data-action="match" data-arg="${id}">${ARENA()} Grande Arena ${md.label} · rating ${getRating(char, id)}</button>`).join('') : `<p class="hint">${LOCK} O PvP libera no <b>nível ${PVP_MIN_LEVEL}</b> (você está no ${char.level}).</p>`}
       <p class="hint">Times de ecos (aliados e inimigos com classe, itens e spirit próprios) na Grande Arena. Segure o ponto central: 100 pontos vencem; eliminar o outro time também. Cada modo tem seu rating. Poções desativadas.</p>
       ${this.game.online ? this.onlineArenaBlock(char) : ''}
-      <button class="btn wide" data-action="waves">🌊 Desafio de Ondas (PvE)</button>
+      <button class="btn wide" data-action="waves">${WAVES} Desafio de Ondas (PvE)</button>
       <p class="hint">Sobreviva a ondas crescentes de monstros. Ouro a cada onda vencida, chefes a cada 10.</p>
-      <p class="soon">🌐 Em breve: duelos contra jogadores reais.</p>`);
+      <p class="soon">${LOCK} Em breve: duelos contra jogadores reais.</p>`);
   }
 
   // Arena online: partidas com jogadores reais (servidor autoritativo) e cooperativo. Só aparece com conta.
   onlineArenaBlock(char) {
     const net = this.game.net, q = net?.queue;
-    if (!net?.joined) return '<p class="hint">🌐 Conectando ao servidor de partidas…</p>';
-    if (q) return `<p class="hint">🔎 Procurando <b>${q.mode === 'coop' ? 'cooperativo' : q.mode}</b>… ${q.waited}s</p><button class="btn wide" data-action="net-cancel">Cancelar busca</button>`;
+    if (!net?.joined) return `<p class="hint">${PARTY} Conectando ao servidor de partidas…</p>`;
+    if (q) return `<p class="hint">${SEARCH} Procurando <b>${q.mode === 'coop' ? 'cooperativo' : q.mode}</b>… ${q.waited}s</p><button class="btn wide" data-action="net-cancel">Cancelar busca</button>`;
     const pvp = pvpUnlocked(char);
-    const modes = Object.entries(MODES).map(([id, md]) => `<button class="btn ${pvp ? 'primary' : ''} wide" data-action="net-queue" data-arg="${id}" ${pvp ? '' : 'disabled'}>🌐 ${md.label} com jogadores reais · rating ${getRating(char, id)}</button>`).join('');
+    const modes = Object.entries(MODES).map(([id, md]) => `<button class="btn ${pvp ? 'primary' : ''} wide" data-action="net-queue" data-arg="${id}" ${pvp ? '' : 'disabled'}>${PARTY} ${md.label} com jogadores reais · rating ${getRating(char, id)}</button>`).join('');
     return `<h3>Jogadores reais</h3>${pvp ? '' : `<p class="hint">${LOCK} PvP online libera no nível ${PVP_MIN_LEVEL}.</p>`}${modes}
-      <button class="btn wide" data-action="net-queue" data-arg="coop">🤝 Cooperativo: ondas e chefe (1–4 jogadores)</button>
-      <p class="hint">Aliados e adversários são pareados por rating e poder; vagas vazias são preenchidas por bots. Grupo: botão 👥.</p>
-      <button class="btn small" data-action="toggle" data-arg="party">👥 Grupo</button>`;
+      <button class="btn wide" data-action="net-queue" data-arg="coop">${PARTY} Cooperativo: ondas e chefe (1–4 jogadores)</button>
+      <p class="hint">Aliados e adversários são pareados por rating e poder; vagas vazias são preenchidas por bots. Grupo: botão Grupo do menu.</p>
+      <button class="btn small" data-action="toggle" data-arg="party">${PARTY} Grupo</button>`;
   }
 
   panel_party() {
@@ -562,7 +599,7 @@ export class UI {
     if (!net?.joined) return this.frame('party', 'Grupo', '<p class="hint">Entre com sua conta e espere a conexão com o servidor de partidas.</p>');
     const p = net.party, me = net.name;
     const members = p ? p.members.map((m) => `<div class="shop-item"><div class="cell"><span class="ic">${CLASSES[m.classId]?.icon ?? '?'}</span></div>
-      <div><div class="nm">${esc(m.name)} ${p.leader === m.name ? '👑' : ''}</div><div class="sub">Nv ${m.level} · ${m.online ? 'online' : 'desconectado'}</div></div>
+      <div><div class="nm">${esc(m.name)} ${p.leader === m.name ? '<small class="tag">líder</small>' : ''}</div><div class="sub">Nv ${m.level} · ${m.online ? 'online' : 'desconectado'}</div></div>
       ${p.leader === me && m.name !== me ? `<button class="btn small" data-action="party-kick" data-arg="${esc(m.name)}">Expulsar</button>` : ''}</div>`).join('') : '<p class="hint">Você não está em um grupo. Convide alguém pelo nome.</p>';
     const invites = net.invites.map((i) => `<div class="shop-item"><div><div class="nm">${esc(i.from)} convidou você</div></div>
       <button class="btn small primary" data-action="party-accept" data-arg="${i.partyId}">Aceitar</button><button class="btn small" data-action="party-decline" data-arg="${i.partyId}">Recusar</button></div>`).join('');
@@ -572,7 +609,7 @@ export class UI {
       <div class="row-btns"><input id="party-name" maxlength="14" placeholder="Nome do jogador" autocomplete="off" /><button class="btn small primary" data-action="party-invite">Convidar</button></div>
       ${p ? '<button class="btn small" data-action="party-leave">Sair do grupo</button>' : ''}
       ${notes}
-      <p class="hint">O líder do grupo (👑) escolhe a fila; o grupo joga junto no mesmo time.</p>`);
+      <p class="hint">O líder do grupo escolhe a fila; o grupo joga junto no mesmo time.</p>`);
   }
 
   // ---- diálogo com NPC (missões) ----
@@ -583,10 +620,10 @@ export class UI {
     ensureJournal(char);
     const ready = readyFor(char, npc.id)[0], offer = offeredBy(char, npc.id, { server: !!g.online })[0], active = activeFor(char, npc.id)[0];
     let text = greetFor(char, D.greet, { online: !!g.online }), body = '', foot = '';
-    const rewardLine = (q) => { const r = q.reward; return `<p class="hint">Recompensa: ${[r.gold ? `${COIN} ${r.gold}` : '', r.xp ? `${r.xp} XP` : '', r.potions ? `🧪 ${r.potions}` : '', ...(r.items ?? []).map((i) => `item ${RARITY[i.rarity]?.name ?? ''}`)].filter(Boolean).join(' · ')}</p>`; };
+    const rewardLine = (q) => { const r = q.reward; return `<p class="hint">Recompensa: ${[r.gold ? `${COIN} ${r.gold}` : '', r.xp ? `${r.xp} XP` : '', r.potions ? `${POT} ${r.potions}` : '', ...(r.items ?? []).map((i) => `item ${RARITY[i.rarity]?.name ?? ''}`)].filter(Boolean).join(' · ')}</p>`; };
     if (ready) { const q = QUESTS[ready]; text = q.text.done; body = `<h3>✔ ${q.name}</h3>`; foot = `${rewardLine(q)}<button class="btn primary wide" data-action="quest-turnin" data-arg="${q.id}">Entregar missão</button>`; }
-    else if (offer) { const q = offer; text = q.text.offer; body = `<h3>❗ ${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>`; foot = `${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
-    else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>⏳ ${q.name}</h3>${this.questLines(char, active)}`; }
+    else if (offer) { const q = offer; text = q.text.offer; body = `<h3>${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>`; foot = `${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
+    else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>${q.name}</h3>${this.questLines(char, active)}`; }
     const more = (offeredBy(char, npc.id, { server: !!g.online }).length > (offer ? 1 : 0)) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
     const svc = D.service ? `<button class="btn wide" data-action="dialog-service" data-arg="${D.service.panel}">${D.service.label}</button>` : '';
     const say = (Array.isArray(text) ? text : [text]).map(esc).join('<br>'); // `done` pode ser uma lista de falas (epílogo)
@@ -627,15 +664,38 @@ export class UI {
       ${char.title ? '<button class="btn small" data-action="set-title" data-arg="">Remover título</button>' : ''}`);
   }
 
-  // ---- mapa-múndi ----
+  // ---- mapa-múndi: mini-mundo com os 6 mapas como nós ligados por caminhos; tocar num nó abre o cartão de viagem ----
+  mapCard(id, here) {
+    const g = this.game, c = g.char, z = ZONES[id], vis = c.visited ?? {}, i = WORLD_ROUTE.indexOf(id);
+    const seen = id === 'town' || !!vis[id], cost = teleportCost(id), scrolls = c.scrolls ?? 0, net = g.inNetZone?.();
+    const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura';
+    const boss = z.boss ? `Chefe: ${esc(MOBS[z.boss.id].name)}` : z.miniboss ? `Mini-chefe: ${esc(z.miniboss.name)}` : '';
+    const info = [lv, boss, z.chests ? `${z.chests.length} baús` : ''].filter(Boolean).join(' · ');
+    let act;
+    if (id === here) act = `<span class="tag">${HERE} Você está aqui</span>`;
+    else if (!seen) act = `<span class="tag dim">${LOCK} Ainda não visitado: chegue lá a pé, pelo portal de ${esc(ZONES[WORLD_ROUTE[Math.max(0, i - 1)]].name)}.</span>`;
+    else if (net && id !== 'town') act = `<span class="tag dim">${LOCK} Na exploração online, volte à Vila antes de viajar.</span>`;
+    else if (g.mode !== 'explore' && !(net && id === 'town')) act = `<span class="tag dim">${LOCK} Indisponível agora.</span>`;
+    else if (cost > scrolls) act = `<button class="btn" disabled>Viajar para ${esc(z.name)}</button><span class="tag dim">Sem Pergaminho (você tem ${scrolls}): a Mercadora Lia vende.</span>`;
+    else act = `<button class="btn primary" data-action="teleport" data-arg="${id}">Viajar para ${esc(z.name)}${cost ? ` — gasta ${cost} Pergaminho` : ' — grátis'}</button>${cost ? `<span class="mp-have">${SCROLL} você tem ${scrolls}</span>` : ''}`;
+    return `<div class="mp-card"><span class="mp-card-ic">${zoneIcon(id)}</span><div class="mp-card-tx"><div class="nm">${esc(z.name)}</div><div class="sub">${info}</div></div><div class="mp-card-act">${act}</div></div>`;
+  }
+
   panel_map() {
-    const g = this.game, here = g.world.zoneId;
-    const route = WORLD_ROUTE, canTp = g.mode === 'explore', vis = g.char.visited ?? {};
-    const rows = route.map((id, i) => { const z = ZONES[id]; const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura'; const boss = z.boss ? `Chefe: ${esc(MOBS[z.boss.id].name)}` : '';
-      return `<div class="shop-item ${here === id ? 'sel' : ''}"><div class="cell"><span class="ic">${here === id ? HERE : zoneIcon(id)}</span></div>
-      <div><div class="nm">${esc(z.name)}${here === id ? ' — você está aqui' : ''}</div><div class="sub">${lv}${boss ? ' · ' + boss : ''}${z.chests ? ` · ${z.chests.length} baús` : ''}</div></div>${here === id ? '' : id === 'town' || vis[id] ? `<button class="btn small" data-action="teleport" data-arg="${id}" ${canTp ? '' : 'disabled'}>Viajar · ${teleportCost(id) ? SCROLL + ' ' + teleportCost(id) : 'grátis'}</button>` : `<span class="tag dim">${LOCK} não visitado</span>`}</div>${i < route.length - 1 ? '<div class="map-link">⟶ portal ⟵</div>' : ''}`; }).join('');
-    const arenas = `<div class="shop-item"><div class="cell"><span class="ic">${ARENA('ic-img')}</span></div><div><div class="nm">Arenas</div><div class="sub">Grande Arena (1×1, 2×2, 4×4), Arena das Ondas e Cooperativo — fale com Mestre Doran</div></div></div>`;
-    return this.frame('map', 'Mapa de Aetheria', `<p class="hint">Os portais ligam as zonas em sequência: Vila ⇄ Bosque ⇄ Planície ⇄ Ruínas ⇄ Cume Gélido ⇄ Cinzas Ardentes. Mapas já visitados têm <b>teletransporte</b>: gasta 1 Pergaminho (você tem ${g.char.scrolls ?? 0}; a Mercadora Lia vende). Ir para a Vila é grátis, e o medalhão da casa também volta à vila.</p>${rows}${arenas}`);
+    const g = this.game, here = g.world.zoneId, vis = g.char.visited ?? {};
+    const route = WORLD_ROUTE, sel = ZONES[this.mapSel] ? this.mapSel : here;
+    const pos = mapPos;
+    const seen = (id) => id === 'town' || !!vis[id];
+    const lines = route.slice(1).map((id, i) => { const a = pos(route[i]), b = pos(id), lit = seen(route[i]) && seen(id); return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="${lit ? 'lit' : ''}"/>`; }).join('');
+    const nodes = route.map((id) => {
+      const z = ZONES[id], [x, y] = pos(id), lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'segura', ok = seen(id);
+      return `<button class="mp-node${id === here ? ' here' : ''}${id === sel ? ' sel' : ''}${ok ? '' : ' locked'}" style="left:${x}%;top:${y}%" data-action="map-sel" data-arg="${id}" aria-label="${esc(z.name)}">
+        ${id === here ? `<span class="mp-pin">${HERE}</span>` : ''}<span class="mp-ic">${zoneIcon(id)}${ok ? '' : `<span class="mp-lock">${LOCK}</span>`}</span>
+        <span class="mp-nm">${esc(z.name)}</span><span class="mp-lv">${lv}</span></button>`;
+    }).join('');
+    return this.frame('map', 'Mapa de Aetheria', `<div class="mp-world"><svg class="mp-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${nodes}</div>
+      ${this.mapCard(sel, here)}
+      <p class="hint mp-hint">Toque num mapa visitado para viajar. Ir para a Vila é grátis; os outros gastam 1 Pergaminho (Mercadora Lia).</p>`);
   }
 
   panel_sage() {
@@ -644,10 +704,10 @@ export class UI {
     return this.frame('sage', 'Sábia Yun', `
       <p class="npc-line">${npcEmblem('sage')}"Spirits são ecos da natureza. Escolha bem quem caminha ao seu lado."</p>
       <div class="sage-types">${types}</div>
-      <div class="shop-item"><div class="cell r-uncommon"><span class="ic">🔮</span></div>
+      <div class="shop-item"><div class="cell r-uncommon"><span class="ic">${ESSENCE}</span></div>
         <div><div class="nm">Essência Selvagem</div><div class="sub">Spirit aleatório</div></div>
         <button class="btn small" data-action="buy-essence" data-arg="wild">${COIN} ${PRICES.essence(char.level)}</button></div>
-      <div class="shop-item"><div class="cell r-epic"><span class="ic">💠</span></div>
+      <div class="shop-item"><div class="cell r-epic"><span class="ic">${ESSENCE}</span></div>
         <div><div class="nm">Essência Prismática</div><div class="sub">Spirit Raro ou melhor</div></div>
         <button class="btn small" data-action="buy-essence" data-arg="prism">${COIN} ${PRICES.prism(char.level)}</button></div>
       <div class="row-btns"><button class="btn small" data-action="toggle" data-arg="spirits">Ver meus spirits</button></div>`);
@@ -709,7 +769,6 @@ export class UI {
         ${s.mult ? `<div class="tt-stat">${Math.round(s.mult * 100)}% do poder${s.ticks ? ` × ${s.ticks}` : ''}</div>` : ''}`;
     }
     if (kind === 'potion') return `<div class="tt-name">${iconImg(POTION_ICON, '🧪', 'tt-ic')} Poção de Vida</div><div>Cura 35% da vida. Recarga 8s.</div><div class="tt-sub">Você tem ${char.potions}. Desativada no duelo PvP.</div>`;
-    if (kind === 'hearth') return `<div class="tt-name">${HOME_IMG.replace('class="art"', 'class="tt-ic"')} Retornar à vila</div><div>Teleporta para Vila de Lúmen quando fora de combate.</div>`;
     if (kind === 'spirit-active') {
       const sp = char.spirits.find((s) => s.id === char.activeSpirit);
       if (!sp) return '<div class="tt-name">Sem spirit ativo</div><div>Abra o painel de spirits (P).</div>';
@@ -725,7 +784,7 @@ export class UI {
     const sub = `${R.name} · ${SLOT_NAMES[it.slot]}${it.weaponType ? ` (${WEAPON_TYPES[it.weaponType].name})` : ''} · Nv ${it.level}`;
     const mul = plusMul(it);
     const lines = Object.entries(it.stats).map(([k, v]) => `<div class="tt-stat">${fmtStat(k, mul === 1 ? v : Math.round(v * mul * 10) / 10)}</div>`).join('');
-    const plusLine = it.plus ? `<div class="tt-sub">Aprimorado +${it.plus} (+${Math.round(PLUS_BONUS * it.plus * 100)}% nos atributos)</div>` : '';
+    const plusLine = it.plus ? `<div class="tt-sub tt-plus">Aprimorado +${it.plus} de ${MAX_PLUS}${it.plus >= MAX_PLUS ? ' (MÁXIMO)' : ''} · +${Math.round(PLUS_BONUS * it.plus * 100)}% nos atributos</div>` : (it.slot ? `<div class="tt-sub">Aprimoramento +0 de ${MAX_PLUS} (Ferreiro Brok)</div>` : '');
     const eq = char.equipment[it.slot];
     let cmp = '';
     if (eq && eq.id !== it.id) {

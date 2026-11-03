@@ -104,7 +104,7 @@ test('item equipado só vale no slot certo e não pode repetir id do inventário
   const c = fullChar('mage', 10);
   const it = generateItem(rng, 10, { classId: 'mage', slot: 'helm' });
   c.equipment.armor = it; // elmo no slot de armadura
-  c.equipment.boots = generateItem(rng, 10, { slot: 'boots' });
+  c.equipment.boots = generateItem(rng, 10, { classId: 'mage', slot: 'boots' });
   c.inventory.push({ ...c.equipment.boots }); // mesma id equipada e no inventário
   const r = parse(c);
   assert.equal(r.char.equipment.armor, undefined);

@@ -15,6 +15,8 @@ import { buildLayout, campSpawns, minibossSpawn } from './layout.js';
 import { mobIntent, rivalIntent } from './ai.js';
 
 const TAU = Math.PI * 2;
+// Spirit coletor: fora de combate busca o drop mais próximo (até `range` px do dono) e o traz; `hand` = distância em que entrega ao dono.
+export const SPIRIT_FETCH = { range: 260, speed: 320, grab: 16, hand: 30 };
 export const DROP_LIFE = 120, DROP_BLINK = 10, DROP_MAX = 120; // drops no chão: vida (s), piscar final (s) e teto por mundo
 export const PVP_DAMAGE = 0.32; // duelos entre heróis mais longos e táticos (medido com npm run balance)
 let nextId = 1;
@@ -682,6 +684,43 @@ export class World {
   }
 
   // ---------- spirits ----------
+  // Coleta (sem Math.random: o mais próximo ganha, empate pela ordem do array): busca → pega (d.carried) → entrega ao dono (d.fetched + evento
+  // `pickup`; quem tem a mochila — main.js collectDrops — dá o item). Só heróis; em combate o spirit larga tudo e volta a seguir o dono.
+  updateSpiritFetch(s, o, dt) {
+    const F = SPIRIT_FETCH;
+    const step = (x, y) => { const d = Math.hypot(x - s.x, y - s.y), m = Math.min(d, F.speed * dt); if (d > 0) { s.x += (x - s.x) / d * m; s.y += (y - s.y) / d * m; } };
+    if (o.kind !== 'player' || this.spiritEngaged(o)) {
+      if (s.carry) s.carry.carried = false;
+      s.carry = s.fetch = null;
+      return false;
+    }
+    if (s.carry) {
+      const d = s.carry;
+      if (d.taken || !this.drops.includes(d)) { s.carry = null; return false; }
+      if (Math.hypot(o.x - s.x, o.y - s.y) <= F.hand) {
+        d.carried = false; d.fetched = true; s.carry = null;
+        this.events.push({ type: 'pickup', drop: d, spirit: s, actor: o, t: this.time });
+        return false;
+      }
+      step(o.x, o.y); d.x = s.x; d.y = s.y;
+      return true;
+    }
+    let d = s.fetch;
+    if (d && (d.taken || d.carried || d.fetched || !this.drops.includes(d))) d = s.fetch = null;
+    if (!d) {
+      let best = Infinity;
+      for (const c of this.drops) {
+        if (c.taken || c.carried || c.fetched || c.kind === 'gold' || c.t < 0.4 || Math.hypot(c.x - o.x, c.y - o.y) > F.range) continue;
+        const dd = Math.hypot(c.x - s.x, c.y - s.y);
+        if (dd < best) { best = dd; d = c; }
+      }
+      if (!d) return false;
+      s.fetch = d;
+    }
+    if (Math.hypot(d.x - s.x, d.y - s.y) <= F.grab) { d.carried = true; s.carry = d; s.fetch = null; return true; }
+    step(d.x, d.y);
+    return true;
+  }
   // O spirit não ataca sozinho: só quando o dono bateu em alguém ou apanhou nos últimos 3 s.
   spiritEngaged(o) { return (o.lastDealt ?? -99) > this.time - 3 || (o.lastDamaged ?? -99) > this.time - 3; }
   updateSpirit(s, dt) {
@@ -689,12 +728,14 @@ export class World {
     if (!o || o.dead) { s.hidden = true; return; }
     s.hidden = false;
     s.bob += dt;
-    const side = s.team === 1 ? -1 : 1;
-    const tx = o.x - Math.cos(o.facing) * 26 + Math.cos(o.facing + Math.PI / 2) * 20 * side;
-    const ty = o.y - Math.sin(o.facing) * 26 + Math.sin(o.facing + Math.PI / 2) * 20 * side - 14;
-    const k = Math.min(1, dt * 6);
-    s.x += (tx - s.x) * k;
-    s.y += (ty - s.y) * k;
+    if (!this.updateSpiritFetch(s, o, dt)) {
+      const side = s.team === 1 ? -1 : 1;
+      const tx = o.x - Math.cos(o.facing) * 26 + Math.cos(o.facing + Math.PI / 2) * 20 * side;
+      const ty = o.y - Math.sin(o.facing) * 26 + Math.sin(o.facing + Math.PI / 2) * 20 * side - 14;
+      const k = Math.min(1, dt * 6);
+      s.x += (tx - s.x) * k;
+      s.y += (ty - s.y) * k;
+    }
     const color = SPIRITS[s.spiritType].color;
     // Alvos do spirit: só quem o dono acertou por último, quem está batendo no dono ou quem o persegue (nunca os mobs que estão só passando).
     const foes = (range, from = s) => this.enemiesOf(s).filter((e) => Math.hypot(e.x - from.x, e.y - from.y) <= range + e.r && (e.id === o.lastTarget || e.id === o.lastAttacker || e.ai?.target === o.id || (!e.ai && this.spiritEngaged(o))));

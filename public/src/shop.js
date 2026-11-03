@@ -22,13 +22,14 @@ export const sellValue = (it) => Math.max(1, Math.floor(it.value * PRICES.sellRa
 // Comuns/incomuns/raras (nunca épico+) e UM épico de destaque por nível. O `value` do destaque já vem inflado
 // (valor·25/markup) para a UI continuar exibindo valor·itemMarkup; `baseValue` guarda o valor real, restaurado na compra.
 // Ids estáveis (`shop-<semente>-<i>`): itens já comprados (no inventário/equipados) saem do estoque.
-export function buildShopStock(char) {
+export function buildShopStock(char, opts = {}) {
+  if (opts.harbor) return buildHarborStock(char, opts); // loja do Porto: estoque diário (no fim do arquivo)
   const seed = hashString(`${char.name}|${char.classId}|${char.created}|${char.level}`);
   const rng = makeRng(seed), cls = CLASSES[char.classId], tag = seed.toString(36);
   const rar = () => { const r = rollRarity(rng, 0.8); return r === 'common' ? 'uncommon' : r === 'epic' || r === 'legendary' ? 'rare' : r; };
   const stock = [
     generateItem(rng, char.level, { slot: 'weapon', weaponType: cls.weapon, rarityId: rar() }),
-    ...[0, 1, 2].map(() => generateItem(rng, char.level, { slot: rng.pick(SLOTS.slice(1)), rarityId: rar() })),
+    ...[0, 1, 2].map(() => generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(SLOTS.slice(1)), rarityId: rar() })),
   ];
   const feat = generateItem(rng, char.level, { classId: char.classId, rarityId: 'epic' });
   feat.baseValue = feat.value;
@@ -36,5 +37,33 @@ export function buildShopStock(char) {
   stock.push(feat);
   stock.forEach((it, i) => { it.id = `shop-${tag}-${i}`; });
   const owned = new Set([...Object.values(char.equipment ?? {}), ...(char.inventory ?? [])].filter(Boolean).map((i) => i.id));
+  return stock.filter((it) => !owned.has(it.id));
+}
+
+// ---------- Mercador do Porto (Bartolomeu) ----------
+// Estoque ROTATIVO por dia UTC (semente = personagem + nível + dia): 6 itens, de incomum a ÉPICO (nunca lendário), 2 deles épicos "do dia".
+// Preços diferentes da loja da Vila: itens comuns saem mais baratos (×5,2 em vez de ×6), épicos mais caros (×30 em vez de ×25) e o porto paga mais na venda (60%).
+// Mesma convenção do destaque da Vila: `value` já vem inflado (preço/itemMarkup) para a UI exibir valor·itemMarkup; `baseValue` é o valor real, restaurado na compra
+// (main.js › compra). `price` é o preço final em ouro, para quem preferir exibi-lo direto. Ids estáveis `hb-<semente>-<i>`.
+export const HARBOR = { markup: 5.2, epicMarkup: 30, sellRate: 0.6 };
+export const harborSellValue = (it) => Math.max(1, Math.floor(it.value * HARBOR.sellRate));
+export function buildHarborStock(char, { day = Math.floor(Date.now() / 86400000) } = {}) {
+  const seed = hashString(`harbor|${char.name}|${char.classId}|${char.created}|${char.level}|${day}`);
+  const rng = makeRng(seed), cls = CLASSES[char.classId], tag = seed.toString(36);
+  const rar = () => { const r = rollRarity(rng, 1.3); return r === 'common' ? 'uncommon' : r === 'legendary' ? 'epic' : r; }; // incomum → épico
+  const stock = [
+    generateItem(rng, char.level, { slot: 'weapon', weaponType: cls.weapon, rarityId: rar() }),
+    ...[0, 1, 2].map(() => generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(SLOTS.slice(1)), rarityId: rar() })),
+    generateItem(rng, char.level, { classId: char.classId, slot: 'weapon', weaponType: cls.weapon, rarityId: 'epic' }),
+    generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(SLOTS.slice(1)), rarityId: 'epic' }),
+  ];
+  stock.forEach((it, i) => {
+    it.id = `hb-${tag}-${i}`;
+    const mk = it.rarity === 'epic' ? HARBOR.epicMarkup : HARBOR.markup;
+    it.baseValue = it.value;
+    it.price = Math.round(it.baseValue * mk);
+    it.value = Math.round(it.price / PRICES.itemMarkup);
+  });
+  const owned = new Set([...Object.values(char.equipment ?? {}), ...(char.inventory ?? []), ...(char.bank ?? [])].filter(Boolean).map((i) => i.id));
   return stock.filter((it) => !owned.has(it.id));
 }

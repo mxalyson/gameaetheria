@@ -30,6 +30,40 @@ export const BASE_NAMES = {
   ring: ['Anel de Cobre', 'Anel de Prata', 'Anel de Ouro', 'Anel Astral'],
   amulet: ['Pingente', 'Colar de Contas', 'Amuleto de Jade', 'Talismã Antigo'],
 };
+// Equipamento por CLASSE (todos os espaços, não só a arma): o item nasce com `classId` e só essa classe o equipa.
+// Armadura por tipo: Guerreiro = placas (pesada), Arqueiro = couro, Mago e Clérigo = tecido (cada um com o próprio conjunto de nomes).
+export const ARMOR_TYPES = { warrior: 'Placas', archer: 'Couro', mage: 'Tecido', cleric: 'Tecido' };
+// Nome base por classe, espaço e tier (nível do item / 8). Ícone: o do tipo/espaço (sem arte própria por classe ainda).
+export const GEAR_NAMES = {
+  warrior: {
+    helm: ['Capacete de Ferro', 'Elmo de Aço', 'Elmo de Batalha', 'Elmo do Campeão'],
+    armor: ['Peitoral de Ferro', 'Cota de Malha', 'Armadura de Placas', 'Couraça do Campeão'],
+    boots: ['Botas de Ferro', 'Grevas de Aço', 'Grevas de Batalha', 'Grevas do Campeão'],
+    ring: ['Anel de Ferro', 'Anel de Guerra', 'Anel de Bronze Real', 'Anel do Vanguardista'],
+    amulet: ['Medalhão de Ferro', 'Insígnia de Guerra', 'Brasão de Aço', 'Colar do Comandante'],
+  },
+  mage: {
+    helm: ['Capuz de Aprendiz', 'Chapéu Arcano', 'Capuz Estelar', 'Coroa Prismática'],
+    armor: ['Túnica de Aprendiz', 'Manto Arcano', 'Manto Estelar', 'Veste Prismática'],
+    boots: ['Sandálias de Seda', 'Botas Arcanas', 'Botas Estelares', 'Sapatilhas Prismáticas'],
+    ring: ['Anel de Cristal', 'Anel Arcano', 'Anel Estelar', 'Anel Prismático'],
+    amulet: ['Pingente de Cristal', 'Orbe Arcano', 'Amuleto Estelar', 'Talismã Prismático'],
+  },
+  archer: {
+    helm: ['Capuz de Couro', 'Chapéu de Caçador', 'Capuz de Patrulheiro', 'Capuz do Falcão'],
+    armor: ['Colete de Couro', 'Gibão de Couro', 'Gibão de Patrulheiro', 'Couro do Falcão'],
+    boots: ['Botas de Couro', 'Botas de Caçador', 'Botas de Patrulheiro', 'Botas Aladas'],
+    ring: ['Anel de Osso', 'Anel de Caçador', 'Anel de Prata Verde', 'Anel do Falcão'],
+    amulet: ['Colar de Penas', 'Colar de Presas', 'Amuleto de Jade', 'Talismã do Falcão'],
+  },
+  cleric: {
+    helm: ['Touca Sagrada', 'Capelo Bento', 'Mitra Sagrada', 'Halo Solar'],
+    armor: ['Túnica Sagrada', 'Hábito Bento', 'Vestes Sagradas', 'Vestes Solares'],
+    boots: ['Sandálias Sagradas', 'Sandálias Bentas', 'Botas Sagradas', 'Sandálias Solares'],
+    ring: ['Anel Sagrado', 'Anel Bento', 'Anel de Ouro Sagrado', 'Anel Solar'],
+    amulet: ['Símbolo Sagrado', 'Relicário Bento', 'Amuleto Sagrado', 'Sol de Ouro'],
+  },
+};
 // Itens exclusivos do último chefe (Cavaleiro Rubro): tema ópalo. Ícone = o do tipo (sem arte própria ainda; ver docs/roadmap/pendencias.md).
 export const OPAL_NAMES = { sword: 'Espada Opalina', staff: 'Cajado Opalino', bow: 'Arco Opalino', mace: 'Maça Opalina', armor: 'Couraça de Ópalo' };
 

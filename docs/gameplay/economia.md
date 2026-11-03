@@ -12,7 +12,7 @@ Atualizado em 2026-10-31. Os números abaixo saem de `npm run economy` (`tools/e
 | Abates na exploração | `rng(nível×2+1 … nível×4+3)` × (chefe ×8, elite ×3) | `(12 + nível×6) × fator` | 14% (elite 60%, chefe 100%) | cliente (com limites) |
 | Baús (5 por zona + acampamentos, tier 1 a 3,8) | `rng(6…12 × nível) × tier` | — | `min(80%; 15% × tier)`, sorte `0,25 × tier` (G1: ≈ 1–3 épico+/h varrendo as zonas; era 6–18/h) | cliente (recarga de 10 min, limitada) |
 | Missões | fixo por missão (60 a 1 200) | fixo (0 a 2 500) | até 1 item raro/épico | cliente, **objetivos de PvP/cooperativo só pelo servidor** |
-| Arena real (1×1, 2×2, 4×4) | vitória `40 + nível×8` (×1,2 / ×1,6), derrota `10 + nível×2` | 6% / 2% do nível (× mesmo fator); 10 partidas por hora a 100%, depois 25%; 0 se o mesmo adversário aparece pela 3ª vez seguida em 30 min (G3; era 12% / 4% sem teto) | 35% de um item na arena offline | **servidor** |
+| Arena real (1×1, 2×2, 4×4) | vitória `40 + nível×8` (×1,2 / ×1,6), derrota `10 + nível×2` | 6% / 2% do nível (× mesmo fator); sem teto por hora (decisão do dono); 0 se o mesmo adversário aparece pela 3ª vez seguida em 30 min (G3; era 12% / 4%) | 35% de um item na arena offline | **servidor** |
 | Cooperativo (5 ondas + chefe) | ondas × 0,5 + `4 × nível` do chefe (derrota paga 60%) | **teto de 30% de um nível** (+10% por jogador extra) | itens do chefe (rolados no servidor), 3 poções | **servidor** |
 | Venda de itens | 50% do valor (`sellValue` em `shop.js`; G13: o código pagava 100%, agora paga 50%) | — | — | cliente |
 
@@ -64,7 +64,7 @@ APRIMORAMENTO (ferreiro): ouro por item vestido, +0 → +8, e quantos abates iss
 - Baús (`tools/chest-check.mjs`, 48 baús/h): épico+/h Bosque 6,3→0,9, Planície 8,3→1,3, Ruínas 10,9→1,6, Cume 13,9→2,0, Cinzas 18,5→2,8; lendário/h Cinzas 6,0→0,5.
 - Loja: raro custa valor×6 (≈ 210 / 516 / 822 ouro no nv 5/15/25, era 140 / 344 / 548); o épico de destaque custa valor×25 (nv 20 ≈ 3,7 mil ouro ≈ 9 min de renda). Sem lendário na loja.
 - Venda: 50% (antes o código pagava 100%). A UI ainda mostra `it.value` como preço de venda: usar `sellValue(it)` de `shop.js`.
-- PvP (`npm run economy`): XP/h nv 20 de 71 149 → 22 231 (≈ 0,5 nível/h contra 1,6); nv 10 de 19 064 → 5 956. Contadores nas chaves `pvpHour`, `pvpHourN`, `pvpFoe`, `pvpFoeN`, `pvpFoeMin` de `stats` (todas em `SERVER_STATS`; minutos, não ms, para caber no limite de 1e8 do savedoc). O servidor deve passar `foeId` (e opcionalmente `now`) a `applyMatchResult`; sem `foeId` só valem os limites de % e por hora. Só o último adversário é lembrado (alternar entre dois adversários escapa do limite de repetição; o limite por hora cobre).
+- PvP (`npm run economy`): XP/h nv 20 de 71 149 → 22 231 com o teto por hora (≈ 0,5 nível/h contra 1,6); o teto por hora foi REMOVIDO por decisão do dono (2026-11-02), então hoje vale a % de 6%/2% sem teto (conferir com `npm run economy`). Contadores nas chaves `pvpFoe`, `pvpFoeN`, `pvpFoeMin` de `stats` (todas em `SERVER_STATS`; minutos, não ms, para caber no limite de 1e8 do savedoc). O servidor deve passar `foeId` (e opcionalmente `now`) a `applyMatchResult`; sem `foeId` vale só a %. Só o último adversário é lembrado (alternar entre dois adversários escapa do limite de repetição; sem teto por hora, nada mais cobre isso).
 - Ferreiro: 6 lendários nv 30 +8 de 543 mil → 396 mil de ouro (carreira ≈ 440 mil). Opalino: +10–12% → +29–31% de pontuação sobre o lendário comum (`tools/opal-check.mjs`).
 
 ## Leitura (honesta)

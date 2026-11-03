@@ -110,3 +110,17 @@ Fotografar com `tools/glb-bake.mjs`, entrar no atlas `meshy.webp` como `m_bridge
 | **Ícone de conversa** (V6) | o botão de interagir usa o pergaminho do menu (`menu-journal.webp`) | opcional: balão de fala pintado 128×128 no estilo dos medalhões (`assets/icons/menu/menu-talk.webp`) |
 | **Textura de telégrafo** (V17) | o círculo de aviso do chefe é gradiente + runas por código (aceitável como efeito) | opcional: disco de runas vermelho-alaranjado, transparente, 256×256, tileável em rotação |
 
+## H. Porto de Marfim — peças que FALTAM (2026-11-02)
+O Porto (`ZONES.harbor`) usa só o que já existe: casas, poço, cercas, lampiões, placa e ponte do Meshy, cerejeiras, texturas de chão `sand-plains`/`slabs`/`water-lake`. Nada foi desenhado por código para suprir a falta. **Estas peças ainda não existem** (por isso o porto tem menos adereços do que uma cidade de cais pede). Mesmas regras da seção "Regras que valem para TODOS": miniatura/caricato, fundo liso, vista 3/4 isométrica, uma peça por imagem, estilo do Meshy das casas da Vila.
+1. **Cais de madeira (píer)**, reto, ~6 tábuas de largura, 4 estacas de apoio, corda nas pontas. Para entrar nas baías (hoje água lisa).
+2. **Barco a remo** de madeira clara, amarrado, vela enrolada; e **barco pequeno com vela** (branca, remendada), para a baía maior.
+3. **Barril** e **caixote de madeira com corda** (2 variações cada) e **pilha de sacos de grãos**: empilhados no cais e na frente do mercado.
+4. **Rede de pesca** pendurada em dois postes e **cesto de peixes**.
+5. **Farol** pequeno de pedra clara com topo de lanterna (a luz noturna de `render/sky.js` aceita um tipo de decoração `lighthouse` quando existir: basta acrescentar em `lightsOf`).
+6. **Barraca de mercado** com toldo listrado (vermelho/creme) e balcão com frutas; 3 toldos de cores diferentes.
+7. **Âncora grande** de ferro enferrujado, meio enterrada na areia, como monumento da praça.
+8. **Conchas e estrelas-do-mar** (3 modelos), **caranguejo** parado e **gaivota** pousada num poste.
+9. **Banco de madeira** (a Vila tem em código; se vier arte, serve às duas cidades) e **estante de contratos** (madeira com 6 pergaminhos pregados) para a Mestra de Caça.
+10. **NPCs** (formato de `docs/art-direction/personagens-miniatura.md`): `banker` Banqueiro Octávio (colete azul, óculos, livro-caixa), `hunter` Mestra de Caça Vesna (arco curto, capa marrom, cicatriz), `dealer` Mercador Bartolomeu (barrigudo, chapéu de capitão, bolsa cheia), `duelist` Duelista Kael (florete, bandana vermelha), `captain` Capitã Maré (casaco azul-petróleo, chapéu bicorne). Hoje usam o herói em miniatura recolorido (`NPC_LOOK` no renderer).
+11. **Textura de chão do porto**: lajes claras de calçada de porto com junta de areia e conchas, sem emenda, 512×512 (`public/assets/ground/harbor.webp`; hoje `sand-plains` com tom quente). E **água de baía** turquesa-esverdeada rasa, sem emenda (hoje `water-lake`).
+

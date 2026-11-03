@@ -77,3 +77,18 @@ test('safeBoxScreen: rótulo sai de baixo dos botões de toque, do menu e da bor
   safeBoxScreen(400, 200, 100, 22, vw, vh, hud, out); // livre: não mexe
   assert.deepEqual([out.x, out.y], [400, 200]);
 });
+
+// Terreno na escala do dispositivo (celular 3×): o teto de memória vale em todas as escalas e a escala só sobe com blocos menores.
+import { groundBudget as gb, quantScale, TILE_BY_SCALE, BUDGET_MIB as BUD } from '../public/src/render/ground-tiles.js';
+import { ZONES as ZN } from '../public/src/data/zones.js';
+test('terreno: escala de bloco 1/1,5/2 respeita o teto de memória na vista do celular (1135×522) e a quantização', () => {
+  const MIB = 1048576;
+  assert.deepEqual([0.55, 1.2, 1.5, 1.7, 2, 2.9].map(quantScale), [1, 1, 1.5, 1.5, 2, 2]);
+  for (const s of [1, 1.5, 2]) {
+    assert.ok(Number.isInteger(TILE_BY_SCALE[s] * s) && Number.isInteger(2 * s), `lados em pixels inteiros na escala ${s}`);
+    for (const [id, z] of Object.entries(ZN)) {
+      const b = gb(z, 1135, 522, s);
+      assert.ok(b.bytes <= BUD * MIB, `${id} @${s}: ${(b.bytes / MIB).toFixed(1)} MiB`);
+    }
+  }
+});

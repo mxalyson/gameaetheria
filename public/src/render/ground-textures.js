@@ -32,10 +32,10 @@ function pattern(g, name, scale) {
 }
 // Cume Gélido e Cinzas Ardentes reaproveitam as texturas da Planície e das Ruínas com um tom por cima (TINT) até chegar arte própria
 // de neve/gelo e de basalto/brasa (prompts em docs/art-direction/prompts-cenario.md › seção E).
-const BASE = { forest: ['forest', 1.4], plains: ['plains', 1.4], ruins: ['ruins', 0.85], town: ['forest', 1.4], glacier: ['plains', 1.4], ember: ['ruins', 0.85] };
-const SAND = { forest: ['sand-dirt', 1], plains: ['sand-plains', 1], ruins: ['slabs', 1], glacier: ['sand-plains', 1], ember: ['slabs', 1] };
-const WATER = { forest: ['water-lake', 1.3], plains: ['water-crystal', 1.3], glacier: ['water-crystal', 1.3], ruins: ['water-lake', 1.3] };
-const TINT = { glacier: ['#e8f3fa', 0.66], ember: ['#2a100c', 0.6] };
+const BASE = { forest: ['forest', 1.4], plains: ['plains', 1.4], ruins: ['ruins', 0.85], town: ['forest', 1.4], glacier: ['plains', 1.4], ember: ['ruins', 0.85], harbor: ['sand-plains', 1.4] }; // porto: areia clara de chão
+const SAND = { forest: ['sand-dirt', 1], plains: ['sand-plains', 1], ruins: ['slabs', 1], glacier: ['sand-plains', 1], ember: ['slabs', 1], harbor: ['slabs', 1] };
+const WATER = { forest: ['water-lake', 1.3], plains: ['water-crystal', 1.3], glacier: ['water-crystal', 1.3], ruins: ['water-lake', 1.3], harbor: ['water-lake', 1.3] };
+const TINT = { glacier: ['#e8f3fa', 0.66], ember: ['#2a100c', 0.6], harbor: ['#f3e2b4', 0.32] }; // porto: tom quente de areia por cima
 
 // Preenche o terreno inteiro com a textura da zona; devolve true se coube.
 export function fillGroundTexture(g, kind, w, h) {

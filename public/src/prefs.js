@@ -32,7 +32,17 @@ export function changePref(prefs, arg) {
   return clean(next);
 }
 
-// 'auto' escolhe pelo aparelho: celular/tablet (toque) começa em qualidade média; computador, alta.
+// 'auto' escolhe pelo aparelho: computador e celulares/tablets potentes (iPhone recente, Android topo: ≥ 6 núcleos e, se o aparelho informar, > 4 GB) usam alta;
+// os fracos começam em média. Antes todo toque caía em "média" (resolução do canvas 1,5× e texturas a 75%): num iPhone de tela 3× tudo saía borrado.
+export function deviceTier() {
+  try {
+    // iPhone/iPad (inclusive Chrome no iOS, que é WebKit): o WebKit não informa deviceMemory e pode informar poucos núcleos; todo iPhone de tela 3× (XS em diante) aguenta 'alta'
+    const ua = navigator.userAgent ?? '', ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (ios && (devicePixelRatio || 1) >= 2.5) return 'high';
+    const cores = navigator.hardwareConcurrency ?? 4, mem = navigator.deviceMemory;
+    return cores <= 4 || (mem && mem <= 4) ? 'medium' : 'high';
+  } catch { return 'medium'; }
+}
 export function resolveQuality(prefs, coarse) {
-  return prefs.quality === 'auto' ? (coarse ? 'medium' : 'high') : prefs.quality;
+  return prefs.quality === 'auto' ? (coarse ? deviceTier() : 'high') : prefs.quality;
 }

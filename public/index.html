@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#1b1d2e" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Aetheria" />
+  <meta name="format-detection" content="telephone=no" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
@@ -29,13 +33,13 @@
       <div id="zone-name"></div>
       <canvas id="minimap" width="170" height="170"></canvas>
       <div class="menu-btns" id="menu-btns">
-        <button data-action="toggle" data-arg="inventory" title="Mochila"><img src="assets/icons/menu/menu-bag.webp?v=ba6f1365" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="character" title="Personagem"><img src="assets/icons/menu/menu-hero.webp?v=ba6f1365" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="spirits" title="Spirits"><img src="assets/icons/menu/menu-spirits.webp?v=ba6f1365" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="journal" title="Diário e missões"><img src="assets/icons/menu/menu-journal.webp?v=ba6f1365" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="map" title="Mapa"><img src="assets/icons/menu/menu-map.webp?v=ba6f1365" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="party" class="online-only" title="Grupo"><img src="assets/icons/menu/menu-party.webp?v=ba6f1365" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="options" title="Opções"><img src="assets/icons/menu/menu-settings.webp?v=ba6f1365" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="inventory" title="Mochila"><img src="assets/icons/menu/menu-bag.webp?v=901f0c1b" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="character" title="Personagem"><img src="assets/icons/menu/menu-hero.webp?v=901f0c1b" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="spirits" title="Spirits"><img src="assets/icons/menu/menu-spirits.webp?v=901f0c1b" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="journal" title="Diário e missões"><img src="assets/icons/menu/menu-journal.webp?v=901f0c1b" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="map" title="Mapa"><img src="assets/icons/menu/menu-map.webp?v=901f0c1b" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="party" class="online-only" title="Grupo"><img src="assets/icons/menu/menu-party.webp?v=901f0c1b" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="options" title="Opções"><img src="assets/icons/menu/menu-settings.webp?v=901f0c1b" alt="" draggable="false"></button>
         <button data-action="fullscreen" class="txt" title="Tela cheia">⛶</button>
       </div>
     </div>
@@ -52,6 +56,7 @@
   <div id="panel-layer"></div>
   <div id="tooltip" class="hidden"></div>
   <div id="toast-layer"></div>
+  <div id="reward-layer"></div>
   <div id="screen"></div>
 
   <script type="module" src="src/main.js"></script>
