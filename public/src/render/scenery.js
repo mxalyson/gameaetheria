@@ -72,6 +72,7 @@ const STYLE = {
 
 // ---------- chão: camadas extras assadas no cache do terreno ----------
 import { trailPattern, waterPattern, groundTexReady, groundExtra } from './ground-textures.js';
+import { propImage } from './props-art.js';
 import { bridgeArtReady, drawBridgeSprite, hideBridgeRails } from './nature-sprites.js';
 
 // `streets` (renderer.js) desenha praça e ruas ANTES dos rios e pontes: depois deles a rua cobria a água e a ponte pintada.
@@ -103,6 +104,12 @@ export function paintGroundScenery(g, world, rng, streets, bounds) {
 
 // Cripta dos Ecos: piso de runas pintado (arte do dono) no centro de cada sala; o resto do chão são as lajes das Ruínas.
 function paintCryptRunes(g, z) {
+  const fl = propImage('crypt_part2'); // piso 3x3 de lajes de runas (Meshy, vista 0); sem ele, o carimbo antigo
+  if (fl) {
+    const cw = fl.m.cell[0], ch = fl.m.cell[1], w = 470, h = w * ch / cw;
+    for (const x of [765, 2060, 3460, 4850]) g.drawImage(fl.img, 0, 0, cw, ch, x - w / 2, z.h / 2 - h / 2 + 20, w, h);
+    return;
+  }
   const im = groundExtra('crypt-runes'); if (!im) return;
   const w = 420, h = w * im.height / im.width, cx = [765, 2060, 3460, 4850];
   for (const x of cx) g.drawImage(im, x - w / 2, z.h / 2 - h / 2 + 20, w, h);

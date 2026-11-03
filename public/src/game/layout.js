@@ -100,9 +100,27 @@ export function buildLayout(zoneId) {
   for (const wl of z.walls ?? []) {
     const [g0, g1] = wl.gap;
     obstacles.push({ x: wl.x, y: 0, w: wl.w, h: g0, block: true }, { x: wl.x, y: g1, w: wl.w, h: z.h - g1, block: true });
-    for (let y = 40; y < z.h; y += 78) if (y < g0 - 30 || y > g1 + 30) decor.push({ type: 'pillar', x: wl.x + wl.w / 2, y, s: 30, v: ((y / 78) | 0) % 2 ? 0.9 : 0.6 });
+    for (let y = 40; y < z.h; y += 78) if (y < g0 - 30 || y > g1 + 30) decor.push({ type: 'pillar', x: wl.x + wl.w / 2, y, s: 30, v: ((y / 78) | 0) % 2 ? 0.9 : 0.6, art: 1, ps: 0.7 });
     for (const y of [g0 - 24, g1 + 24]) decor.push({ type: 'brazier', x: wl.x + wl.w / 2, y, s: 16, v: 0.9 });
   }
+  // Cripta (arte do Meshy, render/props-art.js): portão em cada porta (`yo` = ordenação com o portão aberto), pilares nas bordas do corredor e sarcófagos
+  // com colisão simples, longe da linha das portas (y 440–560) e do centro do corredor, onde os heróis e as criaturas lutam.
+  if (z.dungeon && z.walls?.length) {
+    z.walls.forEach((wl, gi) => decor.push({ type: 'cgate', gi, x: wl.x + wl.w / 2, y: wl.gap[1] + 4, yo: wl.gap[0] - 6 }));
+    const xs = [0, ...z.walls.map((wl) => wl.x + wl.w), z.w];
+    for (let r = 0; r < xs.length - 1; r++) {
+      const a = r ? xs[r] + 130 : 330, b = r < xs.length - 2 ? xs[r + 1] - 130 : z.w - 120;
+      for (let x = a + 100, k = 0; x < b - 60; x += 260, k++) for (const y of [64, z.h - 24]) decor.push({ type: 'pillar', x: x + (y > 500 ? 130 : 0), y, s: 30, v: 0.9, art: 1, ps: 0.75 });
+    }
+    for (const [x, y, v] of z.sarcophagi ?? []) {
+      decor.push({ type: 'csarco', x, y, v });
+      obstacles.push({ x: x - 60, y: y - 26, w: 120, h: 34, block: true });
+    }
+  }
+  // Caixotes e barris do Porto: decoração com colisão pequena (círculo na base)
+  for (const c of z.scenery?.props ?? []) { decor.push({ type: 'cprop', art: c[0], x: c[1], y: c[2], view: c[3] }); obstacles.push({ x: c[1], y: c[2] - 8, r: c[0] ? 14 : 22, block: true }); }
+  // Barcos do Porto (arte do Meshy): sobre a água das baías, só decoração (a água já bloqueia)
+  for (const b of z.scenery?.boats ?? []) decor.push({ type: 'cboat', art: b[0], x: b[1], y: b[2], view: b[3], v: ((b[1] * 7 + b[2]) % 100) / 100 });
 
   // Cenário rico (opt-in por zona). Usa uma semente própria: não altera o sorteio das demais zonas.
   const sc = z.scenery;

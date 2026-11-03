@@ -33,8 +33,8 @@ function loadIndex() {
 
 // Quanto o desenho da célula (com margem) é mais alto que o raio de colisão da criatura; ajustável por criatura.
 // criaturas grandes (chefes), ampliadas ~2× na tela: realce de nitidez leve ao carregar; o orçamento de textura (tests/mobs-art.test.js, 8 MiB por zona) não deixa subir os px do bake
-const BIG = new Set(['treant', 'colossus', 'guardian', 'golem']);
-const ART = { default: { h: 3.4 }, slime: { h: 3.8 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
+const BIG = new Set(['treant', 'colossus', 'guardian', 'golem', 'echolord_p1', 'echolord_p2']);
+const ART = { default: { h: 3.4 }, slime: { h: 3.8 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, echolord_p1: { h: 8.4 }, echolord_p2: { h: 7.2 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
 
 // Recolore uma vez ao carregar (hue em graus, sat/bri multiplicadores, mul = multiplicador por canal): as variantes de cor reaproveitam a arte da criatura de base.
 // V16: a cor nova vem do matiz/mul, mas a LUMINÂNCIA é a da pintura original (sombras e brilhos intactos) em vez de multiplicar o canal (que achatava tudo numa cor só);
@@ -147,16 +147,18 @@ export function mobPortrait(id) {
   return res;
 }
 // carrega de antemão as criaturas da zona (chamado quando a zona muda)
-export function prepareMobs(zone) { if (!mobSpritesEnabled()) return; for (const [id] of zone.mobs ?? []) load(id); if (zone.boss?.id) load(zone.boss.id); for (const id of zone.preload ?? []) load(id); /* masmorra: criaturas das salas */ }
+export function prepareMobs(zone) { if (!mobSpritesEnabled()) return; for (const [id] of zone.mobs ?? []) load(id); if (zone.boss?.id) load(zone.boss.id); for (const id of zone.preload ?? []) load(id); if (zone.preload?.includes('echolord')) load('echolord_p2'); /* masmorra: criaturas das salas */ }
 
 // pesados: o golpe é uma pancada (ergue e bate); aéreos: recolhem e arremetem; os demais agacham e dão o bote
-const HEAVY = new Set(['golem', 'colossus', 'guardian', 'treant']), AIRY = new Set(['wisp', 'wraith']);
+const HEAVY = new Set(['golem', 'colossus', 'guardian', 'treant', 'echolord_p1']), AIRY = new Set(['wisp', 'wraith']);
 // Desenha o monstro `a` como sprite; devolve false se não há arte pronta (o chamador usa o desenho antigo).
 export function drawMobSprite(g, a, t) {
-  const it = load(a.mobId);
+  const sid = a.mobId === 'echolord' && a.hp < a.maxHp * 0.5 ? 'echolord_p2' : a.mobId; // Soberano dos Ecos: arte da fase 2 (braços erguidos) abaixo de 50% de vida (mesmo limiar de BOSS_PHASES.echolord.p2)
+  let it = load(sid);
+  if (sid === 'echolord_p2' && it.state !== 'ready') it = load('echolord'); // fase 2 ainda carregando: segue com a arte da fase 1
   if (it.state === 'loading') return true; // carregando: não desenha (senão o desenho antigo piscava antes do pintado)
   if (it.state !== 'ready') return false;
-  const { meta, img } = it, [cw, ch] = meta.cell, art = ART[a.mobId] ?? ART[MOBS[a.mobId]?.art] ?? ART.default;
+  const { meta, img } = it, [cw, ch] = meta.cell, art = ART[sid] ?? ART[MOBS[sid]?.art] ?? ART.default;
   const view = viewFromFacing(a.facing ?? Math.PI / 2);
   const H = a.r * art.h * (a.boss || a.elite ? 1 : 1.15), k = H / ch, W = cw * k; // comuns +15% (V28: pequenos para toque/mira)
   const ph = a.walk ?? 0;

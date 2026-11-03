@@ -146,7 +146,7 @@ class Game {
         const p = this.player;
         if ((this.mode === 'explore' || this.inNetZone()) && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; if (this.mode === 'explore') this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
         const exploring = this.mode === 'explore', chestView = exploring || this.inNetZone();
-        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: chestView ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: chestView ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
+        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: chestView ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: chestView ? this.chestsOpen : null, crypt: this.netCrypt, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
         if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
         this.ui.updateHud(this);
         this.touch.update(this);

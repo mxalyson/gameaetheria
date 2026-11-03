@@ -30,7 +30,7 @@ export const MOBS_EXTRA = {
   echoshade: { name: 'Sombra do Eco', crypt: true, art: 'wraith', tint: { mul: [0.7, 1.2, 1.3], bri: 1.1 }, shape: 'wraith', color: '#7fe0d8', hp: 0.9, atk: 1.2, speed: 125, kind: 'ranged', range: 290, projSpeed: 340, projColor: '#9ff2ea', cd: 1.4, size: 15, aggro: 340, xp: 1.2 },
   echoknight: { name: 'Sentinela do Eco', crypt: true, art: 'knight', tint: { mul: [0.8, 1.15, 1.3], sat: 0.8 }, shape: 'knight', color: '#6fb8c8', hp: 1.45, atk: 1.3, speed: 108, range: 40, cd: 1.1, size: 18, aggro: 300, xp: 1.35, def: 1.3 },
   echobrute: { name: 'Gárgula Rúnica', crypt: true, art: 'gargoyle', tint: { mul: [0.9, 1.1, 1.4], bri: 1.05 }, shape: 'golem', color: '#7aa0d8', hp: 1.4, atk: 1.25, speed: 125, range: 38, cd: 1.0, size: 19, aggro: 320, xp: 1.3 },
-  echolord: { name: 'Soberano dos Ecos', crypt: true, art: 'guardian', tint: { mul: [0.75, 1.15, 1.45], sat: 1.1, bri: 1.05 }, shape: 'knight', color: '#58d0e0', hp: 20, atk: 2.6, speed: 88, range: 72, cd: 1.25, size: 46, aggro: 480, xp: 1, boss: true, def: 1.4 },
+  echolord: { name: 'Soberano dos Ecos', crypt: true, art: 'echolord_p1', shape: 'knight', color: '#58d0e0', hp: 20, atk: 2.6, speed: 88, range: 72, cd: 1.25, size: 46, aggro: 480, xp: 1, boss: true, def: 1.4 },
   infernoknight: { name: 'Cavaleiro Rubro', art: 'guardian', tint: { mul: [1.4, 0.55, 0.6], sat: 1.25, bri: 0.95 }, shape: 'knight', color: '#e0553a', hp: 16, atk: 3.2, speed: 90, range: 70, cd: 1.2, size: 46, aggro: 460, xp: 1, boss: true, def: 1.5 },
 };
 Object.assign(MOBS, MOBS_EXTRA);

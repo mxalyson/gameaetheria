@@ -346,7 +346,7 @@ test('Cripta dos Ecos: layout determinístico, muros com porta aberta e pontos i
   const fresh = await import('../public/src/game/layout.js?recalculo-cripta');
   assert.deepEqual(fresh.buildLayout('crypt'), a, 'mesmo resultado em qualquer cliente');
   assert.ok(!z.mobs && !z.boss, 'sem monstros soltos: a sala do servidor povoa a masmorra');
-  const rects = a.obstacles.filter((o) => o.w);
+  const rects = a.obstacles.filter((o) => o.w && G.walls.includes(o.x)); // blocos dos muros (os sarcófagos também são retângulos, em outro x)
   assert.equal(rects.length, G.walls.length * 2, 'dois blocos por muro (acima e abaixo da porta)');
   const inRect = (x, y, r = 0) => rects.some((o) => x > o.x - r && x < o.x + o.w + r && y > o.y - r && y < o.y + o.h + r);
   for (const x of G.walls) {
@@ -359,4 +359,13 @@ test('Cripta dos Ecos: layout determinístico, muros com porta aberta e pontos i
   // as salas ficam entre os muros e as faixas de nascimento cabem no corredor
   G.roomX.forEach(([x0, x1], i) => assert.ok(x0 < x1 && (i === 0 || x0 > G.walls[i - 1] + G.wallW) && (i === G.roomX.length - 1 || x1 < G.walls[i]), 'faixa da sala ' + i));
   assert.ok(a.decor.some((d) => d.type === 'pillar') && a.decor.some((d) => d.type === 'brazier'), 'muros desenhados com colunas e braseiros');
+  assert.equal(a.decor.filter((d) => d.type === 'cgate').length, G.walls.length, 'um portão em cada porta');
+  const sarc = a.obstacles.filter((o) => o.w && !G.walls.includes(o.x));
+  assert.ok(sarc.length >= 4 && sarc.every((o) => o.y + o.h < 400 || o.y > 600), 'sarcófagos fora da faixa central (portas, chegadas e chefe)');
+});
+test('Porto: caixotes e barcos decorativos, determinísticos e fora das ruas', () => {
+  const a = buildLayout('harbor'), props = a.decor.filter((d) => d.type === 'cprop'), boats = a.decor.filter((d) => d.type === 'cboat');
+  assert.ok(props.length >= 6 && boats.length >= 2 && boats.length <= 3);
+  for (const d of props) assert.ok(Math.abs(d.y - ZONES.harbor.paths.find((p) => p[1] === p[3] && p[0] < 100)[1]) > 60, 'longe da rua principal (y ' + d.y + ')');
+  assert.deepEqual(buildLayout('harbor').decor.filter((d) => d.type === 'cprop'), props);
 });

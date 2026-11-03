@@ -203,6 +203,9 @@ export const ZONES = {
       kind: 'harbor', noTrail: true,
       // duas baías a oeste do canal (água de lago com margem de areia molhada)
       fixedPonds: [{ x: 400, y: 360, rx: 250, ry: 150, rot: 0.1 }, { x: 420, y: 1330, rx: 250, ry: 140, rot: -0.1 }],
+      boats: [[0, 330, 390, 0], [1, 520, 330, 1], [0, 470, 1350, 2]], // [0 bote|1 veleiro, x, y da quilha, vista 0..2]: na água das baías (render/props-art.js)
+      // caixotes e barris (arte do Meshy): [0 barris|1..4 caixotes, x, y da base, vista 0..1]; poucos grupos junto às baías, à Capitã e ao mercado, longe das ruas
+      props: [[0, 610, 868, 0], [2, 445, 872, 1], [1, 250, 592, 0], [3, 305, 612, 1], [0, 650, 565, 1], [4, 232, 1172, 0], [0, 612, 1200, 0], [4, 1262, 988, 1], [2, 1402, 1004, 0]],
       along: [['lantern', 230, 64, 11, 0.5]],
       fixed: [['signpost', 250, 690, 16, 0.5], ['well', 1620, 840, 18, 0.6],
         ['fence', 1980, 690, 22, 0.4], ['fence', 2090, 690, 22, 0.4], ['fence', 1980, 870, 22, 0.4], ['fence', 2090, 870, 22, 0.4]], // ringue do duelo amistoso
@@ -319,6 +322,7 @@ ZONES.crypt = {
   name: CRYPT.name, w: CG.w, h: CG.h, dungeon: true, fixedLight: true, noLeash: true, level: CRYPT.recommended, spawn: { x: CG.starts[0], y: CG.mid },
   preload: [...new Set([...CRYPT.rooms.flatMap((r) => [...r.waves.flat(), ...r.elites].map((x) => x[0])), CRYPT.boss.id, 'echoshade'])],
   walls: CG.walls.map((x) => ({ x, w: CG.wallW, gap: CG.door })),
+  sarcophagi: [[760, 190, 0.2], [1900, 175, 0.8], [2250, 835, 0.3], [3300, 830, 0.7], [4640, 165, 0.4], [4640, 850, 0.9]], // sarcófagos (x, y da base, espelhado se v>0.5); fora das portas e do centro
   palette: { ground: '#4b4766', ground2: '#423e5c', outside: '#12101c', path: '#5a5578', path2: '#524e70' },
   treeColors: ['#46565f'], flowerColors: ['#9fe0e8'],
   decor: { trees: 0, rocks: 0, bushes: 0, flowers: 0 },

@@ -13,6 +13,7 @@ import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
 import { drawNpcSprite, preloadNpcs, npcTop } from './npc-sprites.js';
 import { drawDayNight } from './sky.js';
+import { loadProps, setCryptState, gateSortY, drawCryptGate, drawCryptPillar, drawCryptSarcophagus, drawHarborBoat, drawHarborCrate, propShadow, propReady } from './props-art.js';
 import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite, drawNatureNamed } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
@@ -102,7 +103,8 @@ export class Renderer {
     g.save();
     g.scale(this.zoom, this.zoom);
     g.translate(-Math.round(cam.x), -Math.round(cam.y));
-    const rdy = (groundReady() ? 1 : 0) + (groundTexReady() ? 2 : 0); // o atlas de chão carrega depois do 1º quadro: refaz os blocos uma vez quando ele chega
+    setCryptState(view.crypt); if (z.dungeon || z.scenery?.boats) loadProps(z.dungeon ? CRYPT_PROPS : HARBOR_PROPS); // arte de objetos só da zona atual
+    const rdy = (groundReady() ? 1 : 0) + (groundTexReady() ? 2 : 0) + (propReady('crypt_part2') ? 4 : 0); // o atlas de chão carrega depois do 1º quadro: refaz os blocos uma vez quando ele chega
     this.groundCache.draw(g, world, cam.x - 8, cam.y - 8, cam.x + this.ww + 8, cam.y + this.wh + 8, rdy);
 
     const x0 = cam.x - 120, y0 = cam.y - 120, x1 = cam.x + this.ww + 120, y1 = cam.y + this.wh + 200;
@@ -115,7 +117,7 @@ export class Renderer {
     for (const tg of world.telegraphs) drawTelegraph(g, tg, t);
 
     const items = [];
-    for (const d of world.layout.decor) if (d.type === 'house' || vis(d.x, d.y)) items.push({ y: d.y, k: 'decor', o: d });
+    for (const d of world.layout.decor) if (d.type === 'house' || vis(d.x, d.y)) items.push({ y: d.type === 'cgate' ? gateSortY(d, view.player) : d.y, k: 'decor', o: d });
     for (const n of z.npcs ?? []) if (vis(n.x, n.y)) items.push({ y: n.y, k: 'npc', o: n });
     for (const c of z.chests ?? []) if (vis(c.x, c.y)) items.push({ y: c.y, k: 'chest', o: c });
     for (const a of world.actors) if (!a.hidden && vis(a.x, a.y)) items.push({ y: a.y + (a.kind === 'spirit' ? 26 : 0), k: 'actor', o: a });
@@ -341,10 +343,12 @@ function drawShadow(g, it) {
   else if (it.k === 'drop') { ellipse(g, o.x, o.y + 4, 7, 3); g.fill(); }
   else if (o.type === 'tree' || o.type === 'pine') { ellipse(g, o.x + 8, o.y + 2, o.s * 0.85, o.s * 0.32); g.fill(); }
   else if (o.type === 'rock' || o.type === 'crystal' || o.type === 'bush' || o.type === 'pillar') { ellipse(g, o.x + 4, o.y + o.s * 0.35, o.s * 0.9, o.s * 0.3); g.fill(); }
+  else if (propShadow(g, o)) { /* sombra do objeto pintado já desenhada */ }
   else if (o.type === 'house') { if (hasNatureSprite(o)) ellipse(g, o.x + o.w / 2, o.y - 2, o.w * 0.56, 11); else g.fillRect(o.x + 8, o.y - 6, o.w, 14); }
   else sceneryShadow(g, o);
 }
 
+const CRYPT_PROPS = ['crypt_part0', 'crypt_part2', 'crypt_part3', 'crypt_part4', 'crypt_part5'], HARBOR_PROPS = ['harbor_boat0', 'harbor_boat1', 'harbor_crate0', 'harbor_crate1', 'harbor_crate2', 'harbor_crate3', 'harbor_crate4'];
 // ---------------- decoração ----------------
 function drawDecor(g, d, t, z, player) {
   if (drawNature(g, d, player)) return; // cenário em sprites (modelos 3D fotografados); sem atlas, ou em tipos não cobertos, segue o desenho antigo abaixo
@@ -410,7 +414,12 @@ function drawDecor(g, d, t, z, player) {
       g.globalCompositeOperation = 'source-over';
       break;
     }
+    case 'cgate': drawCryptGate(g, d, player); break;
+    case 'csarco': drawCryptSarcophagus(g, d); break;
+    case 'cboat': drawHarborBoat(g, d, t); break;
+    case 'cprop': drawHarborCrate(g, d); break;
     case 'pillar': {
+      if (d.art && drawCryptPillar(g, d)) break;
       const broken = d.v < 0.45, H = d.s * (broken ? 1.1 : 2.1), w = d.s * 0.62;
       g.fillStyle = '#8f8ba0';
       ellipse(g, d.x, d.y, d.s * 0.85, d.s * 0.4); g.fill();
