@@ -2,19 +2,18 @@
 // Ficam separadas do personagem salvo: valem para o aparelho, não para o herói.
 const KEY = 'aetheria_prefs_v1';
 
-export const SCALE_MIN = 70;
+export const SCALE_MIN = 60;
 export const SCALE_MAX = 150;
 export const SCALE_STEP = 10;
 export const QUALITIES = ['auto', 'high', 'medium', 'low'];
 export const CONTROLS = ['auto', 'touch', 'keyboard'];
-export const DAYNIGHTS = ['auto', 'day'];
-const DEFAULTS = { scale: 'auto', quality: 'auto', controls: 'auto', daynight: 'auto' };
+const DEFAULTS = { scale: 'auto', quality: 'auto', controls: 'auto' };
 
-// Escala automática da interface (%): acompanha a viewport (referência 1024×480 pt, piso 70%, teto 100%).
-// Celular deitado (iPhone 874×402) cai para ~84%; tela de 700 px de altura ou mais fica em 100%. O tamanho manual (70–150%) continua nas Opções.
-export const AUTO_MIN = 70, AUTO_MAX = 100;
+// Escala automática da interface (%): acompanha a viewport (referência 1250×575 pt, piso 60%, teto 100%).
+// Celular deitado (iPhone 874×402) cai para ~70% (84% ainda deixava painéis ocupando a tela toda); tela de 1250×575 ou mais fica em 100%. O tamanho manual (60–150%) continua nas Opções.
+export const AUTO_MIN = 60, AUTO_MAX = 100;
 export function autoScale(w = globalThis.innerWidth ?? 1024, h = globalThis.innerHeight ?? 480) {
-  const k = Math.min(w / 1024, h / 480);
+  const k = Math.min(w / 1250, h / 575);
   return Math.max(AUTO_MIN, Math.min(AUTO_MAX, Math.round(k * 100)));
 }
 export const resolveScale = (prefs, w, h) => (prefs.scale === 'auto' ? autoScale(w, h) : prefs.scale);
@@ -23,7 +22,6 @@ const clean = (p) => ({
   scale: p.scale === 'auto' ? 'auto' : Math.max(SCALE_MIN, Math.min(SCALE_MAX, Math.round(Number(p.scale) / SCALE_STEP) * SCALE_STEP || DEFAULTS.scale)),
   quality: QUALITIES.includes(p.quality) ? p.quality : DEFAULTS.quality,
   controls: CONTROLS.includes(p.controls) ? p.controls : DEFAULTS.controls,
-  daynight: DAYNIGHTS.includes(p.daynight) ? p.daynight : DEFAULTS.daynight,
 });
 
 export function loadPrefs() {
@@ -34,13 +32,13 @@ export function savePrefs(p) {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* armazenamento indisponível */ }
 }
 
-// arg: "scale:auto", "scale:+10", "scale:-10", "quality:low", "controls:touch", "daynight:day"
+// arg: "scale:auto", "scale:+10", "scale:-10", "quality:low", "controls:touch"
 export function changePref(prefs, arg, w, h) {
   const [key, val] = arg.split(':');
   const next = { ...prefs };
   if (key === 'scale' && val === 'auto') next.scale = 'auto';
   else if (key === 'scale') next.scale = resolveScale(prefs, w, h) + (val.startsWith('+') || val.startsWith('-') ? Number(val) : Number(val) - resolveScale(prefs, w, h));
-  else if (key === 'quality' || key === 'controls' || key === 'daynight') next[key] = val;
+  else if (key === 'quality' || key === 'controls') next[key] = val;
   return clean(next);
 }
 

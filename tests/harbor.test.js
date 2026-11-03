@@ -203,10 +203,10 @@ test('nightMods: aggro cresce e ouro/XP/itens rendem mais à noite (rollMobLoot 
   assert.ok(i2 >= i1, 'itens não diminuem');
 });
 
-test('prefs: daynight só aceita auto/day', async () => {
-  const { changePref } = await import('../public/src/prefs.js');
-  assert.equal(changePref({ scale: 100, quality: 'auto', controls: 'auto', daynight: 'auto' }, 'daynight:day').daynight, 'day');
-  assert.equal(changePref({ scale: 100, quality: 'auto', controls: 'auto', daynight: 'day' }, 'daynight:lixo').daynight, 'auto');
+test('prefs: sem opção de dia e noite (sempre automático)', async () => {
+  const { loadPrefs, changePref } = await import('../public/src/prefs.js');
+  assert.equal('daynight' in changePref({ scale: 100, quality: 'auto', controls: 'auto' }, 'daynight:day'), false);
+  assert.equal('daynight' in loadPrefs(), false);
 });
 
 // ---------- Porto no meio da rota: desconto e reciclagem ----------

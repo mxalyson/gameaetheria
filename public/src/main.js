@@ -32,7 +32,6 @@ import { ACH } from './data/achievements.js';
 import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue } from './shop.js';
 import { TouchControls } from './touch.js';
 import { interactTarget } from './touch-logic.js';
-import { setDayNightMode } from './render/sky.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality, resolveScale } from './prefs.js';
 import { CLASSES } from './data/classes.js';
 import { MOBS, XP_MULT } from './data/mobs.js';
@@ -381,9 +380,10 @@ class Game {
   }
 
   async deleteCharacter(id) {
-    if (!confirm('Apagar este personagem? Essa ação não pode ser desfeita pelo jogo.')) return;
-    try { await this.online.deleteCharacter(id); } catch (e) { return this.showChars(e.message); }
-    this.showChars();
+    this.ui.confirm('Apagar este personagem? Essa ação não pode ser desfeita pelo jogo.', async () => {
+      try { await this.online.deleteCharacter(id); } catch (e) { return this.showChars(e.message); }
+      this.showChars();
+    }, 'Apagar');
   }
 
   async importLocalSave() {
@@ -796,10 +796,13 @@ class Game {
       this.online.importCharacter(text).then((x) => { this.ui.toast('Save importado', x.character.name, 'gold'); this.leaveCharacter().then(() => this.showChars()); }).catch((e) => this.ui.toast('Importação falhou', e.message, ''));
       return;
     }
-    if (loadChar() && !confirm('Importar "' + r.char.name + '" substitui o personagem atual deste aparelho. Continuar?')) return;
-    saveChar(r.char);
-    this.ui.toast('Save importado', r.char.name + (r.warnings.length ? ' · ' + r.warnings.length + ' ajuste(s)' : ''), 'gold');
-    if (this.mode === 'title') this.ui.showTitle(r.char); else this.loadGame(r.char);
+    const apply = () => {
+      saveChar(r.char);
+      this.ui.toast('Save importado', r.char.name + (r.warnings.length ? ' · ' + r.warnings.length + ' ajuste(s)' : ''), 'gold');
+      if (this.mode === 'title') this.ui.showTitle(r.char); else this.loadGame(r.char);
+    };
+    if (loadChar()) this.ui.confirm('Importar "' + r.char.name + '" substitui o personagem atual deste aparelho. Continuar?', apply, 'Importar');
+    else apply();
   }
 
   spawnSpirit(owner, char) {
@@ -827,7 +830,6 @@ class Game {
     document.documentElement.style.setProperty('--ui', String(this.uiScale));
     this.renderer.setQuality(resolveQuality(p, this.touch.coarse));
     this.touch.setMode(p.controls);
-    setDayNightMode(p.daynight); // render/sky.js: 'auto' segue o relógio, 'day' fica sempre claro (o bônus noturno de jogo segue o relógio)
   }
 
   setPref(arg) {
@@ -1418,12 +1420,14 @@ class Game {
     const c = this.char, sp = c.spirits.find((s) => s.id === id);
     if (!sp) return;
     const gold = Math.round(30 * sp.level * SPIRIT_RARITY_MUL[sp.rarity]);
-    if (!confirm(`Libertar ${SPIRITS[sp.type].name} (Nv ${sp.level})? Você recebe ${gold} de ouro.`)) return;
-    c.spirits = c.spirits.filter((s) => s.id !== id);
-    c.gold += gold;
-    if (c.activeSpirit === id) { c.activeSpirit = c.spirits[0]?.id ?? null; this.spawnSpirit(this.player, c); }
-    this.ui.render();
-    this.save();
+    this.ui.confirm(`Libertar ${SPIRITS[sp.type].name} (Nv ${sp.level})? Você recebe ${gold} de ouro.`, () => {
+      if (!c.spirits.some((s) => s.id === id)) return;
+      c.spirits = c.spirits.filter((s) => s.id !== id);
+      c.gold += gold;
+      if (c.activeSpirit === id) { c.activeSpirit = c.spirits[0]?.id ?? null; this.spawnSpirit(this.player, c); }
+      this.ui.render();
+      this.save();
+    }, 'Libertar');
   }
 
   // ---------------- arena PvP (1×1, 2×2, 4×4) ----------------

@@ -74,7 +74,8 @@ const STYLE = {
 import { trailPattern, waterPattern, groundTexReady } from './ground-textures.js';
 import { bridgeArtReady, drawBridgeSprite, hideBridgeRails } from './nature-sprites.js';
 
-export function paintGroundScenery(g, world, rng) {
+// `streets` (renderer.js) desenha praça e ruas ANTES dos rios e pontes: depois deles a rua cobria a água e a ponte pintada.
+export function paintGroundScenery(g, world, rng, streets) {
   const z = world.zone, L = world.layout, P = z.palette, sc = z.scenery;
   if (sc.kind === 'ruins' || sc.kind === 'ember') paintRuinsGround(g, world, rng);
   else paintNatureGround(g, world, rng, STYLE[sc.kind] ?? STYLE.forest);
@@ -88,6 +89,7 @@ export function paintGroundScenery(g, world, rng) {
     g.fillStyle = tone(P.ground, 0.07); ellipse(g, x - 0.8, y - 0.8, 1.4, 0.9); g.fill();
   }
   // Rios, marcas de acampamento e, por cima, as pontes (o terreno é desenhado em blocos: tudo aqui é por coordenada de mundo).
+  streets?.();
   paintRivers(g, world, rng);
   paintCamps(g, world);
   paintBridges(g, world);

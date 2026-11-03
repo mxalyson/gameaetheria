@@ -57,8 +57,14 @@ const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src=
 const npcPortrait = (id) => `<img class="por" src="${asset(`assets/portraits/npc-${id === 'merchant' ? 'merchant' : id}.webp`)}" alt="" draggable="false">`;
 // Emblema no oval do diálogo (provisório até haver retrato pintado de cada NPC): moeda, espada, spirit, escudo, cruz.
 const NPC_EMBLEM = { shop: `<img src="${asset('assets/icons/item/res-gold-coin.webp')}" alt="">`, arena: null, sage: null, guard: null, herbalist: null };
+// NPCs do Porto e mestres de classe usam o retrato do NPC/classe de que a arte foi derivada (mesmos apelidos de render/npc-sprites.js), com a cor ajustada.
+const NPC_FACE = { banker: ['sage', 70], hunter: ['guard', 80], dealer: ['merchant', 0], duelist: ['arena', 0], captain: ['guard', 150] };
 const npcEmblem = (id) => {
-  const html = ['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith'].includes(id) ? npcPortrait(id) : id === 'shop' ? NPC_EMBLEM.shop : attackImg('warrior', '⚔');
+  const m = /^master_(warrior|mage|archer|cleric)$/.exec(id), face = NPC_FACE[id];
+  const html = m ? classPortrait(m[1], '⚔')
+    : ['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith'].includes(id) ? npcPortrait(id)
+    : face ? npcPortrait(face[0]).replace('<img ', face[1] ? `<img style="filter:hue-rotate(${face[1]}deg)" ` : '<img ')
+    : id === 'shop' ? NPC_EMBLEM.shop : attackImg('warrior', '⚔');
   return `<span class="npc-emb por">${html}</span>`;
 };
 // moeda e poção pintadas no lugar dos emojis 🪙 🧪 dentro dos painéis
@@ -357,6 +363,21 @@ export class UI {
     while (log.children.length > 7) log.firstChild.remove();
     setTimeout(() => el.classList.add('fade'), 7000);
     setTimeout(() => el.remove(), 8200);
+  }
+
+  // Confirmação do próprio jogo (no lugar do confirm() do navegador, que no celular abre a janela do sistema). `onYes` roda só se o jogador aceitar.
+  confirm(text, onYes, yesLabel = 'Confirmar') {
+    this.confirmEl?.remove();
+    const el = this.confirmEl = document.createElement('div');
+    el.className = 'confirm-veil';
+    el.innerHTML = `<div class="confirm-box" role="alertdialog"><p></p><div class="confirm-btns"><button class="btn" data-no>Cancelar</button><button class="btn primary" data-yes></button></div></div>`;
+    el.querySelector('p').textContent = text;
+    el.querySelector('[data-yes]').textContent = yesLabel;
+    const close = () => { el.remove(); if (this.confirmEl === el) this.confirmEl = null; };
+    el.querySelector('[data-no]').addEventListener('click', close);
+    el.querySelector('[data-yes]').addEventListener('click', () => { close(); onYes(); });
+    el.addEventListener('click', (e) => { if (e.target === el) close(); });
+    document.body.appendChild(el);
   }
 
   toast(title, sub = '', tone = '', ms = 2200) { // ms: tempo visível (textos de lore pedem mais)
@@ -765,7 +786,6 @@ export class UI {
       <div class="opt-row"><b>Qualidade gráfica</b>${seg('quality', [['auto', 'Auto'], ['high', 'Alta'], ['medium', 'Média'], ['low', 'Baixa']])}</div>
       <p class="hint">Baixa e média reduzem névoa, partículas e resolução: ajudam em celulares fracos e economizam bateria.</p>
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Toque (padrão)'], ['keyboard', 'Teclado e mouse']])}</div>
-      <div class="opt-row"><b>Dia e noite</b>${seg('daynight', [['auto', 'Automático'], ['day', 'Sempre dia']])}</div>
       <p class="hint">À noite o ar escurece e as criaturas enxergam mais longe, mas dão um pouco mais de XP, ouro e itens. "Sempre dia" muda só a aparência.</p>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>

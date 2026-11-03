@@ -26,7 +26,7 @@ Estoque rotativo diário (semente = personagem + nível + dia UTC): 6 itens, de 
 ## Dia e noite
 - Regra pura: `core/daycycle.js` (`dayPhase(hora)`, `isNight(hora)`, `nightMods(hora)`, `hourFromMs`, `parseHora`, `zoneHasCycle`). 12 min reais por dia (30 s por "hora"): aurora 5,5 a 7 (45 s), dia 7 a 21 (7 min), entardecer 21 a 22,5 (45 s), noite 22,5 a 5,5 (3,5 min). Relógio de parede: todos veem a mesma hora. `?hora=22` (ou `setHora(22)` no console; `setHora(null)` volta ao relógio) fixa a hora.
 - Desenho: `render/sky.js › drawDayNight`, chamado uma vez em `renderer.draw` (antes das barras e nomes). Véu de cor por hora (aurora laranja, entardecer rosado, noite azul-marinho com vinheta; Ruínas e Cume mais escuros), buracos de luz no véu em volta do herói (lanterna), lampiões, braseiros e portais (brilho aditivo), vaga-lumes e estrelas à noite, rio de lava e brasas mais vivos nas Cinzas. Arenas (círculo) têm luz fixa. Qualidade baixa: só um retângulo e o halo do herói; média: sem estrelas e com menos vaga-lumes.
-- Opção "Dia e noite: automático / sempre dia": `setDayNightMode('auto' | 'day')` de `render/sky.js` (salva em `localStorage`, chave `aetheria_daynight`).
+- Dia e noite sempre ligados (2026-11-03: a opção "sempre dia" foi removida a pedido do dono).
 - Bônus de risco (**ainda não ligado à sim**): `NIGHT = { aggroMul: 1.1, rewardMul: 1.15 }` em `data/mobs.js` e `nightMods(hora)` em `core/daycycle.js`. Para ligar: na sim ou no servidor, `const m = nightMods(hourFromMs(Date.now()))`, e usar `aggro * m.aggroMul` e `XP/ouro/drop * m.rewardMul` só em zonas com `zoneHasCycle(zone)`. No servidor de zona, usar o relógio do servidor (não o do cliente).
 
 ## Missões do Porto (`data/quests.js`)

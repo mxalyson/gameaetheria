@@ -128,10 +128,9 @@ test('itens por classe, evolução de spirit só com a missão e opção de dia 
     g.char.quests.done[SPIRIT_EVO_QUEST[g.char.spirits[0].type]] = Date.now(); g.ui.render();
   });
   await expect(page.locator('[data-action="spirit-evolve"]')).toHaveCount(1);
-  // opções: Sempre dia
+  // opções: sem escolha de dia e noite (sempre automático)
   await page.evaluate(() => window.game.ui.openPanel('options'));
-  await page.locator('[data-action="pref"][data-arg="daynight:day"]').click();
-  expect(await page.evaluate(() => window.game.prefs.daynight)).toBe('day');
-  expect(await page.evaluate(() => localStorage.getItem('aetheria_daynight'))).toBe('day');
+  await expect(page.locator('.p-options')).toBeVisible();
+  await expect(page.locator('[data-arg^="daynight"]')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

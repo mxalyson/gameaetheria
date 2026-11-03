@@ -277,20 +277,21 @@ function buildGround(world, ox = 0, oy = 0, tw = world.zone.w, th = world.zone.h
     g.fillRect(x - r, y - r, r * 2, r * 2);
   }
 
-  if (z.scenery) paintGroundScenery(g, world, rng);
-
-  if (z.plaza) {
-    g.fillStyle = P.path; circle(g, z.plaza.x, z.plaza.y, z.plaza.r); g.fill();
-    g.fillStyle = P.path2; circle(g, z.plaza.x, z.plaza.y, z.plaza.r - 12); g.fill();
-    g.strokeStyle = shade(P.path, -0.06); g.lineWidth = 2;
-    for (let r = 100; r < z.plaza.r - 12; r += 30) { circle(g, z.plaza.x, z.plaza.y, r); g.stroke(); }
-  }
-  g.lineCap = 'round';
-  for (const [w, c] of [[64, P.path], [48, P.path2]]) {
-    if (!c) continue;
-    g.strokeStyle = c; g.lineWidth = w;
-    for (const [ax, ay, bx, by] of z.paths ?? []) { g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke(); }
-  }
+  const streets = () => {
+    if (z.plaza) {
+      g.fillStyle = P.path; circle(g, z.plaza.x, z.plaza.y, z.plaza.r); g.fill();
+      g.fillStyle = P.path2; circle(g, z.plaza.x, z.plaza.y, z.plaza.r - 12); g.fill();
+      g.strokeStyle = shade(P.path, -0.06); g.lineWidth = 2;
+      for (let r = 100; r < z.plaza.r - 12; r += 30) { circle(g, z.plaza.x, z.plaza.y, r); g.stroke(); }
+    }
+    g.lineCap = 'round';
+    for (const [w, c] of [[64, P.path], [48, P.path2]]) {
+      if (!c) continue;
+      g.strokeStyle = c; g.lineWidth = w;
+      for (const [ax, ay, bx, by] of z.paths ?? []) { g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke(); }
+    }
+  };
+  if (z.scenery) paintGroundScenery(g, world, rng, streets); else streets();
 
   const stamped = stampGround(g, world, rng, { x0: ox, y0: oy, x1: ox + tw, y1: oy + th }); // flores, trevos, pedrinhas e pedras de trilha em sprites (atlas de chão)
   const tuft = shade(P.ground, -0.12);

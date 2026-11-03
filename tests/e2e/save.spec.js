@@ -76,11 +76,11 @@ test('exportar e importar: arquivo válido substitui o personagem; arquivo invá
     const g = window.game; g.char.gold = 4242;
     const { exportSave } = await import('/src/save.js');
     const texto = exportSave(g.char);
-    window.confirm = () => true;
     g.applyImport('{"format":"aetheria-save","char":{"classId":"naoexiste"}}');
     const ruim = g.char.gold;
     g.char.gold = 1;
     g.applyImport(texto);
+    document.querySelector('.confirm-veil [data-yes]').click(); // confirmação do próprio jogo (ui.confirm)
     return { ruim, gold: g.char.gold, salvo: JSON.parse(localStorage.getItem('aetheria_save_v1')).gold };
   });
   expect(r.ruim).toBe(4242); // importação inválida não mexe em nada

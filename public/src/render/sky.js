@@ -1,12 +1,11 @@
 // Dia e noite (só apresentação): cor do ar por hora do dia, luz de lampiões/braseiros/portais, halo de lanterna do herói, vaga-lumes e estrelas.
 // A regra do relógio vive em core/daycycle.js (pura, testada); aqui só se desenha. Um gancho no renderer: drawDayNight(g, world, cam, ww, wh, zoom, player, quality).
 //   - Hora: relógio de parede (12 min reais = 1 dia). `?hora=22` (0-24) fixa a hora para teste/captura; setHora(22) no console faz o mesmo; setHora(null) volta ao relógio.
-//   - Opção "Dia e noite: automático / sempre dia": setDayNightMode('auto'|'day') (salva no aparelho). Arenas (círculo) têm luz fixa.
+//   - Sempre ligado (sem opção para desligar). Arenas (círculo) têm luz fixa.
 //   - Custo: 1 retângulo de cor + 1 vinheta em tela pequena (metade da resolução) + sprites de luz (drawImage) pré-renderizados. Qualidade baixa: só o retângulo e o halo.
 import { dayPhase, hourFromMs, parseHora, zoneHasCycle } from '../core/daycycle.js';
 
 const TAU = Math.PI * 2;
-const MODE_KEY = 'aetheria_daynight';
 const hash = (i, k = 0) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
 const mod = (a, n) => ((a % n) + n) % n;
 
@@ -16,15 +15,6 @@ export function setHora(h) { fixedHour = h == null ? null : mod(Number(h) || 0, 
 export function currentHour() {
   if (fixedHour === undefined) { try { fixedHour = parseHora(globalThis.location?.search); } catch { fixedHour = null; } }
   return fixedHour ?? hourFromMs(Date.now());
-}
-let mode = null;
-export function dayNightMode() {
-  if (mode === null) { try { mode = localStorage.getItem(MODE_KEY) === 'day' ? 'day' : 'auto'; } catch { mode = 'auto'; } }
-  return mode;
-}
-export function setDayNightMode(m) {
-  mode = m === 'day' ? 'day' : 'auto';
-  try { localStorage.setItem(MODE_KEY, mode); } catch { /* armazenamento indisponível */ }
 }
 if (typeof globalThis === 'object') globalThis.setHora = setHora; // atalho de QA no console
 
@@ -91,7 +81,7 @@ const MAX_LIGHTS = 26;
 // Desenha o ar da hora por cima do mundo (antes das barras e nomes: legíveis à noite). `g` já está na transformação do mundo (zoom e câmera).
 export function drawDayNight(g, world, cam, ww, wh, zoom, player, quality = 2) {
   const z = world.zone;
-  if (!zoneHasCycle(z) || dayNightMode() === 'day') return;
+  if (!zoneHasCycle(z)) return;
   const hour = currentHour(), ph = dayPhase(hour), lit = ph.dark;
   const tint = skyTint(hour), kind = z.scenery?.kind, zm = ZONE_DARK[kind] ?? 1;
   const alpha = Math.min(0.78, tint[3] * zm);
