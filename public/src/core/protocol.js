@@ -64,7 +64,10 @@ export function parseClientMessage(data) {
       } };
     }
     case 'queue':
-      return QUEUE_MODES.includes(data.mode) ? { ok: true, msg: { t: 'queue', mode: data.mode } } : { ok: false, code: REJECT.BAD_MODE };
+      if (!QUEUE_MODES.includes(data.mode)) return { ok: false, code: REJECT.BAD_MODE };
+      // `friendly` (duelo amistoso do Porto): só 1×1; sem Elo, ouro nem XP. Aditivo: cliente antigo simplesmente não envia.
+      if (data.friendly !== undefined && (data.friendly !== true || data.mode !== '1v1')) return { ok: false, code: REJECT.BAD_MODE };
+      return { ok: true, msg: data.friendly ? { t: 'queue', mode: data.mode, friendly: true } : { t: 'queue', mode: data.mode } };
     case 'zone_enter': // exploração no servidor: `zone` = zona de destino, `from` = zona de onde vem (o servidor confere o portal e decide o ponto de entrada)
       return ZONES[data.zone]?.mobs && (data.from === 'town' || ZONES[data.from]?.mobs || ZONES[data.from]?.hub) ? { ok: true, msg: { t: 'zone_enter', zone: data.zone, from: data.from } } : { ok: false, code: REJECT.BAD_MESSAGE };
     case 'zone_teleport': // teletransporte para mapa já visitado: só o destino; visitado, pergaminho, combate e limite de uso são conferidos no servidor

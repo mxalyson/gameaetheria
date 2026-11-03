@@ -197,10 +197,19 @@ export class ZoneRoom {
     const ms = this.mobs().filter((m) => !m.dead || m.deadT < 0.6);
     return this.enc.frame(tuples, ms.map(mobTuple), new Map(ms.map((m) => [m.id, mobStatic(m)])), { commit, forceKey: !commit });
   }
+  // Ritual do chefe final para o HUD: [abates, necessário, recarga em minutos, presságio 0|1, chefe vivo 0|1]; null se a zona não tem ritual.
+  // Vai só quando muda (e em todo quadro-chave): a recarga é em minutos inteiros, então são poucos envios.
+  ritualTuple() {
+    const r = this.world.bossProgress;
+    return r ? [r.have, r.need, Math.ceil(r.cool / 60), r.omen ? 1 : 0, r.alive ? 1 : 0] : null;
+  }
   broadcast() {
     const f = this.frameFor(true);
     const ev = this.events; this.events = [];
     const extra = {};
+    const rt = this.ritualTuple(), rts = rt?.join(',');
+    if (rt && (f.k === 1 || rts !== this.lastRt)) extra.rt = rt;
+    this.lastRt = rts;
     if (this.joined.length) extra.pj = this.statics(this.joined);
     if (this.left.length) extra.pl = this.left;
     this.joined = []; this.left = [];
@@ -216,7 +225,7 @@ export class ZoneRoom {
   sendKeyframe(session) {
     const p = session.player;
     if (!p) return;
-    const f = this.frameFor(false);
-    this.send.raw(session, JSON.stringify({ ...this.meta(), ...f, pj: this.statics([...this.players.values()].filter((q) => !q.left)), events: [] }).slice(0, -1) + `,"ack":${p.lastSeq},"me":${this.meJson(p)}}`);
+    const f = this.frameFor(false), rt = this.ritualTuple();
+    this.send.raw(session, JSON.stringify({ ...this.meta(), ...f, ...(rt ? { rt } : {}), pj: this.statics([...this.players.values()].filter((q) => !q.left)), events: [] }).slice(0, -1) + `,"ack":${p.lastSeq},"me":${this.meJson(p)}}`);
   }
 }

@@ -489,7 +489,7 @@ class Game {
     this.netDec = new SnapshotDecoder().init(m);
     if (this.cloud) this.cloud.paused = true; // na instância o servidor altera o personagem
     const w = new World(m.zone, { visuals: true });
-    this.world = w; this.mode = 'net'; this.netInfo = info; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
+    this.world = w; this.mode = 'net'; this.netInfo = info; this.netRitual = null; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
     this.netActors = new Map(); this.netMobs = new Map(); this.netSnaps = []; this.netLast = null; this.netPred = null; this.netT = 0; this.netCastPending = null; this.netVProj = [];
     for (const p of m.players) this.netAddHero(p, m.you);
     this.player = this.netActors.get(m.you);
@@ -555,6 +555,7 @@ class Game {
     s.at = performance.now();
     this.netSnaps.push(s); if (this.netSnaps.length > 24) this.netSnaps.shift();
     this.netLast = s;
+    if (s.rt) this.netRitual = { have: s.rt[0], need: s.rt[1], cool: s.rt[2] * 60, omen: !!s.rt[3], alive: !!s.rt[4] }; // ritual do chefe (instância); delta sem `rt` = não mudou
     const w = this.world, my = this.netInfo.team;
     if (w.objective && s.match) { w.objective.owner = s.match.owner ? (s.match.owner === my ? 1 : 2) : 0; }
     for (const e of s.events) this.netEvent(e);
@@ -723,6 +724,9 @@ class Game {
     const won = coop ? s.winner === 1 : s.winner === m.team, draw = !coop && s.winner === 3;
     this.netResult = { won, draw, coop };
     this.ui.banner(null);
+    if (m.friendly) { // amistoso: o servidor não paga nada (a missão `porto_duelo` segue só offline: OFFLINE_TYPES)
+      return this.ui.showResult({ title: draw ? 'Empate' : won ? 'Vitória!' : 'Derrota', sub: 'Duelo amistoso', lines: ['Amistoso: sem Elo, ouro nem XP.'], button: 'Voltar ao Porto', action: 'net-leave', tone: won ? 'win' : 'lose' });
+    }
     if (this.netRewardMsg) return this.renderNetReward();
     this.ui.showResult({
       title: draw ? 'Empate' : won ? (coop ? 'Vitória cooperativa!' : 'Vitória!') : (coop ? 'Derrota' : 'Derrota'),
@@ -751,6 +755,7 @@ class Game {
   // volta ao jogo normal: adota o personagem OFICIAL do servidor (com as recompensas) e retoma a sincronização
   async leaveNetMatch(exit = null) {
     this.ui.hideScreen(); this.ui.banner(null);
+    if (!exit && this.netInfo?.friendly) exit = { to: 'harbor', x: ZONES.harbor.spawn.x, y: ZONES.harbor.spawn.y }; // amistoso volta ao Porto
     this.netInfo = null; this.netLast = null; this.netActors = null; this.netMobs = null;
     try { const r = await this.online.getCharacter(this.charId); this.char = r.character; this.cloud.attach(this.charId, r.rev, () => this.char); } catch { /* mantém o local */ }
     if (this.cloud) this.cloud.paused = false;
@@ -1446,9 +1451,14 @@ class Game {
     return out;
   }
 
-  // Duelo amistoso do Porto (Duelista Kael): 1×1 contra rival de IA, sem Elo, sem ouro e sem XP de PvP. Só offline: online ainda não há regra no servidor.
+  // Duelo amistoso do Porto (Duelista Kael): 1×1 contra rival de IA, sem Elo, sem ouro e sem XP de PvP. Online: fila `friendly` do servidor (a sala não grava nada).
   startFriendly() {
-    if (this.online) return this.ui.toast('Duelo amistoso', 'Disponível só na jornada solo por enquanto.', '');
+    if (this.online) {
+      if (!this.net?.joined) return this.ui.toast('Servidor de partidas', 'Ainda conectando…', '');
+      if (this.mode !== 'explore') return;
+      this.net.queueFor('1v1', true);
+      return this.ui.toast('Duelo amistoso', 'Procurando o duelista… sem Elo, ouro nem XP.', '');
+    }
     this.startMatch('1v1', { friendly: true });
   }
 

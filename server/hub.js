@@ -16,6 +16,7 @@ import { TICK_DT, MAX_PARTY, REJECT } from '../public/src/core/protocol.js';
 
 export const INVITE_TTL = 60;        // s
 export const BOT_FILL_AFTER = 20;    // s na fila até completar com bots
+export const FRIENDLY_BOT_AFTER = 3; // s: duelo amistoso do Porto completa com bot depressa (é a luta contra o Duelista)
 export const COOP_WAIT = 6;          // s esperando mais jogadores antes de começar o cooperativo
 const COOP_LEVEL_GAP = 8;
 export const TELEPORT_COOLDOWN = 5;      // s entre pedidos de teletransporte da mesma sessão (vale também para pedidos recusados)
@@ -102,7 +103,7 @@ export class Hub {
       case 'party_decline': { const p = this.parties.get(m.partyId); if (p?.invites.delete(s)) this.out.send(p.leader, { t: 'notice', code: 'invite_declined', name: s.name }); return; }
       case 'party_leave': if (!s.partyId) return no(REJECT.NOT_IN_PARTY); if (s.queued) this.cancelQueue(s); this.leaveParty(s, 'left'); return;
       case 'party_kick': return this.kick(s, m.name, no);
-      case 'queue': return this.enqueue(s, m.mode, no);
+      case 'queue': return this.enqueue(s, m.mode, no, !!m.friendly);
       case 'queue_cancel': if (s.queued) this.cancelQueue(s); return;
       case 'zone_enter': return this.zoneEnter(s, m.zone, m.from, no);
       case 'zone_leave': return this.zoneLeave(s);
@@ -175,7 +176,7 @@ export class Hub {
   }
 
   // ---------- fila e matchmaking ----------
-  enqueue(s, mode, no) {
+  enqueue(s, mode, no, friendly = false) {
     if (s.queued) return no(REJECT.ALREADY_QUEUED);
     if (s.room) return no(REJECT.IN_MATCH);
     const p = this.partyOf(s);
@@ -187,9 +188,9 @@ export class Hub {
     for (const m of members) {
       if (!m.ws) return no(REJECT.MEMBER_OFFLINE);
       if (m.room || m.queued) return no(REJECT.IN_MATCH);
-      if (!coop && !pvpUnlocked(m.char)) return no(REJECT.PVP_LOCKED, { minLevel: PVP_MIN_LEVEL, name: m.name });
+      if (!coop && !friendly && !pvpUnlocked(m.char)) return no(REJECT.PVP_LOCKED, { minLevel: PVP_MIN_LEVEL, name: m.name });
     }
-    const e = { mode, members, since: this.clock, rating: coop ? 0 : avg(members.map((m) => this.rating(m, mode))), power: avg(members.map((m) => this.power(m))), level: avg(members.map((m) => m.char.level)) };
+    const e = { mode, friendly, members, since: this.clock, rating: coop ? 0 : avg(members.map((m) => this.rating(m, mode))), power: avg(members.map((m) => this.power(m))), level: avg(members.map((m) => m.char.level)) };
     for (const m of members) m.queued = e;
     this.queue.push(e);
     for (const m of members) this.out.send(m, { t: 'queue', mode, state: 'searching' });
@@ -234,12 +235,12 @@ export class Hub {
     this.matchmakeCoop();
     for (const mode of Object.keys(MODES)) {
       const size = MODES[mode].size;
-      const list = this.queue.filter((e) => e.mode === mode).sort((a, b) => a.since - b.since);
+      const list = this.queue.filter((e) => e.mode === mode).sort((a, b) => a.since - b.since); // amistosos só casam entre si
       const used = new Set();
       for (const seed of list) {
         if (used.has(seed)) continue;
         const wait = this.clock - seed.since;
-        const compatible = list.filter((e) => e !== seed && !used.has(e) && this.ok(seed, e, Math.max(wait, this.clock - e.since)));
+        const compatible = list.filter((e) => e.friendly === seed.friendly && e !== seed && !used.has(e) && this.ok(seed, e, Math.max(wait, this.clock - e.since)));
         const teams = [{ groups: [seed], n: seed.members.length }, { groups: [], n: 0 }];
         const pool = [...compatible];
         const fill = (team) => { // preenche o time com grupos que cabem exatamente (maiores primeiro)
@@ -248,15 +249,15 @@ export class Hub {
           }
         };
         fill(teams[0]); fill(teams[1]);
-        const withBots = wait >= BOT_FILL_AFTER;
+        const withBots = wait >= (seed.friendly ? FRIENDLY_BOT_AFTER : BOT_FILL_AFTER);
         if (!withBots && (teams[0].n < size || teams[1].n < size)) continue;
         for (const t of teams) for (const g of t.groups) used.add(g);
-        this.startRoom(mode, teams, withBots);
+        this.startRoom(mode, teams, withBots, !!seed.friendly);
       }
     }
   }
 
-  startRoom(mode, teams, botsAllowed) {
+  startRoom(mode, teams, botsAllowed, friendly = false) {
     const size = MODES[mode].size;
     const humans = teams.flatMap((t) => t.groups.flatMap((g) => g.members));
     for (const e of teams.flatMap((t) => t.groups)) this.queue = this.queue.filter((x) => x !== e);
@@ -281,14 +282,14 @@ export class Hub {
     });
     void botsAllowed;
     const id = this.nextRoom++;
-    const room = new MatchRoom({ id, mode, entries, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession });
+    const room = new MatchRoom({ id, mode, entries, friendly, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession });
     this.rooms.set(id, room);
     this.stats.matches++;
     for (const p of room.humans()) this.sendMatchFound(p.session, room, p);
   }
   sendMatchFound(s, room, p) {
     if (room.mode === 'zone') return this.sendZoneJoined(s, room);
-    this.out.send(s, { t: 'match_found', room: room.id, mode: room.mode, you: p.actor.id, team: p.team, slot: p.team, arena: { w: room.world.zone.w, h: room.world.zone.h, radius: room.world.zone.radius },
+    this.out.send(s, { t: 'match_found', room: room.id, mode: room.mode, ...(room.friendly ? { friendly: true } : {}), you: p.actor.id, team: p.team, slot: p.team, arena: { w: room.world.zone.w, h: room.world.zone.h, radius: room.world.zone.radius },
       objective: room.world.objective ? { x: room.world.objective.x, y: room.world.objective.y, r: room.world.objective.r } : null,
       players: [...room.players.values()].filter((q) => !q.left).map((q) => ({ id: q.actor.id, team: q.team, name: q.name, classId: q.classId, level: q.actor.level, maxHp: q.actor.maxHp, bot: q.bot })) });
     room.sendKeyframe?.(s); // reconexão: quadro-chave completo para o decodificador recomeçar

@@ -277,6 +277,58 @@ test('ponto de controle: o time que o segura pontua e vence por pontos; recompen
   await closeAll(srv, ...cs);
 });
 
+// ---------- duelo amistoso do Porto ----------
+test('protocolo: queue friendly só vale para 1v1 e é booleano estrito', async () => {
+  const { parseClientMessage, PROTOCOL_VERSION } = await import('../public/src/core/protocol.js');
+  const P = (o) => parseClientMessage({ v: PROTOCOL_VERSION, t: 'queue', ...o });
+  assert.deepEqual(P({ mode: '1v1', friendly: true }).msg, { t: 'queue', mode: '1v1', friendly: true });
+  assert.deepEqual(P({ mode: '1v1' }).msg, { t: 'queue', mode: '1v1' });
+  assert.equal(P({ mode: '2v2', friendly: true }).ok, false);
+  assert.equal(P({ mode: '1v1', friendly: 'yes' }).ok, false);
+  assert.equal(P({ mode: '1v1', friendly: false }).ok, false);
+});
+
+test('duelo amistoso: sem nível de PvP, completa com bot em poucos segundos e NÃO altera Elo, ouro nem XP', async () => {
+  const db = openDb(':memory:');
+  const acc = db.createAccount({ email: 'amigo@x.com', pwHash: 'x' });
+  const doc = newOfficialCharacter('Amigo', 'warrior'); // nível 1: o PvP ranqueado estaria bloqueado
+  const charId = db.createCharacter(acc, doc.name, doc.classId, doc);
+  const session = db.createSession(acc);
+  const srv = await start({ db });
+  const c = await connect(srv); c.send({ t: 'hello', session, characterId: charId }); await c.waitFor((m) => m.t === 'welcome');
+  c.send({ t: 'queue', mode: '1v1' }); await c.sync();
+  assert.ok(rejects(c).includes(REJECT.PVP_LOCKED), 'ranqueado continua bloqueado');
+  c.send({ t: 'queue', mode: '1v1', friendly: true }); await c.sync();
+  assert.equal(srv.hub.rooms.size, 0);
+  srv.step(60 * 2); assert.equal(srv.hub.rooms.size, 0, 'ainda espera um humano');
+  srv.step(60 * 2);
+  const mf = await c.waitFor((m) => m.t === 'match_found');
+  assert.equal(mf.friendly, true); assert.equal(mf.mode, '1v1');
+  const room = srv.room; assert.equal(room.friendly, true);
+  srv.step(60 * 4);
+  room.end(1, 'elimination'); // vitória do jogador
+  srv.step(5);
+  assert.equal(room.state, 'over');
+  assert.equal(c.all('reward').length, 0, 'nenhuma recompensa enviada');
+  const after = db.character(charId).doc;
+  assert.equal(after.gold, doc.gold); assert.equal(after.xp, doc.xp); assert.equal(after.level, doc.level);
+  assert.deepEqual(after.arena, doc.arena);
+  await closeAll(srv, c);
+});
+
+test('duelo amistoso não casa com ranqueado (filas separadas)', async () => {
+  const srv = await start();
+  const [a, b] = await players(srv, 2);
+  a.send({ t: 'queue', mode: '1v1', friendly: true }); b.send({ t: 'queue', mode: '1v1' }); await sync(a, b);
+  srv.step(60 * 2);
+  assert.equal(srv.hub.rooms.size, 0, 'amistoso e ranqueado esperam separados');
+  srv.step(60 * 2); // o amistoso completa com bot; o ranqueado segue esperando (bot só após 20 s)
+  assert.equal(srv.hub.rooms.size, 1);
+  assert.equal(srv.room.friendly, true);
+  assert.equal(b.msgs.some((m) => m.t === 'match_found'), false);
+  await closeAll(srv, a, b);
+});
+
 test('fim do tempo: vence quem tem mais pontos; empate de pontos decide pela vida; tudo empatado = empate sem vencedor', async () => {
   const srv = await start();
   const [a, b] = await players(srv, 2);

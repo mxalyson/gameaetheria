@@ -213,7 +213,7 @@ export function buildLayout(zoneId) {
   }
   // Lore coletável (placa ou estátua tocável, ver touch-logic.js interactTarget): pequeno obstáculo, com área livre em volta antes da vegetação.
   for (const l of z.lore ?? []) {
-    const s = l.kind === 'statue' ? 28 : 16, collR = l.kind === 'statue' ? 0.9 : 0.5;
+    const s = 28, collR = l.kind === 'statue' ? 0.9 : 0.5;
     keepOut.push({ x: l.x, y: l.y, r: 55 });
     decor.push({ type: l.kind, x: l.x, y: l.y, s, v: srng.next() });
     obstacles.push({ x: l.x, y: l.y, r: s * collR, block: true });

@@ -67,7 +67,7 @@ export class NetClient {
   }
 
   send(o) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify({ v: PROTOCOL_VERSION, ...o })); }
-  queueFor(mode) { this.send({ t: 'queue', mode }); }
+  queueFor(mode, friendly = false) { this.send(friendly ? { t: 'queue', mode, friendly: true } : { t: 'queue', mode }); }
   cancelQueue() { this.send({ t: 'queue_cancel' }); }
   invite(name) { this.send({ t: 'party_invite', name }); }
   accept(partyId) { this.invites = this.invites.filter((i) => i.partyId !== partyId); this.send({ t: 'party_accept', partyId }); }

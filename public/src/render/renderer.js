@@ -61,7 +61,19 @@ export class Renderer {
     // as áreas seguras do iPhone (entalhe/barra inicial) deslocam o HUD: somam-se aos recuos
     const { l: sal, r: sar, t: sat, b: sab } = safeInsets();
     this.hud = [[0, 0, 240 * u + sal, 130 * u + sat], [vw - 150 * u - sar, 0, vw, 140 * u + sat], [vw - 540 * u - sar, 0, vw, 60 * u + sat], [vw - 280 * u - sar, vh - 250 * u - sab, vw, vh]];
+    // a fileira de menu real (medida no DOM) é maior que a estimativa acima em telas pequenas: etiquetas não ficam atrás dela
+    this.menuOk = false; this.menuTick = 0;
+    this.measureMenu();
     this.labels = [];
+  }
+
+  // Mede a fileira de menu no DOM (some na tela de título e aparece depois: repete até conseguir, e a cada ~1 s para acompanhar a escala da UI)
+  measureMenu() {
+    const mb = typeof document !== 'undefined' ? document.getElementById('menu-btns')?.getBoundingClientRect() : null;
+    if (!mb || mb.width <= 0) { this.menuOk = false; return; }
+    this.hud.length = 4;
+    this.hud.push([mb.left - 4, 0, mb.right + 4, mb.bottom + 6]);
+    this.menuOk = true;
   }
 
   // Qualidade gráfica: limita a resolução e corta efeitos de atmosfera mais caros (para celulares).
@@ -139,6 +151,7 @@ export class Renderer {
 
     // Barras e nomes por cima de tudo.
     this.labels.length = 0;
+    if (!this.menuOk || ++this.menuTick % 60 === 0) this.measureMenu();
     const hud = this.hud, zm = this.zoom;
     PROMPTS.length = 0; SAFE.cx = cam.x; SAFE.cy = cam.y; SAFE.zm = zm; SAFE.vw = this.vw; SAFE.vh = this.vh; SAFE.hud = hud;
     const covered = (a) => { const sx = (a.x - cam.x) * zm, sy = (a.y - cam.y) * zm - 40 * zm; for (const [x0, y0, x1, y1] of hud) if (sx > x0 && sx < x1 && sy > y0 && sy < y1) return true; return false; };
@@ -909,9 +922,16 @@ function drawPrompt(g, x, y, txt) {
   const w = g.measureText(txt).width + 16;
   // nunca sob botões de toque nem fora da tela; dois rótulos (NPC e baú juntos) não se sobrepõem: tenta ao lado em degraus de 24 px
   const x0 = x, y0 = y;
-  for (let n = 0; n < 5; n++) {
+  const busy = () => PROMPTS.some((q) => Math.abs(q.x - x) < (q.w + w) / 2 && Math.abs(q.y - y) < 24);
+  let n = 0;
+  for (; n < 5; n++) {
     const p = safeBox(x0, y0 + PROMPT_OFF[n], w, 22); x = p.x; y = p.y;
-    if (!PROMPTS.some((q) => Math.abs(q.x - x) < (q.w + w) / 2 && Math.abs(q.y - y) < 24)) break;
+    if (!busy()) break;
+  }
+  // todas as posições ao lado ocupadas: sobe em degraus de 24 px (nunca deixa um rótulo cobrir o texto do outro)
+  for (let k = 1; n >= 5 && k <= 4; k++) {
+    const p = safeBox(x0, y0 - 24 * k, w, 22); x = p.x; y = p.y;
+    if (!busy()) break;
   }
   PROMPTS.push({ x, y, w });
   g.fillStyle = 'rgba(24,16,8,0.82)'; g.beginPath(); g.roundRect(x - w / 2, y, w, 22, 11); g.fill();
@@ -932,6 +952,17 @@ function drawNpcTag(g, n, near, t, mark, guide) {
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
   const top = mobSpritesEnabled() ? npcTop(n.id) : null, ny = (top != null ? n.y + top - 6 : n.y - 44) - (NPC_LIFT.get(n.id) ?? 0); // pintado: o nome fica logo acima da cabeça
+  // nome + marca presos à área livre (fora do menu do alto e dos botões de toque): desloca o conjunto inteiro
+  const hasMark = mark && mark !== 'none', boxH = 16 + (hasMark ? 26 : 0) + (guide && mark === 'offer' ? 22 : 0);
+  const sb = safeBox(n.x, ny - 12 - (boxH - 16), Math.max(g.measureText(n.name).width + 6, 24), boxH);
+  const dx = sb.x - n.x, dy = sb.y - (ny - 12 - (boxH - 16));
+  if (guide && mark === 'offer') { // pulso no chão do guia: fica no lugar, não se desloca
+    const k = (t * 1.2) % 1;
+    g.strokeStyle = `rgba(255,211,77,${0.8 * (1 - k)})`; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(n.x, n.y + 6, 22 + k * 30, 9 + k * 12, 0, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = 'rgba(20,20,35,0.7)'; g.lineWidth = 3;
+  }
+  g.save(); g.translate(dx, dy);
   g.strokeText(n.name, n.x, ny);
   g.fillStyle = '#fff3c4';
   g.fillText(n.name, n.x, ny);
@@ -944,12 +975,10 @@ function drawNpcTag(g, n, near, t, mark, guide) {
   }
   // Onboarding: pulso e seta sobre o guia enquanto a primeira missão não foi aceita
   if (guide && mark === 'offer') {
-    const k = (t * 1.2) % 1;
-    g.strokeStyle = `rgba(255,211,77,${0.8 * (1 - k)})`; g.lineWidth = 3;
-    g.beginPath(); g.ellipse(n.x, n.y + 6, 22 + k * 30, 9 + k * 12, 0, 0, Math.PI * 2); g.stroke();
     const ay = by - 16 + Math.sin(t * 5) * 4;
     g.fillStyle = '#ffd34d'; g.strokeStyle = 'rgba(60,35,0,0.9)'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(n.x, ay + 9); g.lineTo(n.x - 8, ay - 3); g.lineTo(n.x + 8, ay - 3); g.closePath(); g.stroke(); g.fill();
   }
+  g.restore();
   if (near) drawPrompt(g, n.x, n.y + 22, 'Toque para conversar'); // sem tecla no texto (decisão 0016, V5); presa à área livre
 }

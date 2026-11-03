@@ -228,3 +228,45 @@ test('B9: exceção numa sala fecha só essa sala; o servidor segue e a outra sa
   const tick0 = rb.tick; srv.step(3); assert.equal(rb.tick, tick0 + 3, 'a outra sala segue');
   await closeAll(srv, a.c, b.c);
 });
+
+// ---------- ritual do chefe final no HUD online ----------
+import { ZoneRoom } from '../server/zone.js';
+import { SnapshotDecoder } from '../public/src/core/snapshot.js';
+import { KEYFRAME_EVERY } from '../public/src/core/snapshot.js';
+
+test('ritual: o servidor informa o progresso (rt) só quando muda e em todo quadro-chave; zona sem ritual não envia', () => {
+  const mk = (zoneId) => {
+    const log = [];
+    const room = new ZoneRoom({ id: 1, key: 'k', zoneId, seed: 5, send: { stats: { staleInputs: 0 }, to() {}, raw: (s, t) => log.push(JSON.parse(t)) } });
+    const sess = { ws: {}, room: null, player: null, char: newOfficialCharacter('R', 'warrior'), name: 'R', charId: null, accountId: null };
+    room.join(sess, { x: 200, y: 1400 });
+    return { room, log, sess };
+  };
+  const { room, log, sess } = mk('ember');
+  room.bossState.progress = 7; // 7/40
+  room.broadcast();
+  assert.deepEqual(log.at(-1).rt, [7, 40, 0, 0, 0]);
+  room.broadcast(); // delta sem mudança: não repete
+  assert.equal(log.at(-1).rt, undefined);
+  room.bossState.progress = 8;
+  room.broadcast();
+  assert.deepEqual(log.at(-1).rt.slice(0, 2), [8, 40]);
+  room.bossState.omenT = 3; room.broadcast();
+  assert.equal(log.at(-1).rt[3], 1, 'presságio');
+  room.bossState.omenT = 0;
+  room.bossState.coolUntil = room.world.clock() + 1200; room.broadcast();
+  assert.equal(log.at(-1).rt[2], 20, 'recarga em minutos');
+  // quadro-chave periódico repete o campo
+  let sawKey = false;
+  for (let i = 0; i < KEYFRAME_EVERY + 2; i++) { room.broadcast(); const m = log.at(-1); if (m.k === 1) { sawKey = true; assert.ok(m.rt, 'quadro-chave leva rt'); } }
+  assert.ok(sawKey);
+  // quem reconecta recebe o quadro-chave com rt
+  log.length = 0; sess.log = log; room.sendKeyframe(sess);
+  assert.ok(log.at(-1).rt);
+  // o decodificador do cliente repassa `rt`
+  const dec = new SnapshotDecoder(); dec.you = sess.player.actor.id;
+  assert.deepEqual(dec.apply(log.at(-1)).rt, log.at(-1).rt);
+  // zona com chefe por tempo (sem ritual) não envia rt
+  const f = mk('forest'); f.room.broadcast();
+  assert.equal(f.log.at(-1).rt, undefined);
+});

@@ -15,8 +15,8 @@ const idle = () => ({ mx: 0, my: 0, aimX: 0, aimY: 0, attack: false, cast: null 
 
 export class MatchRoom {
   // entries: [{ team: 1|2, session|null, bot: bool, doc, charId, accountId, rating }]
-  constructor({ id, mode, entries, seed, db = null, reconnectSec = 30, send }) {
-    Object.assign(this, { id, mode, db, reconnectSec, send, size: MODES[mode].size });
+  constructor({ id, mode, entries, seed, db = null, reconnectSec = 30, send, friendly = false }) {
+    Object.assign(this, { id, mode, friendly: !!friendly, db, reconnectSec, send, size: MODES[mode].size });
     this.matchId = randomBytes(9).toString('base64url');
     this.world = new World('arena_team', { seed, visuals: false });
     const z = this.world.zone;
@@ -110,7 +110,7 @@ export class MatchRoom {
     if (this.state === 'over') return; // nunca paga duas vezes
     this.state = 'over'; this.resultT = RESULT_SHOW; this.winner = winner; this.reason = reason;
     this.events.push({ e: 'result', winner, reason });
-    if (!this.db) return;
+    if (!this.db || this.friendly) return; // amistoso: nada de Elo, ouro, XP nem auditoria de recompensa
     const teamRating = (team) => { const t = this.teamOf(team); return t.length ? Math.round(t.reduce((s, p) => s + p.rating, 0) / t.length) : 1000; };
     const foeId = (team) => [...this.players.values()].filter((q) => q.team !== team && q.charId).map((q) => q.charId).sort((x, y) => x - y)[0] ?? 0; // id estável do adversário (humano de menor id): anti-troca de vitórias do PvP
     this.foeIdOf = foeId;

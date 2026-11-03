@@ -54,3 +54,18 @@ test('stackLabels: nomes colados sobem em degraus; distantes ficam no lugar', as
   assert.equal(new Set(l).size, 3, 'três nomes sobrepostos precisam de três degraus');
   assert.ok(Math.max(...stackLabels(Array.from({ length: 8 }, () => ({ x: 0, w: 80, y: 0 })))) <= 42);
 });
+
+test('stackLabels: alturas diferentes não empilham; resultado independe da ordem de entrada; sem caixas devolve []', async () => {
+  const { stackLabels } = await import('../public/src/render/safe-box.js');
+  assert.deepEqual(stackLabels([]), []);
+  assert.deepEqual(stackLabels([{ x: 0, w: 100, y: 0 }, { x: 10, w: 100, y: 60 }]), [0, 0], 'pés bem separados em y: sem colisão');
+  const a = [{ x: 0, w: 100, y: 0 }, { x: 50, w: 100, y: 0 }, { x: 400, w: 60, y: 0 }];
+  const l1 = stackLabels(a), l2 = stackLabels([a[1], a[0], a[2]]);
+  assert.deepEqual([l1[0], l1[1], l1[2]], [l2[1], l2[0], l2[2]], 'ordenação interna por x');
+  assert.equal(l1[2], 0, 'o distante não sobe');
+  // vizinhos que se tocam só pela folga (gap) também sobem; sem y informado vale 0
+  const t = stackLabels([{ x: 0, w: 100 }, { x: 102, w: 100 }]);
+  assert.equal(t[1], 14);
+  // o teto de degraus vale para qualquer passo
+  assert.ok(Math.max(...stackLabels(Array.from({ length: 10 }, () => ({ x: 0, w: 80, y: 0 })), 10, 2)) <= 20);
+});

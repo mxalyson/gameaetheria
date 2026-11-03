@@ -292,8 +292,8 @@ export class UI {
   updateHud(game) {
     const { char, player, world } = game;
     if (!player) return;
-    // ritual do chefe final ("Ritual 23/40"): só nas zonas em que o chefe aparece por contador. B28 (limitação conhecida): na instância online o ritual é do servidor e o HUD não o mostra (mode 'net')
-    const rp = game.mode === 'explore' ? world.bossProgress : null, rit = $('ritual');
+    // ritual do chefe final ("Ritual 23/40"): só nas zonas em que o chefe aparece por contador. Na instância online o ritual é do servidor: vem em `rt` nos snapshots (game.netRitual).
+    const rp = game.mode === 'explore' ? world.bossProgress : game.mode === 'net' && game.netInfo?.mode === 'zone' ? game.netRitual ?? null : null, rit = $('ritual');
     if (rit) {
       const txt = !rp || rp.alive ? '' : rp.omen ? 'O chão estremece…' : rp.cool > 0 ? `Ritual em repouso · ${Math.ceil(rp.cool / 60)} min` : `Ritual ${rp.have}/${rp.need}`;
       if (rit.dataset.t !== txt) { rit.dataset.t = txt; rit.textContent = txt; rit.classList.toggle('hidden', !txt); }

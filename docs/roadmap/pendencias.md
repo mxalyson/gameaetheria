@@ -242,3 +242,10 @@ Relatórios completos com tabelas e correções sugeridas: `auditoria-visual.md`
 - [x] Salvar ao esconder/fechar a página (`pagehide` + `visibilitychange` no cliente; o `flushAll()` do servidor já roda no desligamento e a sala grava ao sair).
 - [ ] B28: ritual do chefe no HUD online exige incluir `ritual` no snapshot/`zone_joined` (mudança de protocolo); não feito.
 - [ ] Duelo amistoso sem Elo/ouro/XP exige novo modo/flag no servidor e na fila; não feito.
+
+## Rodada 2026-11-03 (fechamento)
+- [x] Ritual do chefe no HUD online (`rt` no snapshot); duelo amistoso no servidor (`queue.friendly`); G13 (venda 50% Vila / 60% Porto: era só a doc); rótulos do medalhão/chefe/Ren, epílogo da Yun em 667×375, placa de lore maior; teste de `stackLabels`.
+- [ ] Não reproduzido: rótulo cobrindo "Toque para conversar" (tratado por prevenção). Conferir no iPhone.
+- [ ] Missão `porto_duelo` segue só offline (`OFFLINE_TYPES`). Sem e2e no navegador para o HUD do ritual online e o duelo amistoso online.
+- [ ] Reescrita da linha de B15/B19–B30 e G11–G13 perdeu detalhes: conferir `auditoria-bugs.md`/`auditoria-jogabilidade.md`.
+- [ ] O que depende do dono: ver `docs/roadmap/depende-do-dono.md`.

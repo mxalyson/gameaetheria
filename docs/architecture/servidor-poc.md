@@ -46,3 +46,7 @@ Protocolo **v3**: `hello` → `welcome` (lobby) → `queue{mode}` / `party_*` �
 
 ## Teletransporte online (`zone_teleport`)
 Cliente → servidor: `{ t: 'zone_teleport', zone }` (`zone` = `'town'` ou zona de farm). O servidor valida (intervalo de 5 s, fora de combate há 8 s, mapa em `char.visited`, ≥1 pergaminho fora a vila, sala com vaga), debita o pergaminho no documento do personagem (operação `teleport`) e responde `zone_joined` (com `scrolls` = contagem oficial nova) ou `zone_exit {to:'town'}`. Recusas: `reject` com `not_visited`, `no_scroll`, `in_combat`, `teleport_wait` (e `bad_zone`, `in_match`, `already_queued`, `room_full`, `bad_character`). Entrar numa zona por qualquer caminho grava `visited` no personagem. Ver decisão 0015.
+
+## Adendos 2026-11-03
+- Snapshot da instância de zona: campo opcional `rt` = `[abates, necessário, recarga (min), presságio 0|1, chefe vivo 0|1]` (progresso do ritual do chefe final; só vai quando muda e nos quadros-chave; aditivo, sem subir a versão do protocolo).
+- `queue` aceita `friendly: true` (só `mode: '1v1'`): duelo amistoso do Porto, fila separada, bot após 3 s, sem Elo, ouro, XP nem `reward`; `match_found` leva `friendly: true`.
