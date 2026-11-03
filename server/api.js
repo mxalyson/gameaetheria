@@ -40,7 +40,7 @@ function reId(doc) {
   return doc;
 }
 
-export function createApi(db, { googleClientId = null, origins = [], trustProxy = false, fetchJwks, gameUrl = null, strictPve = false, now = () => Date.now() } = {}) {
+export function createApi(db, { googleClientId = null, origins = [], trustProxy = false, fetchJwks, gameUrl = null, strictPve = true, now = () => Date.now() } = {}) {
   const auth = createAuth(db, { googleClientId, fetchJwks, now });
   const ipLimit = new Map(), authLimit = new Map();
   const limited = (map, key, max) => { let l = map.get(key); if (!l) map.set(key, (l = new RateLimiter(max))); return !l.allow(now()); };
@@ -124,6 +124,8 @@ export function createApi(db, { googleClientId = null, origins = [], trustProxy 
           if (!Number.isInteger(b.rev)) return err(res, 400, 'bad_rev', 'Revisão ausente.', cors), true;
           const n = normalizeDoc(b.doc);
           if (!n.ok) return err(res, 422, 'bad_doc', n.reason, cors), true;
+          // aba suspensa/atrasada: revisão velha é conflito (409) ANTES da plausibilidade; assim um documento antigo nunca é lido como 'nível diminuiu'/'salto' e o cliente só recarrega o oficial
+          if (b.rev !== c.rev) return err(res, 409, 'stale_rev', 'O personagem foi alterado em outro lugar.', cors), true;
           const chk = checkSave(c.doc, n.char, Date.now(), { strictPve });
           if (!chk.ok) { db.audit('save_rejected', { accountId: acc.id, ip, detail: `${id} ${chk.reason}` }); return err(res, 422, 'implausible', 'Salvamento recusado: ' + chk.reason, cors), true; }
           const rev = db.saveCharacter(id, chk.doc, b.rev, now());

@@ -26,20 +26,23 @@ async function conta(email, nome, classe, nivel = 10) {
   return { token: r.token, id: c.id, nome };
 }
 
-async function entrar(browser, who) {
-  const ctx = await browser.newContext({ viewport: { width: 1100, height: 760 } });
+// leve: limita o rAF do jogo (ms entre quadros). Com 4 páginas em 2 CPUs o desenho a 60 fps de cada uma esgota a máquina
+// (a 3ª/4ª página levava >15 s para carregar); a ~30 fps as 4 entram em ~11 s. O servidor e as regras não mudam.
+async function entrar(browser, who, leve = 0) {
+  const ctx = await browser.newContext({ viewport: leve ? { width: 700, height: 420 } : { width: 1100, height: 760 } });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  if (leve) await page.addInitScript((ms) => { const raf = window.requestAnimationFrame.bind(window); let last = 0; window.requestAnimationFrame = (cb) => raf((t) => { if (t - last < ms) return window.requestAnimationFrame(cb); last = t; cb(t); }); }, leve);
   await page.addInitScript(([t]) => localStorage.setItem('aetheria_session', t), [who.token]);
   await page.goto('/?api=' + encodeURIComponent(apiBase));
   await page.click(`[data-action="char-select"][data-arg="${who.id}"]`);
   await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
-  await page.waitForFunction(() => window.game.net?.joined, null, { timeout: 10000 });
+  await page.waitForFunction(() => window.game.net?.joined, null, { timeout: 20000, polling: 250 });
   return { ctx, page, errors, who };
 }
 const fila = async (c, modo) => { await c.page.evaluate(() => window.game.ui.openPanel('arena')); await c.page.click(`[data-action="net-queue"][data-arg="${modo}"]`); };
-const naPartida = (c) => c.page.waitForFunction(() => window.game.mode === 'net' && window.game.netLast?.state === 'fight', null, { timeout: 30000 });
+const naPartida = (c) => c.page.waitForFunction(() => window.game.mode === 'net' && window.game.netLast?.state === 'fight', null, { timeout: 30000, polling: 250 });
 // o "jogador" do teste: anda até o alvo mais próximo e ataca (teclado e mouse virtuais do jogo real)
 const perseguir = (c) => c.page.evaluate(() => {
   const g = window.game;
@@ -105,8 +108,9 @@ test('1×1 no jogo real: fila pelo painel, partida renderizada, dano confirmado 
   // missão e contadores de arena são do SERVIDOR: a vitória real completou a missão e contou para a conquista
   const q = await A.page.evaluate(() => ({ p: window.game.char.quests.active.coragem_na_arena?.p, wins: window.game.char.stats.pvpWins, games: window.game.char.stats.pvpGames }));
   expect(q).toEqual({ p: [1], wins: 1, games: 1 });
+  // entrega pela transação quest_turnin: o servidor grava e o cliente adota o documento oficial (assíncrono)
   await A.page.evaluate(() => window.game.questTurnIn('coragem_na_arena'));
-  expect(await A.page.evaluate(() => window.game.flushCloud())).toBe(true);
+  await A.page.waitForFunction(() => window.game.char.quests.done.coragem_na_arena > 0, null, { timeout: 8000 });
   expect(db.character(A.who.id).doc.quests.done.coragem_na_arena).toBeGreaterThan(0);
   expect(A.errors).toEqual([]); expect(B.errors).toEqual([]);
   await A.ctx.close(); await B.ctx.close();
@@ -114,8 +118,8 @@ test('1×1 no jogo real: fila pelo painel, partida renderizada, dano confirmado 
 
 test('grupo no jogo real: convidar pelo painel, aceitar, e a fila 2×2 coloca o grupo no mesmo time', async ({ browser }) => {
   test.setTimeout(120000);
-  const [A, B, C, D] = [await entrar(browser, await conta('a2@x.com', 'Ana', 'warrior')), await entrar(browser, await conta('b2@x.com', 'Bia', 'cleric')),
-    await entrar(browser, await conta('c2@x.com', 'Caio', 'mage')), await entrar(browser, await conta('d2@x.com', 'Davi', 'archer'))];
+  const [A, B, C, D] = [await entrar(browser, await conta('a2@x.com', 'Ana', 'warrior'), 34), await entrar(browser, await conta('b2@x.com', 'Bia', 'cleric'), 34),
+    await entrar(browser, await conta('c2@x.com', 'Caio', 'mage'), 34), await entrar(browser, await conta('d2@x.com', 'Davi', 'archer'), 34)];
   await A.page.evaluate(() => window.game.ui.openPanel('party'));
   await A.page.fill('#party-name', 'Bia'); await A.page.click('[data-action="party-invite"]');
   await B.page.evaluate(() => window.game.ui.openPanel('party'));
@@ -179,13 +183,14 @@ test('servidor de partidas indisponível: o jogo avisa e continua (PvP online de
 test('missão de arena não pode ser forjada pelo cliente: o servidor recusa e restaura o progresso oficial', async ({ browser }) => {
   const A = await entrar(browser, await conta('forja@x.com', 'Forjador', 'mage'));
   await A.page.evaluate(() => window.game.questAccept('coragem_na_arena'));
+  await A.page.waitForFunction(() => window.game.char.quests.active.coragem_na_arena, null, { timeout: 8000 }); // aceite pela transação quest_accept
   expect(await A.page.evaluate(() => window.game.flushCloud())).toBe(true);
   // trapaça: marcar como concluída sem nenhuma vitória no servidor
   await A.page.evaluate(() => { const c = window.game.char; delete c.quests.active.coragem_na_arena; c.quests.done.coragem_na_arena = Date.now(); c.stats.pvpWins = 50; window.game.save(); });
   expect(await A.page.evaluate(() => window.game.flushCloud())).toBe(false);
   await A.page.waitForFunction(() => window.game.char.quests.active.coragem_na_arena && !window.game.char.quests.done.coragem_na_arena, null, { timeout: 8000 });
   expect(await A.page.evaluate(() => window.game.char.stats.pvpWins)).toBe(0);
-  expect(db.audits('save_rejected').some((a) => /quest_server_objective/.test(a.detail))).toBe(true);
+  expect(db.audits('save_rejected').some((a) => /pve_quest|quest_server_objective/.test(a.detail))).toBe(true);
   // forjar só o progresso também não passa: o servidor descarta
   await A.page.evaluate(() => { window.game.char.quests.active.coragem_na_arena.p[0] = 1; window.game.save(); });
   expect(await A.page.evaluate(() => window.game.flushCloud())).toBe(true);

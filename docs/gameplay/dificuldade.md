@@ -216,3 +216,22 @@ Mudanças: vida +12 por nível acima do 4 (`core/stats.js`; início do jogo inta
 | 30 Maestria depois | 45% · 17 s | 44% · 23 s | 43% · 18 s | 53% · 30 s |
 
 Pendente: Guerreiro ainda abaixo de 20 s (mata Mago/Arqueiro rápido) e ciclos Mago × Clérigo (89%) e Mago × Arqueiro (14%) no Nv 20 seguem; o Guerreiro perde 7% para o Clérigo no Nv 30. Início (`boss-check --only early`, 2 lobos Nv 4): Guerreiro 80% (igual), Clérigo 100% (igual, perde 64% da vida), Arqueiro 90%. PvE: chefes e ondas praticamente iguais (coop 4j Nv20 sobe de 88% para 100%).
+
+### Rodada de duelos 3 (2026-11-03): IA do rival e PVP_DAMAGE (item 12 das pendências)
+Mudanças (só PvP; mobs, chefes e ondas usam `mobIntent`, que não foi tocado):
+- `game/ai.js` (`rivalIntent`): o robô de Mago/Arqueiro passa a **mirar à frente** do alvo que anda (velocidade por média móvel dos deslocamentos; tempo de voo = distância / velocidade do projétil; fração `LEAD = 0,4`). Sem antecipação os projéteis lentos do Mago erravam o alvo que desvia lateralmente (acertava ~11 tiros por duelo contra ~37 do Arqueiro).
+- `game/sim.js`: `PVP_DAMAGE` 0,32 → 0,28 (duelos mais longos: Guerreiro/Arqueiro Nv 30 com Maestria saem de 17–18 s para 19–22 s).
+- Testes em `tests/core.test.js` (mira à frente; `PVP_DAMAGE` só entre heróis).
+
+Medido com `node tools/balance.mjs --level N --n 100` (Nv 30 Maestria: `--mastery`). Antes → depois (média da classe · duração média):
+
+| Nível | Guerreiro | Mago | Arqueiro | Clérigo |
+|---|---|---|---|---|
+| 10 | 46% · 13 s → 42% · 15 s | 53% · 25 s → 49% · 26 s | 49% · 26 s → 44% · 26 s | 49% · 18 s → 52% · 21 s |
+| 20 | 45% · 16 s → 38% · 18 s | 55% · 29 s → 49% · 31 s | 47% · 28 s → 50% · 29 s | 46% · 22 s → 53% · 27 s |
+| 30 | 35% · 19 s → 38% · 21 s | 46% · 35 s → 45% · 38 s | 54% · 31 s → 59% · 32 s | 47% · 28 s → 54% · 34 s |
+| 30 Maestria | 45% · 17 s → 42% · 19 s | 44% · 23 s → 43% · 27 s | 43% · 18 s → 53% · 22 s | 53% · 30 s → 51% · 34 s |
+
+Resultado honesto: **durações melhoraram** (todas entre 18 e 38 s; só o Guerreiro fica em 18–19 s nos Nv 20 e 30 Maestria) e a média das classes no Nv 30 Maestria ficou mais próxima de 50% (Arqueiro 43 → 53%), mas o **Guerreiro caiu** (38–42%) e **o ciclo de pares continua** (Guerreiro × Clérigo 87–97% para o Clérigo, Mago × Arqueiro 0–9% para o Arqueiro, Mago × Clérigo 63–82% para o Mago): é o triângulo/ciclo Guerreiro > Arqueiro > Mago > Clérigo > Guerreiro, que vem do kit (Clérigo cura/escudo contra burst; Arqueiro com rajadas em área e Rolamento contra o Mago), não só da IA.
+Testado e descartado (medido em 4 níveis × 40 duelos; nota = desvio médio de 50% e nº de células fora de 25–75%): limite de recuo (kiting) do Mago/Arqueiro por tempo (2–8 s de recuo, 0,6–2,5 s parado) — derruba Mago e Arqueiro para 22–40% e faz o Guerreiro dominar (59–69%); recuo limitado só contra alvo corpo a corpo — melhora Mago × Clérigo (90 → 42–52%) mas leva Guerreiro × Arqueiro a 92–98%; `LEAD` 0,8–1 — Guerreiro/Clérigo passam de 57–63%; velocidade do projétil do Mago (480/440 → 620/580) e recarga do Teleporte (6 → 9 s) — Mago × Arqueiro continua em 0–20%; Arqueiro com ataque básico 0,6 → 0,5 — idem. Início/PvE: `boss-check --only early` igual ao anterior (2 lobos Nv 4: Guerreiro 80%, Mago 97%, Arqueiro 90%, Clérigo 100%); `npm test` 430/430.
+Pendente: o ciclo Mago × Arqueiro e Guerreiro × Clérigo pede mudança de kit/dados (decisão de design), por exemplo habilidade de controle do Mago contra o Arqueiro ou menos cura do Clérigo contra burst; não feito para não mexer no PvE.

@@ -51,15 +51,26 @@ test('movimento em 8 direções: o sprite olha para onde a tela diz e o personag
     const a = await page.evaluate(() => { const s = window.poc.iso.toScreen(window.poc.player.x, window.poc.player.y); return { x: s.x, y: s.y }; });
     const ks = combo.split('+');
     await page.bringToFront();
-    for (const k of ks) await page.keyboard.down(k);
-    // espera o movimento COMEÇAR (em FPS baixo o primeiro passo demora), depois deixa andar um pouco
-    try { await page.waitForFunction(() => window.poc.player.moving, null, { timeout: 4000 }); } catch {
-      throw new Error(`${nome}: não começou a andar. teclas=${JSON.stringify(await page.evaluate(() => [...window.poc.keys]))} fps=${await page.evaluate(() => window.poc.stats.fps)} pos=${await page.evaluate(() => { const p = window.poc.player; return JSON.stringify([Math.round(p.x), Math.round(p.y), p.stunT, p.dead, p.rootT]); })}`);
-    }
-    // anda até 60 px na tela (e não um tempo fixo): com a máquina carregada o simulador recupera quadros em rajada e o tempo fixo levava o herói à borda do mundo (cos < 0,95)
-    await page.waitForFunction(([ax, ay]) => { const s = window.poc.iso.toScreen(window.poc.player.x, window.poc.player.y); return Math.hypot(s.x - ax, s.y - ay) > 60; }, [a.x, a.y], { timeout: 8000, polling: 'raf' });
-    const r = await page.evaluate(() => { const p = window.poc.player, st = window.poc.anims.get(p.id), s = window.poc.iso.toScreen(p.x, p.y); return { view: st.view, clip: st.anim.name, moving: p.moving, x: s.x, y: s.y }; });
-    for (const k of ks) await page.keyboard.up(k);
+    // Teclas, espera e leitura acontecem DENTRO da página, de uma vez: com as teclas pelo Playwright (uma ida e volta por tecla) a
+    // máquina carregada deixava o herói andar alguns quadros só com a 1ª tecla (diagonal torta, cos < 0,95) e o tempo/posição lidos
+    // depois eram de outro quadro. Aqui as teclas entram no mesmo instante, anda-se até 60 px na tela e solta-se no mesmo quadro.
+    const r = await page.evaluate(([ks, ax, ay]) => new Promise((resolve, reject) => {
+      const ev = (type, k) => window.dispatchEvent(new KeyboardEvent(type, { key: k, bubbles: true }));
+      ks.forEach((k) => ev('keydown', k));
+      const t0 = performance.now();
+      const tick = () => {
+        const p = window.poc.player, s = window.poc.iso.toScreen(p.x, p.y);
+        if (Math.hypot(s.x - ax, s.y - ay) > 60) {
+          const st = window.poc.anims.get(p.id);
+          const out = { view: st.view, clip: st.anim.name, moving: p.moving, x: s.x, y: s.y };
+          ks.forEach((k) => ev('keyup', k));
+          return resolve(out);
+        }
+        if (performance.now() - t0 > 12000) { ks.forEach((k) => ev('keyup', k)); return reject(new Error('não andou 60 px em 12 s; fps=' + window.poc.stats.fps)); }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }), [ks, a.x, a.y]).catch((e) => { throw new Error(nome + ': ' + e.message); });
     expect(r.moving, nome).toBe(true);
     expect(r.clip, nome).toBe('walk');
     expect(r.view, `${nome} setor`).toBe(setor);
@@ -95,16 +106,15 @@ test('ataque básico e Bola de Fogo: animação, disparo no quadro certo e dano 
   expect(t1.proj, 'ainda sem projétil antes do quadro de disparo').toBe(0);
   expect(t1.cd, 'recarga só começa no disparo').toBe(0);
   // espera o EFEITO (em FPS baixo a simulação anda mais devagar que o relógio: passo máximo de 5 por quadro)
-  await page.waitForFunction((hp0) => window.__mob.hp < hp0, alvo.hp, { timeout: 8000 });
+  await page.waitForFunction((hp0) => window.__mob.hp < hp0, alvo.hp, { timeout: 30000, polling: 100 }); // o projétil voa em tempo de simulação, que desacelera sob carga (FPS baixo)
   const hp1 = await page.evaluate(() => ({ hp: window.__mob.hp, cd: window.poc.player.cds.basic, text: window.poc.world.texts.length }));
   expect(hp1.hp, 'dano real do mago').toBeLessThan(alvo.hp);
   // Bola de Fogo (tecla 1)
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => window.poc.player.cds.basic <= 0.05 || !window.poc.player.cds.basic, null, { polling: 100 }); // em vez de 500 ms fixos: espera o ataque básico recarregar
   const antes = await page.evaluate(() => window.__mob.hp);
   await page.keyboard.press('1');
-  await page.waitForTimeout(80);
-  expect(await page.evaluate(() => window.poc.anims.get(window.poc.player.id).anim.name)).toBe('skill');
-  await page.waitForFunction((hp0) => window.__mob.hp < hp0 - 20, antes, { timeout: 8000 });
+  await page.waitForFunction(() => window.poc.anims.get(window.poc.player.id).anim.name === 'skill', null, { timeout: 5000, polling: 'raf' });
+  await page.waitForFunction((hp0) => window.__mob.hp < hp0 - 20, antes, { timeout: 30000, polling: 100 });
   await page.screenshot({ path: 'test-results/poc-skill.png' });
   const depois = await page.evaluate(() => ({ hp: window.__mob.hp, cd: window.poc.player.cds.s0, clip: window.poc.anims.get(window.poc.player.id).anim.name }));
   expect(depois.hp, 'Bola de Fogo causou dano').toBeLessThan(antes - 20);
@@ -124,12 +134,15 @@ test('morte do monstro: a animação termina mesmo depois de a simulação remov
   });
   const pos = await worldToClient(page, await page.evaluate(() => window.__mob.x), await page.evaluate(() => window.__mob.y), 18);
   await page.mouse.move(pos.x, pos.y);
-  await page.mouse.down(); await page.waitForTimeout(80); await page.mouse.up();
-  try { await page.waitForFunction(() => window.__mob.dead, null, { timeout: 5000 }); } catch (e) {
+  // segura o botão até o jogo REGISTRAR o disparo (recarga > 0) e só então solta: com 80 ms fixos, sob carga o quadro nem chegava a ver o clique
+  await page.mouse.down();
+  await page.waitForFunction(() => window.poc.player.cds.basic > 0 || window.__mob.dead, null, { timeout: 15000, polling: 50 });
+  await page.mouse.up();
+  try { await page.waitForFunction(() => window.__mob.dead, null, { timeout: 15000, polling: 100 }); } catch (e) {
     const d = await page.evaluate(() => { const m = window.__mob, p = window.poc.player; return { hp: m.hp, mob: [Math.round(m.x), Math.round(m.y)], player: [Math.round(p.x), Math.round(p.y)], cam: [Math.round(window.poc.cam.x), Math.round(window.poc.cam.y)], cd: p.cds.basic, clip: window.poc.anims.get(p.id).anim.name, mouse: { ...window.poc.mouse }, aim: window.poc.aimPoint(), proj: window.poc.world.projectiles.length, fps: window.poc.stats.fps }; });
     throw new Error('DIAG ' + JSON.stringify(d) + ' pos ' + JSON.stringify(pos));
   }
-  await page.waitForTimeout(750); // a simulação remove o ator 0,6 s depois da morte
+  await page.waitForFunction((id) => !window.poc.world.actors.some((a) => a.id === id), await page.evaluate(() => window.__id), { timeout: 15000, polling: 100 }); // a simulação remove o ator 0,6 s depois da morte
   const r = await page.evaluate(() => ({ naLista: window.poc.world.actors.some((a) => a.id === window.__id), anim: window.poc.anims.get(window.__id)?.anim.name, ghost: window.poc.lastOrder.some((i) => i.kind === 'ghost' && i.id === window.__id) }));
   expect(r.naLista, 'a simulação já removeu o monstro').toBe(false);
   expect(r.anim).toBe('death');

@@ -32,6 +32,9 @@ export const TX_OPS = {
   sell: { id: true, shop: true }, sell_bulk: { n: [0, 5], shop: true }, enhance: { id: true },
   bank_deposit: { id: true }, bank_withdraw: { id: true }, claim_daily: { id: true },
   quest_accept: { id: true }, quest_turnin: { id: true },
+  // ganhos que antes eram locais: spirits (libertar/comprar/evoluir), reciclagem, placa de lore; equipamento e atributos (valem também na instância)
+  spirit_free: { id: true }, spirit_evolve: { id: true }, buy_essence: { kind: ['essence', 'prism'] }, recycle: { ids: 3 }, lore: { id: true },
+  equip: { id: true }, unequip: { slot: true }, alloc: { stat: true, n: [1, 999] }, alloc_auto: {},
 };
 const TX_ID = /^[A-Za-z0-9_:.-]{1,48}$/;
 
@@ -90,6 +93,10 @@ export function parseClientMessage(data) {
       const msg = { t: 'tx', op: data.op, req: Number.isInteger(data.req) && data.req >= 0 && data.req < 2 ** 31 ? data.req : 0 };
       if (spec.id) { if (typeof data.id !== 'string' || !TX_ID.test(data.id)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.id = data.id; }
       if (spec.shop) { if (data.shop !== undefined && data.shop !== 'town' && data.shop !== 'harbor') return { ok: false, code: REJECT.BAD_MESSAGE }; msg.shop = data.shop ?? 'town'; }
+      if (spec.kind) { if (!spec.kind.includes(data.kind)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.kind = data.kind; }
+      if (spec.slot) { if (!['weapon', 'armor', 'helm', 'boots', 'ring', 'amulet'].includes(data.slot)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.slot = data.slot; }
+      if (spec.stat) { if (!['str', 'agi', 'int', 'vit'].includes(data.stat)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.stat = data.stat; }
+      if (spec.ids) { if (!Array.isArray(data.ids) || data.ids.length !== spec.ids || !data.ids.every((x) => typeof x === 'string' && TX_ID.test(x))) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.ids = [...data.ids]; }
       if (spec.n) { if (!Number.isInteger(data.n) || data.n < spec.n[0] || data.n > spec.n[1]) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.n = data.n; }
       return { ok: true, msg };
     }

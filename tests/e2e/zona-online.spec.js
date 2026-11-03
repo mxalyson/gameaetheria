@@ -62,9 +62,10 @@ test('portal da vila → instância do servidor; abater monstro paga XP/ouro gra
   expect(depois.xp > antes.xp || depois.level > antes.level).toBe(true);
   expect(await page.evaluate(() => window.game.char.level)).toBe(depois.level);
 
-  // painéis de equipamento ficam bloqueados na instância; H leva de volta à vila
+  // equipamento e atributos funcionam na instância (transações equip/alloc do servidor); H leva de volta à vila
   await page.keyboard.press('i');
-  expect(await page.evaluate(() => window.game.ui.isOpen('inventory'))).toBe(false);
+  expect(await page.evaluate(() => window.game.ui.isOpen('inventory'))).toBe(true);
+  await page.keyboard.press('i');
   await page.screenshot({ path: 'test-results/zona-online.png' });
   // B15: logo depois do combate o servidor recusa a saída (continua na instância)
   await page.evaluate(() => window.game.hearth());

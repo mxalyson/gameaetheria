@@ -836,3 +836,9 @@ body:not(.touch) #ritual { top: calc(var(--map) + 150px); }
   .p-dialog .dlg-scroll .hint { margin: 2px 0; }
   .p-dialog .npc-emb.por img { transform: none; object-position: 50% 10%; }
 }
+
+/* nome de item opalino (mochila, loja, tooltip): texto em arco-íris suave, no mesmo tom da moldura */
+.opal-name { background: linear-gradient(100deg, #ff9ee0, #8fe6ff 35%, #b4ffb0 60%, #ffe28a 85%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #cfe9ff; animation: opal-sheen 5s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .opal-name { animation: none; } }
+/* aviso de noite no HUD (texto curto sob o nome da zona) */
+.night-tag { display: block; font-family: system-ui, sans-serif; font-weight: 700; font-size: 10px; letter-spacing: 0; color: #a9c4ff; margin-top: 2px; }

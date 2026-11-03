@@ -261,3 +261,197 @@ test('instância: o Zéfiro dá +12% de velocidade ao herói', async () => {
   assert.equal(srv.actor(j.you).speedMul, 1.12);
   await closeAll(srv, c);
 });
+
+// ---------------- rodada: ganhos locais viram transações (spirits, reciclagem, lore, equipamento/atributos) ----------------
+import { SPIRIT_RARITY_MUL, MAX_SPIRITS } from '../public/src/data/spirits.js';
+import { SPIRIT_EVO_QUEST, QUESTS } from '../public/src/data/quests.js';
+import { generateItem } from '../public/src/core/loot.js';
+import { checkSave } from '../server/plausible.js';
+
+test('protocolo: ops novas (spirit_free/spirit_evolve/buy_essence/recycle/lore/equip/unequip/alloc/alloc_auto) têm campos validados e extras somem', () => {
+  assert.deepEqual(TX({ op: 'buy_essence', kind: 'prism', req: 2, ouro: 9 }).msg, { t: 'tx', op: 'buy_essence', req: 2, kind: 'prism' });
+  assert.equal(TX({ op: 'buy_essence', kind: 'ouro' }).ok, false); assert.equal(TX({ op: 'buy_essence' }).ok, false);
+  assert.equal(TX({ op: 'spirit_free' }).ok, false); assert.ok(TX({ op: 'spirit_free', id: 'sp1' }).ok); assert.ok(TX({ op: 'spirit_evolve', id: 'sp1' }).ok);
+  assert.deepEqual(TX({ op: 'recycle', ids: ['a', 'b', 'c'] }).msg.ids, ['a', 'b', 'c']);
+  assert.equal(TX({ op: 'recycle', ids: ['a', 'b'] }).ok, false); assert.equal(TX({ op: 'recycle', ids: ['a', 'b', '../c'] }).ok, false); assert.equal(TX({ op: 'recycle', ids: 'abc' }).ok, false);
+  assert.ok(TX({ op: 'lore', id: 'forest' }).ok); assert.equal(TX({ op: 'lore' }).ok, false);
+  assert.ok(TX({ op: 'unequip', slot: 'weapon' }).ok); assert.equal(TX({ op: 'unequip', slot: 'tail' }).ok, false);
+  assert.deepEqual(TX({ op: 'alloc', stat: 'str', n: 5 }).msg, { t: 'tx', op: 'alloc', req: 0, stat: 'str', n: 5 });
+  assert.equal(TX({ op: 'alloc', stat: 'luck', n: 1 }).ok, false); assert.equal(TX({ op: 'alloc', stat: 'str', n: 0 }).ok, false); assert.equal(TX({ op: 'alloc', stat: 'str', n: 1000 }).ok, false);
+  assert.ok(TX({ op: 'alloc_auto' }).ok);
+});
+
+test('placeProblem: equipamento/atributos/spirit valem na instância e nas cidades; lore só na instância; reciclar só no Porto; spirits só fora da instância', () => {
+  for (const op of ['equip', 'unequip', 'alloc', 'alloc_auto', 'spirit_set']) { assert.equal(placeProblem(op, { inZone: true }), null, op); assert.equal(placeProblem(op, { inZone: false, hubAt: null }), null, op); }
+  assert.equal(placeProblem('lore', { inZone: true }), null); assert.equal(placeProblem('lore', { inZone: false }), 'not_here');
+  for (const op of ['spirit_free', 'spirit_evolve', 'buy_essence', 'recycle']) assert.equal(placeProblem(op, { inZone: true }), 'not_here', op);
+  assert.equal(placeProblem('recycle', { inZone: false, hubAt: null }), 'not_here'); assert.equal(placeProblem('recycle', { inZone: false, hubAt: 'harbor' }), null);
+  assert.equal(placeProblem('spirit_free', { inZone: false, hubAt: null }), null);
+});
+
+test('runTx (puro): libertar spirit paga pelo nível e raridade; comprar essência cobra, sorteia no servidor e respeita o limite', () => {
+  const doc = newOfficialCharacter('S', 'mage'); doc.gold = 50000; doc.level = 14;
+  const sp = doc.spirits[0];
+  const free = runTx(doc, { op: 'spirit_free', id: sp.id }, { rng: makeRng(1) });
+  assert.equal(free.summary.gold, Math.round(30 * sp.level * SPIRIT_RARITY_MUL[sp.rarity]));
+  assert.equal(free.doc.gold, 50000 + free.summary.gold); assert.equal(free.doc.spirits.length, doc.spirits.length - 1);
+  assert.notEqual(free.doc.activeSpirit, sp.id);
+  assert.throws(() => runTx(doc, { op: 'spirit_free', id: 'nao-existe' }, { rng: makeRng(1) }), TxError);
+  const buy = runTx(doc, { op: 'buy_essence', kind: 'essence' }, { rng: makeRng(7) });
+  assert.equal(buy.doc.gold, 50000 - PRICES.essence(14)); assert.equal(buy.doc.spirits.length, doc.spirits.length + 1);
+  assert.equal(buy.doc.spirits.at(-1).level, 12);
+  const prism = runTx(doc, { op: 'buy_essence', kind: 'prism' }, { rng: makeRng(7) });
+  assert.equal(prism.doc.gold, 50000 - PRICES.prism(14)); assert.ok(['rare', 'epic', 'legendary'].includes(prism.doc.spirits.at(-1).rarity));
+  assert.throws(() => runTx({ ...doc, gold: 10 }, { op: 'buy_essence', kind: 'essence' }, { rng: makeRng(7) }), /Ouro/);
+  const full = structuredClone(doc); while (full.spirits.length < MAX_SPIRITS) full.spirits.push({ ...sp, id: 'f' + full.spirits.length });
+  assert.throws(() => runTx(full, { op: 'buy_essence', kind: 'essence' }, { rng: makeRng(7) }), /Limite/);
+});
+
+test('runTx (puro): evoluir spirit cobra, exige missão/nível e conta o objetivo spiritStage NO SERVIDOR; reciclar troca 3 comuns por 1 raro', () => {
+  const doc = newOfficialCharacter('E', 'mage'); doc.gold = 90000; doc.level = 30;
+  const sp = doc.spirits[0]; sp.level = 12;
+  doc.quests.done.cavaleiro_rubro = 1; doc.quests.active.ecos_unidos = { at: 1, p: [30, 0] };
+  assert.throws(() => runTx(doc, { op: 'spirit_evolve', id: sp.id }, { rng: makeRng(1) }), /missão/);
+  doc.quests.done[SPIRIT_EVO_QUEST[sp.type]] = 1;
+  const r = runTx(doc, { op: 'spirit_evolve', id: sp.id }, { rng: makeRng(1) });
+  assert.equal(r.doc.spirits[0].stage, 2); assert.ok(r.doc.gold < 90000);
+  assert.deepEqual(r.doc.quests.active.ecos_unidos.p, [30, 1], 'objetivo spiritStage contado pelo servidor');
+  assert.ok(r.summary.quests.includes('ecos_unidos'));
+  assert.throws(() => runTx(r.doc, { op: 'spirit_evolve', id: sp.id }, { rng: makeRng(1) }), /evoluída/);
+  // reciclar
+  const d2 = newOfficialCharacter('R', 'warrior'); d2.level = 10;
+  const rng = makeRng(3), commons = [0, 1, 2].map(() => generateItem(rng, 10, { classId: 'warrior', rarityId: 'common' }));
+  d2.inventory.push(...commons);
+  const out = runTx(d2, { op: 'recycle', ids: commons.map((i) => i.id) }, { rng: makeRng(4) });
+  assert.equal(out.doc.inventory.length, d2.inventory.length - 2); assert.equal(out.summary.item.rarity, 'rare');
+  assert.throws(() => runTx(d2, { op: 'recycle', ids: [commons[0].id, commons[0].id, commons[1].id] }, { rng: makeRng(4) }), TxError);
+});
+
+test('runTx (puro): equipar, desequipar e distribuir atributos pelo documento oficial', () => {
+  const doc = newOfficialCharacter('Q', 'warrior'); doc.level = 10; doc.statPoints = 7;
+  const rng = makeRng(9);
+  const weapon = generateItem(rng, 5, { classId: 'warrior', rarityId: 'rare', slot: 'weapon' });
+  doc.inventory.push(weapon);
+  let r = runTx(doc, { op: 'equip', id: weapon.id }, { rng });
+  assert.equal(r.doc.equipment.weapon.id, weapon.id); assert.ok(!r.doc.inventory.some((i) => i.id === weapon.id));
+  r = runTx(r.doc, { op: 'unequip', slot: 'weapon' }, { rng });
+  assert.equal(r.doc.equipment.weapon, undefined); assert.ok(r.doc.inventory.some((i) => i.id === weapon.id));
+  assert.throws(() => runTx(r.doc, { op: 'unequip', slot: 'weapon' }, { rng }), /Nada equipado/);
+  assert.throws(() => runTx(doc, { op: 'equip', id: 'nao-tenho' }, { rng }), /mochila/);
+  r = runTx(doc, { op: 'alloc', stat: 'str', n: 5 }, { rng });
+  assert.equal(r.doc.statPoints, 2); assert.equal(r.doc.alloc.str, doc.alloc.str + 5);
+  r = runTx(r.doc, { op: 'alloc', stat: 'vit', n: 999 }, { rng }); // n é limitado aos pontos livres
+  assert.equal(r.doc.statPoints, 0); assert.equal(r.doc.alloc.vit, doc.alloc.vit + 2);
+  assert.throws(() => runTx(r.doc, { op: 'alloc', stat: 'str', n: 1 }, { rng }), /Sem pontos/);
+  const a = runTx(doc, { op: 'alloc_auto' }, { rng });
+  const sum = (d) => d.alloc.str + d.alloc.vit + d.alloc.agi + d.alloc.int;
+  assert.equal(a.doc.statPoints, 0); assert.equal(sum(a.doc), sum(doc) + 7);
+});
+
+test('instância: equipar e distribuir pontos recalculam o ator NA HORA; reciclar/libertar/comprar essência são recusados lá; lore exige estar perto e marca só na 1ª leitura', async () => {
+  const { db, srv, c, ch, patch, tx } = await setup();
+  const weapon = generateItem(makeRng(5), 1, { classId: 'warrior', rarityId: 'epic', slot: 'weapon' });
+  patch((d) => { d.level = 10; d.statPoints = 6; d.inventory.push(weapon); }); // nível 10: o documento só mantém pontos livres que o nível comporta
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  const me = srv.actor(j.you);
+  const p0 = me.stats.power, hp0 = me.maxHp;
+  let r = await tx({ op: 'equip', id: weapon.id });
+  assert.equal(r.ok, true, r.reason); assert.equal(r.sync, true);
+  assert.ok(me.stats.power > p0, `poder subiu (${p0} -> ${me.stats.power})`);
+  assert.equal(db.character(ch).doc.equipment.weapon.id, weapon.id);
+  r = await tx({ op: 'alloc', stat: 'vit', n: 6 });
+  assert.equal(r.ok, true, r.reason); assert.ok(me.maxHp > hp0, 'vida máxima subiu');
+  assert.equal(db.character(ch).doc.statPoints, 0);
+  r = await tx({ op: 'unequip', slot: 'weapon' });
+  assert.equal(r.ok, true); assert.ok(me.stats.power <= p0 + 0.001, 'sem a arma o poder volta');
+  for (const op of [{ op: 'spirit_free', id: 'x' }, { op: 'buy_essence', kind: 'essence' }, { op: 'spirit_evolve', id: 'x' }, { op: 'recycle', ids: ['a', 'b', 'c'] }]) assert.equal((await tx(op)).code, 'not_here', op.op);
+  // lore
+  const lore = ZONES.forest.lore[0];
+  r = await tx({ op: 'lore', id: lore.id });
+  assert.equal(r.ok, false); assert.match(r.reason, /perto/);
+  r = await tx({ op: 'lore', id: 'plains' });
+  assert.equal(r.ok, false, 'placa de outra zona não existe aqui');
+  me.x = lore.x + 20; me.y = lore.y;
+  r = await tx({ op: 'lore', id: lore.id });
+  assert.equal(r.ok, true, r.reason); assert.equal(r.first, true);
+  assert.equal(db.character(ch).doc.stats.lore & 1, 1);
+  r = await tx({ op: 'lore', id: lore.id });
+  assert.equal(r.ok, true); assert.equal(r.first, false, 'só a primeira leitura conta');
+  await closeAll(srv, c);
+});
+
+test('hub: teletransporte conta o objetivo/contador `teleport` e a chegada ao Porto conta `visit` no SERVIDOR (o cliente não soma mais)', async () => {
+  const { db, srv, c, ch, patch } = await setup();
+  const qid = Object.values(QUESTS).find((q) => q.objectives.some((o) => o.type === 'teleport'))?.id;
+  assert.ok(qid, 'existe missão com objetivo teleport');
+  patch((d) => { d.level = 10; d.scrolls = 3; d.visited = { ...d.visited, forest: 1, harbor: 1 }; d.quests.active = { [qid]: { at: 1, p: QUESTS[qid].objectives.map(() => 0) } }; });
+  const idx = QUESTS[qid].objectives.findIndex((o) => o.type === 'teleport');
+  srv.step(60 * 6);
+  c.send({ t: 'zone_teleport', zone: 'harbor' });
+  await c.waitFor((m) => m.t === 'zone_exit' && m.to === 'harbor');
+  let d = db.character(ch).doc;
+  assert.equal(d.stats.teleports, 1); assert.equal(d.stats.harborVisits, 1); assert.equal(d.quests.active[qid].p[idx], 1);
+  srv.step(60 * 6);
+  c.send({ t: 'zone_teleport', zone: 'town' });
+  await c.waitFor((m) => m.t === 'zone_exit' && m.to === 'town');
+  d = db.character(ch).doc;
+  assert.equal(d.stats.teleports, 2, 'a Vila também conta (igual ao cliente antigo)'); assert.equal(d.stats.harborVisits, 1);
+  await closeAll(srv, c);
+});
+
+test('hub: vencer o duelo amistoso online conta SÓ a missão porto_duelo (sem Elo, ouro nem XP); derrota não conta e a mesma partida não paga duas vezes', async () => {
+  const { db, srv, c, ch, patch } = await setup();
+  patch((d) => { d.level = 10; d.quests.active.porto_duelo = { at: 1, p: [0] }; });
+  const before = db.character(ch).doc;
+  c.send({ t: 'queue', mode: '1v1', friendly: true });
+  await c.sync(); // o servidor já processou o pedido; só então o relógio avança (amistoso completa com bot após 3 s)
+  srv.step(60 * 6);
+  const found = await c.waitFor((m) => m.t === 'match_found');
+  assert.equal(found.friendly, true);
+  const room = [...srv.hub.rooms.values()].find((r) => r.friendly);
+  const mine = [...room.players.values()].find((p) => p.charId === ch);
+  room.end(mine.team === 1 ? 2 : 1, 'elimination'); // derrota: nada muda
+  assert.equal(db.character(ch).doc.stats.friendlyWins ?? 0, 0);
+  room.state = 'fight';
+  room.end(3, 'draw'); // empate: nada muda
+  assert.equal(db.character(ch).doc.stats.friendlyWins ?? 0, 0);
+  room.state = 'fight';
+  room.end(mine.team, 'elimination');
+  const msg = await c.waitFor((m) => m.t === 'friendly_reward');
+  assert.ok(msg.quests.includes('porto_duelo'));
+  const d = db.character(ch).doc;
+  assert.equal(d.stats.friendlyWins, 1); assert.equal(d.quests.active.porto_duelo.p[0], 1);
+  assert.equal(d.gold, before.gold); assert.equal(d.xp, before.xp); assert.equal(d.level, before.level);
+  assert.equal(d.arena.rating, before.arena.rating); assert.equal(d.arena.wins, before.arena.wins);
+  room.state = 'fight'; room.end(mine.team, 'elimination'); // mesma partida: idempotente
+  assert.equal(db.character(ch).doc.stats.friendlyWins, 1);
+  await closeAll(srv, c);
+});
+
+test('modo estrito: spirit novo, evolução, lore, teletransporte, visita e duelo amistoso locais são recusados; gastar ouro segue valendo', () => {
+  const old = newOfficialCharacter('Z', 'warrior'); old.level = 12; old.gold = 5000;
+  const strict = (n) => checkSave(old, n, Date.now(), { strictPve: true });
+  const mk = (f) => { const n = structuredClone(old); f(n); return n; };
+  assert.equal(strict(mk((n) => { n.spirits.push({ ...n.spirits[0], id: 'novo' }); })).reason, 'pve_spirit');
+  assert.equal(strict(mk((n) => { n.spirits[0].stage = 2; })).reason, 'pve_spirit_stage');
+  assert.equal(strict(mk((n) => { n.stats.lore = 1; })).reason, 'pve_lore');
+  assert.equal(strict(mk((n) => { n.stats.teleports = 1; })).reason, 'pve_stat_teleports');
+  assert.equal(strict(mk((n) => { n.stats.harborVisits = 1; })).reason, 'pve_stat_harborVisits');
+  assert.equal(strict(mk((n) => { n.stats.friendlyWins = 1; })).reason, 'pve_stat_friendlyWins');
+  const sc = strict(mk((n) => { n.scrolls = 3; n.gold -= 500; }));
+  assert.equal(sc.ok, true); assert.equal(sc.doc.scrolls, old.scrolls ?? 0, 'pergaminho local é descartado (só a transação buy_scroll vale)');
+  assert.equal(strict(mk((n) => { n.gold -= 100; })).ok, true);
+});
+
+test('objetivos visit/teleport/lore/spiritStage/friendlyDuel só valem se o SERVIDOR os contou (progresso do cliente é descartado no estrito)', () => {
+  const old = newOfficialCharacter('Y', 'warrior'); old.level = 12;
+  old.quests.active.porto_duelo = { at: 1, p: [0] };
+  const neu = structuredClone(old); neu.quests.active.porto_duelo.p = [1];
+  const r = checkSave(old, neu, Date.now(), { strictPve: true });
+  assert.equal(r.ok, true); assert.equal(r.doc.quests.active.porto_duelo.p[0], 0, 'cliente não conta o duelo amistoso');
+  const lax = checkSave(old, neu, Date.now());
+  assert.equal(lax.doc.quests.active.porto_duelo.p[0], 1, 'sem o modo estrito (STRICT_PVE=0) segue como antes');
+  const done = structuredClone(neu); delete done.quests.active.porto_duelo; done.quests.done.porto_duelo = Date.now();
+  assert.equal(checkSave(old, done, Date.now(), { strictPve: true }).reason, 'pve_quest', 'no estrito nenhuma missão é concluída pelo cliente (só a transação quest_turnin)');
+});

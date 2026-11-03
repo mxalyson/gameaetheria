@@ -6,6 +6,7 @@ import { MODES, newMatch, controlTick, matchWinner, spawnSlots } from '../public
 import { applyMatchResult } from '../public/src/core/rewards.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { wire } from './wire.js';
+import { recordServerEvent } from './tx.js';
 import { DeltaEncoder, actorTuple } from './snapshot.js';
 
 export const COUNTDOWN = 3;   // s
@@ -110,7 +111,8 @@ export class MatchRoom {
     if (this.state === 'over') return; // nunca paga duas vezes
     this.state = 'over'; this.resultT = RESULT_SHOW; this.winner = winner; this.reason = reason;
     this.events.push({ e: 'result', winner, reason });
-    if (!this.db || this.friendly) return; // amistoso: nada de Elo, ouro, XP nem auditoria de recompensa
+    if (this.friendly) return this.friendlyWins(winner); // amistoso: nada de Elo, ouro, XP nem auditoria de recompensa; só a vitória conta para a missão `porto_duelo`
+    if (!this.db) return;
     const teamRating = (team) => { const t = this.teamOf(team); return t.length ? Math.round(t.reduce((s, p) => s + p.rating, 0) / t.length) : 1000; };
     const foeId = (team) => [...this.players.values()].filter((q) => q.team !== team && q.charId).map((q) => q.charId).sort((x, y) => x - y)[0] ?? 0; // id estável do adversário (humano de menor id): anti-troca de vitórias do PvP
     this.foeIdOf = foeId;
@@ -129,6 +131,18 @@ export class MatchRoom {
     }
   }
 
+
+  // Duelo amistoso do Porto: quem VENCEU (humano, ainda na sala, não empate) ganha o evento `friendlyDuel` (missão + contador). Idempotente por partida e personagem.
+  friendlyWins(winner) {
+    if (!this.db || winner === 3) return;
+    for (const p of this.players.values()) {
+      if (!p.charId || p.bot || p.left || p.team !== winner) continue;
+      const out = recordServerEvent(this.db, `friendly:${this.matchId}:${p.charId}`, p.charId, { type: 'friendlyDuel', won: true });
+      if (!out) continue;
+      if (p.session) p.session.char = out.doc;
+      if (p.session?.ws && p.session.player === p) this.send.to(p.session, { t: 'friendly_reward', ...out.summary });
+    }
+  }
 
   // ---- snapshots (compactos e por delta: ver core/snapshot.js) ----
   meta() {

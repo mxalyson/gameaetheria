@@ -87,3 +87,8 @@ Com missões: 9,8 h (gear normal: trava no Guardião) a 9,2 h (gear bom). XP tot
 2. G4 (chefes 3–4 e níveis de missão) juntos com 1.
 3. G3 (teto/anti-conluio de PvP no servidor) antes de abrir a fila pública.
 4. G5, G6, G7, G8, G9, G10, G11, G12, G13 em lotes por arquivo de dados (`journal.js`, `mobs.js`, `classes.js`/`skills.js`, `items.js`).
+
+## Status de G11–G13 (conferido no código em 2026-11-03)
+- **G11 (ritual do Cavaleiro Rubro): parcial.** `cooldown` já é 1 200 s (`data/mobs.js:83`) e a recarga corre no relógio real (`coolUntil`, `game/sim.js:239`). `need` continua 40 (a sugestão era 50) e não conferi se abates durante a recarga somam; **pendente** decidir com o dono.
+- **G12 (hostilidade): parcial.** Ruínas em `hostile: 0.85` e Cume em `0.8` (`data/zones.js:154,260`), como sugerido; Planície e Cinzas não foram tocadas.
+- **G13: feito em (a), (e), (f); resto aceito.** (a) venda paga 50% na Vila e 60% no Porto (`shop.js:19,49`; `economia.md` já diz isso). (e) a recarga do chefe usa `BOSS_SPAWN` (`game/sim.js:208`). (c) cooldown de baú ainda é do aparelho (ver B24, **aceito**). (b)/(d)/(f) não reconferidos nesta rodada: **pendente** de verificação.

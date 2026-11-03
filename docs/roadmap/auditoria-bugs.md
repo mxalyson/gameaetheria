@@ -58,3 +58,23 @@ Legenda de status (CLAUDE.md): **reproduzido** = rodei um script; **lido** = vis
 ## Arquivos temporários
 
 Os scripts `tools/zz-audit-*.mjs` foram usados e apagados. Nenhuma outra alteração além deste documento.
+
+## Status de B15 e B19–B30 (conferido no código em 2026-11-03)
+
+Classes: **feito** = correção presente no código (evidência = marcador/trecho); **aceito** = risco conhecido e documentado; **pendente**.
+
+| # | Status | Evidência |
+|---|---|---|
+| B15 | feito | `server/hub.js:435` (`zoneLeave`, comentário "B15"): sair da instância em luta ou morto segue o mesmo critério do teletransporte. Não rodei teste novo nesta conferência. |
+| B19 | feito | `server/hub.js:53` ("B19"): ao reconectar do zero, a sessão antiga é encerrada (grava o lote da instância). |
+| B20 | feito | `XP_MULT = { elite: 3, boss: 10 }` em `data/mobs.js:39`, usado por `main.js:1222` e `server/zone.js:153`. |
+| B21 | feito | `grep -c "case 'zone_teleport'" core/protocol.js` = 1. |
+| B22 | feito | `server/hub.js:25`: `TELEPORT_ENTRY = { x: FARM_ENTRY, y: FARM_MID }`. |
+| B23 | feito | sem `NORMAL_MOBS`/`BOSS_MOBS` em `main.js` nem `num` em `savedoc.js`; `BOSS_MOBS` (sem uso) removido de `data/mobs.js` nesta rodada. |
+| B24 | aceito | `chestReady` ainda usa `Date.now()` do aparelho (`core/journal.js:219`); o servidor limita `newChests: 6` por gravação (`server/plausible.js:13,170`). Cooldown de baú autoritativo no servidor segue pendente. |
+| B25 | feito | `SCROLL_MAX = 99` em `shop.js:6` ("B25"). |
+| B26 | feito | `server.js:9`: `decodeURIComponent` dentro de `try` ("B26"). |
+| B27 | feito | `render/mob-sprites.js:99` (`retryLater`, nova tentativa a cada 4 s). |
+| B28 | feito | `ui/ui.js:297-298`: ritual online via `game.netRitual` (snapshot `rt`). |
+| B29 | aceito | `BUDGET_MIB = 36` continua "mole" de propósito (comentário "B29" em `render/ground-tiles.js:12`); ultrawide passa de 36 MiB sem thrash. |
+| B30 | feito | `game/sim.js:379`: `stamp` recomeça antes de estourar o `Int32Array` ("B30"). |

@@ -23,6 +23,8 @@ import { ZONES, WORLD_ROUTE, teleportCost } from '../data/zones.js';
 import { offeredBy, readyFor, activeFor, serviceFor, questGiverId, spiritEvoStatus, dailyBoard, dailyState, dailyProgressOf, dailyComplete, dayUTC, titleText, achievementProgress, ensureJournal, greetFor, LORE_ZONES, loreSeen, loreCount, tipSeen } from '../core/journal.js';
 import { SCALE_MIN, SCALE_MAX, resolveScale } from '../prefs.js';
 import { asset } from '../assets-version.js';
+import { zoneHasCycle, isNight } from '../core/daycycle.js';
+import { currentHour } from '../render/sky.js';
 
 // posições (%) dos nós no mapa-múndi: zigue-zague seguindo WORLD_ROUTE (serve para qualquer número de zonas)
 const mapPos = (id) => { const n = WORLD_ROUTE.length, i = Math.max(0, WORLD_ROUTE.indexOf(id)); return [n > 1 ? 9 + (82 * i) / (n - 1) : 50, i % 2 ? 38 : 66]; };
@@ -312,7 +314,8 @@ export class UI {
     this.set('hud-xp-text', 'text', char.level >= MAX_LEVEL ? 'XP máximo' : `XP ${char.xp} / ${need}`);
     // o ouro agora fica no rodapé da mochila; no HUD sobra só o aviso de pontos livres
     this.set('hud-gold', 'html', char.statPoints ? `<span class="pts" data-action="toggle" data-arg="character">+${char.statPoints} pontos</span>` : '');
-    this.set('zone-name', 'text', world.zone.name);
+    // aviso de noite: só em zona com ciclo (nunca vila-arena/interior) e quando core/daycycle.js diz que é noite (bônus de risco)
+    this.set('zone-name', 'html', esc(world.zone.name) + (zoneHasCycle(world.zone) && isNight(currentHour()) ? '<span class="night-tag" title="Noite: criaturas enxergam mais longe e dão mais XP, ouro e itens">🌙 Noite: +15% XP/ouro</span>' : ''));
 
     const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, s3: player.cds.s3 ?? 0, potion: game.potionCd };
     const maxOf = { basic: CLASSES[char.classId].basic.cd / player.stats.atkSpeed, potion: 8 };
@@ -564,7 +567,7 @@ export class UI {
     const shopStock = harbor ? this.game.harborStock : this.game.shopStock; // Porto: estoque do dia (shop.js buildHarborStock), preços próprios, venda a 60%
     const stock = shopStock.map((it, i) => `
       <div class="shop-item">${this.itemCell(it, 'buy-item', i)}
-        <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level}</div></div>
+        <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level}</div></div>
         <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${itemPrice(it)}</button></div>`).join('') || `<p class="empty-msg">${harbor ? 'Estoque do dia esgotado. O cais traz mercadoria nova amanhã.' : 'Estoque esgotado. Volte após subir de nível.'}</p>`;
     const price = (k) => (harbor ? harborPrice(k, char.level) : PRICES[k](char.level)); // Porto: -15% em poções e pergaminhos (o servidor cobra assim)
     const potion = price('potion');
@@ -591,7 +594,7 @@ export class UI {
     const rows = SLOTS.map((sl) => char.equipment[sl]).filter(Boolean).map((it) => {
       const max = (it.plus ?? 0) >= MAX_PLUS, cost = enhanceCost(it);
       return `<div class="shop-item">${this.itemCell(it, 'unequip', it.slot)}
-        <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${it.plus ?? 0} de ${MAX_PLUS} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
+        <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${it.plus ?? 0} de ${MAX_PLUS} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
         ${max ? `<span class="tag">Máx +${MAX_PLUS}</span>` : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
     }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
     return `<h3 id="smith-section">${this.shopAnchor === 'smith' ? 'Aprimorar equipado' : 'Ferreiro Brok · aprimorar equipado'} <span class="pts">máx +${MAX_PLUS}</span></h3>${rows}`;
@@ -787,7 +790,7 @@ export class UI {
       <div class="opt-row"><b>Qualidade gráfica</b>${seg('quality', [['auto', 'Auto'], ['high', 'Alta'], ['medium', 'Média'], ['low', 'Baixa']])}</div>
       <p class="hint">Baixa e média reduzem névoa, partículas e resolução: ajudam em celulares fracos e economizam bateria.</p>
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Toque (padrão)'], ['keyboard', 'Teclado e mouse']])}</div>
-      <p class="hint">À noite o ar escurece e as criaturas enxergam mais longe, mas dão um pouco mais de XP, ouro e itens. "Sempre dia" muda só a aparência.</p>
+      <p class="hint">À noite o ar escurece e as criaturas enxergam mais longe, mas dão um pouco mais de XP, ouro e itens. O ciclo de dia e noite é sempre ligado.</p>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
       </div><div class="col">
@@ -869,7 +872,7 @@ export class UI {
     else if (equipped) action = `${again} para desequipar`;
     else if (this.isOpen('shop')) action = `${again} para vender por ${COIN} ${this.game.sellPrice(it)}`;
     else if (ok.ok) action = `${again} para equipar`;
-    return `<div class="tt-name" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}
+    return `<div class="tt-name${it.opal ? ' opal-name' : ''}" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}
       ${cid ? `<div class="${wrongClass ? 'tt-req' : 'tt-sub'}">Apenas para ${esc(itemClassName(it))}</div>` : ''}${ok.ok || wrongClass && ok.reason.startsWith('Apenas') ? '' : `<div class="tt-req">${ok.reason}</div>`}${cmp}
       <div class="tt-foot">${action}${!inShop && !this.isOpen('shop') ? `${action ? ' · ' : ''}vale ${COIN} ${this.game.sellPrice(it)}` : ''}</div>`;
   }

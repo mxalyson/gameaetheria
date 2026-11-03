@@ -21,7 +21,7 @@ const TAU = Math.PI * 2;
 // Spirit coletor: fora de combate busca o drop mais próximo (até `range` px do dono) e o traz; `hand` = distância em que entrega ao dono.
 export const SPIRIT_FETCH = { range: 260, speed: 320, grab: 16, hand: 30 };
 export const DROP_LIFE = 120, DROP_BLINK = 10, DROP_MAX = 120; // drops no chão: vida (s), piscar final (s) e teto por mundo
-export const PVP_DAMAGE = 0.32; // duelos entre heróis mais longos e táticos (medido com npm run balance)
+export const PVP_DAMAGE = 0.28; // duelos entre heróis mais longos e táticos (medido com npm run balance; 0,32 deixava Guerreiro/Arqueiro Nv30 com Maestria em 17–18 s)
 let nextId = 1;
 
 export const angDiff = (a, b) => {

@@ -2,7 +2,7 @@
 // Configuração por variáveis de ambiente (nenhum segredo fica no código nem no frontend; GOOGLE_CLIENT_ID é público por natureza):
 //   DB_PATH (padrão data/aetheria.db) · API_PORT (5176) · GAME_PORT (5175) · HOST (127.0.0.1)
 //   ALLOWED_ORIGINS (lista separada por vírgula; padrão http://localhost:5174) · GOOGLE_CLIENT_ID (opcional) · GAME_URL (wss://… público do jogo) · TRUST_PROXY=1 atrás de proxy
-//   P11.3: STRICT_PVE=1 (recusa salvamentos que aumentem XP/ouro/itens/abates; só o servidor de zona e as transações rendem)
+//   P11.3: modo estrito de PvE LIGADO por padrão (recusa salvamentos que aumentem XP/ouro/itens/abates/spirits; só o servidor de zona e as transações rendem); STRICT_PVE=0 desliga
 //   P10: METRICS_TOKEN (≥ 16 caracteres; liga GET /metrics) · LOG_LEVEL (debug|info|warn|error) · SHUTDOWN_GRACE_MS (3000) · MAX_PER_IP (20)
 // Rotas de operação na porta da API: /healthz (vivo), /readyz (pronto), /metrics (com token). Logs são linhas JSON.
 // Em produção: coloque atrás de um proxy com TLS (HTTPS/WSS) — este processo fala HTTP/WS simples.
@@ -21,7 +21,7 @@ for (const w of cfg.warnings) log.warn('configuração', { aviso: w });
 mkdirSync(dirname(cfg.dbPath), { recursive: true });
 const db = openDb(cfg.dbPath);
 const gameUrl = cfg.gameUrl || `ws://${cfg.host}:${cfg.gamePort}`; // URL que o NAVEGADOR usa para o WebSocket (em produção: wss://…)
-const strictPve = process.env.STRICT_PVE === '1'; // P11.3: recusa ganhos de PvE vindos do cliente (ver server/plausible.js); opcional até o cliente migrar tudo
+const strictPve = process.env.STRICT_PVE !== '0'; // P11.3: PADRÃO LIGADO — recusa ganhos de PvE vindos do cliente (ver server/plausible.js); STRICT_PVE=0 desliga
 const api = createApi(db, { googleClientId: cfg.googleClientId, origins: cfg.origins, trustProxy: cfg.trustProxy, gameUrl, strictPve });
 const game = createGameServer({ port: cfg.gamePort, host: cfg.host, db, allowedOrigins: cfg.origins, trustProxy: cfg.trustProxy, maxPerIp: cfg.maxPerIp });
 const ops = createOps({ db, game, metricsToken: cfg.metricsToken });

@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { MatchRoom } from './room.js';
 import { CoopRoom } from './coop.js';
 import { ZoneRoom, entryPoint } from './zone.js';
-import { runTx, placeProblem, TxError } from './tx.js';
+import { runTx, placeProblem, TxError, recordServerEvent } from './tx.js';
 import { ZONES, FARM_ENTRY, FARM_MID } from '../public/src/data/zones.js';
 import { MODES } from '../public/src/core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../public/src/core/power.js';
@@ -96,6 +96,8 @@ export class Hub {
   // ---------- mensagens ----------
   handle(s, m) {
     const no = (code, extra = {}) => this.out.send(s, { t: 'reject', code, ...extra });
+    // partida já decidida (resultado na tela por RESULT_SHOW s): quem clicou em "Voltar" não fica preso à sala; transação, fila, grupo e viagem valem já
+    if (m.t !== 'input' && m.t !== 'ping' && s.room && s.room.mode !== 'zone' && s.room.state === 'over') { s.room = null; s.player = null; }
     switch (m.t) {
       case 'ping': return this.out.send(s, { t: 'pong', ts: m.ts, tick: this.tick });
       case 'input': if (s.room) s.room.input(s, m); return;
@@ -351,6 +353,12 @@ export class Hub {
       s.char = out.doc;
     } catch { /* sem o registro o jogador só precisa passar por lá de novo */ }
   }
+  // Evento de diário contado pelo servidor (teletransporte, visita ao Porto): o cliente não soma esses objetivos sozinho (modo estrito de PvE).
+  serverEvent(s, ev) {
+    const out = recordServerEvent(this.db, `ev:${s.id}:${++this.tpSeq}:${randomBytes(4).toString('hex')}`, s.charId, ev);
+    if (out) s.char = out.doc;
+    return out;
+  }
   // Teletransporte: o servidor confere TUDO (o cliente só pede). Vila é grátis; outras zonas custam 1 pergaminho debitado no documento oficial.
   zoneTeleport(s, zoneId, no) {
     if (this.clock - (s.tpAt ?? -99) < TELEPORT_COOLDOWN) return no(REJECT.TELEPORT_WAIT);
@@ -388,6 +396,8 @@ export class Hub {
       } catch { return no(REJECT.NO_SCROLL); }
     }
     if (room) room.leave(s.player, 'teleport'); // grava o lote pendente de recompensas antes de trocar de lugar
+    this.serverEvent(s, { type: 'teleport' }); // objetivo/contador de teletransporte: do servidor (antes de zone_exit/zone_joined, que o cliente usa para reler o personagem)
+    if (toHub && zoneId === 'harbor') this.serverEvent(s, { type: 'visit', zoneId });
     if (toTown) { s.hubAt = null; return this.out.send(s, { t: 'zone_exit', to: 'town' }); }
     if (toHub) { s.hubAt = zoneId; this.markVisited(s, zoneId); return this.out.send(s, { t: 'zone_exit', to: zoneId, x: ZONES[zoneId].spawn.x, y: ZONES[zoneId].spawn.y }); }
     this.joinZoneRoom(s, zoneId, { ...(ZONES[zoneId].spawn ?? TELEPORT_ENTRY) }, { scrolls });
@@ -445,7 +455,7 @@ export class Hub {
     if (pt.to === 'town' || (dest.hub && !dest.mobs)) { // cidade neutra: sai da instância; o cliente anda no mapa local
       room.leave(p, 'portal');
       s.hubAt = pt.to === 'town' ? null : pt.to;
-      if (s.hubAt) this.markVisited(s, pt.to);
+      if (s.hubAt) { this.markVisited(s, pt.to); if (pt.to === 'harbor') this.serverEvent(s, { type: 'visit', zoneId: 'harbor' }); }
       this.out.send(s, { t: 'zone_exit', to: pt.to, x: pt.tx, y: pt.ty });
       return;
     }

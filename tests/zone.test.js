@@ -270,3 +270,58 @@ test('ritual: o servidor informa o progresso (rt) só quando muda e em todo quad
   const f = mk('forest'); f.room.broadcast();
   assert.equal(f.log.at(-1).rt, undefined);
 });
+
+// ---------- rodada: chefe na rede, esbirros, Maestria na hora ----------
+import { makeMobActor } from '../public/src/game/sim.js';
+
+test('chefe: boss_warn e phase do mundo da sala viram eventos do snapshot (cliente online mostra o aviso e a fúria)', async () => {
+  const { srv, players } = await setup(1);
+  const { c } = players[0];
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  await c.waitFor((m) => m.t === 'zone_joined');
+  const room = srv.hub.zoneRooms.values().next().value;
+  const boss = room.mobs()[0];
+  room.world.events.push({ type: 'boss_warn', stage: 'omen', mobId: 'x', name: 'Chefe Teste', x: 10.2, y: 20.7, t: 0 }, { type: 'phase', actor: boss, phase: 3, t: 0 });
+  srv.step(6);
+  const evs = (await c.waitFor((m) => m.t === 'snap' && (m.events ?? []).some((e) => e.e === 'phase'))).events;
+  assert.deepEqual(evs.find((e) => e.e === 'boss_warn'), { e: 'boss_warn', stage: 'omen', name: 'Chefe Teste', x: 10, y: 21 });
+  assert.deepEqual(evs.find((e) => e.e === 'phase'), { e: 'phase', actor: boss.id, phase: 3 });
+  await closeAll(srv, c);
+});
+
+test('esbirros de chefe (summoned): sem XP, sem loot e SEM abate (não contam para missão/conquista); mob comum conta', async () => {
+  const { srv, players } = await setup(1);
+  const { c } = players[0];
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  const room = srv.hub.zoneRooms.values().next().value, me = srv.actor(j.you), p = room.players.get(me.id);
+  const minion = makeMobActor('slime', 3, me.x + 20, me.y, { summoned: true });
+  room.onMobKilled(minion);
+  assert.equal(p.pend.xp, 0); assert.equal(p.pend.kills.length, 0); assert.equal(p.pend.gold + p.pend.potions + p.pend.items.length + p.pend.essences.length, 0);
+  const common = makeMobActor('slime', 3, me.x + 20, me.y);
+  room.onMobKilled(common);
+  assert.ok(p.pend.xp > 0); assert.equal(p.pend.kills.length, 1);
+  await closeAll(srv, c);
+});
+
+test('Maestria: o ator da sala ganha a 4ª habilidade na hora que o documento a tem (transação ou lote), sem esperar o próximo lote', async () => {
+  const { db, srv, players } = await setup(1);
+  const { c, ch } = players[0];
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  const room = srv.hub.zoneRooms.values().next().value, me = srv.actor(j.you), p = room.players.get(me.id);
+  assert.equal(!!me.mastery, false);
+  const doc = structuredClone(db.character(ch).doc); doc.quests.done.maestria = Date.now();
+  room.afterTx(p, { op: 'equip' }, doc); // qualquer transação aplicada com o jogador na sala sincroniza o ator
+  assert.equal(me.mastery, true);
+  // pelo lote: outro caminho que relê o documento oficial
+  me.mastery = false;
+  const row = db.character(ch); const d2 = structuredClone(row.doc); d2.quests.done.maestria = Date.now(); assert.ok(db.saveCharacter(ch, d2, row.rev));
+  p.pend.skills.push('slash');
+  room.flush(p);
+  assert.equal(me.mastery, true);
+  // e a transação de entrega da missão NÃO existe dentro da instância (o mestre fica na Vila): fica claro no servidor
+  const { placeProblem } = await import('../server/tx.js');
+  assert.equal(placeProblem('quest_turnin', { inZone: true }), 'not_here');
+  await closeAll(srv, c);
+});

@@ -14,7 +14,9 @@ import { MOBS, MOBS_EXTRA } from '../data/mobs.js';
 import { makeRng, hashString } from './rng.js';
 
 export const SERVER_TYPES = new Set(['pvp', 'coop']); // objetivos que só o servidor soma
-export const OFFLINE_TYPES = new Set(['friendlyDuel']); // objetivos que só existem no jogo solo (o duelo amistoso não roda online)
+export const OFFLINE_TYPES = new Set(); // objetivos que só existem no jogo solo (vazio desde que o duelo amistoso passou a rodar online: o servidor conta a vitória)
+// Objetivos que, no modo ESTRITO de PvE (server/plausible.js), só o servidor soma (transações `lore`/`spirit_evolve`, teletransporte/visita no hub, vitória no duelo amistoso).
+export const PVE_SERVER_TYPES = new Set(['visit', 'teleport', 'lore', 'spiritStage', 'friendlyDuel']);
 export const MAX_ACTIVE = 5;
 export const CHEST_COOLDOWN_MS = 10 * 60 * 1000;
 
@@ -92,7 +94,7 @@ function matches(o, ev, doc) {
     case 'upgrade': return ev.type === 'upgrade';
     case 'bank': return ev.type === 'bank';                       // guardar 1 item no banco do Porto
     case 'daily': return ev.type === 'daily';                     // entregar 1 contrato do Quadro
-    case 'friendlyDuel': return ev.type === 'friendlyDuel' && !!ev.won; // vencer um duelo amistoso (só offline)
+    case 'friendlyDuel': return ev.type === 'friendlyDuel' && !!ev.won; // vencer um duelo amistoso (offline: o jogo conta; online: o servidor)
     default: return false;
   }
 }

@@ -46,3 +46,15 @@ test('ASSET_V e a VERSION do service worker andam juntas (tools/bump-assets.mjs 
   const sw = readFileSync('public/sw.js', 'utf8');
   assert.match(sw, new RegExp(`const VERSION = 'aetheria-${ASSET_V}'`));
 });
+
+test('texturas de chão e baú usam ASSET_V (hash do conteúdo), não número manual; mudar arte invalida o cache via sw.js', async () => {
+  const g = readFileSync('public/src/render/ground-textures.js', 'utf8');
+  assert.ok(!/GROUND_V/.test(g), 'sem GROUND_V manual');
+  assert.match(g, /\.webp\?v=\$\{ASSET_V\}/);
+  assert.match(readFileSync('public/src/render/prop-sprites.js', 'utf8'), /chest\.webp\?v=\$\{ASSET_V\}/);
+  // o hash cobre public/assets/** inteiro (inclui ground/): a VERSION do sw.js sai desse mesmo hash
+  const { assetsHash } = await import('../tools/bump-assets.mjs');
+  assert.equal(assetsHash(), ASSET_V, 'rode node tools/bump-assets.mjs se mudou arte');
+  const tools = readFileSync('tools/bump-assets.mjs', 'utf8');
+  assert.match(tools, /join\(PUB, 'assets'\)/);
+});

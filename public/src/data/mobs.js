@@ -31,7 +31,6 @@ export const MOBS_EXTRA = {
 Object.assign(MOBS, MOBS_EXTRA);
 
 export const NORMAL_MOBS = Object.keys(MOBS).filter((id) => !MOBS[id].boss);
-export const BOSS_MOBS = Object.keys(MOBS).filter((id) => MOBS[id].boss);
 
 // ---- Curva de dificuldade (medida com tools/boss-check.mjs; números em docs/gameplay/dificuldade.md) ----
 // Base por nível do mob; hp/atk/def de cada MOBS são multiplicadores sobre ela. Calibrada contra a curva de poder do herói

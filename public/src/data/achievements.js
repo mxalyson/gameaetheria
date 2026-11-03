@@ -30,7 +30,6 @@ export const ACHIEVEMENTS = [
   // `mask` = o contador é uma máscara de bits (vale quantos bits estão ligados): 1 lore por zona de farm (core/journal.js LORE_ZONES).
   { id: 'leitor_de_ecos', name: 'Leitor de Ecos', desc: 'Leia as 5 inscrições deixadas nas zonas: placas e estátuas.', stat: 'lore', mask: true, min: 5, title: 'Leitor de Ecos' },
 ];
-export const ACHIEVEMENT_IDS = ACHIEVEMENTS.map((a) => a.id);
 export const ACH = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 // Contadores do personagem. `SERVER_STATS` só o servidor altera (vêm de partidas decididas lá).
 export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin', 'teleports', 'upgrades', 'tips', 'lore', 'spiritKills', 'skillUses', 'deposits', 'contracts', 'friendlyWins', 'harborVisits'];

@@ -126,6 +126,8 @@ function bossTick(m, w, tgt, d, M) {
 }
 
 // Rival da arena: usa o mesmo kit de classe do jogador.
+// Fração da antecipação de mira (0 = mira no alvo, 1 = mira exata à frente). 0,4 foi o melhor em `npm run balance`: com 0,8–1 o Arqueiro e o Guerreiro dominam.
+const LEAD = 0.4;
 export function rivalIntent(r, w, dt) {
   const ai = (r.ai ??= { think: 0, strafe: 1, jx: 0, jy: 0, cast: null });
   const tgt = w.nearestEnemy(r);
@@ -134,6 +136,12 @@ export function rivalIntent(r, w, dt) {
   const melee = cls.basic.kind === 'melee';
   const dx = tgt.x - r.x, dy = tgt.y - r.y, d = Math.hypot(dx, dy) || 1;
   const nx = dx / d, ny = dy / d;
+
+  // Velocidade do alvo (média móvel dos últimos deslocamentos): serve para mirar à frente em projéteis lentos, como um jogador faz.
+  if (ai.lid === tgt.id && dt > 0) {
+    ai.vx = (ai.vx ?? 0) * 0.85 + ((tgt.x - ai.lx) / dt) * 0.15; ai.vy = (ai.vy ?? 0) * 0.85 + ((tgt.y - ai.ly) / dt) * 0.15;
+  } else { ai.vx = 0; ai.vy = 0; }
+  ai.lid = tgt.id; ai.lx = tgt.x; ai.ly = tgt.y;
 
   ai.think -= dt;
   if (ai.think <= 0) {
@@ -157,8 +165,15 @@ export function rivalIntent(r, w, dt) {
   if (!melee || d < 140) { mx += -ny * ai.strafe * 0.7; my += nx * ai.strafe * 0.7; }
 
   [mx, my] = steerAround(r, w, mx, my);
+  // mira à frente: tempo de voo = distância / velocidade do projétil (o ataque básico ou a habilidade lançada agora)
+  let lead = 0;
+  if (!melee) {
+    const sk = ai.cast ? skillOf(r.classId, r.spec, skillIdAt(r.classId, ai.cast.idx)) : null;
+    const sp = sk ? (sk.kind === 'projectile' ? sk.speed : 0) : cls.basic.speed;
+    if (sp) lead = Math.min(0.9, d / sp) * LEAD;
+  }
   const it = {
-    mx, my, aimX: tgt.x + ai.jx, aimY: tgt.y + ai.jy, cast: null,
+    mx, my, aimX: tgt.x + ai.vx * lead + ai.jx, aimY: tgt.y + ai.vy * lead + ai.jy, cast: null,
     attack: d <= (melee ? cls.basic.range + tgt.r : cls.basic.range * 0.95),
   };
   if (ai.cast) {

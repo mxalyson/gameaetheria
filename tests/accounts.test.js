@@ -22,7 +22,7 @@ const goodClaims = (extra = {}) => ({ iss: 'https://accounts.google.com', aud: C
 async function setup({ google = false, origins = ['http://localhost:5174'] } = {}) {
   const db = openDb(':memory:');
   const clock = { t: Date.now() }; // relógio injetável: os testes avançam o tempo sem esperar
-  const api = createApi(db, { googleClientId: google ? CLIENT_ID : null, origins, now: () => clock.t, fetchJwks: async () => [JWK] });
+  const api = createApi(db, { strictPve: false, /* estes testes cobrem os limites de plausibilidade clássicos; o modo estrito (padrão) é de pve-strict.test.js */ googleClientId: google ? CLIENT_ID : null, origins, now: () => clock.t, fetchJwks: async () => [JWK] });
   const server = api.server();
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;

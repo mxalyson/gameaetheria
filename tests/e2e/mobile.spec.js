@@ -62,24 +62,22 @@ test('joystick move o herói e para ao soltar', async ({ page }) => {
   await t.down(1, 150, 260);
   await t.move(1, 150 + 60, 260);
   await expect(page.locator('#stick')).toBeVisible({ timeout: 4000 }); // com os heróis em miniatura carregando, o quadro pode atrasar
-  await page.waitForTimeout(500);
+  // espera o EFEITO (andou >40 px), não um tempo fixo: sob carga o quadro atrasa
+  await page.waitForFunction((x0) => window.game.player.x - x0 > 40, a.x, { timeout: 15000, polling: 50 });
   const b = await page.evaluate(() => ({ x: window.game.player.x, y: window.game.player.y }));
   await page.screenshot({ path: 'test-results/mobile-joystick.png' });
   await t.up(1);
   expect(b.x - a.x).toBeGreaterThan(40);
   expect(Math.abs(b.y - a.y)).toBeLessThan(15);
-  await page.waitForTimeout(400);
-  const c1 = await page.evaluate(() => window.game.player.x);
-  await page.waitForTimeout(300);
-  const c2 = await page.evaluate(() => window.game.player.x);
-  expect(Math.abs(c2 - c1)).toBeLessThan(1);
+  // parou: a posição fica igual por 6 quadros seguidos (em vez de 400+300 ms fixos)
+  await page.waitForFunction(() => new Promise((res) => { let last = window.game.player.x, n = 0; const f = () => { const x = window.game.player.x; n = Math.abs(x - last) < 0.5 ? n + 1 : 0; last = x; if (n >= 6) res(true); else requestAnimationFrame(f); }; requestAnimationFrame(f); }), null, { timeout: 15000 });
   expect(await page.locator('#stick').isVisible()).toBe(false);
 });
 
 test('botões: ataque (segurar), habilidade com auto-mira, esquiva/poção e multitoque', async ({ page }) => {
   await startGame(page);
   await page.evaluate(() => { const g = window.game; g.enterZone('forest', 600, 900); g.player.hp = g.player.maxHp = 99999; });
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => window.game.world.zoneId === 'forest' && window.game.world.actors.some((a) => a.kind === 'mob'), null, { polling: 50 });
   // Um inimigo à direita e acima do herói, dentro do alcance de auto-mira.
   await page.evaluate(() => {
     const g = window.game, p = g.player;
@@ -94,14 +92,12 @@ test('botões: ataque (segurar), habilidade com auto-mira, esquiva/poção e mul
   const t = await touch(page);
   const atk = await center(page, '.tbtn.atk');
   await t.down(1, atk.x, atk.y);
-  await page.waitForTimeout(250);
-  expect(await page.evaluate(() => window.game.player.cds.basic)).toBeGreaterThan(0);
+  await page.waitForFunction(() => window.game.player.cds.basic > 0, null, { timeout: 10000, polling: 50 });
   // multitoque: com o ataque pressionado, usa a habilidade 1.
   const sk = await center(page, '.tbtn.sk0');
   await t.down(2, sk.x, sk.y);
   await t.up(2);
-  await page.waitForTimeout(250);
-  expect(await page.evaluate(() => window.game.player.cds.s0)).toBeGreaterThan(1);
+  await page.waitForFunction(() => window.game.player.cds.s0 > 1, null, { timeout: 10000, polling: 50 });
   await page.screenshot({ path: 'test-results/mobile-combate.png' });
   await t.up(1);
   expect(await page.evaluate(() => window.game.touch.attack)).toBe(false);
@@ -111,8 +107,7 @@ test('botões: ataque (segurar), habilidade com auto-mira, esquiva/poção e mul
   const pots = await page.evaluate(() => window.game.char.potions);
   const pot = await center(page, '.tbtn.pot');
   await page.touchscreen.tap(pot.x, pot.y);
-  await page.waitForTimeout(200);
-  expect(await page.evaluate(() => window.game.char.potions)).toBe(pots - 1);
+  await page.waitForFunction((n) => window.game.char.potions === n, pots - 1, { timeout: 10000, polling: 50 });
 });
 
 test('painéis cabem na tela horizontal; opções mudam escala, qualidade e persistem', async ({ page }) => {
@@ -121,7 +116,7 @@ test('painéis cabem na tela horizontal; opções mudam escala, qualidade e pers
   await page.keyboard.press('Escape');
   await page.locator('[data-arg="inventory"]').tap();
   await page.locator('[data-arg="character"]').first().tap().catch(() => {});
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => window.game.ui.open.has('inventory'), null, { timeout: 10000, polling: 50 });
   await page.evaluate(() => { window.game.ui.open.add('inventory'); window.game.ui.open.add('character'); window.game.ui.render(); });
   expect(await fits('#panel-layer')).toBe(true);
   await page.screenshot({ path: 'test-results/mobile-paineis.png' });

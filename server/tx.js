@@ -2,27 +2,33 @@
 // O cliente só PEDE (core/protocol.js › TX_OPS); aqui o servidor confere tudo no documento OFICIAL do banco e devolve o novo documento.
 // Função pura sobre o documento (testável sem rede): runTx(doc, m, ctx) -> { doc, summary } ou lança TxError (a operação do banco reverte).
 // Toda transação passa por db.applyOperation (idempotente, uma gravação atômica) e pelo mesmo `validate` do restante do servidor.
-import { openChest, claimDaily, acceptQuest, turnInQuest, recordEvent, ensureJournal, dayUTC } from '../public/src/core/journal.js';
+import { openChest, claimDaily, acceptQuest, turnInQuest, recordEvent, ensureJournal, dayUTC, readLore, evolvedSpirits } from '../public/src/core/journal.js';
+import { createSpirit, evolveSpirit } from '../public/src/core/progression.js';
+import { canEquip } from '../public/src/core/stats.js';
+import { SPIRIT_RARITY_MUL, MAX_SPIRITS } from '../public/src/data/spirits.js';
 import { enhance, findGear } from '../public/src/core/enhance.js';
 import { depositItem, withdrawItem } from '../public/src/core/bank.js';
-import { buildShopStock, buildHarborStock, PRICES, sellValue, harborSellValue, harborPrice, SCROLL_MAX } from '../public/src/shop.js';
+import { buildShopStock, buildHarborStock, PRICES, sellValue, harborSellValue, harborPrice, SCROLL_MAX, recycle } from '../public/src/shop.js';
 import { INVENTORY_SIZE, RARITY } from '../public/src/data/items.js';
 import { validate } from '../public/src/core/savedoc.js';
 import { QUESTS } from '../public/src/data/quests.js';
+import { CLASSES } from '../public/src/data/classes.js';
 
 export class TxError extends Error {}
 const fail = (msg) => { throw new TxError(msg); };
 
 export const POTION_HEAL = 0.35;   // fração da vida (igual ao jogo offline)
 export const POTION_COOLDOWN = 8;  // s
+export const LORE_REACH = 130;    // px entre o ATOR do servidor e a placa de lore (o cliente toca a 80)
 export const CHEST_REACH = 130;    // px entre o ATOR do servidor e o baú (o cliente abre a 70; folga para latência)
 
-// Onde cada operação existe: dentro da instância só baú/poção/spirit; nas cidades, o resto. Devolve o código de recusa ou null.
+// Onde cada operação existe: dentro da instância baú/poção/lore e equipamento/atributos/spirit ativo; nas cidades, o resto. Devolve o código de recusa ou null.
 export function placeProblem(op, { inZone, hubAt, shop = 'town' }) {
-  const inst = op === 'chest' || op === 'potion';
-  if (inZone) return op === 'spirit_set' || inst ? null : 'not_here';
+  const inst = op === 'chest' || op === 'potion' || op === 'lore'; // só existem dentro da instância
+  const both = ['spirit_set', 'equip', 'unequip', 'alloc', 'alloc_auto'].includes(op); // valem na instância e nas cidades
+  if (inZone) return both || inst ? null : 'not_here';
   if (inst) return 'not_here';
-  const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily';
+  const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily' || op === 'recycle';
   if (harborOnly && hubAt !== 'harbor') return 'not_here';
   if (shop === 'harbor' && hubAt !== 'harbor') return 'not_here';
   if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk'].includes(op)) return 'not_here'; // lojas da Vila só na Vila
@@ -144,10 +150,102 @@ export function runTx(doc, m, ctx) {
       Object.assign(s, { reward: r.reward, quests: questsReady(r), achievements: r.achievements, levels: r.reward.levels, level: c.level });
       break;
     }
+    case 'lore': { // placa/estátua da zona: servidor confere zona, proximidade e a 1ª leitura (bit em stats.lore + conquista)
+      const a = ctx.player?.actor, l = ctx.room?.world?.zone?.lore?.find((x) => x.id === m.id);
+      if (!a || !l) fail('Placa inexistente aqui.');
+      if (a.dead) fail('Você está caído.');
+      if (Math.hypot(a.x - l.x, a.y - l.y) > LORE_REACH) fail('Chegue mais perto.');
+      const r = readLore(c, l.id);
+      Object.assign(s, { first: r.first, achievements: r.achievements });
+      break;
+    }
+    case 'spirit_free': { // devolve ouro pela raridade e nível (mesma conta do jogo offline)
+      const sp = c.spirits.find((x) => x.id === m.id);
+      if (!sp) fail('Spirit não encontrado.');
+      const gold = Math.round(30 * sp.level * SPIRIT_RARITY_MUL[sp.rarity]);
+      c.spirits = c.spirits.filter((x) => x.id !== m.id);
+      c.gold += gold;
+      if (c.activeSpirit === m.id) c.activeSpirit = c.spirits[0]?.id ?? null;
+      s.gold = gold;
+      break;
+    }
+    case 'buy_essence': { // sorteio com o RNG do servidor; o spirit nasce no nível do herói − 2 (igual ao jogo)
+      if (c.spirits.length >= MAX_SPIRITS) fail('Limite de spirits atingido. Liberte algum primeiro.');
+      const prism = m.kind === 'prism', price = prism ? PRICES.prism(lv) : PRICES.essence(lv);
+      if (c.gold < price) fail('Ouro insuficiente.');
+      c.gold -= price;
+      const rarity = prism ? ctx.rng.weighted([['rare', 70], ['epic', 25], ['legendary', 5]]) : undefined;
+      const sp = createSpirit(ctx.rng, { rarity, luck: 0.4, level: Math.max(1, lv - 2) });
+      c.spirits.push(sp);
+      if (!c.activeSpirit) c.activeSpirit = sp.id;
+      const ev = recordEvent(c, { type: 'spirit', count: c.spirits.length }, now);
+      Object.assign(s, { price, spirit: sp.type, rarity: sp.rarity, quests: questsReady(ev), achievements: ev.achievements });
+      break;
+    }
+    case 'spirit_evolve': {
+      const r = evolveSpirit(c, m.id);
+      if (!r.ok) fail(r.reason);
+      const ev = recordEvent(c, { type: 'spiritStage', count: evolvedSpirits(c) }, now); // objetivo spiritStage contado aqui, não no cliente
+      Object.assign(s, { cost: r.cost, type: c.spirits.find((x) => x.id === m.id).type, quests: questsReady(ev), achievements: ev.achievements });
+      break;
+    }
+    case 'recycle': {
+      const r = recycle(c, m.ids, ctx.rng);
+      if (!r.ok) fail(r.reason);
+      s.item = r.item;
+      break;
+    }
+    case 'equip': {
+      const idx = c.inventory.findIndex((x) => x.id === m.id);
+      if (idx < 0) fail('Item não está na mochila.');
+      const it = c.inventory[idx], ok = canEquip(c, it);
+      if (!ok.ok) fail(ok.reason);
+      const prev = c.equipment[it.slot];
+      c.equipment[it.slot] = it;
+      c.inventory.splice(idx, 1);
+      if (prev) c.inventory.splice(idx, 0, prev);
+      break;
+    }
+    case 'unequip': {
+      if (!c.equipment[m.slot]) fail('Nada equipado nesse espaço.');
+      if (c.inventory.length >= INVENTORY_SIZE) fail('Inventário cheio.');
+      c.inventory.push(c.equipment[m.slot]);
+      delete c.equipment[m.slot];
+      break;
+    }
+    case 'alloc': { // distribui pontos livres (n limitado aos pontos que o documento tem)
+      if (c.statPoints <= 0) fail('Sem pontos para distribuir.');
+      const n = Math.min(c.statPoints, m.n);
+      c.alloc[m.stat] += n; c.statPoints -= n; s.n = n;
+      break;
+    }
+    case 'alloc_auto': { // 70% no atributo principal da classe e o resto em Vitalidade (igual ao botão do jogo)
+      const pts = c.statPoints;
+      if (pts <= 0) fail('Sem pontos para distribuir.');
+      const prim = CLASSES[c.classId].primary, main = Math.ceil(pts * 0.7);
+      c.alloc[prim] += main; c.alloc.vit += pts - main; c.statPoints = 0; s.main = main; s.prim = prim;
+      break;
+    }
     default: fail('Operação desconhecida.');
   }
   const v = validate(c);
   if (!v.ok) fail('Documento inválido após a transação: ' + v.reason);
   s.goldTotal = v.char.gold; s.potionsTotal = v.char.potions;
   return { doc: v.char, summary: s };
+}
+
+// Evento de diário contado pelo SERVIDOR (teletransporte, visita ao Porto, vitória no duelo amistoso): uma operação idempotente sobre o documento oficial.
+// Devolve { doc, summary: { quests, achievements } } ou null se não há banco/personagem ou a gravação falhar (o evento se perde, nunca derruba a sala).
+export function recordServerEvent(db, opId, charId, ev, now = Date.now()) {
+  if (!db || !charId) return null;
+  try {
+    const out = db.applyOperation(opId, charId, 'event', (doc) => {
+      const c = structuredClone(doc);
+      const r = recordEvent(c, ev, now);
+      const v = validate(c);
+      if (!v.ok) throw new Error('documento inválido após o evento: ' + v.reason);
+      return { doc: v.char, summary: { event: ev.type, quests: questsReady(r), achievements: r.achievements } };
+    });
+    return out.duplicate ? null : out;
+  } catch { return null; }
 }

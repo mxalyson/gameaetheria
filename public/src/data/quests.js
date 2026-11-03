@@ -211,4 +211,3 @@ Object.assign(QUESTS, {
 // Missão de evolução de cada tipo de spirit (core/progression.js, core/journal.js spiritEvoStatus).
 export const SPIRIT_EVO_QUEST = Object.fromEntries(EVO.map(([type, , , key]) => [type, 'evolucao_do_spirit_' + key]));
 
-export const QUEST_IDS = Object.keys(QUESTS);

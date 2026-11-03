@@ -1,9 +1,10 @@
 // Objetos do mundo PINTADOS (não por código): baú. Arte: assets/props/chest.webp (recorte da folha de itens; tools/chest-from-sheet.py).
 // Só há arte de baú FECHADO: o saqueado é o mesmo sprite com a tampa recortada e erguida e o interior escuro (pré-calculado uma vez), sem brilho. Arte própria de baú aberto: pendência (docs/art-direction/prompts-cenario.md).
+import { ASSET_V } from '../assets-version.js';
 let img = null, used = null, loading = null;
 function load() {
   if (loading) return;
-  loading = new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'assets/props/chest.webp?v=1'; })
+  loading = new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/props/chest.webp?v=${ASSET_V}`; })
     .then(async (i) => {
       await i.decode?.();
       // baú saqueado (V20): mesma arte, mas a tampa é recortada e erguida (SPLIT = linha da emenda), com o interior escuro no vão; depois, tudo mais escuro

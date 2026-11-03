@@ -32,7 +32,6 @@ export const BASE_NAMES = {
 };
 // Equipamento por CLASSE (todos os espaços, não só a arma): o item nasce com `classId` e só essa classe o equipa.
 // Armadura por tipo: Guerreiro = placas (pesada), Arqueiro = couro, Mago e Clérigo = tecido (cada um com o próprio conjunto de nomes).
-export const ARMOR_TYPES = { warrior: 'Placas', archer: 'Couro', mage: 'Tecido', cleric: 'Tecido' };
 // Nome base por classe, espaço e tier (nível do item / 8). Ícone: o do tipo/espaço (sem arte própria por classe ainda).
 export const GEAR_NAMES = {
   warrior: {

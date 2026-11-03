@@ -1,5 +1,6 @@
 // Texturas de CHÃO pintadas (arte gerada, sem emenda; tools/ground-textures-from-images.py): grama do Bosque e da Planície, lajes das Ruínas, terra e lajes das trilhas, água dos lagos.
 // Só entram no cache do terreno (buildGround, uma vez por zona): custo por quadro zero. Sem as imagens (ou com ?chao=original, que fica salvo no aparelho) vale o chão por código.
+import { ASSET_V } from '../assets-version.js';
 const KEY = 'aetheria_chao';
 const NAMES = ['forest', 'plains', 'ruins', 'sand-dirt', 'sand-plains', 'slabs', 'water-lake', 'water-crystal'];
 const imgs = new Map();
@@ -15,11 +16,11 @@ export function groundTexEnabled() {
   return on;
 }
 
-const GROUND_V = 2; // suba junto com VERSION do sw.js ao trocar as texturas (o service worker serve .webp do cache primeiro)
+// ?v= = hash do conteúdo de public/assets/** (ASSET_V, o mesmo da VERSION do sw.js): trocar uma textura muda o hash (tools/bump-assets.mjs) e invalida o cache sozinho
 export function loadGroundTextures() {
   if (!groundTexEnabled() || loading) return loading;
   loading = Promise.all(NAMES.map((n) => new Promise((res) => {
-    const i = new Image(); i.onload = () => { imgs.set(n, i); res(); }; i.onerror = () => res(); i.src = `assets/ground/${n}.webp?v=${GROUND_V}`;
+    const i = new Image(); i.onload = () => { imgs.set(n, i); res(); }; i.onerror = () => res(); i.src = `assets/ground/${n}.webp?v=${ASSET_V}`;
   }))).then(() => { ready = imgs.size === NAMES.length; });
   return loading;
 }

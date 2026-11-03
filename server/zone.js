@@ -149,6 +149,7 @@ export class ZoneRoom {
   // ---- recompensas: o servidor sorteia tudo ----
   onMobKilled(m) {
     const M = MOBS[m.mobId];
+    if (m.summoned) return; // esbirros de chefe: sem XP, loot NEM abate (nem missão/conquista), igual ao jogo offline (main.js onMobKilled)
     const rm = this.world.nightMods?.rewardMul ?? 1; // bônus noturno (relógio do servidor), só em zonas com ciclo
     const mul = M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1) * rm;
     for (const p of this.alive()) {
@@ -191,11 +192,12 @@ export class ZoneRoom {
       return null;
     }
   }
-  // subiu de nível no servidor: o ator recalcula atributos e recupera a vida (como onLevelUp do jogo)
+  // documento novo (nível, Maestria, equipamento, atributos): o ator recalcula tudo NA HORA e recupera a vida só se subiu de nível (como onLevelUp do jogo).
+  // Chamado no lote de recompensas e em afterTx (qualquer transação aplicada com o jogador na sala: equip/alloc/entrega de missão).
   syncLevel(p, doc) {
     const fresh = makeHeroActor(doc, p.actor.x, p.actor.y, 'player', 1);
     const levelUp = fresh.level !== p.actor.level;
-    Object.assign(p.actor, { level: fresh.level, mastery: fresh.mastery, stats: fresh.stats, maxHp: fresh.maxHp, hp: levelUp ? fresh.maxHp : Math.min(p.actor.hp, fresh.maxHp) });
+    Object.assign(p.actor, { level: fresh.level, spec: fresh.spec, mastery: fresh.mastery, stats: fresh.stats, maxHp: fresh.maxHp, hp: levelUp ? fresh.maxHp : Math.min(p.actor.hp, fresh.maxHp) });
   }
 
   leave(p, reason = 'left') {

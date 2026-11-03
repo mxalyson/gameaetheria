@@ -362,7 +362,8 @@ test('Porto: 5 missões novas, com giver no Porto e objetivos bank/daily/friendl
   assert.deepEqual(QUESTS.porto_contrato.objectives.map((o) => o.type), ['daily']);
   assert.deepEqual(QUESTS.porto_duelo.objectives.map((o) => o.type), ['friendlyDuel']);
   assert.ok(QUESTS.porto_gelo.level >= 22 && QUESTS.porto_gelo.objectives[0].zone === 'glacier');
-  assert.ok(OFFLINE_TYPES.has('friendlyDuel'));
+  assert.equal(OFFLINE_TYPES.size, 0, 'o duelo amistoso agora também roda online (o servidor conta a vitória)');
+  assert.ok(offeredBy(hero(10), 'duelist', { server: true }).some((q) => q.id === 'porto_duelo'));
 });
 
 test('Porto: guardar item no banco avança porto_chegada e conta o depósito; só a missão ativa progride', () => {
@@ -387,10 +388,10 @@ test('Porto: entregar contrato do Quadro cumpre porto_contrato (daily) e soma o 
   assert.equal(isComplete(d, 'porto_contrato'), true); assert.ok(r.quests.some((q) => q.id === 'porto_contrato'));
 });
 
-test('Porto: duelo amistoso só conta vitória; a missão porto_duelo some online e aparece offline', () => {
+test('Porto: duelo amistoso só conta vitória; a missão porto_duelo aparece offline E online (o servidor conta a vitória)', () => {
   const d = ensureJournal(hero(10));
   assert.ok(offeredBy(d, 'duelist', { server: false }).some((q) => q.id === 'porto_duelo'), 'offline oferece');
-  assert.ok(!offeredBy(d, 'duelist', { server: true }).some((q) => q.id === 'porto_duelo'), 'online não oferece');
+  assert.ok(offeredBy(d, 'duelist', { server: true }).some((q) => q.id === 'porto_duelo'), 'online oferece (duelo amistoso agora roda no servidor)');
   acceptQuest(d, 'porto_duelo');
   recordEvent(d, { type: 'friendlyDuel', won: false });
   assert.equal(isComplete(d, 'porto_duelo'), false); assert.equal(d.stats.friendlyWins, 0);

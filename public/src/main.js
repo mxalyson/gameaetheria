@@ -32,6 +32,7 @@ import { ACH } from './data/achievements.js';
 import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue, harborPrice } from './shop.js';
 import { TouchControls } from './touch.js';
 import { interactTarget } from './touch-logic.js';
+import { QualityGovernor } from './quality-governor.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality, resolveScale } from './prefs.js';
 import { CLASSES } from './data/classes.js';
 import { MOBS, XP_MULT } from './data/mobs.js';
@@ -45,6 +46,7 @@ const TOWN = ZONES.town.spawn;
 // 60 Hz (e não 30) evita precisar interpolar o desenho no cliente; o servidor pode enviar snapshots a 20 Hz.
 export const FIXED_DT = 1 / 60;
 const MAX_TICKS = 8;
+const SERVER_COUNTED = new Set(['teleport', 'visit', 'spiritStage']); // eventos de diário que o servidor de partidas conta (server/hub.js, server/tx.js); o cliente não os soma online
 
 const TELEPORT_REJECT = { not_visited: 'Você ainda não visitou esse mapa.', no_scroll: 'Sem pergaminho de teletransporte.', in_combat: 'Em combate: espere uns segundos para viajar.', teleport_wait: 'Calma: espere alguns segundos entre viagens.' };
 
@@ -58,6 +60,7 @@ class Game {
     this.input = new Input(this.canvas);
     this.ui = new UI(this);
     this.prefs = loadPrefs();
+    this.qgov = new QualityGovernor();
     this.touch = new TouchControls(this);
     this.portrait = matchMedia('(orientation: portrait) and (pointer: coarse)');
     this.applyPrefs();
@@ -111,8 +114,11 @@ class Game {
 
   frame(now) {
     try {
-      const dt = Math.min(0.05, (now - this.last) / 1000);
+      const raw = (now - this.last) / 1000, dt = Math.min(0.05, raw);
       this.last = now;
+      // qualidade automática: só em jogo (não no título) e com prefs.quality 'auto'; a escolha manual nunca é alterada
+      const lowered = this.qgov.update(raw, this.prefs.quality === 'auto' && this.mode !== 'title' && !this.portrait.matches, resolveQuality(this.prefs, this.touch.coarse));
+      if (lowered) { this.applyPrefs(); this.ui.toast('Qualidade ajustada', '', ''); }
       const ok = this.guard('quadro', () => this.frameBody(dt));
       this.frameFails = ok ? 0 : (this.frameFails ?? 0) + 1;
       if (this.frameFails === 20) this.ui.toast('Erro', 'Algo deu errado, recarregue a página.', '');
@@ -436,6 +442,7 @@ class Game {
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
+        friendlyReward: (m) => { for (const id of m.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold'); this.announceAchievements(m.achievements ?? []); },
         txResult: (m) => this.onTxResult(m),
         zoneExit: (m) => this.leaveNetMatch(m),
         snap: (s) => this.onNetSnap(s),
@@ -469,7 +476,6 @@ class Game {
   togglePanel(id) {
     if ((id === 'journal' || id === 'map') && this.mode !== 'explore' && !(id === 'map' && this.inNetZone())) return; // diário e mapa só no mundo normal (o mapa também abre na instância online: lá o nó da Vila é o retorno)
     if (id === 'party' && !this.online) return;
-    if (this.inNetZone() && ['inventory', 'character'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à Vila pelo Mapa para mexer no equipamento e nos atributos. Spirit e poções funcionam aqui.', '');
     this.ui.toggle(id);
   }
   async enterZoneOnline(zone, from) {
@@ -558,6 +564,7 @@ class Game {
     free();
     this.refreshShopStocks();
     if (this.player && !this.inNetZone() && this.mode === 'explore') this.refreshStats();
+    else if (this.inNetZone() && this.player && ['equip', 'unequip', 'alloc', 'alloc_auto'].includes(m.op)) this.refreshStats(); // instância: atributos novos também valem na previsão local
     if (m.levels && this.mode === 'explore') this.onLevelUp();
     for (const id of m.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     this.announceAchievements(m.achievements ?? []);
@@ -775,7 +782,7 @@ class Game {
     const won = coop ? s.winner === 1 : s.winner === m.team, draw = !coop && s.winner === 3;
     this.netResult = { won, draw, coop };
     this.ui.banner(null);
-    if (m.friendly) { // amistoso: o servidor não paga nada (a missão `porto_duelo` segue só offline: OFFLINE_TYPES)
+    if (m.friendly) { // amistoso: o servidor não paga Elo/ouro/XP (só conta a vitória para a missão `porto_duelo`: mensagem friendly_reward)
       return this.ui.showResult({ title: draw ? 'Empate' : won ? 'Vitória!' : 'Derrota', sub: 'Duelo amistoso', lines: ['Amistoso: sem Elo, ouro nem XP.'], button: 'Voltar ao Porto', action: 'net-leave', tone: won ? 'win' : 'lose' });
     }
     if (this.netRewardMsg) return this.renderNetReward();
@@ -888,7 +895,8 @@ class Game {
     const p = this.prefs;
     this.uiScale = resolveScale(p) / 100; // 'auto' acompanha a viewport (prefs.js autoScale)
     document.documentElement.style.setProperty('--ui', String(this.uiScale));
-    this.renderer.setQuality(resolveQuality(p, this.touch.coarse));
+    const q = resolveQuality(p, this.touch.coarse);
+    this.renderer.setQuality(p.quality === 'auto' ? this.qgov.apply(q) : q); // o governador só limita o modo auto
     this.touch.setMode(p.controls);
   }
 
@@ -1100,6 +1108,7 @@ class Game {
 
   // eventos do jogo → diário (contadores, missões, conquistas) e avisos ao jogador
   gameEvent(ev) {
+    if (this.txOnline && SERVER_COUNTED.has(ev.type)) return { quests: [], achievements: [] }; // com servidor de partidas, teletransporte/visita/spiritStage são contados lá (modo estrito de PvE)
     const out = recordEvent(this.char, ev);
     for (const q of out.quests) if (q.complete) this.ui.toast('Missão pronta!', QUESTS[q.id].name + ' — volte ao NPC (marca ?)', 'gold');
     this.announceAchievements(out.achievements);
@@ -1141,7 +1150,7 @@ class Game {
   // Botão de interagir (toque) e tecla E: NPC por perto conversa; senão abre o baú.
   interact() {
     const t = interactTarget(this.player, this.world);
-    if (this.inNetZone()) { if (t?.kind === 'chest' && !this.player.dead) this.useChest(t.ref.id); return; } // instância online: só o baú (NPCs e placas ficam nas cidades)
+    if (this.inNetZone()) { if (this.player.dead) return; if (t?.kind === 'chest') this.useChest(t.ref.id); else if (t?.kind === 'lore') this.readLore(t.ref); return; } // instância online: baú e placa de lore (NPCs ficam nas cidades)
     if (t?.kind === 'npc') this.talk(t.ref);
     else if (t?.kind === 'chest') this.useChest(t.ref.id);
     else if (t?.kind === 'lore') this.readLore(t.ref);
@@ -1149,7 +1158,8 @@ class Game {
 
   // Placa/estátua de lore: mostra o texto; a 1ª leitura de cada zona fica no diário (bit em char.stats.lore) e pode dar conquista.
   readLore(l) {
-    if (this.mode !== 'explore' || !l) return;
+    if (!l || (this.mode !== 'explore' && !this.inNetZone())) return;
+    if (this.serverTx({ op: 'lore', id: l.id }, (m) => this.ui.toast(l.name, l.text, m.first ? 'gold' : '', 4200))) return; // online: o servidor confere a proximidade e marca a 1ª leitura
     const r = readLore(this.char, l.id);
     this.ui.toast(l.name, l.text, r.first ? 'gold' : '', 4200);
     if (r.first) { this.announceAchievements(r.achievements); this.save(); if (this.ui.anyOpen()) this.ui.render(); }
@@ -1333,6 +1343,7 @@ class Game {
   }
 
   equip(id) {
+    if (this.inNetZone() && this.serverTx({ op: 'equip', id })) return; // instância online: o servidor troca o equipamento e recalcula o ator
     const c = this.char, idx = c.inventory.findIndex((i) => i.id === id);
     if (idx < 0) return;
     const it = c.inventory[idx], ok = canEquip(c, it);
@@ -1347,6 +1358,7 @@ class Game {
   }
 
   unequip(slot) {
+    if (this.inNetZone() && this.serverTx({ op: 'unequip', slot })) return;
     const c = this.char;
     if (!c.equipment[slot]) return;
     if (c.inventory.length >= INVENTORY_SIZE) return this.ui.log('Inventário cheio.', '#ffb4a8');
@@ -1401,6 +1413,7 @@ class Game {
   }
 
   pickSpec(id) {
+    if (this.inNetZone()) return this.ui.toast('Na exploração online', 'Escolher especialização só na Vila.', '');
     if (this.mode === 'pvp') return this.ui.log('Não dá para trocar de especialização durante uma partida.', '#ffb4a8');
     const r = chooseSpec(this.char, id);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
@@ -1415,6 +1428,7 @@ class Game {
     const c = this.char, [stat, q] = String(arg).split(':');
     if (c.statPoints <= 0 || !(stat in c.alloc)) return;
     const n = Math.min(c.statPoints, q === 'max' ? c.statPoints : q ? Number(q) || 1 : this.input.held('shift') ? 5 : 1);
+    if (this.inNetZone() && this.serverTx({ op: 'alloc', stat, n: Math.max(1, Math.min(999, n)) })) return; // instância online: o servidor distribui os pontos
     c.alloc[stat] += n;
     c.statPoints -= n;
     this.refreshStats();
@@ -1426,6 +1440,7 @@ class Game {
   allocAuto() {
     const c = this.char, prim = CLASSES[c.classId].primary, pts = c.statPoints;
     if (pts <= 0) return;
+    if (this.inNetZone() && this.serverTx({ op: 'alloc_auto' })) return;
     const main = Math.ceil(pts * 0.7);
     c.alloc[prim] += main; c.alloc.vit += pts - main; c.statPoints = 0;
     this.refreshStats(); this.ui.render(); this.save();
@@ -1434,6 +1449,7 @@ class Game {
 
   evolveSpirit(id) {
     if (this.inNetZone()) return this.ui.toast('Na exploração online', 'Evoluir, comprar e libertar spirits só na Vila.', '');
+    if (this.serverTx({ op: 'spirit_evolve', id }, (m) => { const S = SPIRITS[m.type]; this.ui.toast(`${S.name} evoluiu!`, 'Forma evoluída', 'gold'); this.ui.log(`${S.name} evoluiu para a forma 2 (−${m.cost} ouro).`, S.color); })) return; // online: o servidor cobra, evolui e conta o objetivo spiritStage
     const r = evolveSpirit(this.char, id);
     if (!r.ok) return this.ui.toast('Não dá para evoluir', r.reason, '');
     const sp = this.char.spirits.find((s) => s.id === id), S = SPIRITS[sp.type];
@@ -1495,6 +1511,7 @@ class Game {
     if (this.inNetZone()) return this.ui.toast('Na exploração online', 'Evoluir, comprar e libertar spirits só na Vila.', '');
     const c = this.char;
     if (c.spirits.length >= MAX_SPIRITS) return this.ui.log('Limite de spirits atingido. Liberte algum primeiro.', '#ffb4a8');
+    if (this.serverTx({ op: 'buy_essence', kind: kind === 'prism' ? 'prism' : 'essence' }, (m) => { const S = SPIRITS[m.spirit], R = RARITY[m.rarity]; this.ui.toast(`Novo spirit: ${S.name}`, `${R.name} · ${S.element} · ${S.role}`, 'gold'); this.tip('spirit'); })) return; // online: o servidor sorteia
     const cost = kind === 'prism' ? PRICES.prism(c.level) : PRICES.essence(c.level);
     if (!this.spend(cost)) return;
     const rarity = kind === 'prism' ? this.rng.weighted([['rare', 70], ['epic', 25], ['legendary', 5]]) : undefined;
@@ -1517,6 +1534,7 @@ class Game {
     const gold = Math.round(30 * sp.level * SPIRIT_RARITY_MUL[sp.rarity]);
     this.ui.confirm(`Libertar ${SPIRITS[sp.type].name} (Nv ${sp.level})? Você recebe ${gold} de ouro.`, () => {
       if (!c.spirits.some((s) => s.id === id)) return;
+      if (this.serverTx({ op: 'spirit_free', id }, (m) => { this.ui.log(`Spirit libertado (+${m.gold} ouro).`, '#ffd34d'); if (this.player) this.spawnSpirit(this.player, this.char); })) return; // online: o servidor paga
       c.spirits = c.spirits.filter((s) => s.id !== id);
       c.gold += gold;
       if (c.activeSpirit === id) { c.activeSpirit = c.spirits[0]?.id ?? null; this.spawnSpirit(this.player, c); }

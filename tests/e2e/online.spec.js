@@ -69,7 +69,7 @@ test('cadastro → personagem → progresso na nuvem → recarregar a página �
   await expect(page.locator('.char-list')).toContainText('ainda não tem personagens');
   await criarPersonagem(page, 'Ana Nuvem', 'mage');
   const gold0 = await page.evaluate(() => window.game.char.gold);
-  await page.evaluate(() => { window.game.char.gold += 120; window.game.char.xp += 30; window.game.save(); });
+  await page.evaluate(() => { window.game.char.gold -= 7; window.game.save(); }); // STRICT_PVE: o cliente só grava o que NÃO rende (gastar); ganhos vêm por transação/instância
   expect(await page.evaluate(() => window.game.flushCloud())).toBe(true);
   // nada do personagem fica no localStorage do aparelho (o oficial é o servidor)
   expect(await page.evaluate(() => localStorage.getItem('aetheria_save_v1'))).toBeNull();
@@ -78,7 +78,7 @@ test('cadastro → personagem → progresso na nuvem → recarregar a página �
   await expect(page.locator('.char-card')).toContainText('Ana Nuvem');
   await page.click('[data-action="char-select"]');
   await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
-  expect(await page.evaluate(() => window.game.char.gold)).toBe(gold0 + 120);
+  expect(await page.evaluate(() => window.game.char.gold)).toBe(gold0 - 7);
 
   // sair da conta e voltar a entrar (outra "sessão")
   await page.evaluate(() => window.game.ui.openPanel('options'));

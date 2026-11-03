@@ -4,7 +4,7 @@
 // desses tipos e as conquistas (recalculadas a partir dos contadores).
 import { QUESTS } from '../public/src/data/quests.js';
 import { SERVER_STATS, STAT_KEYS_PROGRESS, FLAG_STATS } from '../public/src/data/achievements.js';
-import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, MAX_ACTIVE, isComplete } from '../public/src/core/journal.js';
+import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, PVE_SERVER_TYPES, MAX_ACTIVE, isComplete, LORE_MASK } from '../public/src/core/journal.js';
 import { RARITY, AFFIXES } from '../public/src/data/items.js';
 import { xpToNext } from '../public/src/core/progression.js';
 import { PRICES } from '../public/src/shop.js';
@@ -65,8 +65,10 @@ const spiritIds = (c) => new Set((c.spirits ?? []).map((s) => s.id));
 // Modo ESTRITO de PvE (P11.3), para servidor com a exploração autoritativa: o que o PvE rende é decidido SÓ pelo servidor (lotes da instância
 // e transações de server/tx.js), então um salvamento do cliente que AUMENTA XP/nível, ouro, poções, itens, aprimoramento, abates, baús ou
 // missões concluídas é recusado. Gastar ouro, mover/equipar itens, distribuir pontos e trocar spirit seguem valendo. O que o cliente ainda
-// ganha por conta própria (libertar spirit, comprar essência, reciclar) NÃO está coberto: por isso o modo é opcional (STRICT_PVE=1) até migrar.
-export const PVE_STATS = ['kills', 'bossKills', 'chests', 'spiritKills', 'skillUses', 'upgrades', 'deposits', 'contracts', 'quests'];
+// ganha por conta própria (libertar spirit, comprar/evoluir essência, reciclar, lore, teletransporte, visita ao Porto, duelo amistoso) agora também é do servidor
+// (transações de server/tx.js e eventos do hub/sala), então o modo é o PADRÃO (STRICT_PVE=0 desliga). Sem servidor de partidas conectado o cliente ainda joga local,
+// mas esses ganhos são recusados na gravação (o jogo volta ao último estado oficial): a exploração de contingência não rende na nuvem.
+export const PVE_STATS = ['kills', 'bossKills', 'chests', 'spiritKills', 'skillUses', 'upgrades', 'deposits', 'contracts', 'quests', 'teleports', 'harborVisits', 'friendlyWins'];
 export function pveProblem(old, neu) {
   if (neu.level > old.level || totalXp(neu) > totalXp(old)) return 'pve_xp';
   if (neu.gold > old.gold) return 'pve_gold';
@@ -76,6 +78,9 @@ export function pveProblem(old, neu) {
   const plusOld = plusById(old);
   for (const [id, p] of plusById(neu)) if (p > (plusOld.get(id) ?? 0)) return 'pve_plus';
   for (const k of PVE_STATS) if ((neu.stats[k] ?? 0) > (old.stats[k] ?? 0)) return 'pve_stat_' + k;
+  if (((neu.stats.lore ?? 0) & ~(old.stats.lore ?? 0) & LORE_MASK) !== 0) return 'pve_lore';
+  const hadSp = spiritIds(old), stage2 = new Set((old.spirits ?? []).filter((x) => x.stage === 2).map((x) => x.id));
+  for (const sp of neu.spirits ?? []) { if (!hadSp.has(sp.id)) return 'pve_spirit'; if (sp.stage === 2 && !stage2.has(sp.id)) return 'pve_spirit_stage'; }
   for (const id of Object.keys(neu.quests.done)) if (old.quests.done[id] == null) return 'pve_quest';
   for (const id of Object.keys(neu.chests ?? {})) if (old.chests[id] == null || neu.chests[id] > old.chests[id]) return 'pve_chest';
   return null;
@@ -138,7 +143,8 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   const xpBudget = Math.round(xpToNext(old.level) * LIMITS.xpFreeLevels) + (dKills + dBoss * 10) * perKill + dQuests * MAX_QUEST_XP;
   if (totalXp(neu) - totalXp(old) > xpBudget) return { ok: false, reason: 'xp_jump' };
 
-  // ---- missões ----
+  // ---- missões ---- (no modo estrito, visita/teletransporte/lore/spiritStage/duelo amistoso também só valem se o SERVIDOR os contou)
+  const isSrv = (t) => SERVER_TYPES.has(t) || (!!opts.strictPve && PVE_SERVER_TYPES.has(t));
   const quests = { active: {}, done: { ...old.quests.done } };
   let newDone = 0, newActive = 0;
   for (const [id, ts] of Object.entries(neu.quests.done)) {
@@ -147,7 +153,7 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
     if (!q || !was) return { ok: false, reason: 'quest_forged' };               // só se pode concluir o que estava ativo
     if (!requirementsMet({ ...neu, quests: { ...neu.quests, done: { ...old.quests.done } } }, q)) return { ok: false, reason: 'quest_requirements' };
     // objetivos de servidor precisam estar completos NO SERVIDOR (progresso antigo, que o cliente não consegue alterar)
-    if (q.objectives.some((o, i) => SERVER_TYPES.has(o.type) && (was.p[i] ?? 0) < (o.count ?? 1))) return { ok: false, reason: 'quest_server_objective' };
+    if (q.objectives.some((o, i) => isSrv(o.type) && (was.p[i] ?? 0) < (o.count ?? 1))) return { ok: false, reason: 'quest_server_objective' };
     quests.done[id] = ts; newDone++;
   }
   if (newDone > LIMITS.doneQuests) return { ok: false, reason: 'quest_flood' };
@@ -158,7 +164,7 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
       if (!requirementsMet(neu, q)) return { ok: false, reason: 'quest_requirements' };
       newActive++;
     }
-    quests.active[id] = { at: was?.at ?? a.at, p: q.objectives.map((o, i) => (SERVER_TYPES.has(o.type) ? (was?.p[i] ?? 0) : Math.max(was?.p[i] ?? 0, a.p[i] ?? 0))) };
+    quests.active[id] = { at: was?.at ?? a.at, p: q.objectives.map((o, i) => (isSrv(o.type) ? (was?.p[i] ?? 0) : Math.max(was?.p[i] ?? 0, a.p[i] ?? 0))) };
   }
   if (newActive > LIMITS.newQuests || Object.keys(quests.active).length > MAX_ACTIVE) return { ok: false, reason: 'quest_flood' };
   void isComplete;
@@ -173,7 +179,7 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   const arena = { ...neu.arena, rating: old.arena.rating, wins: old.arena.wins, losses: old.arena.losses, ratings: old.arena.ratings ?? {} };
   // scrolls/visited/pity são do servidor: scrolls só sobem se o ouro caiu o preço (compra na loja, que é do cliente); visited vem do banco; pity só desce
   const paid = Math.max(0, Math.floor((old.gold - neu.gold) / PRICES.scroll(old.level)));
-  const scrolls = Math.max(0, Math.min(neu.scrolls ?? 0, (old.scrolls ?? 0) + paid));
+  const scrolls = Math.max(0, Math.min(neu.scrolls ?? 0, opts.strictPve ? (old.scrolls ?? 0) : (old.scrolls ?? 0) + paid)); // estrito: pergaminho só pela transação buy_scroll
   const pity = {}; for (const k of ['epic', 'legendary', 'opal']) pity[k] = Math.min(neu.pity?.[k] ?? 0, old.pity?.[k] ?? 0);
   // Contratos diários (core/journal.js): o dia nunca volta nem salta além de amanhã, e a entrega do dia não se desfaz (sem repetir recompensa).
   const nowDay = Math.floor(now / 86400000), od = old.daily, nd = neu.daily;

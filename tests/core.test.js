@@ -1089,3 +1089,29 @@ test('Balanceamento: bônus de vida por nível só vale depois do nível 4 (iní
   assert.equal(hp(4), sem(4) + rookieHp(4, CLASSES.warrior.rookie));
   assert.equal(hp(30), sem(30) + 26 * 12);
 });
+
+// ---------- IA do rival: mira à frente em projéteis lentos (item 12 de pendencias) ----------
+test('IA do rival: o Mago mira à frente do alvo que anda (mas não na posição exata) e o parado é mirado no lugar', () => {
+  const w = new World('arena', { seed: 3, visuals: false });
+  const mage = w.add(makeHeroActor(newCharacter('M', 'mage', makeRng(1)), 550, 840, 'rival', 1));
+  const foe = w.add(makeHeroActor(newCharacter('W', 'warrior', makeRng(2)), 550, 400, 'rival', 2));
+  // alvo parado: velocidade 0, mira dentro do tremor (±18) de sempre
+  let it;
+  for (let i = 0; i < 30; i++) it = rivalAi(mage, w, 1 / 60);
+  assert.ok(Math.abs(it.aimX - foe.x) <= 18.01 && Math.abs(it.aimY - foe.y) <= 18.01, 'parado: sem antecipação');
+  // alvo andando para a direita a 200 px/s: a mira passa a ficar à direita dele
+  for (let i = 0; i < 90; i++) { foe.x += 200 / 60; it = rivalAi(mage, w, 1 / 60); }
+  assert.ok(it.aimX > foe.x + 20, 'a mira antecipa o movimento (aimX ' + it.aimX.toFixed(0) + ' > ' + (foe.x + 20).toFixed(0) + ')');
+  assert.ok(it.aimX < foe.x + 200, 'e não passa do razoável');
+});
+
+test('PvP: o fator de dano entre heróis (PVP_DAMAGE) fica em 0,28 e só vale herói contra herói', async () => {
+  const { PVP_DAMAGE } = await import('../public/src/game/sim.js');
+  assert.equal(PVP_DAMAGE, 0.28);
+  const mk = () => { const w = new World('arena', { seed: 4, visuals: false }); const a = w.add(makeHeroActor(newCharacter('A', 'warrior', makeRng(1)), 500, 500, 'rival', 1)); return { w, a }; };
+  const { w, a } = mk();
+  const rival = w.add(makeHeroActor(newCharacter('B', 'warrior', makeRng(2)), 520, 500, 'rival', 2));
+  const mob = w.add(makeMobActor('wolf', 4, 520, 520)); mob.stats.defense = rival.stats.defense = 0; mob.maxHp = mob.hp = rival.maxHp = rival.hp = 1e6;
+  const dHero = w.damage(a, rival, 1, {}), dMob = w.damage(a, mob, 1, {});
+  assert.ok(dHero > 0 && dMob > 0 && dHero < dMob * 0.6, `herói→herói (${dHero}) bem menor que herói→mob (${dMob})`);
+});
