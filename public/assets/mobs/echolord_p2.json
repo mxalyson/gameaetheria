@@ -1,21 +1,22 @@
 {
  "id": "echolord_p2",
  "cell": [
-  86,
-  128
+  216,
+  251
  ],
- "cols": 6,
- "rows": 8,
- "frames": 6,
+ "cols": 4,
+ "rows": 5,
+ "frames": 4,
  "style": "float",
- "ax": 43,
- "ay": 99,
- "ppm": 72.28505254572204,
+ "ax": 108,
+ "ay": 224,
+ "ppm": 207.4117301006805,
  "size": [
   0.902,
   1.093,
   0.357
  ],
- "src": "lich_king.glb",
- "v": 1793742312
+ "src": "meshy-cenario/lich_king.glb",
+ "v": 1793748394,
+ "mirror": true
 }

@@ -32,24 +32,27 @@ function loadIndex() {
 }
 
 // Quanto o desenho da célula (com margem) é mais alto que o raio de colisão da criatura; ajustável por criatura.
-// criaturas grandes (chefes), ampliadas ~2× na tela: realce de nitidez leve ao carregar; o orçamento de textura (tests/mobs-art.test.js, 8 MiB por zona) não deixa subir os px do bake
+// criaturas grandes (chefes), ampliadas ~2× na tela: realce de nitidez leve ao carregar; o orçamento de textura (tests/mobs-art.test.js, 10 MiB por zona; 16 MiB só na masmorra `crypt`) não deixa subir os px do bake
+// Soberano dos Ecos (as duas fases): assado a ~190 px/unidade do modelo (célula ~245×260, 4 quadros × 5 vistas com as de oeste espelhadas — json.mirror) para ficar nítido em celular 2–3×; h acompanha o ppm do bake (mesmo tamanho na tela de antes)
 const BIG = new Set(['treant', 'colossus', 'guardian', 'golem', 'echolord_p1', 'echolord_p2']);
-const ART = { default: { h: 3.4 }, slime: { h: 3.8 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, echolord_p1: { h: 8.4 }, echolord_p2: { h: 7.2 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
+const ART = { default: { h: 3.4 }, slime: { h: 3.8 }, treant: { h: 5.2 }, colossus: { h: 5.2 }, shroom: { h: 4.2 }, guardian: { h: 5.4 }, echolord_p1: { h: 6.1 }, echolord_p2: { h: 4.92 }, wolf: { h: 3.1 }, crystalwolf: { h: 2.8 }, wisp: { h: 3.0 }, wraith: { h: 3.4 } };
 
 // Recolore uma vez ao carregar (hue em graus, sat/bri multiplicadores, mul = multiplicador por canal): as variantes de cor reaproveitam a arte da criatura de base.
 // V16: a cor nova vem do matiz/mul, mas a LUMINÂNCIA é a da pintura original (sombras e brilhos intactos) em vez de multiplicar o canal (que achatava tudo numa cor só);
 // brilhos que estouram dessaturam em direção ao branco, como luz de verdade. `sharp` (0–1) aplica um realce leve de nitidez (criaturas grandes ampliadas, V15/V16).
 // Contorno escuro fino cozido no atlas ao carregar (sem custo por quadro nem memória extra): mobs claros sobre piso roxo, azuis sobre neve ou lavanda sobre grama
 // perdiam a silhueta. A silhueta (alfa) é carimbada em 8 deslocamentos de `px` pixels do atlas, tingida de escuro, e o sprite vai por cima.
-function outline(c, px) {
+function outline(c, px, col = 'rgba(14,10,22,0.78)') {
   const o = document.createElement('canvas'); o.width = c.width; o.height = c.height;
   const g = o.getContext('2d');
   for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; g.drawImage(c, Math.round(Math.cos(a) * px), Math.round(Math.sin(a) * px)); }
-  g.globalCompositeOperation = 'source-in'; g.fillStyle = 'rgba(14,10,22,0.78)'; g.fillRect(0, 0, o.width, o.height);
+  g.globalCompositeOperation = 'source-in'; g.fillStyle = col; g.fillRect(0, 0, o.width, o.height);
   g.globalCompositeOperation = 'source-over'; g.drawImage(c, 0, 0);
   return o;
 }
-export function tint(img, t, sharp = 0, ol = 0, cell = null) {
+// Soberano dos Ecos: armadura quase preta sobre o piso escuro da Cripta: clareia (bri) e contorna em turquesa (rim) em vez do contorno escuro dos outros
+const LIFT = { echolord_p1: { bri: 1.4, sat: 1.15 }, echolord_p2: { bri: 1.25, sat: 1.1 } }, RIM = { echolord_p1: 'rgba(110,225,235,0.85)', echolord_p2: 'rgba(110,225,235,0.85)' };
+export function tint(img, t, sharp = 0, ol = 0, cell = null, rim = undefined) {
   const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, c.width, c.height), p = d.data, W = c.width, H = c.height;
@@ -88,7 +91,7 @@ export function tint(img, t, sharp = 0, ol = 0, cell = null) {
     }
   }
   g.putImageData(d, 0, 0);
-  if (ol > 0) { const o = outline(c, ol); return typeof createImageBitmap === 'function' ? createImageBitmap(o) : o; }
+  if (ol > 0) { const o = outline(c, ol, rim); return typeof createImageBitmap === 'function' ? createImageBitmap(o) : o; }
   return typeof createImageBitmap === 'function' ? createImageBitmap(c) : c; // bitmap (GPU) em vez de canvas de CPU
 }
 
@@ -107,7 +110,7 @@ function load(id) {
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/mobs/${art}.webp?v=${meta.v ?? 0}`; });
       if (img.naturalWidth !== meta.cell[0] * meta.cols || img.naturalHeight !== meta.cell[1] * meta.rows) { it.state = 'none'; return; } // imagem e medidas não combinam: desenho antigo em vez de sprite quebrado
       await img.decode?.(); it.meta = meta; const glow = AIRY.has(art); // fantasmas e fogos-fátuos são translúcidos e brilhantes: contorno escuro os suja
-      it.img = await tint(img, V?.tint, BIG.has(art) ? 0.55 : HD ? 0.3 : 0, glow ? 0 : meta.cell[0] > 170 ? 2 : 1.5, meta.cell); it.state = 'ready'; stats.loaded++;
+      it.img = await tint(img, V?.tint ?? LIFT[art], BIG.has(art) ? 0.55 : HD ? 0.3 : 0, glow ? 0 : meta.cell[0] > 170 ? 2 : 1.5, meta.cell, RIM[art]); it.state = 'ready'; stats.loaded++;
     } catch { retryLater(); }
   });
   return it;
@@ -189,7 +192,9 @@ export function drawMobSprite(g, a, t) {
   // o passo da simulação é lento nos pesados (velocidade/28 rad/s): o ciclo é acelerado para o balanço ficar visível; parado, ciclo lento próprio de cada tipo
   const kind = HEAVY.has(a.mobId) || HEAVY.has(MOBS[a.mobId]?.art) ? 0 : AIRY.has(a.mobId) || AIRY.has(MOBS[a.mobId]?.art) ? 2 : 1, rate = [1.7, 1.3, 1.1][kind], idle = [0.45, 0.7, 0.9][kind];
   const fr = nf ? Math.floor((((moving ? (ph * rate) / (2 * Math.PI) : t * idle + a.id * 0.37) % 1) + 1) % 1 * nf) : 0;
-  const sx = nf ? fr * cw : (view % 4) * cw, sy = nf ? view * ch : Math.floor(view / 4) * ch;
+  const flip = !!meta.mirror && view > 4, vr = flip ? 8 - view : view; // atlas com 5 vistas (S…N): as de oeste são as de leste espelhadas
+  const sx = nf ? fr * cw : (view % 4) * cw, sy = nf ? vr * ch : Math.floor(view / 4) * ch;
+  if (flip) g.scale(-1, 1);
   g.drawImage(img, sx, sy, cw, ch, -meta.ax * k, -meta.ay * k, W, H);
   if (a.hitFlash > 0 && !a.dead) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = Math.min(0.55, a.hitFlash * 5); g.drawImage(img, sx, sy, cw, ch, -meta.ax * k, -meta.ay * k, W, H); }
   g.restore(); stats.drawn++;

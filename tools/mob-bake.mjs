@@ -13,7 +13,7 @@ const PROPS = !!(flags.props || flags.repack), OUT = PROPS ? 'public/assets/prop
 const [file, id, part = '-1', max = '168', style = '', frames = '6', elev = '40'] = process.argv.slice(2); // style (hop|waddle|trot) => atlas ANIMADO: 8 direções x quadros do ciclo
 if (!file || !id) { console.log('uso: node tools/mob-bake.mjs <pasta/arquivo.glb> <id> [parte] [px]'); process.exit(1); }
 let b, r;
-if (flags.repack) { r = JSON.parse(fs.readFileSync(`test-results/mob-bake/${id}.json`, 'utf8')); } else {
+if (flags.repack || flags.pack) { r = JSON.parse(fs.readFileSync(`test-results/mob-bake/${id}.json`, 'utf8')); } else {
 b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await b.newPage({ viewport: { width: 400, height: 300 } }); p.on('pageerror', (e) => console.log('pageerror', e.message));
 // serve public/ direto do disco (interceptação do Playwright): não precisa de servidor no ar nem abre porta
@@ -28,9 +28,9 @@ const parts = await p.evaluate((f) => window.loadGlb(f), file); console.log(part
 const partArg = part.includes(',') ? part.split(',').map(Number) : Number(part); // "5,1,2" junta várias peças numa criatura
 r = style ? await p.evaluate(([i, m, st, n, e]) => window.bakeAnim(i, { max: m, style: st, frames: n, el: Number(e) }), [partArg, Number(max), style, Number(frames), elev]) : await p.evaluate(([i, m, e]) => window.bakeDirs(i, { max: m, el: e }), [partArg, Number(max), Number(elev)]);
 }
-fs.mkdirSync('test-results/mob-bake', { recursive: true }); if (!flags.repack) fs.writeFileSync(`test-results/mob-bake/${id}.png`, Buffer.from(r.png.split(',')[1], 'base64'));
+fs.mkdirSync('test-results/mob-bake', { recursive: true }); if (!flags.repack && !flags.pack) fs.writeFileSync(`test-results/mob-bake/${id}.png`, Buffer.from(r.png.split(',')[1], 'base64'));
 const { png, ...meta } = r; fs.mkdirSync(OUT, { recursive: true });
-if (!flags.repack) fs.writeFileSync(`test-results/mob-bake/${id}.json`, JSON.stringify({ id, ...meta, src: file }, null, 1)); // grade completa: base do --repack
+if (!flags.repack && !flags.pack) fs.writeFileSync(`test-results/mob-bake/${id}.json`, JSON.stringify({ id, ...meta, src: file }, null, 1)); // grade completa: base do --repack
 let outMeta = { id, ...meta, src: meta.src ?? file, v: Math.floor(Date.now() / 1000) };
 if (PROPS && (flags.views || flags.scale)) { // pacote enxuto: só as vistas pedidas, em uma linha, na escala pedida
   const views = (flags.views ?? '0,1,2,3,4,5,6,7').split(',').map(Number), k = Number(flags.scale ?? 1);
@@ -51,5 +51,29 @@ if (!PROPS) {
   fs.writeFileSync(idxPath, JSON.stringify({ ids: [...ids].sort() }, null, 1));
 }
 await b?.close();
-if (!(PROPS && (flags.views || flags.scale))) execFileSync('python', ['-c', `from PIL import Image; Image.open('test-results/mob-bake/${id}.png').save('${OUT}/${id}.webp','WEBP',quality=88,method=6)`]);
+// MOBS animados (chefes grandes): --keep=0,1,2,3,4 guarda só essas vistas (linhas) e, com --mirror, o renderer espelha 3,2,1 para 5,6,7 (json.mirror = true);
+// --crop recorta TODAS as células na mesma caixa justa dos pixels visíveis (sem espaço vazio; âncora acompanha); --q=90 qualidade do WebP. --pack refaz isso a partir da grade já fotografada.
+if (!PROPS && (flags.keep || flags.crop)) {
+  const keep = (flags.keep ?? '0,1,2,3,4,5,6,7').split(',').map(Number), q = Number(flags.q ?? 90), mirror = !!flags.mirror;
+  const out = execFileSync('python', ['-c', `from PIL import Image
+import json
+g=Image.open('test-results/mob-bake/${id}.png').convert('RGBA'); W,H=${meta.cell[0]},${meta.cell[1]}; F=${meta.cols}; K=${JSON.stringify(keep)}
+bx0,by0,bx1,by1=W,H,0,0
+for k in K:
+  for f in range(F):
+    c=g.crop((f*W,k*H,(f+1)*W,(k+1)*H)); b=c.getchannel('A').point(lambda a:255 if a>10 else 0).getbbox()
+    if b: bx0=min(bx0,b[0]);by0=min(by0,b[1]);bx1=max(bx1,b[2]);by1=max(by1,b[3])
+m=${flags.crop ? 2 : 0}
+if ${flags.crop ? 1 : 0}: bx0=max(0,bx0-m);by0=max(0,by0-m);bx1=min(W,bx1+m);by1=min(H,by1+m)
+else: bx0,by0,bx1,by1=0,0,W,H
+cw,ch=bx1-bx0,by1-by0
+o=Image.new('RGBA',(cw*F,ch*len(K)))
+for n,k in enumerate(K):
+  for f in range(F): o.paste(g.crop((f*W+bx0,k*H+by0,f*W+bx1,k*H+by1)),(f*cw,n*ch))
+o.save('${OUT}/${id}.webp','WEBP',quality=${q},method=6)
+print(json.dumps([cw,ch,bx0,by0]))`]).toString().trim().split(String.fromCharCode(10)).pop();
+  const [cw, ch, bx0, by0] = JSON.parse(out);
+  outMeta = { ...outMeta, cell: [cw, ch], rows: keep.length, ax: meta.ax - bx0, ay: meta.ay - by0, ...(mirror ? { mirror: true } : {}) };
+  fs.writeFileSync(`${OUT}/${id}.json`, JSON.stringify(outMeta, null, 1));
+} else if (!(PROPS && (flags.views || flags.scale))) execFileSync('python', ['-c', `from PIL import Image; Image.open('test-results/mob-bake/${id}.png').save('${OUT}/${id}.webp','WEBP',quality=88,method=6)`]);
 console.log(id, 'célula', outMeta.cell.join('×'), 'âncora', outMeta.ax, outMeta.ay, 'tam. do modelo', r.size.join('×'), '→ ' + OUT + '/' + id + '.webp');
