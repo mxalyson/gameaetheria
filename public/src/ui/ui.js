@@ -50,6 +50,9 @@ export const noticeText = (n) => {
 // Ícone do equipamento: arte pintada por tipo (espada, cajado, arco, maça, elmo, armadura, botas, anel, amuleto); se a imagem faltar, volta ao emoji.
 const itemImg = (type, emoji) => `<img class="it-img" src="${asset(`assets/icons/item/item-${type}.webp`)}" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
 import { spiritUrl } from '../render/spirit-sprites.js';
+// fragmento e chave de Eco pintados (recortes do conjunto Eco do dono)
+const ECHO_FRAG = `<img class="coin" src="${asset('assets/icons/item/res-eco-fragment.webp')}" alt="" draggable="false">`;
+const ECHO_KEY = `<img class="coin" src="${asset('assets/icons/item/res-eco-key.webp')}" alt="" draggable="false">`;
 const SCROLL = `<img class="coin" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false">`;
 // ícones de zona pintados (recortes dos sprites 3D: tools/ui-icon-from-atlas.py); com o arquivo ausente, vale o emoji
 const ZONE_EMOJI = { crypt: '🕯️', town: '🏠', harbor: '⚓', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
@@ -95,7 +98,10 @@ const itemPrice = (it) => it.price ?? it.value * PRICES.itemMarkup;
 export const plusBadge = (it) => (it?.plus ? `<span class="plus-b ${it.plus >= MAX_PLUS ? 'max' : it.plus >= 6 ? 'hi' : ''}" title="Aprimorado +${it.plus} de ${MAX_PLUS}">${it.plus >= MAX_PLUS ? 'MAX' : '+' + it.plus}</span>` : '');
 // Escudo: arte pintada shield-<raridade>.webp (do dono; ver docs/roadmap/depende-do-dono.md); sem o arquivo, cai para o ícone de armadura com um selo de escudo (sem arte nova por código).
 const shieldImg = (rarity) => `<img class="it-img" src="${asset(`assets/icons/item/shield-${rarity}.webp`)}" alt="" draggable="false" onerror="this.outerHTML='<span class=&quot;shield-fb&quot;><img class=&quot;it-img&quot; src=&quot;${asset('assets/icons/item/item-armor.webp')}&quot; alt=&quot;&quot;><i>🛡️</i></span>'">`;
-export const itemIcon = (it) => (it.slot === 'offhand' ? shieldImg(it.rarity) : it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
+// Itens Eco (Cripta dos Ecos): arte própria por arma e por classe (eco-sword/staff/bow/mace, eco-armor-<classe>); sem o arquivo cai no ícone comum.
+const ecoImg = (file, fallback) => `<img class="it-img" src="${asset(`assets/icons/item/${file}.webp`)}" alt="" draggable="false" onerror="this.outerHTML='${fallback.replace(/'/g, '&#39;').replace(/"/g, '&quot;')}'">`;
+const ecoIcon = (it) => (it.slot === 'weapon' ? ecoImg(`eco-${it.weaponType}`, itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon)) : it.slot === 'armor' && it.classId ? ecoImg(`eco-armor-${it.classId}`, itemImg('armor', SLOT_ICONS.armor)) : null);
+export const itemIcon = (it) => (it.eco && ecoIcon(it)) || (it.slot === 'offhand' ? shieldImg(it.rarity) : it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
 const ghostIcon = (s, cls) => (s === 'offhand' ? shieldImg('common') : s === 'weapon' ? itemImg(cls.weapon, WEAPON_TYPES[cls.weapon].icon) : itemImg(s, SLOT_ICONS[s]));
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
 
@@ -608,11 +614,11 @@ export class UI {
     const rows = Object.values(ECHO_RECIPES).map((R) => {
       const name = R.slot === 'weapon' ? ECHO_NAMES.weapon[CLASSES[char.classId].weapon] : ECHO_NAMES.armor[char.classId], own = ownsEcho(char, R.slot);
       const can = !own && char.level >= CRYPT.minLevel && frags >= R.frags && char.gold >= R.gold;
-      return `<div class="shop-item"><div class="cell r-epic"><span class="ic">${R.slot === 'weapon' ? '⚔️' : '🛡️'}</span></div>
+      return `<div class="shop-item"><div class="cell r-epic"><span class="ic">${R.slot === 'weapon' ? ecoImg(`eco-${CLASSES[char.classId].weapon}`, '⚔️') : ecoImg(`eco-armor-${char.classId}`, '🛡️')}</span></div>
         <div><div class="nm" style="color:${RARITY.epic.color}">${esc(name)}</div><div class="sub">${R.slot === 'weapon' ? 'Arma' : 'Armadura'} da sua classe · ${R.frags} Fragmentos de Eco + ${R.gold} ouro</div></div>
         ${own ? '<span class="tag">Já forjado</span>' : `<button class="btn small" data-action="craft-echo" data-arg="${R.id}" ${can ? '' : 'disabled'}>${COIN} ${R.gold}</button>`}</div>`;
     }).join('');
-    return `<h3 id="echo-section">Forja do Eco <span class="pts">${frags} fragmentos</span></h3>${rows}<p class="hint">Fragmentos de Eco só caem na Cripta dos Ecos (abra o mapa). Nível ${CRYPT.minLevel}+.</p>`;
+    return `<h3 id="echo-section">Forja do Eco <span class="pts">${ECHO_FRAG} ${frags} fragmentos</span></h3>${rows}<p class="hint">Fragmentos de Eco só caem na Cripta dos Ecos (abra o mapa). Nível ${CRYPT.minLevel}+.</p>`;
   }
 
   // Ferreiro: aprimora os equipamentos vestidos (+1 a +${MAX_PLUS}); é o grande ralo de ouro de fim de jogo
@@ -731,7 +737,7 @@ export class UI {
   // Cartão da Cripta dos Ecos (masmorra): entrada pelo mapa; o servidor repete todas as conferências (hub.js cryptEnter).
   cryptCard() {
     const g = this.game, c = g.char, z = ZONES.crypt, e = c.echo ?? { frags: 0, keys: 0 }, chk = cryptEntryCheck(c), net = g.inNetZone?.();
-    const info = `Nv ${CRYPT.recommended[0]}–${CRYPT.recommended[1]} · 4 salas e chefe · até ${CRYPT.maxPlayers} heróis · ${e.frags} fragmentos · ${e.keys} Chave(s) de Eco`;
+    const info = `Nv ${CRYPT.recommended[0]}–${CRYPT.recommended[1]} · 4 salas e chefe · até ${CRYPT.maxPlayers} heróis · ${ECHO_FRAG} ${e.frags} fragmentos · ${ECHO_KEY} ${e.keys} Chave(s) de Eco`;
     let act;
     if (!g.txOnline) act = `<span class="tag dim">${LOCK} Só abre com o servidor de partidas conectado.</span>`;
     else if (net) act = `<span class="tag dim">${LOCK} Na exploração online, volte à Vila antes de entrar.</span>`;

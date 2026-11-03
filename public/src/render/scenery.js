@@ -71,7 +71,7 @@ const STYLE = {
 };
 
 // ---------- chão: camadas extras assadas no cache do terreno ----------
-import { trailPattern, waterPattern, groundTexReady } from './ground-textures.js';
+import { trailPattern, waterPattern, groundTexReady, groundExtra } from './ground-textures.js';
 import { bridgeArtReady, drawBridgeSprite, hideBridgeRails } from './nature-sprites.js';
 
 // `streets` (renderer.js) desenha praça e ruas ANTES dos rios e pontes: depois deles a rua cobria a água e a ponte pintada.
@@ -94,10 +94,18 @@ export function paintGroundScenery(g, world, rng, streets, bounds) {
   }
   // Rios, marcas de acampamento e, por cima, as pontes (o terreno é desenhado em blocos: tudo aqui é por coordenada de mundo).
   streets?.();
+  if (sc.groundTex === 'crypt') paintCryptRunes(g, z);
   paintRivers(g, world, rng);
   paintCamps(g, world);
   paintBridges(g, world);
   void L;
+}
+
+// Cripta dos Ecos: piso de runas pintado (arte do dono) no centro de cada sala; o resto do chão são as lajes das Ruínas.
+function paintCryptRunes(g, z) {
+  const im = groundExtra('crypt-runes'); if (!im) return;
+  const w = 420, h = w * im.height / im.width, cx = [765, 2060, 3460, 4850];
+  for (const x of cx) g.drawImage(im, x - w / 2, z.h / 2 - h / 2 + 20, w, h);
 }
 
 const riverPath = (g, pts) => { g.beginPath(); g.moveTo(pts[0].x, pts[0].y); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y); };

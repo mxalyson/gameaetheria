@@ -322,7 +322,7 @@ ZONES.crypt = {
   palette: { ground: '#4b4766', ground2: '#423e5c', outside: '#12101c', path: '#5a5578', path2: '#524e70' },
   treeColors: ['#46565f'], flowerColors: ['#9fe0e8'],
   decor: { trees: 0, rocks: 0, bushes: 0, flowers: 0 },
-  scenery: { kind: 'ruins', noTrail: true },
+  scenery: { kind: 'ruins', noTrail: true, groundTex: 'crypt' }, // groundTex: piso de runas pintado nas salas (render/scenery.js)
   atmosphere: { tint: 'rgba(80,200,220,0.07)', edge: 'rgba(6,4,20,0.65)', fog: { n: 6, color: '160,220,235', alpha: 0.08 }, motes: { n: 30, color: '130,230,240', drift: 3, rise: 10 } },
   portals: [{ x: CG.exit.x, y: CG.exit.y, to: 'town', tx: 850, ty: 790, label: 'Vila de Lúmen' }],
 };

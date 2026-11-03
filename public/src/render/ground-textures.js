@@ -3,6 +3,8 @@
 import { ASSET_V } from '../assets-version.js';
 const KEY = 'aetheria_chao';
 const NAMES = ['forest', 'plains', 'ruins', 'sand-dirt', 'sand-plains', 'slabs', 'water-lake', 'water-crystal'];
+// extras: carimbos opcionais (não bloqueiam o `ready` do chão): piso de runas da Cripta dos Ecos
+const EXTRA = ['crypt-runes'];
 const imgs = new Map();
 let on = null, ready = false, loading = null;
 
@@ -19,12 +21,13 @@ export function groundTexEnabled() {
 // ?v= = hash do conteúdo de public/assets/** (ASSET_V, o mesmo da VERSION do sw.js): trocar uma textura muda o hash (tools/bump-assets.mjs) e invalida o cache sozinho
 export function loadGroundTextures() {
   if (!groundTexEnabled() || loading) return loading;
-  loading = Promise.all(NAMES.map((n) => new Promise((res) => {
+  loading = Promise.all([...NAMES, ...EXTRA].map((n) => new Promise((res) => {
     const i = new Image(); i.onload = () => { imgs.set(n, i); res(); }; i.onerror = () => res(); i.src = `assets/ground/${n}.webp?v=${ASSET_V}`;
-  }))).then(() => { ready = imgs.size === NAMES.length; });
+  }))).then(() => { ready = NAMES.every((n) => imgs.has(n)); });
   return loading;
 }
 export const groundTexReady = () => ready;
+export const groundExtra = (name) => imgs.get(name) ?? null;
 
 // cada tile cobre `scale` vezes o seu tamanho em pixels no mundo; sem emenda, então basta repetir
 function pattern(g, name, scale) {
