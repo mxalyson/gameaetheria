@@ -50,7 +50,7 @@ test('modo teclado: a barra mostra a arte com a tecla, e o tooltip tem ícone, n
 test('escolha de classe lista as habilidades com ícone', async ({ page }) => {
   await page.goto('/?api=&visual=original');
   await page.click('[data-action="new-char"]');
-  await page.waitForFunction(() => [...document.querySelectorAll('.class-card img.cc-sk')].length === 12 && [...document.querySelectorAll('.class-card img.cc-sk')].every((i) => i.complete && i.naturalWidth > 0));
+  await page.waitForFunction(() => [...document.querySelectorAll('.class-card img.cc-sk')].length === 16 && [...document.querySelectorAll('.class-card img.cc-sk')].every((i) => i.complete && i.naturalWidth > 0));
 });
 
 test('categorias e estado indisponível: selo de categoria em cada habilidade, tooltip com categoria e ícone bloqueado quando atordoado', async ({ browser }) => {

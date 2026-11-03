@@ -2,7 +2,7 @@
 // Quando houver servidor, um rival real será um personagem salvo de outro jogador
 // no mesmo formato de `char` — o resto do código de arena não muda.
 import { CLASSES } from '../data/classes.js';
-import { SLOTS } from '../data/items.js';
+import { SLOTS, SHIELD_CLASSES } from '../data/items.js';
 import { generateItem, rollRarity } from './loot.js';
 import { newCharacter, createSpirit, POINTS_PER_LEVEL } from './progression.js';
 import { makeRng } from './rng.js';
@@ -30,6 +30,7 @@ export function generateRival(rng, player, { classId: forced, rating: forcedRati
   const luck = Math.max(0, Math.min(2, (rating - 950) / 350)) * Math.min(1, strength);
   const gearLevel = Math.max(1, Math.round(level * Math.min(1, strength))); // rival fraco usa equipamento de nível menor
   for (const slot of SLOTS) {
+    if (slot === 'offhand' && !SHIELD_CLASSES.includes(classId)) continue; // só Guerreiro e Clérigo têm escudo
     if (slot !== 'weapon' && slot !== 'armor' && (strength < 0.3 || !rng.chance(0.6))) { delete char.equipment[slot]; continue; }
     char.equipment[slot] = generateItem(rng, gearLevel, { classId, slot, weaponType: slot === 'weapon' ? cls.weapon : undefined, rarityId: rollRarity(rng, luck) });
   }

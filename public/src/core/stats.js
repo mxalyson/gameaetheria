@@ -1,5 +1,5 @@
 import { CLASSES, STAT_KEYS } from '../data/classes.js';
-import { SLOTS, WEAPON_TYPES, RARITY } from '../data/items.js';
+import { SLOTS, WEAPON_TYPES, RARITY, SHIELD_CLASSES } from '../data/items.js';
 import { plusMul } from './enhance.js';
 
 export function gearTotals(equipment) {
@@ -48,6 +48,7 @@ export function computeStats(char) {
     atkSpeed: Math.min(2, 1 + p.agi * 0.004 + (g.atkSpeed ?? 0) / 100),
     moveSpeed: 200 * (1 + Math.min(40, g.moveSpeed ?? 0) / 100),
     lifesteal: Math.min(15, g.lifesteal ?? 0) / 100,
+    block: char.equipment?.offhand && SHIELD_CLASSES.includes(char.classId) ? Math.min(60, g.block ?? 0) : 0, // % de chance de bloqueio (core/block.js); só o escudo dá
   };
 }
 
@@ -62,11 +63,12 @@ export function canEquip(char, item) {
   if (char.level < item.reqLevel) return { ok: false, reason: `Requer nível ${item.reqLevel}.` };
   const cid = itemClassId(item);
   if (cid && cid !== char.classId) return { ok: false, reason: `Apenas para ${itemClassName(item)}.` };
+  if (item.slot === 'offhand' && !SHIELD_CLASSES.includes(char.classId)) return { ok: false, reason: 'Só Guerreiro e Clérigo usam escudo.' };
   return { ok: true };
 }
 
 // Pontuação aproximada para comparar itens e ordenar.
-const SCORE_W = { atk: 3, def: 1.5, hp: 0.25, str: 2, agi: 2, int: 2, vit: 2, crit: 3, atkSpeed: 3, moveSpeed: 2, lifesteal: 4 };
+const SCORE_W = { atk: 3, def: 1.5, hp: 0.25, str: 2, agi: 2, int: 2, vit: 2, crit: 3, atkSpeed: 3, moveSpeed: 2, lifesteal: 4, block: 2 };
 export function itemScore(item) {
   let s = 0;
   for (const [k, v] of Object.entries(item.stats)) s += (SCORE_W[k] ?? 1) * v;

@@ -455,3 +455,78 @@ test('objetivos visit/teleport/lore/spiritStage/friendlyDuel só valem se o SERV
   const done = structuredClone(neu); delete done.quests.active.porto_duelo; done.quests.done.porto_duelo = Date.now();
   assert.equal(checkSave(old, done, Date.now(), { strictPve: true }).reason, 'pve_quest', 'no estrito nenhuma missão é concluída pelo cliente (só a transação quest_turnin)');
 });
+
+test('runTx (puro): escudo equipa/desequipa para Guerreiro e Clérigo; Mago e Arqueiro recusam; slot offhand passa no protocolo', () => {
+  const rng = makeRng(21);
+  for (const [cid, ok] of [['warrior', true], ['cleric', true], ['mage', false], ['archer', false]]) {
+    const doc = newOfficialCharacter('S', cid); doc.level = 10;
+    const sh = generateItem(rng, 5, { classId: ok ? cid : 'warrior', rarityId: 'rare', slot: 'offhand' });
+    sh.classId = cid; // item da classe do dono (a recusa vem da regra de escudo, não da classe do item)
+    doc.inventory.push(sh);
+    if (ok) {
+      const r = runTx(doc, { op: 'equip', id: sh.id }, { rng });
+      assert.equal(r.doc.equipment.offhand.id, sh.id);
+      const u = runTx(r.doc, { op: 'unequip', slot: 'offhand' }, { rng });
+      assert.equal(u.doc.equipment.offhand, undefined); assert.ok(u.doc.inventory.some((i) => i.id === sh.id));
+    } else assert.throws(() => runTx(doc, { op: 'equip', id: sh.id }, { rng }), TxError);
+  }
+  assert.ok(TX({ op: 'unequip', slot: 'offhand' }).ok);
+});
+
+test('craft (Forja do Eco): fragmentos + ouro viram 1 arma e 1 armadura Eco por personagem; o servidor decide tudo', async () => {
+  const { craftEcho, ownsEcho } = await import('../public/src/core/echo.js');
+  const { ECHO_RECIPES, ECHO_NAMES, ECHO_ITEM, CRYPT } = await import('../public/src/data/crypt.js');
+  const { checkSave } = await import('../server/plausible.js');
+  const { validate } = await import('../public/src/core/savedoc.js');
+  assert.deepEqual(TX({ op: 'craft', id: 'eco_weapon', gold: 0 }).msg, { t: 'tx', op: 'craft', req: 0, id: 'eco_weapon' });
+  assert.equal(TX({ op: 'craft' }).ok, false);
+  assert.equal(placeProblem('craft', { inZone: true }), 'not_here'); assert.equal(placeProblem('craft', { inZone: false, hubAt: null }), null);
+  assert.equal(placeProblem('craft', { inZone: false, hubAt: 'harbor' }), 'not_here', 'o Ferreiro é da Vila');
+  const doc = newOfficialCharacter('Forja', 'mage'); doc.level = 25; doc.gold = 10_000; doc.echo = { frags: 120, keys: 0, entry: 0 };
+  const ctx = { rng: makeRng(5), now: Date.now() };
+  // falhas: receita desconhecida, fragmentos/ouro/nível/mochila; o original não muda
+  assert.throws(() => runTx(doc, { op: 'craft', id: 'eco_lanca' }, ctx), TxError);
+  assert.throws(() => runTx({ ...doc, echo: { frags: 39, keys: 0, entry: 0 } }, { op: 'craft', id: 'eco_weapon' }, ctx), /Faltam fragmentos/);
+  assert.throws(() => runTx({ ...doc, gold: 100 }, { op: 'craft', id: 'eco_weapon' }, ctx), /Ouro insuficiente/);
+  assert.throws(() => runTx({ ...doc, level: 19 }, { op: 'craft', id: 'eco_weapon' }, ctx), TxError);
+  assert.equal(doc.echo.frags, 120); assert.equal(doc.gold, 10_000);
+  const r = runTx(doc, { op: 'craft', id: 'eco_weapon' }, ctx);
+  const it = r.doc.inventory.find((x) => x.eco);
+  assert.ok(it && it.slot === 'weapon' && it.weaponType === 'staff' && it.classId === 'mage' && it.rarity === 'epic');
+  assert.equal(it.name, ECHO_NAMES.weapon.staff);
+  assert.equal(r.doc.echo.frags, 120 - ECHO_RECIPES.eco_weapon.frags); assert.equal(r.doc.gold, 10_000 - ECHO_RECIPES.eco_weapon.gold);
+  assert.ok(it.stats.crit >= ECHO_ITEM.weapon.crit && it.stats.atk > 0);
+  assert.equal(r.summary.name, it.name); assert.equal(r.summary.fragsTotal, r.doc.echo.frags);
+  assert.ok(ownsEcho(r.doc, 'weapon') && !ownsEcho(r.doc, 'armor'));
+  assert.throws(() => runTx(r.doc, { op: 'craft', id: 'eco_weapon' }, ctx), /já possui/); // 1 por personagem (também equipado)
+  const eq = structuredClone(r.doc); eq.equipment.weapon = eq.inventory.pop();
+  assert.throws(() => runTx(eq, { op: 'craft', id: 'eco_weapon' }, ctx), /já possui/);
+  const r2 = runTx(r.doc, { op: 'craft', id: 'eco_armor' }, ctx);
+  const ar = r2.doc.inventory.find((x) => x.eco && x.slot === 'armor');
+  assert.equal(ar.name, ECHO_NAMES.armor.mage); assert.ok(ar.stats.vit > 0 && ar.stats.def > 0 && ar.classId === 'mage');
+  // o item Eco sobrevive à validação do documento e NÃO pode ser forjado pelo cliente (plausibilidade)
+  assert.ok(validate(structuredClone(r2.doc)).char.inventory.every((x) => x.eco === true || !x.eco));
+  assert.equal(validate(structuredClone(r2.doc)).char.inventory.filter((x) => x.eco).length, 2);
+  const old = validate(structuredClone(doc)).char, forged = structuredClone(old);
+  forged.inventory.push({ ...structuredClone(it), id: 'iForjado' });
+  assert.equal(checkSave(old, forged).ok, false, 'item Eco criado pelo cliente é recusado');
+  assert.equal(checkSave(old, forged, Date.now(), { strictPve: true }).ok, false);
+  const more = structuredClone(old); more.echo.frags += 10; // fragmentos só vêm do servidor
+  assert.equal(checkSave(old, more, Date.now(), { strictPve: true }).reason, 'pve_echo');
+  assert.equal(checkSave(old, more).doc.echo.frags, old.echo.frags, 'fora do modo estrito o valor oficial prevalece');
+  assert.ok(CRYPT.frags.cap >= 120);
+});
+
+test('servidor: craft grava no banco, responde tx_result e some quando o personagem não tem fragmentos', async () => {
+  const { srv, db, c, ch, patch, tx } = await setup();
+  patch((x) => { x.level = 22; x.gold = 5000; x.echo = { frags: 45, keys: 0, entry: 0 }; });
+  const bad = await tx({ op: 'craft', id: 'eco_armor' });
+  assert.equal(bad.ok, false); assert.match(bad.reason, /Faltam fragmentos/);
+  const ok = await tx({ op: 'craft', id: 'eco_weapon' });
+  assert.equal(ok.ok, true); assert.equal(ok.sync, true); assert.equal(ok.name, 'Lâmina do Eco');
+  const doc = db.character(ch).doc;
+  assert.equal(doc.echo.frags, 5); assert.equal(doc.gold, 2500); assert.ok(doc.inventory.some((x) => x.eco && x.weaponType === 'sword'));
+  const again = await tx({ op: 'craft', id: 'eco_weapon' });
+  assert.equal(again.ok, false);
+  await closeAll(srv, c);
+});

@@ -96,6 +96,14 @@ export function buildLayout(zoneId) {
     obstacles.push({ x: p.x, y: p.y, r: 28, block: true });
   }
 
+  // Muros da masmorra (zones.js › crypt): paredes norte-sul com uma porta no meio. Bloqueiam movimento e projéteis; colunas e braseiros desenham o muro.
+  for (const wl of z.walls ?? []) {
+    const [g0, g1] = wl.gap;
+    obstacles.push({ x: wl.x, y: 0, w: wl.w, h: g0, block: true }, { x: wl.x, y: g1, w: wl.w, h: z.h - g1, block: true });
+    for (let y = 40; y < z.h; y += 78) if (y < g0 - 30 || y > g1 + 30) decor.push({ type: 'pillar', x: wl.x + wl.w / 2, y, s: 30, v: ((y / 78) | 0) % 2 ? 0.9 : 0.6 });
+    for (const y of [g0 - 24, g1 + 24]) decor.push({ type: 'brazier', x: wl.x + wl.w / 2, y, s: 16, v: 0.9 });
+  }
+
   // Cenário rico (opt-in por zona). Usa uma semente própria: não altera o sorteio das demais zonas.
   const sc = z.scenery;
   const srng = makeRng(hashString(zoneId + ':scenery'));

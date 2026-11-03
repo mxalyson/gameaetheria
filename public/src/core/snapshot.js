@@ -11,7 +11,7 @@ export class SnapshotDecoder {
   // `match_found`: estáticos dos jogadores (id, team, name, classId, level, maxHp, bot)
   init(m) {
     this.you = m.you; this.actors.clear(); this.mobs.clear();
-    for (const p of m.players) this.actors.set(p.id, { id: p.id, team: p.team, name: p.name, classId: p.classId, level: p.level, maxHp: p.maxHp, bot: !!p.bot, x: 0, y: 0, hp: p.maxHp, facing: 0, dead: false, moving: false, swing: false, stun: false, shield: 0, online: true });
+    for (const p of m.players) this.actors.set(p.id, { id: p.id, team: p.team, name: p.name, classId: p.classId, level: p.level, maxHp: p.maxHp, bot: !!p.bot, x: 0, y: 0, hp: p.maxHp, facing: 0, dead: false, moving: false, swing: false, stun: false, shield: 0, look: 0, online: true });
     return this;
   }
 
@@ -26,6 +26,7 @@ export class SnapshotDecoder {
       a.x = t[1]; a.y = t[2]; a.hp = t[3]; a.facing = t[4] / 100;
       a.dead = !!(t[5] & F.DEAD); a.moving = !!(t[5] & F.MOVING); a.swing = !!(t[5] & F.SWING); a.stun = !!(t[5] & F.STUN); a.online = !(t[5] & F.OFFLINE);
       a.shield = t[6] ?? 0;
+      a.look = t[7] ?? 0; // aura de evolução (core/aura.js decodeLook); ausente = 0
     }
     for (const n of msg.n ?? []) this.mobs.set(n.id, { id: n.id, mob: n.mob, level: n.level, boss: !!n.boss, elite: !!n.elite, miniboss: !!n.mb, name: n.nm, r: n.r, summoned: !!n.su, camp: n.cp, maxHp: n.maxHp, x: 0, y: 0, hp: n.maxHp, facing: 0, dead: false, moving: false, swing: false, _seen: true });
     for (const t of msg.m ?? []) {

@@ -20,7 +20,7 @@ export const RESPAWN_AFTER = 4;  // s morto até renascer na entrada da zona
 const SHARE_RADIUS = 900;        // quem está longe do abate não ganha nada dele
 const r1 = (n) => Math.round(n * 10) / 10;
 const idle = () => ({ mx: 0, my: 0, aimX: 0, aimY: 0, attack: false, cast: null });
-const emptyBatch = () => ({ xp: 0, gold: 0, potions: 0, items: [], essences: [], kills: [], skills: [], deaths: 0 });
+const emptyBatch = () => ({ xp: 0, gold: 0, potions: 0, items: [], essences: [], kills: [], skills: [], deaths: 0, frags: 0, crypt: false });
 
 // Ponto de entrada numa zona vindo de `from` (o portal de lá aponta para cá). null = portal inexistente (movimento ilegal).
 export function entryPoint(zoneId, from) {
@@ -118,6 +118,7 @@ export class ZoneRoom {
       const w = wire(ev); if (w) this.events.push(w);
     }
     evs.length = 0;
+    this.afterEvents?.(); // gancho das subclasses (server/crypt.js: ondas, portões e fim da masmorra)
     for (const p of this.players.values()) {
       if (p.left) continue;
       const a = p.actor;
@@ -172,7 +173,7 @@ export class ZoneRoom {
   // Grava o lote pendente do jogador (operação idempotente). Devolve o resumo ou null.
   flush(p) {
     const b = p.pend;
-    if (!p.charId || !this.db || !(b.xp || b.gold || b.potions || b.items.length || b.essences.length || b.kills.length || b.skills.length || b.deaths)) return null;
+    if (!p.charId || !this.db || !(b.xp || b.gold || b.potions || b.items.length || b.essences.length || b.kills.length || b.skills.length || b.deaths || b.frags || b.crypt)) return null;
     b.pity = { ...p.pity }; p.pend = emptyBatch();
     const opId = `zone:${this.matchId}:${p.charId}:${++this.flushSeq}`;
     try {
@@ -186,7 +187,7 @@ export class ZoneRoom {
     } catch (e) {
       // a operação reverteu (nada foi gravado): devolve o lote ao pendente para a próxima tentativa, em vez de perder a recompensa
       const n = p.pend;
-      n.xp += b.xp; n.gold += b.gold; n.potions += b.potions; n.deaths += b.deaths;
+      n.xp += b.xp; n.gold += b.gold; n.potions += b.potions; n.deaths += b.deaths; n.frags += b.frags; n.crypt = n.crypt || b.crypt;
       n.items.unshift(...b.items); n.essences.unshift(...b.essences); n.kills.unshift(...b.kills); n.skills.unshift(...b.skills);
       try { this.db.audit('zone_reward_error', { accountId: p.accountId, detail: e.message }); } catch { /* sem auditoria */ }
       return null;
@@ -243,6 +244,9 @@ export class ZoneRoom {
     const rt = this.ritualTuple(), rts = rt?.join(',');
     if (rt && (f.k === 1 || rts !== this.lastRt)) extra.rt = rt;
     this.lastRt = rts;
+    const hud = this.hudTuple?.(), hs = hud?.join(',');
+    if (hud && (f.k === 1 || hs !== this.lastHud)) extra.cr = hud;
+    this.lastHud = hs;
     if (this.joined.length) extra.pj = this.statics(this.joined);
     if (this.left.length) extra.pl = this.left;
     this.joined = []; this.left = [];
@@ -258,7 +262,7 @@ export class ZoneRoom {
   sendKeyframe(session) {
     const p = session.player;
     if (!p) return;
-    const f = this.frameFor(false), rt = this.ritualTuple();
-    this.send.raw(session, JSON.stringify({ ...this.meta(), ...f, ...(rt ? { rt } : {}), pj: this.statics([...this.players.values()].filter((q) => !q.left)), events: [] }).slice(0, -1) + `,"ack":${p.lastSeq},"me":${this.meJson(p)}}`);
+    const f = this.frameFor(false), rt = this.ritualTuple(), hud = this.hudTuple?.();
+    this.send.raw(session, JSON.stringify({ ...this.meta(), ...f, ...(rt ? { rt } : {}), ...(hud ? { cr: hud } : {}), pj: this.statics([...this.players.values()].filter((q) => !q.left)), events: [] }).slice(0, -1) + `,"ack":${p.lastSeq},"me":${this.meJson(p)}}`);
   }
 }

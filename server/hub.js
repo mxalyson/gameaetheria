@@ -5,6 +5,8 @@ import { randomBytes } from 'node:crypto';
 import { MatchRoom } from './room.js';
 import { CoopRoom } from './coop.js';
 import { ZoneRoom, entryPoint } from './zone.js';
+import { CryptRoom } from './crypt.js';
+import { cryptEntryCheck, applyCryptEntry } from '../public/src/core/echo.js';
 import { runTx, placeProblem, TxError, recordServerEvent } from './tx.js';
 import { ZONES, FARM_ENTRY, FARM_MID } from '../public/src/data/zones.js';
 import { MODES } from '../public/src/core/match.js';
@@ -111,6 +113,7 @@ export class Hub {
       case 'queue_cancel': if (s.queued) this.cancelQueue(s); return;
       case 'zone_enter': return this.zoneEnter(s, m.zone, m.from, no);
       case 'zone_leave': return this.zoneLeave(s);
+      case 'crypt_enter': return this.cryptEnter(s, no);
       case 'zone_teleport': return this.zoneTeleport(s, m.zone, no);
       case 'tx': return this.transaction(s, m, no);
     }
@@ -332,7 +335,8 @@ export class Hub {
     let { room } = this.zoneRoomFor(s, zoneId);
     if (!room) {
       const id = this.nextRoom++;
-      room = new ZoneRoom({ id, key, zoneId, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession, onPortal: (p, pt) => this.zonePortal(room, p, pt) });
+      const Room = ZONES[zoneId].dungeon ? CryptRoom : ZoneRoom; // masmorra (Cripta dos Ecos): sala própria com ondas e chefe
+      room = new Room({ id, key, zoneId, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession, onPortal: (p, pt) => this.zonePortal(room, p, pt) });
       this.rooms.set(id, room); this.zoneRooms.set(key, room);
     }
     this.refreshChar(s);
@@ -343,7 +347,7 @@ export class Hub {
   }
   // Mapa visitado é gravado pelo servidor (o cliente fica com a nuvem pausada dentro da instância): é o que libera o teletransporte depois.
   markVisited(s, zoneId) {
-    if (!this.db || !s.charId) return;
+    if (!this.db || !s.charId || !(ZONES[zoneId]?.mobs || ZONES[zoneId]?.hub)) return; // a masmorra não é parada de viagem
     try {
       if (this.db.character(s.charId)?.doc.visited?.[zoneId]) return;
       const out = this.db.applyOperation(`visit:${s.id}:${++this.tpSeq}:${randomBytes(4).toString('hex')}`, s.charId, 'visit', (d) => {
@@ -401,6 +405,32 @@ export class Hub {
     if (toTown) { s.hubAt = null; return this.out.send(s, { t: 'zone_exit', to: 'town' }); }
     if (toHub) { s.hubAt = zoneId; this.markVisited(s, zoneId); return this.out.send(s, { t: 'zone_exit', to: zoneId, x: ZONES[zoneId].spawn.x, y: ZONES[zoneId].spawn.y }); }
     this.joinZoneRoom(s, zoneId, { ...(ZONES[zoneId].spawn ?? TELEPORT_ENTRY) }, { scrolls });
+  }
+  // Cripta dos Ecos (masmorra): a entrada é um nó do MAPA. O servidor confere tudo no documento oficial: nível, Ruínas visitadas, espera de 20 min ou Chave de Eco
+  // (debitada na mesma operação idempotente que carimba a entrada), fora de partida/fila, e que o jogador está numa cidade (não dentro de outra instância).
+  // Grupo: cada membro paga a própria entrada e cai na mesma instância (até MAX_PARTY); instância já vencida não aceita mais ninguém.
+  cryptEnter(s, no) {
+    if (!this.db || !s.charId) return no(REJECT.BAD_CHARACTER);
+    if (s.queued) return no(REJECT.ALREADY_QUEUED);
+    if (s.room) return no(s.room.mode !== 'zone' ? REJECT.IN_MATCH : REJECT.NOT_HERE); // dentro de outra instância: volte à cidade antes
+    const { room } = this.zoneRoomFor(s, 'crypt');
+    if (room?.cleared) return no(REJECT.CRYPT_OVER);
+    if (room?.size >= MAX_PARTY) return no(REJECT.ROOM_FULL);
+    this.refreshChar(s);
+    const row = this.db.character(s.charId);
+    if (!row) return no(REJECT.BAD_CHARACTER);
+    const chk = cryptEntryCheck(row.doc, Date.now());
+    if (!chk.ok) return no(chk.code, { reason: chk.reason, waitSec: chk.waitSec });
+    try {
+      const out = this.db.applyOperation(`crypt:${s.id}:${++this.tpSeq}:${randomBytes(4).toString('hex')}`, s.charId, 'crypt_entry', (d) => {
+        const c = structuredClone(d), r = applyCryptEntry(c, Date.now());
+        if (!r.ok) throw new Error(r.code);
+        return { doc: c, summary: { via: r.via, keys: c.echo.keys } };
+      });
+      s.char = out.doc;
+      this.db.audit('crypt_entry', { accountId: s.accountId, detail: JSON.stringify({ char: s.charId, via: out.summary.via, keys: out.summary.keys }) });
+    } catch (e) { return no(REJECT.CRYPT_WAIT, { reason: 'Não foi possível entrar agora.' }); }
+    this.joinZoneRoom(s, 'crypt', { ...ZONES.crypt.spawn }, { crypt: true });
   }
   sendZoneJoined(s, room, extra = null) {
     const p = s.player;

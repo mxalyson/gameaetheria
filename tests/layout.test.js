@@ -115,6 +115,7 @@ test('zonas de farm: 4600×2800, portais nas bordas oeste/leste na altura do mei
   }
   // os portais de ida e volta se encontram: o ponto de chegada de um fica junto do portal do outro
   for (const [from, z] of Object.entries(ZONES)) for (const p of z.portals ?? []) {
+    if (z.dungeon) continue; // masmorra: entra-se pelo mapa (crypt_enter) e a saída é de mão única para a Vila
     const back = ZONES[p.to].portals.find((q) => q.to === from);
     assert.ok(back, `${from} → ${p.to} tem volta`);
     assert.ok(p.tx > 0 && p.tx < ZONES[p.to].w && p.ty > 0 && p.ty < ZONES[p.to].h, `${from} → ${p.to}: chegada dentro do mapa`);
@@ -244,7 +245,7 @@ test('memória do terreno: teto de blocos < 40 MiB para qualquer mapa (inteiro s
   for (const [id, z] of Object.entries(ZONES)) {
     const b = groundBudget(z);
     assert.ok(b.bytes < 40 * MIB, `${id}: ${(b.bytes / MIB).toFixed(1)} MiB`);
-    assert.equal(b.mode, FARM.includes(id) || id === 'harbor' ? 'tiles' : 'whole', id); // o Porto (2400×1700) passa de 14 MiB e vai em blocos
+    assert.equal(b.mode, FARM.includes(id) || id === 'harbor' || id === 'crypt' ? 'tiles' : 'whole', id); // o Porto (2400×1700) passa de 14 MiB e vai em blocos
   }
   assert.ok(4600 * 2800 * 4 > 40 * MIB, 'sem blocos o mapa novo estouraria o teto');
   assert.ok(BUDGET_MIB <= 36);
@@ -337,4 +338,25 @@ test('Vila: a trilha automática não corta a vila (noTrail) e o layout da vila 
   assert.equal(L.town.trail.length, 0);
   const fresh = await import('../public/src/game/layout.js?recalculo3');
   assert.deepEqual(fresh.buildLayout('harbor'), buildLayout('harbor'));
+});
+
+test('Cripta dos Ecos: layout determinístico, muros com porta aberta e pontos importantes livres', async () => {
+  const { CRYPT_GEOM: G } = await import('../public/src/data/crypt.js');
+  const z = ZONES.crypt, a = buildLayout('crypt');
+  const fresh = await import('../public/src/game/layout.js?recalculo-cripta');
+  assert.deepEqual(fresh.buildLayout('crypt'), a, 'mesmo resultado em qualquer cliente');
+  assert.ok(!z.mobs && !z.boss, 'sem monstros soltos: a sala do servidor povoa a masmorra');
+  const rects = a.obstacles.filter((o) => o.w);
+  assert.equal(rects.length, G.walls.length * 2, 'dois blocos por muro (acima e abaixo da porta)');
+  const inRect = (x, y, r = 0) => rects.some((o) => x > o.x - r && x < o.x + o.w + r && y > o.y - r && y < o.y + o.h + r);
+  for (const x of G.walls) {
+    assert.ok(!inRect(x + G.wallW / 2, G.mid, 20), 'a porta do muro ' + x + ' deixa um herói passar');
+    assert.ok(inRect(x + G.wallW / 2, G.door[0] - 40) && inRect(x + G.wallW / 2, G.door[1] + 40), 'o muro fecha fora da porta');
+  }
+  for (const s of G.starts) assert.ok(!inRect(s, G.mid, 30), 'chegada livre');
+  assert.ok(!inRect(G.bossAt.x, G.bossAt.y, 60), 'chefe nasce em lugar livre');
+  assert.ok(!inRect(z.portals[0].x, z.portals[0].y, 30), 'saída livre');
+  // as salas ficam entre os muros e as faixas de nascimento cabem no corredor
+  G.roomX.forEach(([x0, x1], i) => assert.ok(x0 < x1 && (i === 0 || x0 > G.walls[i - 1] + G.wallW) && (i === G.roomX.length - 1 || x1 < G.walls[i]), 'faixa da sala ' + i));
+  assert.ok(a.decor.some((d) => d.type === 'pillar') && a.decor.some((d) => d.type === 'brazier'), 'muros desenhados com colunas e braseiros');
 });

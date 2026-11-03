@@ -208,6 +208,20 @@ Object.assign(QUESTS, {
   },
 });
 
+// ---- Cripta dos Ecos (masmorra por instância, decisão 0017): a Yun apresenta a masmorra; o objetivo `crypt` só o servidor soma ----
+Object.assign(QUESTS, {
+  cripta_dos_ecos: {
+    id: 'cripta_dos_ecos', name: 'A Cripta dos Ecos', giver: 'sage', level: 20, after: 'ruinas_sombrias',
+    text: {
+      offer: 'Sob as Ruínas dorme uma cripta onde os ecos se prendem a si mesmos. Abra o mapa, entre com até três aliados e silencie o Soberano dos Ecos.',
+      progress: 'A entrada fica no mapa, ligada às Ruínas: quatro salas, e a última guarda o Soberano. Uma entrada a cada vinte minutos.',
+      done: 'Calado, enfim. Os fragmentos que ele guardava servem ao Ferreiro Brok: ele sabe forjar o eco em aço.',
+    },
+    objectives: [{ type: 'crypt', count: 1, label: 'Derrote o Soberano dos Ecos na Cripta' }],
+    reward: { gold: 1400, xp: 7000, potions: 3, items: [{ rarity: 'epic' }] },
+  },
+});
+
 // Missão de evolução de cada tipo de spirit (core/progression.js, core/journal.js spiritEvoStatus).
 export const SPIRIT_EVO_QUEST = Object.fromEntries(EVO.map(([type, , , key]) => [type, 'evolucao_do_spirit_' + key]));
 

@@ -121,8 +121,8 @@ test('mapa: zonas não visitadas mostram o cadeado (sem "${...}" literal)', asyn
   const errors = await criar(page);
   await page.evaluate(() => window.game.ui.openPanel('map'));
   // mapa real: nós `.mp-node`; só a Vila vem liberada, o resto mostra o cadeado e, ao tocar, o cartão explica como chegar
-  await expect(page.locator('.mp-node')).toHaveCount(7);
-  await expect(page.locator('.mp-node.locked')).toHaveCount(6);
+  await expect(page.locator('.mp-node')).toHaveCount(8);
+  await expect(page.locator('.mp-node.locked')).toHaveCount(7);
   expect(await page.locator('.mp-node:not(.locked)').getAttribute('data-arg')).toBe('town');
   await page.locator('.mp-node[data-arg="ruins"]').click();
   await expect(page.locator('.mp-card')).toContainText('Ainda não visitado');

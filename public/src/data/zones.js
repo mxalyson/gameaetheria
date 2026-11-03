@@ -1,3 +1,4 @@
+import { CRYPT_GEOM as CG, CRYPT } from './crypt.js';
 // Mundo leve: uma vila central + 3 regiões de farm em sequência + arenas.
 // Nível dos mobs cresce de oeste para leste dentro de cada região.
 const ARENA = {
@@ -19,6 +20,8 @@ export const WORLD_ROUTE = ['town', 'forest', 'plains', 'harbor', 'ruins', 'glac
 export const WORLD_NODES = {
   town: { x: 14, y: 36 }, forest: { x: 34, y: 36 }, plains: { x: 53, y: 50 }, harbor: { x: 63, y: 66 },
   ruins: { x: 72, y: 36 }, glacier: { x: 86, y: 54 }, ember: { x: 94, y: 30 },
+  // Masmorra (fora de WORLD_ROUTE: não é parada de viagem; tem entrada própria no painel do mapa). Ligada às Ruínas.
+  crypt: { x: 78, y: 84 },
 };
 // Cidades neutras (`hub`): zona segura sem monstros. Ficam sempre longe uma da outra (nunca duas coladas): a Vila no começo, o Porto no meio da rota.
 export const isHub = (id) => !!ZONES[id]?.hub;
@@ -308,6 +311,20 @@ ZONES.ember = {
     extras: [['rubble', 70, 16, 26, 0], ['brazier', 34, 14, 16, 0.9], ['deadtree', 40, 26, 34, 0.5], ['runestone', 14, 22, 28, 0.6]] },
   atmosphere: { tint: 'rgba(255,110,50,0.20)', edge: 'rgba(40,6,2,0.62)', fog: { n: 8, color: '255,170,130', alpha: 0.08 }, motes: { n: 40, color: '255,170,90', drift: 4, rise: 14 } },
   portals: [{ x: 40, y: FARM_MID, to: 'glacier', tx: FARM_EAST_IN, ty: FARM_MID, label: 'Cume Gélido' }],
+};
+
+// ---- Cripta dos Ecos: masmorra por instância (decisão 0017; dados em data/crypt.js). Sem mobs/boss: quem povoa e conduz é server/crypt.js,
+// então nenhum portal, teletransporte ou ZoneRoom comum a alcança (só a mensagem crypt_enter do mapa). Layout determinístico: muros com porta em game/layout.js.
+ZONES.crypt = {
+  name: CRYPT.name, w: CG.w, h: CG.h, dungeon: true, fixedLight: true, noLeash: true, level: CRYPT.recommended, spawn: { x: CG.starts[0], y: CG.mid },
+  preload: [...new Set([...CRYPT.rooms.flatMap((r) => [...r.waves.flat(), ...r.elites].map((x) => x[0])), CRYPT.boss.id, 'echoshade'])],
+  walls: CG.walls.map((x) => ({ x, w: CG.wallW, gap: CG.door })),
+  palette: { ground: '#4b4766', ground2: '#423e5c', outside: '#12101c', path: '#5a5578', path2: '#524e70' },
+  treeColors: ['#46565f'], flowerColors: ['#9fe0e8'],
+  decor: { trees: 0, rocks: 0, bushes: 0, flowers: 0 },
+  scenery: { kind: 'ruins', noTrail: true },
+  atmosphere: { tint: 'rgba(80,200,220,0.07)', edge: 'rgba(6,4,20,0.65)', fog: { n: 6, color: '160,220,235', alpha: 0.08 }, motes: { n: 30, color: '130,230,240', drift: 3, rise: 10 } },
+  portals: [{ x: CG.exit.x, y: CG.exit.y, to: 'town', tx: 850, ty: 790, label: 'Vila de Lúmen' }],
 };
 
 // Baús dos acampamentos: o centro de cada acampamento com `chest` (tier) vira um baú da zona (ids `<zona>:c<n>`), igual aos demais.

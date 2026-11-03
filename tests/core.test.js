@@ -737,6 +737,7 @@ test('equipamento por classe: todo espaço nasce com classId da classe pedida e 
   const rng = makeRng(11);
   for (const owner of CLASS_IDS) {
     for (const slot of SLOTS) {
+      if (slot === 'offhand' && owner !== 'warrior' && owner !== 'cleric') continue; // escudo só existe para quem o usa
       const it = generateItem(rng, 10, { classId: owner, slot, rarityId: 'rare' });
       assert.equal(it.classId, owner, `${owner}/${slot}`);
       assert.equal(itemClassId(it), owner);
@@ -1114,4 +1115,138 @@ test('PvP: o fator de dano entre heróis (PVP_DAMAGE) fica em 0,28 e só vale he
   const mob = w.add(makeMobActor('wolf', 4, 520, 520)); mob.stats.defense = rival.stats.defense = 0; mob.maxHp = mob.hp = rival.maxHp = rival.hp = 1e6;
   const dHero = w.damage(a, rival, 1, {}), dMob = w.damage(a, mob, 1, {});
   assert.ok(dHero > 0 && dMob > 0 && dHero < dMob * 0.6, `herói→herói (${dHero}) bem menor que herói→mob (${dMob})`);
+});
+
+// ---------------- escudo e bloqueio passivo ----------------
+import { blockChance, inFrontArc, BLOCK } from '../public/src/core/block.js';
+import { SHIELD_BLOCK } from '../public/src/data/items.js';
+
+test('escudo: só Guerreiro e Clérigo equipam; stats def/vida/bloqueio por raridade; Mago/Arqueiro nunca sorteiam escudo', () => {
+  const rng = makeRng(3);
+  for (const cid of Object.keys(CLASSES)) {
+    const c = newCharacter('T', cid, makeRng(1)); c.level = 20;
+    const sh = generateItem(rng, 10, { classId: cid, slot: 'offhand', rarityId: 'epic' });
+    sh.classId = cid;
+    assert.equal(canEquip(c, sh).ok, cid === 'warrior' || cid === 'cleric', cid);
+  }
+  for (const r of Object.keys(SHIELD_BLOCK)) {
+    const sh = generateItem(makeRng(5), 12, { classId: 'warrior', slot: 'offhand', rarityId: r });
+    assert.equal(sh.stats.block, SHIELD_BLOCK[r]); assert.ok(sh.stats.def > 0 && sh.stats.hp > 0);
+    assert.equal(sh.slot, 'offhand'); assert.equal(sh.classId, 'warrior');
+  }
+  assert.ok(SHIELD_BLOCK.common >= 20 && SHIELD_BLOCK.legendary <= 40);
+  for (let i = 0; i < 400; i++) assert.notEqual(generateItem(rng, 10, { classId: i % 2 ? 'mage' : 'archer' }).slot, 'offhand');
+  let seen = 0;
+  for (let i = 0; i < 400; i++) if (generateItem(rng, 10, { classId: 'cleric' }).slot === 'offhand') seen++;
+  assert.ok(seen > 20, 'Clérigo recebe escudos no loot');
+});
+
+test('computeStats: escudo equipado dá bloqueio e defesa; sem escudo, bloqueio 0', () => {
+  const c = newCharacter('T', 'warrior', makeRng(1)); c.level = 10;
+  const base = computeStats(c);
+  assert.equal(base.block, 0);
+  c.equipment.offhand = generateItem(makeRng(4), 10, { classId: 'warrior', slot: 'offhand', rarityId: 'rare' });
+  const st = computeStats(c);
+  assert.equal(st.block, SHIELD_BLOCK.rare); assert.ok(st.def > base.def && st.maxHp > base.maxHp);
+});
+
+test('bloqueio: chance vem do item, +10 parado >= 0,6 s, arco frontal de 140 graus', () => {
+  assert.equal(blockChance({ block: 0 }, 5), 0);
+  assert.equal(blockChance({ block: 30 }, 0), 0.3);
+  assert.equal(blockChance({ block: 30 }, BLOCK.stillT), 0.4);
+  assert.ok(inFrontArc(0, 0, 0, 100, 0));
+  assert.ok(inFrontArc(0, 0, 0, 100, 100)); // 45 graus
+  assert.ok(!inFrontArc(0, 0, 0, 0, 100));  // 90 graus: fora de 70
+  assert.ok(!inFrontArc(0, 0, 0, -100, 0));
+});
+
+function duelo(seed, { shield, front = true, n = 400, ranged = false }) {
+  const w = new World('arena', { seed, visuals: false });
+  const c = newCharacter('T', 'warrior', makeRng(1)); c.level = 10;
+  if (shield) c.equipment.offhand = generateItem(makeRng(4), 10, { classId: 'warrior', slot: 'offhand', rarityId: 'legendary' });
+  const p = w.add(makeHeroActor(c, 500, 500)); p.facing = 0;
+  const m = w.add(makeMobActor('wolf', 10, front ? 530 : 470, 500));
+  let blocked = 0, hits = 0;
+  for (let i = 0; i < n; i++) {
+    p.hp = p.maxHp; p.stunT = 0; m.stunT = 0; p.x = 500; p.y = 500; m.x = front ? 530 : 470; m.y = 500; // o recuo de cada golpe empurra o herói: recoloca
+    const before = w.events.length;
+    w.damage(m, p, 1);
+    for (const e of w.events.slice(before)) { if (e.type === 'hit') hits++; if (e.type === 'block') { blocked++; assert.ok(m.stunT > 0 && m.stunT <= BLOCK.recoilStun + 1e-9); } }
+  }
+  return { blocked, hits };
+}
+
+test('bloqueio no sim: só com escudo e golpe frontal; taxa perto da chance; atordoa o atacante; determinístico', () => {
+  const a = duelo(11, { shield: true });
+  assert.ok(a.blocked > 400 * 0.3 && a.blocked < 400 * 0.5, `taxa ${a.blocked}/400 (lendário 40%)`);
+  assert.deepEqual(duelo(11, { shield: true }), a, 'mesma semente, mesmo resultado');
+  assert.equal(duelo(11, { shield: false }).blocked, 0, 'sem escudo não bloqueia');
+  assert.equal(duelo(11, { shield: true, front: false }).blocked, 0, 'golpe pelas costas não bloqueia');
+});
+
+test('bloqueio reduz o dano em 60% e não vale para dano contínuo', () => {
+  const run = (shield, dot) => {
+    const w = new World('arena', { seed: 2, visuals: false });
+    const c = newCharacter('T', 'warrior', makeRng(1)); c.level = 10;
+    if (shield) { c.equipment.offhand = generateItem(makeRng(4), 10, { classId: 'warrior', slot: 'offhand', rarityId: 'legendary' }); c.equipment.offhand.stats.block = 100; }
+    const p = w.add(makeHeroActor(c, 500, 500)); p.facing = 0; p.stats.block = shield ? 60 : 0;
+    p.stillT = 1; // 60 + 10 = 70% de chance; força passando o rng por muitas tentativas
+    const m = w.add(makeMobActor('wolf', 10, 530, 500)); m.stats.crit = 0;
+    let best = Infinity, worst = 0;
+    for (let i = 0; i < 60; i++) { p.hp = p.maxHp; p.x = 500; p.y = 500; w.damage(m, p, 1, dot ? { dot: true } : {}); const d = p.maxHp - p.hp; best = Math.min(best, d); worst = Math.max(worst, d); }
+    return { best, worst };
+  };
+  const plain = run(false, false), sh = run(true, false), dot = run(true, true);
+  assert.ok(sh.best < plain.best * 0.5, 'algum golpe foi bloqueado (-60%)');
+  assert.ok(dot.best >= plain.best * 0.8, 'dano contínuo ignora o bloqueio');
+});
+
+test('save: equipamento.offhand opcional; escudo em classe sem escudo é removido', () => {
+  const mk = (cid) => {
+    const c = newCharacter('T', cid, makeRng(1));
+    const sh = generateItem(makeRng(4), 5, { classId: 'warrior', slot: 'offhand', rarityId: 'rare' }); sh.classId = cid;
+    c.equipment.offhand = sh;
+    return c;
+  };
+  const w = parseSave(JSON.stringify(mk('warrior')));
+  assert.ok(w.ok && w.char.equipment.offhand?.stats.block > 0);
+  const m = parseSave(JSON.stringify(mk('mage')));
+  assert.ok(m.ok && !m.char.equipment.offhand);
+  const none = parseSave(JSON.stringify(newCharacter('T', 'cleric', makeRng(1))));
+  assert.ok(none.ok && !none.char.equipment.offhand);
+});
+
+test('Soberano dos Ecos: só 2 fases (sem fúria), golpes em área com AVISO maiores na fase 2 e esbirros só nela; criaturas da Cripta fora das ondas da arena', async () => {
+  const { NORMAL_MOBS, MOBS, BOSS_PHASES } = await import('../public/src/data/mobs.js');
+  const { generateEchoItem, rollCryptFrags, rollEchoDrop } = await import('../public/src/core/loot.js');
+  const { CRYPT, ECHO_NAMES } = await import('../public/src/data/crypt.js');
+  assert.ok(['echoshade', 'echoknight', 'echobrute', 'echolord'].every((id) => MOBS[id].crypt && !NORMAL_MOBS.includes(id)), 'as ondas da arena (economy.js) não mudam');
+  const w = new World('arena', { seed: 5, visuals: false });
+  const hero = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 500, 500)); hero.stats.def = 1e7;
+  const b = w.add(makeMobActor('echolord', 28, 620, 500)); b.ai.target = hero.id; b.ai.state = 'chase';
+  const tick = () => { hero.hp = hero.maxHp; w.update(1 / 60); };
+  const slams = () => w.events.filter((e) => e.type === 'telegraph' && e.src === undefined);
+  for (let i = 0; i < 60 * 8; i++) tick();
+  const s1 = w.events.filter((e) => e.type === 'telegraph');
+  assert.ok(s1.length >= 1 && s1.every((e) => e.r === BOSS_PHASES.echolord.slam.r[0] && e.delay >= 1), 'golpe com aviso (delay ≥ 1 s) na fase 1');
+  assert.ok(!w.actors.some((a) => a.summonedBy === b.id), 'sem esbirros na fase 1');
+  w.events.length = 0; b.hp = b.maxHp * 0.45; tick();
+  assert.equal(b.phase, 2); assert.ok(b.stats.atkSpeed > 1 && b.stats.power > b.base.power);
+  b.hp = b.maxHp * 0.05; for (let i = 0; i < 60 * 30; i++) tick();
+  assert.equal(b.phase, 2, 'sem 3ª fase: não há fúria');
+  assert.ok(w.events.filter((e) => e.type === 'telegraph').every((e) => e.r === BOSS_PHASES.echolord.slam.r[1]), 'golpes maiores na fase 2');
+  const mins = w.actors.filter((a) => a.summonedBy === b.id && !a.dead);
+  assert.ok(mins.length > 0 && mins.length <= 4 && mins.every((m) => m.mobId === 'echoshade' && m.summoned));
+  void slams;
+  // item Eco: da classe, épico, nome próprio e sempre acima do épico comum; fragmentos dentro da faixa
+  for (const cid of Object.keys(CLASSES)) for (const slot of ['weapon', 'armor']) {
+    const it = generateEchoItem(makeRng(7), 26, cid, slot), base = generateItem(makeRng(7), 26, { classId: cid, slot, weaponType: slot === 'weapon' ? CLASSES[cid].weapon : undefined, rarityId: 'epic' });
+    assert.ok(it.eco && it.rarity === 'epic' && it.classId === cid && it.slot === slot);
+    assert.equal(it.name, slot === 'weapon' ? ECHO_NAMES.weapon[CLASSES[cid].weapon] : ECHO_NAMES.armor[cid]);
+    assert.ok((it.stats.atk ?? it.stats.def) > (base.stats.atk ?? base.stats.def), 'base ×1,35');
+  }
+  const rng = makeRng(11);
+  for (let i = 0; i < 200; i++) { const f = rollCryptFrags(rng, 'boss'); assert.ok(f >= CRYPT.frags.boss[0] && f <= CRYPT.frags.boss[1]); const r = rollCryptFrags(rng, 'room', 1); assert.ok(r >= CRYPT.frags.room[1][0] && r <= CRYPT.frags.room[1][1]); }
+  let drops = 0; for (let i = 0; i < 2000; i++) if (rollEchoDrop(rng, 26, 'mage')) drops++;
+  assert.ok(drops > 2000 * CRYPT.itemChance * 0.8 && drops < 2000 * CRYPT.itemChance * 1.2, 'chance do item Eco ~' + CRYPT.itemChance + ': ' + drops);
 });

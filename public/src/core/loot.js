@@ -1,5 +1,6 @@
 import { CLASSES } from '../data/classes.js';
-import { SLOTS, RARITIES, RARITY, WEAPON_TYPES, BASE_NAMES, GEAR_NAMES, EPITHETS, AFFIXES, OPAL_NAMES } from '../data/items.js';
+import { CRYPT, ECHO_NAMES, ECHO_ITEM } from '../data/crypt.js';
+import { SLOTS, RARITIES, RARITY, WEAPON_TYPES, BASE_NAMES, GEAR_NAMES, EPITHETS, AFFIXES, OPAL_NAMES, SHIELD_CLASSES, SHIELD_BLOCK } from '../data/items.js';
 
 let counter = 0;
 export const uid = () => Date.now().toString(36) + (counter++).toString(36) + Math.floor(Math.random() * 1e6).toString(36);
@@ -10,7 +11,9 @@ export function rollRarity(rng, luck = 0) {
 }
 
 export function generateItem(rng, level, { classId, rarityId, slot, weaponType, luck = 0 } = {}) {
-  slot = slot ?? rng.pick(SLOTS);
+  // escudo só cai para quem o usa: as demais classes sorteiam entre os 6 espaços de sempre (mesma sequência de antes)
+  slot = slot ?? rng.pick(SHIELD_CLASSES.includes(classId) ? SLOTS : SLOTS.slice(0, 6));
+  if (slot === 'offhand' && !SHIELD_CLASSES.includes(classId)) classId = SHIELD_CLASSES[0];
   // Tudo é da classe: o item nasce com `classId` (arma: a do tipo de arma; sem classe informada, sorteia uma).
   if (slot === 'weapon' && weaponType && WEAPON_TYPES[weaponType]) classId = WEAPON_TYPES[weaponType].classId;
   if (!CLASSES[classId]) classId = rng.pick(Object.keys(CLASSES));
@@ -25,13 +28,22 @@ export function generateItem(rng, level, { classId, rarityId, slot, weaponType, 
   } else if (slot === 'armor') {
     stats.def = Math.round((3 + level * 1.6) * rarity.mul * roll());
     stats.hp = Math.round((10 + level * 5) * rarity.mul * roll());
+  } else if (slot === 'offhand') {
+    stats.def = Math.round((0.5 + level * 0.15) * rarity.mul * roll());
+    stats.hp = Math.round((1 + level * 0.25) * rarity.mul * roll());
+    stats.block = SHIELD_BLOCK[rarity.id];
+  } else if (slot === 'offhand') {
+    stats.def = Math.round((0.5 + level * 0.15) * rarity.mul * roll());
+    stats.hp = Math.round((1 + level * 0.25) * rarity.mul * roll());
+    stats.block = SHIELD_BLOCK[rarity.id];
   } else if (slot === 'helm' || slot === 'boots') {
     stats.def = Math.round((2 + level * 0.9) * rarity.mul * roll());
   }
 
   // Joias sempre ganham um afixo extra (não têm atributo base).
-  const nAffixes = rarity.affixes + (slot === 'ring' || slot === 'amulet' ? 1 : 0);
-  const pool = AFFIXES.filter((a) => !(a.stat in stats) || a.stat === 'hp' || a.stat === 'def');
+  const nAffixes = slot === 'offhand' ? 0 : rarity.affixes + (slot === 'ring' || slot === 'amulet' ? 1 : 0); // escudo: sem afixos (defesa, vida e bloqueio já são o item; medido em npm run balance)
+  // escudo: afixos só defensivos (vida/defesa); ataque e atributo principal ficam com as outras peças (não vira 7º espaço de poder)
+  const pool = AFFIXES.filter((a) => (!(a.stat in stats) || a.stat === 'hp' || a.stat === 'def') && (slot !== 'offhand' || a.stat === 'hp' || a.stat === 'def'));
   for (let i = 0; i < nAffixes && pool.length; i++) {
     const idx = Math.floor(rng.next() * pool.length);
     // anel/amuleto: o primeiro afixo é sempre o atributo principal da classe (stats focados na classe)
@@ -121,4 +133,29 @@ export function rollMobLoot(rng, mob, playerClassId, pity = null, rewardMul = 1)
   if (rng.chance(mob.boss ? 0.25 : mob.elite ? 0.05 : 0.012)) out.push({ kind: 'essence', luck: mob.boss ? 1.5 : 0.3 });
   if (rng.chance(mob.boss ? 1 : 0.04)) out.push({ kind: 'potion', amount: mob.boss ? 3 : 1 });
   return out;
+}
+
+// ---------- Cripta dos Ecos (masmorra, decisão 0017) ----------
+// Item Eco: arma ou armadura da classe, épico com atributos base ×ECHO_ITEM.statMul e bônus fixos. Só nasce no servidor (drop do chefe ou forja do Ferreiro).
+export function generateEchoItem(rng, level, classId, slot = 'weapon') {
+  const weapon = slot === 'weapon';
+  const cls = CLASSES[classId] ?? CLASSES.warrior;
+  const it = generateItem(rng, level, weapon ? { slot: 'weapon', weaponType: cls.weapon, rarityId: 'epic' } : { slot: 'armor', classId: cls.id ?? classId, rarityId: 'epic' });
+  for (const k of Object.keys(it.stats)) it.stats[k] = Math.round(it.stats[k] * ECHO_ITEM.statMul);
+  for (const [k, v] of Object.entries(ECHO_ITEM[weapon ? 'weapon' : 'armor'])) it.stats[k] = (it.stats[k] ?? 0) + v;
+  if (!weapon) it.stats.vit = (it.stats.vit ?? 0) + Math.round(level * ECHO_ITEM.vitPerLevel);
+  it.name = weapon ? ECHO_NAMES.weapon[it.weaponType] : ECHO_NAMES.armor[it.classId];
+  it.eco = true;
+  it.value = Math.round(it.value * 2);
+  return it;
+}
+// Fragmentos de uma sala limpa (kind 'room', índice da sala) ou do chefe (kind 'boss'); sorteio individual do herói.
+export function rollCryptFrags(rng, kind, room = 0) {
+  const [a, b] = kind === 'boss' ? CRYPT.frags.boss : CRYPT.frags.room[Math.max(0, Math.min(CRYPT.frags.room.length - 1, room))];
+  return rng.int(a, b);
+}
+// Item Eco direto do chefe (chance por herói); null se não saiu.
+export function rollEchoDrop(rng, level, classId) {
+  if (!rng.chance(CRYPT.itemChance)) return null;
+  return generateEchoItem(rng, level, classId, rng.chance(CRYPT.itemWeaponShare) ? 'weapon' : 'armor');
 }

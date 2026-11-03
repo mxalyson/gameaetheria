@@ -5,7 +5,8 @@ import { newCharacter, POINTS_PER_LEVEL } from '../public/src/core/progression.j
 import { generateItem } from '../public/src/core/loot.js';
 import { playerPower } from '../public/src/core/power.js';
 import { CLASSES } from '../public/src/data/classes.js';
-import { SLOTS } from '../public/src/data/items.js';
+// NOSHIELD=1: duela sem escudo (referência para medir o efeito do escudo)
+import { SLOTS, SHIELD_CLASSES } from '../public/src/data/items.js';
 import { World, makeHeroActor } from '../public/src/game/sim.js';
 import { specsOf, SPEC_LEVEL } from '../public/src/core/specs.js';
 
@@ -23,7 +24,7 @@ function build(classId, level, seed) {
   if (level >= SPEC_LEVEL) { const ids = Object.keys(specsOf(classId)); c.spec = SPEC_IDX >= 0 ? ids[SPEC_IDX] : ids[seed % ids.length]; }
   const cls = CLASSES[classId], pts = POINTS_PER_LEVEL * (level - 1);
   c.alloc[cls.primary] += Math.round(pts * 0.6); c.alloc.vit += Math.round(pts * 0.3); c.alloc.agi += pts - Math.round(pts * 0.6) - Math.round(pts * 0.3);
-  for (const slot of SLOTS) c.equipment[slot] = generateItem(rng, level, { classId, slot, weaponType: slot === 'weapon' ? cls.weapon : undefined, rarityId: 'uncommon' });
+  for (const slot of SLOTS) if ((slot !== 'offhand' || (SHIELD_CLASSES.includes(classId) && !process.env.NOSHIELD))) c.equipment[slot] = generateItem(rng, level, { classId, slot, weaponType: slot === 'weapon' ? cls.weapon : undefined, rarityId: 'uncommon' });
   return c;
 }
 

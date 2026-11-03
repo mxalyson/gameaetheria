@@ -42,7 +42,9 @@ test('mapa na instância online: só a Vila viaja (zone_leave); outros pedem vol
 test('panel_map desenha os todos os nós da rota e nenhum botão de casa/lista antiga', () => {
   const ui = mk();
   const html = ui.panel_map();
-  assert.equal((html.match(/class="mp-node/g) ?? []).length, WORLD_ROUTE.length);
+  assert.equal((html.match(/class="mp-node/g) ?? []).length, WORLD_ROUTE.length + 1, 'rota + o nó da masmorra'); // Cripta dos Ecos: nó extra, fora da rota de viagem
+  assert.match(html, /mp-node dungeon[^>]*data-arg="crypt"/);
+  assert.ok(!WORLD_ROUTE.includes('crypt'), 'a masmorra não é parada de viagem');
   assert.doesNotMatch(html, /portal ⟵|map-link/);
   assert.match(html, /mp-node here/);
 });
@@ -51,4 +53,31 @@ test('mochila: ouro no rodapé como valor, fora do HUD', () => {
   const ui = mk();
   const html = ui.panel_inventory();
   assert.match(html, /inv-gold[^>]*>.*<b>1234<\/b>/s);
+});
+
+test('mapa: Cripta dos Ecos trava por nível/Ruínas/servidor, mostra a espera e libera o botão de entrada (chave gasta só com espera)', () => {
+  const ui = mk({ txOnline: true });
+  const c = ui.game.char;
+  Object.assign(c, { level: 10, echo: { frags: 7, keys: 1, entry: 0 } });
+  assert.match(ui.mapCard('crypt', 'town'), /Nível 20 para entrar/);
+  c.level = 25; assert.match(ui.mapCard('crypt', 'town'), /Ruínas Sombrias a pé/);
+  c.visited.ruins = true;
+  assert.match(ui.mapCard('crypt', 'town'), /data-action="crypt-enter"[^>]*>Entrar na Cripta dos Ecos — grátis/);
+  assert.match(ui.mapCard('crypt', 'town'), /7 fragmentos · 1 Chave/);
+  c.echo.entry = Date.now() - 60_000; // entrou há 1 min: espera, mas há Chave
+  assert.match(ui.mapCard('crypt', 'town'), /gasta 1 Chave de Eco/);
+  c.echo.keys = 0; assert.match(ui.mapCard('crypt', 'town'), /disabled[\s\S]*Chave de Eco/);
+  ui.game.txOnline = false; assert.match(ui.mapCard('crypt', 'town'), /servidor de partidas/);
+  ui.game.txOnline = true; ui.game.inNetZone = () => true; assert.match(ui.mapCard('crypt', 'town'), /volte à Vila/);
+});
+
+test('Ferreiro: Forja do Eco lista as duas receitas, bloqueia sem fragmentos e marca o que já foi forjado', () => {
+  const ui = mk();
+  const c = ui.game.char; Object.assign(c, { level: 25, classId: 'archer', gold: 5000, echo: { frags: 45, keys: 0, entry: 0 } });
+  let h = ui.echoForge();
+  assert.match(h, /Arco do Eco/); assert.match(h, /Gibão do Eco/); assert.match(h, /45 fragmentos/);
+  assert.match(h, /data-arg="eco_weapon"[^>]*>/); assert.doesNotMatch(h.match(/data-arg="eco_weapon"[^>]*>/)[0], /disabled/);
+  assert.match(h.match(/data-arg="eco_armor"[^>]*>/)[0], /disabled/, '60 fragmentos: faltam');
+  c.equipment.weapon = { eco: true, slot: 'weapon' };
+  assert.match(ui.echoForge(), /Já forjado/);
 });

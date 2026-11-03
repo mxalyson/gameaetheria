@@ -2,6 +2,9 @@
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
 import { safeBoxScreen, stackLabels } from './safe-box.js';
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
+import { drawAuraBack, drawAuraMotes } from './aura.js';
+
+let auraQ = 2; // qualidade para a aura de evolução (0 só halo, 1 meio, 2 cheio); atualizada em setQuality
 import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
 import { drawChestSprite } from './prop-sprites.js';
@@ -79,6 +82,7 @@ export class Renderer {
   // Qualidade gráfica: limita a resolução e corta efeitos de atmosfera mais caros (para celulares).
   setQuality(level) {
     this.quality = { low: 0, medium: 1, high: 2 }[level] ?? 2;
+    auraQ = this.quality;
     this.dprCap = [1, 2, 3][this.quality]; // alta usa a densidade real da tela (iPhone = 3×); antes o teto de 2 deixava o celular borrado
     this.resize();
   }
@@ -492,8 +496,11 @@ function drawActorHero(g, a, t) {
   if (a.dead) { g.globalAlpha = Math.max(0.25, 1 - a.deadT); }
   if (a.dash?.invuln) g.globalAlpha = 0.55;
   // visual novo (opcional, ?visual=miniatura): sprite do herói em miniatura; se ainda não carregou, cai no desenho antigo
+  const feetY = a.y + 12;
+  if (a.spec) drawAuraBack(g, a, t, auraQ, feetY); // aura de evolução (luz procedural atrás do herói)
   const r = heroSpritesEnabled() ? drawHeroSprite(g, a, t) : false;
   if (r === false) drawHero(g, a, a.classId, t, cls.color, cls.accent); // 'wait' = carregando: não desenha (a tela de carregamento cobre)
+  if (a.spec) drawAuraMotes(g, a, t, auraQ, feetY);
   g.restore();
   drawStatus(g, a, t);
 }

@@ -26,7 +26,7 @@ export function spawnEventVfx(world, ev) {
   const a = ev.type === 'heal' ? ev.actor : ev.target;
   if (!a || !world) return null;
   let kind = null;
-  if (ev.type === 'hit') kind = ev.absorbed ? 'absorb' : ev.crit ? 'crit' : null;
+  if (ev.type === 'hit') kind = ev.absorbed || ev.blocked ? 'absorb' : ev.crit ? 'crit' : null;
   else if (ev.type === 'heal' && ev.amount >= (a.maxHp ?? 100) * 0.04) {
     const last = healAt.get(a);
     if (last === undefined || world.time - last >= 0.5) { healAt.set(a, world.time); kind = 'heal'; }

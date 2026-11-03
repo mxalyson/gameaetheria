@@ -12,6 +12,7 @@ export const DIALOGS = {
     { text: 'Ah, a arena! Ela guarda os ecos de todos que lutaram aqui. Suba ao palco e prove seu valor!' },
   ], service: { label: 'Entrar na arena', panel: 'arena' } },
   sage: { greet: [
+    { when: { done: 'cripta_dos_ecos' }, text: 'Você calou o Soberano, mas os ecos de lá não se apagam. Os fragmentos que trouxe rendem aço no Ferreiro. A Cripta recupera o fôlego em vinte minutos.' },
     { when: { done: 'ecos_unidos' }, text: 'Os ecos repousam, mas eu ainda os ouço, bem baixinho. Escolha bem quem caminha ao seu lado.' },
     { when: { done: 'anciao_gelido' }, text: 'O frio não era dele. Era do que veio antes. Os spirits ainda estremecem quando falo disso.' },
     { when: { bossKills: 1 }, text: 'Ouço o Carvalho em você, quase um sussurro. Spirits são ecos da natureza: escolha bem quem caminha ao seu lado.' },

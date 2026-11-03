@@ -2,7 +2,7 @@ import { CLASSES, STAT_KEYS, STAT_NAMES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
 import { isSkillUnlocked, skillUnlockLevel } from '../core/unlocks.js';
 import { skillOf, specsOf, specInfo, activeSpec, respecCost, SPEC_LEVEL } from '../core/specs.js';
-import { SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
+import { SHIELD_CLASSES, SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
 import { computeStats, canEquip, itemScore, itemClassId, itemClassName } from '../core/stats.js';
 import { BANK_SIZE, ensureBank } from '../core/bank.js';
@@ -19,7 +19,9 @@ import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
 import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { DIALOGS, TIPS } from '../data/dialogs.js';
-import { ZONES, WORLD_ROUTE, teleportCost } from '../data/zones.js';
+import { ZONES, WORLD_ROUTE, WORLD_NODES, teleportCost } from '../data/zones.js';
+import { CRYPT, ECHO_RECIPES, ECHO_NAMES } from '../data/crypt.js';
+import { cryptEntryCheck, ownsEcho } from '../core/echo.js';
 import { offeredBy, readyFor, activeFor, serviceFor, questGiverId, spiritEvoStatus, dailyBoard, dailyState, dailyProgressOf, dailyComplete, dayUTC, titleText, achievementProgress, ensureJournal, greetFor, LORE_ZONES, loreSeen, loreCount, tipSeen } from '../core/journal.js';
 import { SCALE_MIN, SCALE_MAX, resolveScale } from '../prefs.js';
 import { asset } from '../assets-version.js';
@@ -50,7 +52,9 @@ const itemImg = (type, emoji) => `<img class="it-img" src="${asset(`assets/icons
 import { spiritUrl } from '../render/spirit-sprites.js';
 const SCROLL = `<img class="coin" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false">`;
 // ícones de zona pintados (recortes dos sprites 3D: tools/ui-icon-from-atlas.py); com o arquivo ausente, vale o emoji
-const ZONE_EMOJI = { town: '🏠', harbor: '⚓', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
+const ZONE_EMOJI = { crypt: '🕯️', town: '🏠', harbor: '⚓', forest: '🌲', plains: '💎', ruins: '🏚️', glacier: '❄️', ember: '🔥' };
+// Faixa de estado da Cripta dos Ecos (tupla `cr` do servidor: server/crypt.js hudTuple; fases em PH).
+export const cryptHudText = (c) => ['Sala ' + c.room + ' de 4 · prepare-se', `Sala ${c.room} · onda ${c.wave}/${c.waves} · restam ${c.left}`, `Sala ${c.room} · próxima onda…`, `Sala ${c.room} limpa · siga pela porta`, `Soberano dos Ecos · restam ${c.left}`, `Cripta vencida · saída em ${c.exit}s`][c.phase] ?? '';
 const ZONE_ART = new Set(['town', 'forest', 'plains', 'ruins', 'glacier', 'ember', 'harbor']); // ember/harbor = recortes tingidos (tools/ui-tint.py)
 const zoneIcon = (id) => (ZONE_ART.has(id) ? `<img class="zone-ic" src="${asset(`assets/icons/ui/zone-${id}.webp`)}" alt="${ZONE_EMOJI[id]}" draggable="false" onerror="this.replaceWith(this.alt)">` : ZONE_EMOJI[id] ?? '🗺️');
 const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${asset(spiritUrl(type, stage))}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
@@ -89,8 +93,10 @@ const ESSENCE = sign('assets/icons/item/res-essence.webp', '🔮', 'ic-img');
 const itemPrice = (it) => it.price ?? it.value * PRICES.itemMarkup;
 // Selo dourado de aprimoramento no canto da célula: +1…+5 dourado, +6/+7 laranja, +8 (máximo) "MAX" vermelho
 export const plusBadge = (it) => (it?.plus ? `<span class="plus-b ${it.plus >= MAX_PLUS ? 'max' : it.plus >= 6 ? 'hi' : ''}" title="Aprimorado +${it.plus} de ${MAX_PLUS}">${it.plus >= MAX_PLUS ? 'MAX' : '+' + it.plus}</span>` : '');
-export const itemIcon = (it) => (it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
-const ghostIcon = (s, cls) => (s === 'weapon' ? itemImg(cls.weapon, WEAPON_TYPES[cls.weapon].icon) : itemImg(s, SLOT_ICONS[s]));
+// Escudo: arte pintada shield-<raridade>.webp (do dono; ver docs/roadmap/depende-do-dono.md); sem o arquivo, cai para o ícone de armadura com um selo de escudo (sem arte nova por código).
+const shieldImg = (rarity) => `<img class="it-img" src="${asset(`assets/icons/item/shield-${rarity}.webp`)}" alt="" draggable="false" onerror="this.outerHTML='<span class=&quot;shield-fb&quot;><img class=&quot;it-img&quot; src=&quot;${asset('assets/icons/item/item-armor.webp')}&quot; alt=&quot;&quot;><i>🛡️</i></span>'">`;
+export const itemIcon = (it) => (it.slot === 'offhand' ? shieldImg(it.rarity) : it.slot === 'weapon' ? itemImg(it.weaponType, WEAPON_TYPES[it.weaponType].icon) : itemImg(it.slot, SLOT_ICONS[it.slot]));
+const ghostIcon = (s, cls) => (s === 'offhand' ? shieldImg('common') : s === 'weapon' ? itemImg(cls.weapon, WEAPON_TYPES[cls.weapon].icon) : itemImg(s, SLOT_ICONS[s]));
 const fmtStat = (k, v) => (PERCENT_STATS.has(k) ? `+${v}% ${STAT_LABELS[k]}` : `+${v} ${STAT_LABELS[k]}`);
 
 export class UI {
@@ -295,9 +301,10 @@ export class UI {
     const { char, player, world } = game;
     if (!player) return;
     // ritual do chefe final ("Ritual 23/40"): só nas zonas em que o chefe aparece por contador. Na instância online o ritual é do servidor: vem em `rt` nos snapshots (game.netRitual).
+    const cr = game.mode === 'net' && game.netInfo?.zone === 'crypt' ? game.netCrypt : null;
     const rp = game.mode === 'explore' ? world.bossProgress : game.mode === 'net' && game.netInfo?.mode === 'zone' ? game.netRitual ?? null : null, rit = $('ritual');
     if (rit) {
-      const txt = !rp || rp.alive ? '' : rp.omen ? 'O chão estremece…' : rp.cool > 0 ? `Ritual em repouso · ${Math.ceil(rp.cool / 60)} min` : `Ritual ${rp.have}/${rp.need}`;
+      const txt = cr ? cryptHudText(cr) : !rp || rp.alive ? '' : rp.omen ? 'O chão estremece…' : rp.cool > 0 ? `Ritual em repouso · ${Math.ceil(rp.cool / 60)} min` : `Ritual ${rp.have}/${rp.need}`;
       if (rit.dataset.t !== txt) { rit.dataset.t = txt; rit.textContent = txt; rit.classList.toggle('hidden', !txt); }
     }
     this.set('hud-name', 'text', char.name + (titleText(char) ? ' · ' + titleText(char) : ''));
@@ -496,7 +503,7 @@ export class UI {
     const cls = CLASSES[char.classId];
     const st = computeStats(char);
     const tier = tierFor(char.arena.rating);
-    const equip = SLOTS.map((s) => `
+    const equip = SLOTS.filter((s) => s !== 'offhand' || SHIELD_CLASSES.includes(char.classId)).map((s) => `
       <div class="eq-slot"><label>${SLOT_NAMES[s]}</label>
         ${char.equipment[s] ? this.itemCell(char.equipment[s], 'unequip', s) : `<div class="cell empty ghost">${ghostIcon(s, cls)}</div>`}
       </div>`).join('');
@@ -506,6 +513,7 @@ export class UI {
     const d = [
       ['Vida', st.maxHp], ['Poder', st.power], ['Defesa', st.def], ['Crítico', st.crit.toFixed(1) + '%'],
       ['Vel. de Ataque', Math.round(st.atkSpeed * 100) + '%'], ['Vel. de Movimento', Math.round(st.moveSpeed)], ['Roubo de Vida', Math.round(st.lifesteal * 100) + '%'],
+      ...(st.block ? [['Bloqueio (frente)', st.block + '%']] : []),
     ].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('');
     return this.frame('character', 'Personagem', `<div class="cols"><div class="col">
       <div class="char-head" style="--cc:${cls.color}">
@@ -588,6 +596,19 @@ export class UI {
       <button class="btn small" data-action="sell-bulk" data-arg="1">Comuns + Incomuns</button></div>`);
   }
 
+  // Forja do Eco (Ferreiro Brok): 1 arma e 1 armadura Eco por personagem, gastando Fragmentos de Eco (só a Cripta dos Ecos rende) + ouro. O servidor valida (tx `craft`).
+  echoForge() {
+    const { char } = this.game, frags = char.echo?.frags ?? 0;
+    const rows = Object.values(ECHO_RECIPES).map((R) => {
+      const name = R.slot === 'weapon' ? ECHO_NAMES.weapon[CLASSES[char.classId].weapon] : ECHO_NAMES.armor[char.classId], own = ownsEcho(char, R.slot);
+      const can = !own && char.level >= CRYPT.minLevel && frags >= R.frags && char.gold >= R.gold;
+      return `<div class="shop-item"><div class="cell r-epic"><span class="ic">${R.slot === 'weapon' ? '⚔️' : '🛡️'}</span></div>
+        <div><div class="nm" style="color:${RARITY.epic.color}">${esc(name)}</div><div class="sub">${R.slot === 'weapon' ? 'Arma' : 'Armadura'} da sua classe · ${R.frags} Fragmentos de Eco + ${R.gold} ouro</div></div>
+        ${own ? '<span class="tag">Já forjado</span>' : `<button class="btn small" data-action="craft-echo" data-arg="${R.id}" ${can ? '' : 'disabled'}>${COIN} ${R.gold}</button>`}</div>`;
+    }).join('');
+    return `<h3 id="echo-section">Forja do Eco <span class="pts">${frags} fragmentos</span></h3>${rows}<p class="hint">Fragmentos de Eco só caem na Cripta dos Ecos (abra o mapa). Nível ${CRYPT.minLevel}+.</p>`;
+  }
+
   // Ferreiro: aprimora os equipamentos vestidos (+1 a +${MAX_PLUS}); é o grande ralo de ouro de fim de jogo
   smithSection() {
     const { char } = this.game;
@@ -597,7 +618,7 @@ export class UI {
         <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${it.plus ?? 0} de ${MAX_PLUS} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
         ${max ? `<span class="tag">Máx +${MAX_PLUS}</span>` : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
     }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
-    return `<h3 id="smith-section">${this.shopAnchor === 'smith' ? 'Aprimorar equipado' : 'Ferreiro Brok · aprimorar equipado'} <span class="pts">máx +${MAX_PLUS}</span></h3>${rows}`;
+    return `${this.echoForge()}<h3 id="smith-section">${this.shopAnchor === 'smith' ? 'Aprimorar equipado' : 'Ferreiro Brok · aprimorar equipado'} <span class="pts">máx +${MAX_PLUS}</span></h3>${rows}`;
   }
 
   panel_arena() {
@@ -701,7 +722,22 @@ export class UI {
   }
 
   // ---- mapa-múndi: mini-mundo com os 6 mapas como nós ligados por caminhos; tocar num nó abre o cartão de viagem ----
+  // Cartão da Cripta dos Ecos (masmorra): entrada pelo mapa; o servidor repete todas as conferências (hub.js cryptEnter).
+  cryptCard() {
+    const g = this.game, c = g.char, z = ZONES.crypt, e = c.echo ?? { frags: 0, keys: 0 }, chk = cryptEntryCheck(c), net = g.inNetZone?.();
+    const info = `Nv ${CRYPT.recommended[0]}–${CRYPT.recommended[1]} · 4 salas e chefe · até ${CRYPT.maxPlayers} heróis · ${e.frags} fragmentos · ${e.keys} Chave(s) de Eco`;
+    let act;
+    if (!g.txOnline) act = `<span class="tag dim">${LOCK} Só abre com o servidor de partidas conectado.</span>`;
+    else if (net) act = `<span class="tag dim">${LOCK} Na exploração online, volte à Vila antes de entrar.</span>`;
+    else if (g.mode !== 'explore') act = `<span class="tag dim">${LOCK} Indisponível agora.</span>`;
+    else if (chk.code === 'crypt_level' || chk.code === 'crypt_locked') act = `<span class="tag dim">${LOCK} ${esc(chk.reason)}</span>`;
+    else if (!chk.ok) act = `<button class="btn" disabled>Entrar na Cripta</button><span class="tag dim">${esc(chk.reason)}</span>`;
+    else act = `<button class="btn primary" data-action="crypt-enter">Entrar na ${esc(z.name)}${chk.via === 'key' ? ' — gasta 1 Chave de Eco' : ' — grátis'}</button>`;
+    return `<div class="mp-card"><span class="mp-card-ic">${zoneIcon('crypt')}</span><div class="mp-card-tx"><div class="nm">${esc(z.name)}</div><div class="sub">${info}</div></div><div class="mp-card-act">${act}</div></div>`;
+  }
+
   mapCard(id, here) {
+    if (id === 'crypt') return this.cryptCard();
     const g = this.game, c = g.char, z = ZONES[id], vis = c.visited ?? {}, i = WORLD_ROUTE.indexOf(id);
     const seen = id === 'town' || !!vis[id], cost = teleportCost(id), scrolls = c.scrolls ?? 0, net = g.inNetZone?.();
     const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura';
@@ -729,9 +765,14 @@ export class UI {
         ${id === here ? `<span class="mp-pin">${HERE}</span>` : ''}<span class="mp-ic">${zoneIcon(id)}${ok ? '' : `<span class="mp-lock">${LOCK}</span>`}</span>
         <span class="mp-nm">${esc(z.name)}</span><span class="mp-lv">${lv}</span></button>`;
     }).join('');
-    return this.frame('map', 'Mapa de Aetheria', `<div class="mp-world"><svg class="mp-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${nodes}</div>
+    // masmorra: nó extra ligado às Ruínas por um caminho tracejado (não é parada de viagem; trava até o nível e as Ruínas visitadas)
+    const cn = WORLD_NODES.crypt, rp = pos('ruins'), cok = g.char.level >= CRYPT.minLevel && !!vis[CRYPT.needVisited];
+    const dline = `<line x1="${rp[0]}" y1="${rp[1]}" x2="${cn.x}" y2="${cn.y}" class="dungeon${cok ? ' lit' : ''}"/>`;
+    const cnode = `<button class="mp-node dungeon${sel === 'crypt' ? ' sel' : ''}${cok ? '' : ' locked'}" style="left:${cn.x}%;top:${cn.y}%" data-action="map-sel" data-arg="crypt" aria-label="${esc(ZONES.crypt.name)}">
+      <span class="mp-ic">${zoneIcon('crypt')}${cok ? '' : `<span class="mp-lock">${LOCK}</span>`}</span><span class="mp-nm">${esc(ZONES.crypt.name)}</span><span class="mp-lv">Masmorra · Nv ${CRYPT.recommended[0]}+</span></button>`;
+    return this.frame('map', 'Mapa de Aetheria', `<div class="mp-world"><svg class="mp-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}${dline}</svg>${nodes}${cnode}</div>
       ${this.mapCard(sel, here)}
-      <p class="hint mp-hint">Toque num mapa visitado para viajar. Ir para a Vila é grátis; os outros gastam 1 Pergaminho (Mercadora Lia).</p>`);
+      <p class="hint mp-hint">Toque num mapa visitado para viajar. Ir para a Vila é grátis; os outros gastam 1 Pergaminho (Mercadora Lia). A Cripta dos Ecos (masmorra) abre pelo nó dela, sem pergaminho.</p>`);
   }
 
   // ---- Porto de Marfim: banco (40 vagas) e quadro de contratos diários ----

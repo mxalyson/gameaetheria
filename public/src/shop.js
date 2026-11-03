@@ -1,7 +1,10 @@
 import { generateItem, rollRarity } from './core/loot.js';
 import { makeRng, hashString } from './core/rng.js';
 import { CLASSES } from './data/classes.js';
-import { SLOTS } from './data/items.js';
+import { SLOTS, SHIELD_CLASSES } from './data/items.js';
+
+// Espaços sortáveis na loja (sem arma): o escudo só aparece para quem o equipa.
+const gearSlots = (classId) => (SHIELD_CLASSES.includes(classId) ? SLOTS.slice(1) : SLOTS.slice(1, 6));
 
 export const SCROLL_MAX = 99; // igual ao teto de `scrolls` em core/savedoc.js (B25)
 
@@ -29,7 +32,7 @@ export function buildShopStock(char, opts = {}) {
   const rar = () => { const r = rollRarity(rng, 0.8); return r === 'common' ? 'uncommon' : r === 'epic' || r === 'legendary' ? 'rare' : r; };
   const stock = [
     generateItem(rng, char.level, { slot: 'weapon', weaponType: cls.weapon, rarityId: rar() }),
-    ...[0, 1, 2].map(() => generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(SLOTS.slice(1)), rarityId: rar() })),
+    ...[0, 1, 2].map(() => generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(gearSlots(char.classId)), rarityId: rar() })),
   ];
   const feat = generateItem(rng, char.level, { classId: char.classId, rarityId: 'epic' });
   feat.baseValue = feat.value;
@@ -53,9 +56,9 @@ export function buildHarborStock(char, { day = Math.floor(Date.now() / 86400000)
   const rar = () => { const r = rollRarity(rng, 1.3); return r === 'common' ? 'uncommon' : r === 'legendary' ? 'epic' : r; }; // incomum → épico
   const stock = [
     generateItem(rng, char.level, { slot: 'weapon', weaponType: cls.weapon, rarityId: rar() }),
-    ...[0, 1, 2].map(() => generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(SLOTS.slice(1)), rarityId: rar() })),
+    ...[0, 1, 2].map(() => generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(gearSlots(char.classId)), rarityId: rar() })),
     generateItem(rng, char.level, { classId: char.classId, slot: 'weapon', weaponType: cls.weapon, rarityId: 'epic' }),
-    generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(SLOTS.slice(1)), rarityId: 'epic' }),
+    generateItem(rng, char.level, { classId: char.classId, slot: rng.pick(gearSlots(char.classId)), rarityId: 'epic' }),
   ];
   stock.forEach((it, i) => {
     it.id = `hb-${tag}-${i}`;

@@ -4,12 +4,23 @@
 // Só desenho: lê o estado do ator (parado/andando/golpe/skill/dano/morte/dash) e não altera a simulação.
 import { deathPose } from './hero-death.js';
 import { loadPrefs, resolveQuality } from '../prefs.js';
+import { auraTier, auraSpec } from '../core/aura.js';
 
 const KEY = 'aetheria_visual';
 const CLASS_TO_HERO = { warrior: 'paladino', mage: 'aprendiz', archer: 'franco', cleric: 'sacerdote' };
 const BASE = new URL('../../labs/iso-poc/art-local/atlas-rig/', import.meta.url).href;
 export const SIZE = 0.9;             // escala do quadro (128 lógico): ≈ 80 px de altura no jogo (o herói antigo tinha ~48)
 const FEET_Y = 12;                    // os pés do herói antigo ficam em a.y + 12
+// GANCHO do "design completo" (arte nova do dono, ainda NÃO existe): devolve o visual de evolução de um personagem ou ator.
+// tier 0 = comum, 1 = especialização (nv 15, aura), 2 = Maestria (nv 25, aura refinada). `atlasVariant` é o id do atlas de variante
+// (ex.: 'paladino-bastion-t2') QUANDO o dono fornecer a arte; hoje é sempre undefined e o herói usa o atlas da classe + aura (render/aura.js).
+// Para ligar: registrar o atlas em VARIANT_ATLASES e fazer drawHeroSprite carregar `atlasVariant` no lugar de CLASS_TO_HERO[classId]. Ver docs/art-direction/aura-evolucao.md.
+const VARIANT_ATLASES = {}; // chave `${classId}:${spec}:${tier}` -> id do atlas (vazio de propósito: não inventar arte)
+export function heroLook(o) {
+  const tier = auraTier(o), spec = tier ? auraSpec(o) : null;
+  return { tier, spec, atlasVariant: VARIANT_ATLASES[`${o?.classId}:${spec}:${tier}`] };
+}
+
 export const stats = { drawn: 0, loaded: 0, texBytes: 0, texScale: 1 };
 
 // Escala das texturas (memória de GPU): cada herói tem ≈ 20–24 MiB decodificados em resolução cheia (4 classes ≈ 87 MiB).

@@ -21,7 +21,7 @@ test('dados: toda missão é coerente (giver/after/objetivos/recompensa) e o enc
   const npcs = new Set(Object.values(ZONES).flatMap((z) => (z.npcs ?? []).map((n) => n.id)));
   for (const q of Object.values(QUESTS)) {
     assert.ok(npcs.has(q.giver) || (q.giver === 'master' && ['warrior', 'mage', 'archer', 'cleric'].every((c) => npcs.has('master_' + c))), `${q.id}: NPC ${q.giver} não existe`);
-    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage', 'miniboss', 'skillUse', 'spiritKill', 'bank', 'daily', 'friendlyDuel'].includes(o.type)));
+    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage', 'miniboss', 'skillUse', 'spiritKill', 'bank', 'daily', 'friendlyDuel', 'crypt'].includes(o.type)));
     assert.ok(q.text.offer && q.text.progress && q.text.done);
     // coerência de nível ↔ zona: ninguém pede para caçar numa zona muito acima do nível da missão
     for (const o of q.objectives) if (o.zone && o.zone !== 'any') assert.ok(q.level >= ZONES[o.zone].level[0] - 2, `${q.id}: nível ${q.level} baixo demais para ${o.zone}`);
@@ -437,4 +437,46 @@ test('saves antigos: quem já visitou as Ruínas também visitou o Porto', () =>
   assert.equal(validate(JSON.parse(JSON.stringify(d))).char.visited.harbor, 1);
   const n = ensureJournal(hero(15)); n.visited = { town: 1, forest: 1 };
   assert.ok(!validate(JSON.parse(JSON.stringify(n))).char.visited.harbor);
+});
+
+test('Cripta dos Ecos: missão da Yun, evento só do servidor, conquistas, Chave de Eco por contrato e entrada', async () => {
+  const { QUESTS: Q } = await import('../public/src/data/quests.js');
+  const { cryptEntryCheck, applyCryptEntry, grantEchoKey } = await import('../public/src/core/echo.js');
+  const { ACH: A } = await import('../public/src/data/achievements.js');
+  const { CRYPT } = await import('../public/src/data/crypt.js');
+  const q = Q.cripta_dos_ecos;
+  assert.equal(q.giver, 'sage'); assert.ok(q.level >= CRYPT.minLevel);
+  for (const t of Object.values(q.text)) { assert.ok(t.length <= 220, 'texto curto: ' + t.length); assert.doesNotMatch(t, /\b(tecla|aperte|pressione|clique)\b/i, 'sem citar teclas'); }
+  // o objetivo é do servidor: o jogo offline nem oferece a missão
+  const d = ensureJournal(hero(22)); d.quests.done.ruinas_sombrias = 1;
+  assert.ok(offeredBy(d, 'sage', { server: true }).some((x) => x.id === q.id));
+  assert.ok(!offeredBy(d, 'sage', { server: false }).some((x) => x.id === q.id), 'offline não oferece');
+  acceptQuest(d, q.id);
+  const r = recordEvent(d, { type: 'crypt' });
+  assert.equal(d.stats.cryptClears, 1); assert.ok(r.quests.some((x) => x.id === q.id && x.complete));
+  assert.ok(d.achievements.cripta_vencida != null && A.cripta_veterana && d.achievements.cripta_veterana == null);
+  for (let i = 0; i < 4; i++) recordEvent(d, { type: 'crypt' });
+  assert.ok(d.achievements.cripta_veterana != null, '5 vitórias');
+  // o salvamento do cliente não pode inventar vitórias na Cripta
+  const old = validate(JSON.parse(JSON.stringify(ensureJournal(hero(22))))).char, neu = JSON.parse(JSON.stringify(old));
+  neu.stats.cryptClears = 5;
+  assert.equal(checkSave(old, neu).doc.stats.cryptClears, 0, 'contador é do servidor');
+  // entrada: nível, Ruínas visitadas, espera de 20 min e Chave de Eco
+  const e = validate(JSON.parse(JSON.stringify(ensureJournal(hero(25))))).char, t0 = 1_000_000_000_000;
+  assert.equal(cryptEntryCheck({ ...e, level: 19 }, t0).code, 'crypt_level');
+  e.visited = { town: 1 }; assert.equal(cryptEntryCheck(e, t0).code, 'crypt_locked');
+  e.visited = { town: 1, ruins: 1 };
+  assert.deepEqual([cryptEntryCheck(e, t0).ok, cryptEntryCheck(e, t0).via], [true, 'free']);
+  assert.equal(applyCryptEntry(e, t0).ok, true);
+  assert.equal(cryptEntryCheck(e, t0 + 60_000).code, 'crypt_wait');
+  assert.equal(cryptEntryCheck(e, t0 + CRYPT.cooldownSec * 1000).via, 'free', 'passados 20 min');
+  assert.equal(grantEchoKey(e), 1);
+  const k = cryptEntryCheck(e, t0 + 60_000); assert.equal(k.via, 'key');
+  applyCryptEntry(e, t0 + 60_000); assert.equal(e.echo.keys, 0); assert.equal(e.echo.entry, t0 + 60_000);
+  for (let i = 0; i < 9; i++) grantEchoKey(e); assert.equal(e.echo.keys, CRYPT.keyMax, 'teto de chaves');
+  // a Chave vem do contrato do Porto entregue (claimDaily) — no teto não soma
+  const J = await import('../public/src/core/journal.js');
+  const dd = ensureJournal(hero(15)); const board = J.dailyBoard(dd, J.dayUTC());
+  J.dailyState(dd, J.dayUTC()).p[board[0].id] = board[0].count;
+  const cl = J.claimDaily(dd, board[0].id); assert.equal(cl.reward.key, 1); assert.equal(dd.echo.keys, 1);
 });

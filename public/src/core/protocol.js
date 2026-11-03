@@ -21,6 +21,7 @@ export const REJECT = {
   PARTY_FULL: 'party_full', PARTY_TOO_BIG: 'party_too_big', NO_SUCH_PLAYER: 'no_such_player', NO_INVITE: 'no_invite', ALREADY_IN_PARTY: 'already_in_party', SELF: 'self', MEMBER_OFFLINE: 'member_offline',
   BAD_ZONE: 'bad_zone', AUTH_REQUIRED: 'auth_required', BAD_SESSION: 'bad_session', BAD_CHARACTER: 'bad_character', ALREADY_ONLINE: 'already_online',
   NOT_VISITED: 'not_visited', NO_SCROLL: 'no_scroll', IN_COMBAT: 'in_combat', TELEPORT_WAIT: 'teleport_wait', NOT_AT_PORTAL: 'not_at_portal', // teletransporte online
+  CRYPT_LEVEL: 'crypt_level', CRYPT_LOCKED: 'crypt_locked', CRYPT_WAIT: 'crypt_wait', CRYPT_OVER: 'crypt_over', // Cripta dos Ecos: nível · falta chegar às Ruínas · espera (sem Chave de Eco) · a instância já terminou
   TX_WAIT: 'tx_wait', NOT_HERE: 'not_here', // transações do servidor (P11.4): pedidos rápidos demais · serviço indisponível neste lugar (ex.: loja dentro da instância)
 };
 
@@ -35,6 +36,7 @@ export const TX_OPS = {
   // ganhos que antes eram locais: spirits (libertar/comprar/evoluir), reciclagem, placa de lore; equipamento e atributos (valem também na instância)
   spirit_free: { id: true }, spirit_evolve: { id: true }, buy_essence: { kind: ['essence', 'prism'] }, recycle: { ids: 3 }, lore: { id: true },
   equip: { id: true }, unequip: { slot: true }, alloc: { stat: true, n: [1, 999] }, alloc_auto: {},
+  craft: { id: true }, // forja do Ferreiro: item Eco (fragmentos da Cripta + ouro); id = receita (data/crypt.js ECHO_RECIPES)
 };
 const TX_ID = /^[A-Za-z0-9_:.-]{1,48}$/;
 
@@ -94,13 +96,13 @@ export function parseClientMessage(data) {
       if (spec.id) { if (typeof data.id !== 'string' || !TX_ID.test(data.id)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.id = data.id; }
       if (spec.shop) { if (data.shop !== undefined && data.shop !== 'town' && data.shop !== 'harbor') return { ok: false, code: REJECT.BAD_MESSAGE }; msg.shop = data.shop ?? 'town'; }
       if (spec.kind) { if (!spec.kind.includes(data.kind)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.kind = data.kind; }
-      if (spec.slot) { if (!['weapon', 'armor', 'helm', 'boots', 'ring', 'amulet'].includes(data.slot)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.slot = data.slot; }
+      if (spec.slot) { if (!['weapon', 'armor', 'helm', 'boots', 'ring', 'amulet', 'offhand'].includes(data.slot)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.slot = data.slot; }
       if (spec.stat) { if (!['str', 'agi', 'int', 'vit'].includes(data.stat)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.stat = data.stat; }
       if (spec.ids) { if (!Array.isArray(data.ids) || data.ids.length !== spec.ids || !data.ids.every((x) => typeof x === 'string' && TX_ID.test(x))) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.ids = [...data.ids]; }
       if (spec.n) { if (!Number.isInteger(data.n) || data.n < spec.n[0] || data.n > spec.n[1]) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.n = data.n; }
       return { ok: true, msg };
     }
-    case 'queue_cancel': case 'party_create': case 'party_leave': case 'zone_leave':
+    case 'queue_cancel': case 'party_create': case 'party_leave': case 'zone_leave': case 'crypt_enter': // crypt_enter: o servidor confere nível, mapa visitado, espera/Chave e a posição (nada vem no pedido)
       return { ok: true, msg: { t: data.t } };
     case 'party_invite': case 'party_kick':
       if (typeof data.name !== 'string' || data.name.length < 1 || data.name.length > 40) return { ok: false, code: REJECT.BAD_MESSAGE };

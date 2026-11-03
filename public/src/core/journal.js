@@ -12,8 +12,9 @@ import { generateItem, rollRarity } from './loot.js';
 import { ZONES } from '../data/zones.js';
 import { MOBS, MOBS_EXTRA } from '../data/mobs.js';
 import { makeRng, hashString } from './rng.js';
+import { grantEchoKey } from './echo.js';
 
-export const SERVER_TYPES = new Set(['pvp', 'coop']); // objetivos que só o servidor soma
+export const SERVER_TYPES = new Set(['pvp', 'coop', 'crypt']); // objetivos que só o servidor soma
 export const OFFLINE_TYPES = new Set(); // objetivos que só existem no jogo solo (vazio desde que o duelo amistoso passou a rodar online: o servidor conta a vitória)
 // Objetivos que, no modo ESTRITO de PvE (server/plausible.js), só o servidor soma (transações `lore`/`spirit_evolve`, teletransporte/visita no hub, vitória no duelo amistoso).
 export const PVE_SERVER_TYPES = new Set(['visit', 'teleport', 'lore', 'spiritStage', 'friendlyDuel']);
@@ -90,6 +91,7 @@ function matches(o, ev, doc) {
     case 'chest': return ev.type === 'chest' && (o.zone === 'any' || o.zone === ev.zoneId);
     case 'pvp': return ev.type === 'pvp' && ev.won && (o.mode === 'any' || o.mode === ev.mode);
     case 'coop': return ev.type === 'coop' && ev.victory;
+    case 'crypt': return ev.type === 'crypt'; // vencer o chefe da Cripta dos Ecos (evento do servidor)
     case 'teleport': return ev.type === 'teleport';
     case 'upgrade': return ev.type === 'upgrade';
     case 'bank': return ev.type === 'bank';                       // guardar 1 item no banco do Porto
@@ -109,6 +111,7 @@ export function recordEvent(doc, ev, now = Date.now()) {
   else if (ev.type === 'chest') st.chests++;
   else if (ev.type === 'pvp') { st.pvpGames++; if (ev.won) st.pvpWins++; }
   else if (ev.type === 'coop' && ev.victory) st.coopClears++;
+  else if (ev.type === 'crypt') st.cryptClears++;
   else if (ev.type === 'teleport') st.teleports++;
   else if (ev.type === 'upgrade') st.upgrades++;
   else if (ev.type === 'bank') st.deposits++;
@@ -305,7 +308,8 @@ export function claimDaily(doc, id, now = Date.now()) {
   doc.gold += c.reward.gold;
   const levels = addXp(doc, c.reward.xp);
   doc.potions = Math.min(999, doc.potions + c.reward.potions);
+  const key = grantEchoKey(doc); // Chave de Eco: entrada extra na Cripta (core/echo.js); no teto não soma
   const ev = recordEvent(doc, { type: 'daily' }, now); // missão `porto_contrato` e contador de contratos
   const out = recordEvent(doc, { type: 'level', level: doc.level }, now);
-  return { ok: true, reward: { ...c.reward }, levels, achievements: [...ev.achievements, ...out.achievements], quests: [...ev.quests, ...out.quests] };
+  return { ok: true, reward: { ...c.reward, key }, levels, achievements: [...ev.achievements, ...out.achievements], quests: [...ev.quests, ...out.quests] };
 }

@@ -13,6 +13,7 @@ import { INVENTORY_SIZE, RARITY } from '../public/src/data/items.js';
 import { validate } from '../public/src/core/savedoc.js';
 import { QUESTS } from '../public/src/data/quests.js';
 import { CLASSES } from '../public/src/data/classes.js';
+import { craftEcho } from '../public/src/core/echo.js';
 
 export class TxError extends Error {}
 const fail = (msg) => { throw new TxError(msg); };
@@ -31,7 +32,7 @@ export function placeProblem(op, { inZone, hubAt, shop = 'town' }) {
   const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily' || op === 'recycle';
   if (harborOnly && hubAt !== 'harbor') return 'not_here';
   if (shop === 'harbor' && hubAt !== 'harbor') return 'not_here';
-  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk'].includes(op)) return 'not_here'; // lojas da Vila só na Vila
+  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk', 'craft'].includes(op)) return 'not_here'; // lojas da Vila só na Vila
   return null;
 }
 
@@ -187,6 +188,12 @@ export function runTx(doc, m, ctx) {
       if (!r.ok) fail(r.reason);
       const ev = recordEvent(c, { type: 'spiritStage', count: evolvedSpirits(c) }, now); // objetivo spiritStage contado aqui, não no cliente
       Object.assign(s, { cost: r.cost, type: c.spirits.find((x) => x.id === m.id).type, quests: questsReady(ev), achievements: ev.achievements });
+      break;
+    }
+    case 'craft': { // Ferreiro Brok: 1 arma e 1 armadura Eco por personagem (core/echo.js); fragmentos só vêm da Cripta (lote da instância)
+      const r = craftEcho(c, m.id, ctx.rng);
+      if (!r.ok) fail(r.reason);
+      Object.assign(s, { item: r.item, name: r.item.name, frags: r.frags, cost: r.gold, fragsTotal: c.echo.frags });
       break;
     }
     case 'recycle': {

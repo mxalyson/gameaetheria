@@ -2,7 +2,7 @@
 // ATENÇÃO: validar no cliente NÃO impede trapaça (o jogador controla o navegador); serve para (1) não quebrar o jogo com save
 // corrompido/antigo, (2) não deixar texto malicioso entrar na tela, (3) ser a base do validador que o servidor vai usar.
 import { CLASSES } from '../data/classes.js';
-import { SLOTS, RARITY, WEAPON_TYPES, INVENTORY_SIZE } from '../data/items.js';
+import { SLOTS, SHIELD_CLASSES, RARITY, WEAPON_TYPES, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, SPIRIT_RARITY_MUL, MAX_SPIRITS } from '../data/spirits.js';
 import { MAX_PLUS } from './enhance.js';
 import { MAX_LEVEL, POINTS_PER_LEVEL, SAVE_VERSION } from './progression.js';
@@ -11,12 +11,13 @@ import { QUESTS } from '../data/quests.js';
 import { ZONES } from '../data/zones.js';
 import { BANK_SIZE } from './bank.js';
 import { ACH, STAT_KEYS_PROGRESS } from '../data/achievements.js';
+import { CRYPT } from '../data/crypt.js';
 
 export { SAVE_VERSION };
 export const SAVE_FORMAT = 'aetheria-save';
 export const MAX_SAVE_BYTES = 300 * 1024;
 
-const STAT_CAP = { str: 400, agi: 400, int: 400, vit: 400, atk: 2000, def: 2000, hp: 20000, crit: 100, atkSpeed: 100, moveSpeed: 100, lifesteal: 100 };
+const STAT_CAP = { str: 400, agi: 400, int: 400, vit: 400, atk: 2000, def: 2000, hp: 20000, block: 100, crit: 100, atkSpeed: 100, moveSpeed: 100, lifesteal: 100 };
 const ALLOC_KEYS = ['str', 'agi', 'int', 'vit'];
 
 const int = (v, min, max, dflt) => {
@@ -80,6 +81,7 @@ function cleanItem(it) {
     id, kind: 'gear', name: cleanText(it.name, 60) || 'Item', slot: it.slot, classId: it.slot === 'weapon' ? WEAPON_TYPES[weaponType].classId : (CLASSES[it.classId] ? it.classId : null), weaponType, rarity: it.rarity,
     level: int(it.level, 1, 60, 1), reqLevel: int(it.reqLevel, 1, 60, 1), stats, value: int(it.value, 0, 1e6, 0),
     ...(it.opal === true ? { opal: true } : {}), // exclusivo do último chefe
+    ...(it.eco === true ? { eco: true } : {}), // item Eco da Cripta (só o servidor emite)
     ...(int(it.plus, 0, MAX_PLUS, 0) > 0 ? { plus: int(it.plus, 0, MAX_PLUS, 0) } : {}),
   };
 }
@@ -123,6 +125,7 @@ export function validate(doc) {
   // Migração (itens por classe): armadura/joia de save antigo não tem classe; pertence ao personagem que a carrega (equipada ou na mochila).
   const own = (it) => { if (!it.classId) it.classId = doc.classId; return it; };
   for (const k of Object.keys(equipment)) { own(equipment[k]); if (equipment[k].classId !== doc.classId) { delete equipment[k]; warnings.push(`item de outra classe em ${k} removido`); } }
+  if (equipment.offhand && !SHIELD_CLASSES.includes(doc.classId)) { delete equipment.offhand; warnings.push('escudo de classe sem escudo removido'); } // equipamento.offhand é opcional (Guerreiro e Clérigo)
   const seen = new Set(Object.values(equipment).map((i) => i.id));
   const inventory = [];
   for (const raw of Array.isArray(doc.inventory) ? doc.inventory : []) {
@@ -192,6 +195,7 @@ export function validate(doc) {
     arena: { rating: int(a.rating, 0, 5000, 1000), wins: int(a.wins, 0, 1e6, 0), losses: int(a.losses, 0, 1e6, 0), bestWave: int(a.bestWave, 0, 1e4, 0), ratings },
     pity: { epic: int(doc.pity?.epic, 0, 9999, 0), legendary: int(doc.pity?.legendary, 0, 9999, 0), opal: int(doc.pity?.opal, 0, 99, 0) }, // proteção de azar do loot
     created: int(doc.created, 0, 4e12, Date.now()),
+    echo: { frags: int(doc.echo?.frags, 0, CRYPT.frags.cap, 0), keys: int(doc.echo?.keys, 0, CRYPT.keyMax, 0), entry: int(doc.echo?.entry, 0, 4e12, 0) }, // Cripta dos Ecos (core/echo.js)
   };
   if (char.name !== doc.name) warnings.push('nome ajustado');
   return { ok: true, char, warnings };

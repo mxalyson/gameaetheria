@@ -7,6 +7,8 @@ import { INVENTORY_SIZE } from '../data/items.js';
 import { MAX_SPIRITS } from '../data/spirits.js';
 import { ensureJournal, recordEvent } from './journal.js';
 import { hashString } from './rng.js';
+import { ensureEcho } from './echo.js';
+import { CRYPT } from '../data/crypt.js';
 
 // Aplica o resultado de uma partida (1×1, 2×2 ou 4×4) a UM personagem. `result`: 'win' | 'loss' | 'draw'.
 // Rating separado por modo; times maiores pagam um pouco mais (mesma regra do cliente). Devolve { doc, summary } sem alterar o original.
@@ -88,14 +90,16 @@ export function applyZoneBatch(doc, batch) {
     if (c.spirits.length < MAX_SPIRITS) { c.spirits.push(sp); if (!c.activeSpirit) c.activeSpirit = sp.id; } else c.gold += 100;
   }
   c.potions = Math.min(999, c.potions + (batch.potions ?? 0));
+  if (batch.frags) { const e = ensureEcho(c); e.frags = Math.min(CRYPT.frags.cap, e.frags + batch.frags); } // Fragmentos de Eco (só a Cripta rende)
   if (batch.pity) c.pity = batch.pity; // azar acumulado (validate limita os valores)
   ensureJournal(c);
   const ach = [], quests = [];
   for (const k of batch.kills ?? []) { const r = recordEvent(c, { type: 'kill', mobId: k.mobId, zoneId: batch.zoneId, boss: !!k.boss, mini: !!k.mini, spiritType: k.spiritType }); ach.push(...r.achievements); quests.push(...r.quests.filter((q) => q.complete).map((q) => q.id)); }
+  if (batch.crypt) { const r = recordEvent(c, { type: 'crypt' }); ach.push(...r.achievements); quests.push(...r.quests.filter((q) => q.complete).map((q) => q.id)); } // Cripta vencida: só o servidor registra
   for (const skillId of batch.skills ?? []) { const r = recordEvent(c, { type: 'skill', skillId }); ach.push(...r.achievements); quests.push(...r.quests.filter((q) => q.complete).map((q) => q.id)); }
   if (levels) recordEvent(c, { type: 'level', level: c.level });
   if (c.spirits.length) recordEvent(c, { type: 'spirit', count: c.spirits.length });
   const v = validate(c);
   if (!v.ok) throw new Error('documento inválido após recompensa de zona: ' + v.reason);
-  return { doc: v.char, summary: { mode: 'zone', zone: batch.zoneId, gold: v.char.gold - before.gold, xp: batch.xp ?? 0, levels, level: v.char.level, items: kept, converted, potions: batch.potions ?? 0, kills: (batch.kills ?? []).length, deaths: batch.deaths ?? 0, achievements: ach, quests } };
+  return { doc: v.char, summary: { mode: 'zone', zone: batch.zoneId, gold: v.char.gold - before.gold, xp: batch.xp ?? 0, levels, level: v.char.level, items: kept, converted, potions: batch.potions ?? 0, frags: batch.frags ?? 0, kills: (batch.kills ?? []).length, deaths: batch.deaths ?? 0, achievements: ach, quests } };
 }

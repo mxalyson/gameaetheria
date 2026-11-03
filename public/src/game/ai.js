@@ -99,7 +99,7 @@ function telegraph(w, m, x, y, r, mult, delay, color) {
 
 // Mecânica dos chefes: 3 fases por vida (<60% mais rápido, <30% enrage), golpes em área maiores/mais frequentes e, no último chefe, invocações.
 function bossTick(m, w, tgt, d, M) {
-  const P = BOSS_PHASES.default, X = BOSS_PHASES[m.mobId] ?? {};
+  const X = BOSS_PHASES[m.mobId] ?? {}, P = X.slam ? X : BOSS_PHASES.default; // chefe com mecânica própria (ex.: Soberano dos Ecos, 2 fases) traz fases/golpes completos
   const frac = m.hp / m.maxHp;
   const ph = frac < P.p3 ? 3 : frac < P.p2 ? 2 : 1;
   if (ph !== m.phase) {

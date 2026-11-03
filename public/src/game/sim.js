@@ -13,6 +13,7 @@ import { ZONES } from '../data/zones.js';
 import { SPIRITS } from '../data/spirits.js';
 import { buildLayout, campSpawns, minibossSpawn } from './layout.js';
 import { mobIntent, rivalIntent } from './ai.js';
+import { blockChance, inFrontArc, BLOCK } from '../core/block.js';
 import { nightMods, hourFromMs, zoneHasCycle } from '../core/daycycle.js';
 
 const DAY_MODS = { aggroMul: 1, rewardMul: 1 };
@@ -300,7 +301,7 @@ export class World {
     const bn = a.burn;
     if (bn) { // queimadura do Meteoro Arcano
       bn.t -= dt; bn.next -= dt;
-      if (bn.next <= 0) { bn.next += bn.every; this.damage(bn.src, a, bn.mult); }
+      if (bn.next <= 0) { bn.next += bn.every; this.damage(bn.src, a, bn.mult, { dot: true }); }
       if (bn.t <= 0 || a.dead) a.burn = null;
     }
     a.hitFlash = Math.max(0, a.hitFlash - dt);
@@ -324,7 +325,8 @@ export class World {
       this.moveActor(a, mx * sp * dt, my * sp * dt);
       a.moving = true;
       a.walk += dt * sp / 28;
-    } else a.moving = false;
+      a.stillT = 0;
+    } else { a.moving = false; a.stillT = (a.stillT ?? 0) + dt; } // parado encarando: bônus de bloqueio do escudo
     if (it.attack && a.cds.basic <= 0) this.basicAttack(a, it.aimX, it.aimY);
     if (it.cast != null) this.castSkill(a, it.cast, it.aimX, it.aimY);
   }
@@ -589,6 +591,7 @@ export class World {
   // ---------- dano / cura ----------
   damage(src, t, mult, opts = {}) {
     if (!t || t.dead || t.untargetable || t.dash?.invuln) return 0;
+    let blocked = false;
     // Duelos entre heróis ficam mais longos e táticos.
     if (t.kind === 'player' || t.kind === 'rival') {
       if (src.kind === 'player' || src.kind === 'rival' || src.kind === 'spirit') mult *= PVP_DAMAGE;
@@ -601,6 +604,12 @@ export class World {
     } else if (src.kind === 'mob' && t.level != null && t.kind !== 'mob') {
       const gap = src.level - t.level - LEVEL_GAP.free;
       if (gap > 0) mult *= Math.min(LEVEL_GAP.maxTaken, 1 + LEVEL_GAP.taken * gap);
+    }
+    // Bloqueio passivo do escudo (core/block.js): golpe/projétil vindo da frente pode ser reduzido; só sorteia quem tem escudo (não altera a sequência do RNG dos demais).
+    if (t.stats.block > 0 && !opts.dot && src !== t && inFrontArc(t.facing, t.x, t.y, src.x, src.y) && this.rng.next() < blockChance(t.stats, t.stillT) * (src.kind === 'mob' ? 1 : BLOCK.pvpMul)) {
+      mult *= 1 - BLOCK.reduce;
+      blocked = true;
+      if (Math.hypot(src.x - t.x, src.y - t.y) <= BLOCK.recoilReach && src.kind === 'mob') src.stunT = Math.max(src.stunT, src.boss ? BLOCK.recoilStun * 0.3 : BLOCK.recoilStun);
     }
     const res = computeHit(this.rng,
       { power: src.stats.power, crit: src.stats.crit, critMult: src.stats.critMult, dmgBonus: this.buffVal(src, 'dmg') },
@@ -622,12 +631,13 @@ export class World {
       this.moveActor(t, Math.cos(ang) * 4, Math.sin(ang) * 4);
     }
     const hurtsPlayer = t.kind === 'player';
-    this.events.push({ type: 'hit', src, target: t, amount: res.amount, absorbed: amt === 0, crit: res.crit, t: this.time });
+    this.events.push({ type: 'hit', src, target: t, amount: res.amount, absorbed: amt === 0, crit: res.crit, blocked, t: this.time });
+    if (blocked) this.events.push({ type: 'block', actor: t, src, t: this.time });
     if (opts.stun) this.events.push({ type: 'status', actor: t, kind: 'stun', dur: t.stunT, t: this.time });
     if (opts.slow) this.events.push({ type: 'status', actor: t, kind: 'slow', dur: opts.slowDur, t: this.time });
     this.addText({
       x: t.x + this.vrng.range(-8, 8), y: t.y - t.r - 12, t: 0, life: 0.9,
-      text: amt === 0 ? 'absorvido' : String(res.amount), size: res.crit ? 21 : 15,
+      text: blocked ? 'Bloqueou ' + res.amount : amt === 0 ? 'absorvido' : String(res.amount), size: res.crit ? 21 : 15,
       color: amt === 0 ? '#ffe9a0' : hurtsPlayer ? '#ff6b6b' : res.crit ? '#ffd166' : '#ffffff',
     });
     this.burst(t.x, t.y, hurtsPlayer ? '#ff8080' : '#ffffff', res.crit ? 10 : 5, 140);

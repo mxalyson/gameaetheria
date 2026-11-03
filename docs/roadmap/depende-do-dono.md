@@ -43,6 +43,12 @@ Espada curva (Guerreiro), orbe/cajado arcano (Mago), arco com flecha de luz (Arq
 - **Ícones de itens e spirits restantes**: usar `docs/art-direction/prompts-icones-itens.md`.
 - **4 folhas que só apareceram na conversa** (tooltip/faixa/diálogo, 7 molduras de raridade, 4 ataques básicos, 7 ícones de menu): reenviar como arquivo.
 
+### A6b. Escudos (item do Guerreiro e do Clérigo; slot offhand)
+Icones de 128×128 (ou 256), fundo transparente, estilo dos demais itens (mesma moldura de raridade). 5 arquivos, um por raridade, em `assets/icons/item/shield-common.webp`, `shield-uncommon.webp`, `shield-rare.webp`, `shield-epic.webp`, `shield-legendary.webp`. Enquanto não existem, a UI usa o ícone de armadura com um selo de escudo.
+- Prompt base: *"hand-painted fantasy RPG item icon, a heater shield seen from the front, slight 3/4 angle, anime style, soft rim light, transparent background, centered, no text"*
+- Comum: madeira com aro de ferro cinza · Incomum: ferro polido, aro verde · Rara: aço azulado com runa · Épica: aço roxo com gema · Lendária: ouro e laranja com brasão solar radiante.
+- Para o Clérigo, se quiser variante: mesmo escudo com símbolo sagrado (sol) no centro (arquivos `shield-<raridade>-cleric.webp`; ainda não usados pelo código, avise para ligar).
+
 ### A7. Místico (5º herói)
 Conceito: místico errante que tece "ecos" (invocações/controle). Prompt: *"chibi fantasy mystic hero, anime style, flowing violet and teal robes, floating glowing sigils, staff with a hanging lantern, hand-painted, full body, standing neutral pose"* → GLB Meshy; depois eu faço atlas, kit de habilidades e ícones.
 
@@ -58,3 +64,23 @@ Conceito: místico errante que tece "ecos" (invocações/controle). Prompt: *"ch
 4. **Medição em aparelho real:** rodar `docs/roadmap/teste-android.md` e me trazer FPS/RAM; no iPhone, abrir com `?fps=1` se existir, ou me descrever travadas. Testar também um celular médio/fraco e sessão longa (aquecimento).
 5. **Rede real:** testar com 2 aparelhos em redes diferentes (perda/latência/TLS).
 6. **Teste de invasão e anti-abuso de contas** (CAPTCHA): só por terceiros / quando houver servidor público.
+
+## A8. "Design completo Nv25" por especialização (8 variantes de herói)
+A aura de evolução já existe (procedural). O visual final do Nv25 (Maestria) precisa de arte sua: um herói por especialização, mesma silhueta/proporção chibi da classe, mais elaborado (armadura/robe refinado, detalhes dourados/prata, sem exagero). Gere no Meshy a partir do herói base da classe e me traga o GLB; eu faço atlas e ligo no gancho `heroLook` (`docs/art-direction/aura-evolucao.md`).
+Prompts (base: *"chibi fantasy {classe} hero, anime style, hand-painted, full body, neutral standing pose, refined elite version"*):
+1. Bastião: *"... paladin, heavy gold-and-steel plate, tower shield with engraved crest, short cape, calm radiant look"*
+2. Carrasco: *"... executioner warrior, dark crimson armor with ember-lit cracks, huge two-handed axe, horned helm"*
+3. Piromante: *"... pyromancer mage, orange-and-black robes with flame embroidery, floating ember orb, staff with fire crystal"*
+4. Criomante: *"... cryomancer mage, icy blue and white robes, frost crystal crown, staff with ice shard, cold mist hem"*
+5. Atirador: *"... marksman archer, teal leather coat with silver fittings, long precision bow with scope-like rune, hooded cape"*
+6. Caçador: *"... hunter archer, forest green and bark-brown gear, leaf mantle, antler-shaped bow, quiver with feathers"*
+7. Guardião: *"... guardian cleric, white and gold vestments, winged shoulder guards, radiant shield-staff, halo ornament"*
+8. Inquisidor: *"... inquisitor cleric, violet and amber ornate robes, floating rune book, judgement mace with glowing sigils"*
+
+## A8. Cripta dos Ecos (masmorra, decisão 0017): arte do chefe novo e peças (PROVISÓRIO até chegar)
+Hoje o **Soberano dos Ecos** usa o sprite do Guardião das Ruínas recolorido (azul-turquesa) e as criaturas da masmorra (Sombra, Sentinela, Gárgula Rúnica) são espectro/cavaleiro/gárgula recoloridos. Quando houver arte própria, eu troco `art`/`tint` em `data/mobs.js` e gero `assets/mobs/echolord.*` com `tools/mob-bake.mjs`.
+- **Soberano dos Ecos (chefe, Meshy GLB, chibi/miniatura):** *"chibi fantasy boss, spectral king of echoes, tall armored lich knight with a cracked crystal crown, teal and violet glowing runes, floating shards orbiting him, hovering ghostly cape, menacing, hand-painted, stylized miniature, plain background, full body, neutral pose"* → `echolord`. Precisa de pose de ataque pesado (golpe no chão) e pose de invocar (braços erguidos).
+- **Criaturas (opcional, 3 peças):** *"chibi spectral sentinel, teal glowing armor shell, hollow helm"* · *"chibi runic gargoyle, blue stone with glowing runes"* · *"chibi echo wraith, teal translucent robe, floating lantern"*.
+- **Itens Eco (ícones 512×512, moldura de raridade épica):** arma por classe (espada, cajado, arco, martelo) e armadura por classe, todas em tom turquesa/violeta com rachaduras luminosas; mais o **Fragmento de Eco** (estilhaço de cristal turquesa pulsando) e a **Chave de Eco** (chave de cristal). Hoje usam o ícone do tipo.
+- **Ícone do nó no mapa:** `assets/icons/ui/zone-crypt.webp` (128 px, cripta/portal de pedra com brilho turquesa, mesmo desenho dos outros `zone-*`). Hoje é um emoji.
+- **Cenário da masmorra (opcional):** textura de chão de laje escura com runas, e peças: sarcófago, coluna rachada, portão de pedra (aberto/fechado). Hoje o corredor usa colunas e braseiros das Ruínas.

@@ -325,3 +325,112 @@ test('Maestria: o ator da sala ganha a 4ª habilidade na hora que o documento a 
   assert.equal(placeProblem('quest_turnin', { inZone: true }), 'not_here');
   await closeAll(srv, c);
 });
+
+// ---- Cripta dos Ecos (masmorra por instância, decisão 0017) ----
+const prep = (db, ch, fn) => db.applyOperation('prep' + Math.random(), ch, 'test', (d) => { const x = structuredClone(d); fn(x); return { doc: x, summary: {} }; });
+
+test('Cripta: o protocolo só aceita crypt_enter sem campos; a masmorra não é alcançável por portal nem teletransporte', async () => {
+  const { parseClientMessage, PROTOCOL_VERSION } = await import('../public/src/core/protocol.js');
+  const P = (o) => parseClientMessage({ v: PROTOCOL_VERSION, ...o });
+  assert.deepEqual(P({ t: 'crypt_enter', zone: 'forest', extra: 1 }).msg, { t: 'crypt_enter' });
+  assert.equal(P({ t: 'zone_enter', zone: 'crypt', from: 'town' }).ok, false);
+  assert.equal(P({ t: 'zone_teleport', zone: 'crypt' }).ok, false);
+  const { ZONES } = await import('../public/src/data/zones.js');
+  assert.ok(!ZONES.crypt.mobs && !ZONES.crypt.hub, 'sem monstros soltos e não é cidade');
+  assert.ok(!Object.values(ZONES).some((z) => z.hub && z.mobs), 'cidades continuam sem monstros');
+});
+
+test('Cripta: entrada conferida no servidor, portão, ondas, chefe de 2 fases com aviso, fragmentos, vitória, saída e espera de 20 min', async () => {
+  const { PH } = await import('../server/crypt.js');
+  const { CRYPT, CRYPT_GEOM: G } = await import('../public/src/data/crypt.js');
+  const { srv, db, players } = await setup(1);
+  const { c, ch } = players[0];
+  c.send({ t: 'crypt_enter' });
+  await c.waitFor((m) => m.t === 'reject' && m.code === 'crypt_level'); // nível 1
+  prep(db, ch, (x) => { x.level = 25; x.visited = { ...x.visited }; delete x.visited.ruins; });
+  c.send({ t: 'crypt_enter' });
+  await c.waitFor((m) => m.t === 'reject' && m.code === 'crypt_locked'); // falta chegar às Ruínas
+  prep(db, ch, (x) => { x.visited.ruins = 1; });
+  c.send({ t: 'crypt_enter' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  assert.equal(j.zone, 'crypt'); assert.equal(j.x, G.starts[0]); assert.equal(j.w, G.w);
+  assert.ok(db.character(ch).doc.echo.entry > 0, 'a entrada foi carimbada no documento oficial');
+  const room = [...srv.hub.zoneRooms.values()].find((r) => r.zoneId === 'crypt');
+  const p = [...room.players.values()][0], a = p.actor;
+  const god = () => { a.maxHp = a.hp = 1e9; a.dead = false; };
+  god();
+  const kill = () => { for (const m of room.mobs()) if (!m.dead) room.world.damage(a, m, 1e8); };
+
+  // salas 1–3: duas ondas curtas cada; o portão segura o herói antes do muro até a sala ser limpa
+  for (let r = 0; r < 3; r++) {
+    for (let w = 0; w < 2; w++) {
+      srv.step(r === 0 && w === 0 ? 310 : 200); god();
+      assert.equal(room.cr.phase, PH.FIGHT, `sala ${r + 1} onda ${w + 1}`);
+      const mobs = room.mobs().filter((m) => !m.dead);
+      assert.ok(mobs.length >= 4 && mobs.every((m) => m.level >= 25 && m.level <= 30 + CRYPT.rooms[r].lvlPlus), 'mobs no nível do herói (+sala)');
+      assert.ok(mobs.every((m) => m.crypt && !m.boss));
+      if (w === 0) { a.x = G.walls[r] + 200; srv.step(2); assert.ok(a.x <= G.walls[r], 'portão fechado: o herói não passa do muro'); god(); }
+      kill(); srv.step(2);
+    }
+    assert.equal(room.cr.phase, PH.ADVANCE, `sala ${r + 1} limpa`);
+    a.x = G.walls[r] + G.wallW + 100; srv.step(2); god();
+  }
+  assert.equal(room.cr.phase, PH.BOSS); assert.equal(room.cr.room, 3);
+  const boss = room.bossMob;
+  assert.ok(boss.boss && boss.mobId === 'echolord' && boss.level >= 28);
+  // chefe: golpes em área com AVISO (telegraph), fase 2 abaixo de 50% com esbirros
+  a.x = boss.x - 120; a.y = boss.y; srv.step(420); god(); await c.sync();
+  assert.ok(c.msgs.some((m) => m.t === 'snap' && m.events?.some((e) => e.e === 'telegraph' && e.delay >= 1)), 'aviso do golpe em área');
+  assert.equal(boss.phase, 1);
+  boss.hp = boss.maxHp * 0.4; srv.step(900); god(); await c.sync();
+  assert.equal(boss.phase, 2, 'fase 2');
+  assert.ok(c.msgs.some((m) => m.t === 'snap' && m.events?.some((e) => e.e === 'phase' && e.phase === 2)));
+  assert.ok(room.mobs().some((m) => m.summoned && m.mobId === 'echoshade'), 'esbirros na fase 2');
+  kill(); srv.step(2);
+  assert.equal(room.cr.phase, PH.VICTORY); assert.ok(room.cleared);
+
+  // recompensas gravadas pelo servidor: fragmentos (3 salas + chefe), vitória contada, missão e conquista
+  const doc = db.character(ch).doc;
+  assert.ok(doc.echo.frags >= 2 + 2 + 3 + 8 && doc.echo.frags <= 3 + 4 + 4 + 12, 'fragmentos: ' + doc.echo.frags);
+  assert.equal(doc.stats.cryptClears, 1); assert.ok(doc.achievements.cripta_vencida);
+  assert.ok(doc.stats.bossKills >= 1);
+  await c.sync();
+  assert.equal(c.msgs.filter((m) => m.t === 'zone_reward').reduce((t, m) => t + (m.frags ?? 0), 0), doc.echo.frags, 'os resumos enviados somam os fragmentos gravados');
+
+  // fim: a saída automática leva à Vila; nova entrada imediata é recusada (20 min) e uma Chave de Eco a libera
+  srv.step(CRYPT.exitSec * 60 + 30);
+  await c.waitFor((m) => m.t === 'zone_exit' && m.to === 'town');
+  assert.ok(!srv.hub.zoneRooms.size, 'instância encerrada');
+  c.send({ t: 'crypt_enter' });
+  await c.waitFor((m) => m.t === 'reject' && m.code === 'crypt_wait');
+  prep(db, ch, (x) => { x.echo.keys = 1; });
+  c.send({ t: 'crypt_enter' });
+  await c.waitFor((m) => m.t === 'zone_joined' && m.zone === 'crypt' && m !== j);
+  assert.equal(db.character(ch).doc.echo.keys, 0, 'a Chave foi gasta na mesma operação da entrada');
+  await closeAll(srv, c);
+});
+
+test('Cripta: 3 quedas por herói; na seguinte ele é levado para fora; sem monstros fora da instância', async () => {
+  const { CRYPT } = await import('../public/src/data/crypt.js');
+  const { srv, db, players } = await setup(1);
+  const { c, ch } = players[0];
+  prep(db, ch, (x) => { x.level = 22; x.visited = { ...(x.visited ?? {}), ruins: 1 }; });
+  c.send({ t: 'crypt_enter' });
+  await c.waitFor((m) => m.t === 'zone_joined');
+  const room = [...srv.hub.zoneRooms.values()].find((r) => r.zoneId === 'crypt');
+  const a = [...room.players.values()][0].actor;
+  srv.step(320);
+  const mob = room.mobs().find((m) => !m.dead);
+  let exited = false;
+  for (let i = 0; i < CRYPT.maxDeaths + 1 && !exited; i++) {
+    a.hp = 1; room.world.damage(mob, a, 1e9);
+    srv.step(4 * 60 + 20); await c.sync();
+    exited = c.msgs.some((m) => m.t === 'zone_exit');
+    if (i < CRYPT.maxDeaths) assert.ok(!exited && !a.dead, `renasceu na queda ${i + 1}`);
+  }
+  assert.ok(exited, 'quarta queda: fora da masmorra');
+  assert.equal(db.character(ch).doc.stats.cryptClears, 0, 'sem vitória');
+  c.send({ t: 'crypt_enter' });
+  await c.waitFor((m) => m.t === 'reject' && m.code === 'crypt_wait'); // fracasso não devolve a entrada
+  await closeAll(srv, c);
+});

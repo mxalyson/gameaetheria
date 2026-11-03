@@ -1,6 +1,9 @@
-export const SLOTS = ['weapon', 'helm', 'armor', 'boots', 'ring', 'amulet'];
-export const SLOT_NAMES = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', boots: 'Botas', ring: 'Anel', amulet: 'Amuleto' };
-export const SLOT_ICONS = { helm: '🪖', armor: '🥋', boots: '👢', ring: '💍', amulet: '📿' };
+export const SLOTS = ['weapon', 'helm', 'armor', 'boots', 'ring', 'amulet', 'offhand'];
+// Escudo (offhand): só Guerreiro e Clérigo equipam. Bloqueio passivo (core/block.js): a chance vem do item.
+export const SHIELD_CLASSES = ['warrior', 'cleric'];
+export const SHIELD_BLOCK = { common: 20, uncommon: 24, rare: 28, epic: 34, legendary: 40 }; // % de chance de bloquear golpe frontal, por raridade
+export const SLOT_NAMES = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', boots: 'Botas', ring: 'Anel', amulet: 'Amuleto', offhand: 'Escudo' };
+export const SLOT_ICONS = { helm: '🪖', armor: '🥋', boots: '👢', ring: '💍', amulet: '📿', offhand: '🛡️' };
 
 export const RARITIES = [
   { id: 'common', name: 'Comum', color: '#c9ccd3', affixes: 0, mul: 1.0, weight: 60 },
@@ -40,6 +43,7 @@ export const GEAR_NAMES = {
     boots: ['Botas de Ferro', 'Grevas de Aço', 'Grevas de Batalha', 'Grevas do Campeão'],
     ring: ['Anel de Ferro', 'Anel de Guerra', 'Anel de Bronze Real', 'Anel do Vanguardista'],
     amulet: ['Medalhão de Ferro', 'Insígnia de Guerra', 'Brasão de Aço', 'Colar do Comandante'],
+    offhand: ['Escudo de Madeira', 'Escudo de Ferro', 'Escudo de Aço', 'Baluarte do Campeão'],
   },
   mage: {
     helm: ['Capuz de Aprendiz', 'Chapéu Arcano', 'Capuz Estelar', 'Coroa Prismática'],
@@ -61,6 +65,7 @@ export const GEAR_NAMES = {
     boots: ['Sandálias Sagradas', 'Sandálias Bentas', 'Botas Sagradas', 'Sandálias Solares'],
     ring: ['Anel Sagrado', 'Anel Bento', 'Anel de Ouro Sagrado', 'Anel Solar'],
     amulet: ['Símbolo Sagrado', 'Relicário Bento', 'Amuleto Sagrado', 'Sol de Ouro'],
+    offhand: ['Escudo Votivo', 'Escudo Bento', 'Escudo Sagrado', 'Égide Solar'],
   },
 };
 // Itens exclusivos do último chefe (Cavaleiro Rubro): tema ópalo. Ícone = o do tipo (sem arte própria ainda; ver docs/roadmap/pendencias.md).
@@ -85,8 +90,8 @@ export const AFFIXES = [
 export const STAT_LABELS = {
   atk: 'Ataque', def: 'Defesa', hp: 'Vida',
   str: 'Força', agi: 'Agilidade', int: 'Inteligência', vit: 'Vitalidade',
-  crit: 'Crítico', atkSpeed: 'Vel. de Ataque', moveSpeed: 'Vel. de Movimento', lifesteal: 'Roubo de Vida',
+  crit: 'Crítico', atkSpeed: 'Vel. de Ataque', moveSpeed: 'Vel. de Movimento', lifesteal: 'Roubo de Vida', block: 'Bloqueio',
 };
-export const PERCENT_STATS = new Set(['crit', 'atkSpeed', 'moveSpeed', 'lifesteal']);
+export const PERCENT_STATS = new Set(['crit', 'atkSpeed', 'moveSpeed', 'lifesteal', 'block']);
 
 export const INVENTORY_SIZE = 30;

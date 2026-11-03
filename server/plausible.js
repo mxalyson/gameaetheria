@@ -5,7 +5,7 @@
 import { QUESTS } from '../public/src/data/quests.js';
 import { SERVER_STATS, STAT_KEYS_PROGRESS, FLAG_STATS } from '../public/src/data/achievements.js';
 import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, PVE_SERVER_TYPES, MAX_ACTIVE, isComplete, LORE_MASK } from '../public/src/core/journal.js';
-import { RARITY, AFFIXES } from '../public/src/data/items.js';
+import { RARITY, AFFIXES, SHIELD_BLOCK } from '../public/src/data/items.js';
 import { xpToNext } from '../public/src/core/progression.js';
 import { PRICES } from '../public/src/shop.js';
 
@@ -19,6 +19,7 @@ export function itemCeiling(slot, rarityId, level) {
   const add = (k, v) => { c[k] = (c[k] ?? 0) + v; };
   if (slot === 'weapon') add('atk', Math.round((6 + level * 2.4) * mul * 1.15));
   else if (slot === 'armor') { add('def', Math.round((3 + level * 1.6) * mul * 1.15)); add('hp', Math.round((10 + level * 5) * mul * 1.15)); }
+  else if (slot === 'offhand') { add('def', Math.round((0.5 + level * 0.15) * mul * 1.15)); add('hp', Math.round((1 + level * 0.25) * mul * 1.15)); add('block', SHIELD_BLOCK[rarityId]); }
   else if (slot === 'helm' || slot === 'boots') add('def', Math.round((2 + level * 0.9) * mul * 1.15));
   const baseKeys = Object.keys(c).length;
   for (const a of AFFIXES) {
@@ -33,6 +34,7 @@ export function itemCeiling(slot, rarityId, level) {
 // Item por classe: todo item novo precisa ser da classe do herói (ou legado sem classe, que o servidor carimba).
 function newItemProblem(it, heroLevel, heroClass) {
   if (it.opal) return 'opal_forged';
+  if (it.eco) return 'eco_forged'; // item Eco só nasce no servidor (drop do chefe da Cripta ou forja)
   if (heroClass && it.classId && it.classId !== heroClass) return 'item_wrong_class';
   if (it.level > heroLevel + LIMITS.itemLevelAhead || it.reqLevel < Math.max(1, it.level - 2)) return 'item_forged';
   const cap = itemCeiling(it.slot, it.rarity, it.level);
@@ -47,7 +49,7 @@ export function sanitizeImport(doc, fresh) {
   for (const k of Object.keys(doc.equipment)) if (!ok(doc.equipment[k])) delete doc.equipment[k];
   doc.inventory = doc.inventory.filter(ok);
   doc.bank = (doc.bank ?? []).filter(ok);
-  doc.scrolls = 0; doc.pity = { epic: 0, legendary: 0, opal: 0 }; doc.visited = { ...fresh.visited };
+  doc.scrolls = 0; doc.echo = { frags: 0, keys: 0, entry: 0 }; doc.pity = { epic: 0, legendary: 0, opal: 0 }; doc.visited = { ...fresh.visited };
   return doc;
 }
 const SAME_ITEM = ['slot', 'weaponType', 'rarity', 'level', 'reqLevel', 'value'];
@@ -72,6 +74,7 @@ export const PVE_STATS = ['kills', 'bossKills', 'chests', 'spiritKills', 'skillU
 export function pveProblem(old, neu) {
   if (neu.level > old.level || totalXp(neu) > totalXp(old)) return 'pve_xp';
   if (neu.gold > old.gold) return 'pve_gold';
+  if ((neu.echo?.frags ?? 0) > (old.echo?.frags ?? 0) || (neu.echo?.keys ?? 0) > (old.echo?.keys ?? 0)) return 'pve_echo';
   if (neu.potions > old.potions) return 'pve_potions';
   const had = itemIds(old);
   for (const id of itemIds(neu)) if (!had.has(id)) return 'pve_items';
@@ -114,7 +117,7 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
     if (was) {
       // classId: item antigo do banco pode não ter o campo (o cliente o carimba com a classe do dono ao migrar): aceitar só essa classe
       if (was.classId != null ? it.classId !== was.classId : (it.classId != null && it.classId !== old.classId)) return { ok: false, reason: 'item_tampered' };
-      if (SAME_ITEM.some((k) => it[k] !== was[k]) || !!it.opal !== !!was.opal || JSON.stringify(it.stats) !== JSON.stringify(was.stats)) return { ok: false, reason: 'item_tampered' };
+      if (SAME_ITEM.some((k) => it[k] !== was[k]) || !!it.opal !== !!was.opal || !!it.eco !== !!was.eco || JSON.stringify(it.stats) !== JSON.stringify(was.stats)) return { ok: false, reason: 'item_tampered' };
       continue;
     }
     const bad = newItemProblem(it, neu.level, neu.classId);
@@ -186,7 +189,9 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   let daily = nd;
   if (nd && (nd.day > nowDay + 1 || (od && nd.day < od.day))) daily = od ?? { day: 0, p: {}, done: {} };
   else if (nd && od && nd.day === od.day) daily = { day: nd.day, p: { ...nd.p }, done: { ...nd.done, ...od.done } };
-  const out = { ...neu, ...(daily ? { daily } : {}), arena, stats, quests, chests, scrolls, visited: { ...(old.visited ?? {}) }, pity, achievements: { ...old.achievements } };
+  // Cripta dos Ecos: fragmentos, chaves e o instante da última entrada são do servidor (só caem; a entrada nunca volta no tempo)
+  const echo = { frags: Math.min(neu.echo?.frags ?? 0, old.echo?.frags ?? 0), keys: Math.min(neu.echo?.keys ?? 0, old.echo?.keys ?? 0), entry: Math.max(neu.echo?.entry ?? 0, old.echo?.entry ?? 0) };
+  const out = { ...neu, echo, ...(daily ? { daily } : {}), arena, stats, quests, chests, scrolls, visited: { ...(old.visited ?? {}) }, pity, achievements: { ...old.achievements } };
   checkAchievements(out, now); // as conquistas são recalculadas aqui: o cliente não "se concede" nenhuma
   out.title = out.title && out.achievements[out.title] != null ? out.title : null;
   return { ok: true, doc: out };

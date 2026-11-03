@@ -7,7 +7,7 @@ import { makeRng } from '../public/src/core/rng.js';
 import { newCharacter, POINTS_PER_LEVEL } from '../public/src/core/progression.js';
 import { generateItem } from '../public/src/core/loot.js';
 import { CLASSES } from '../public/src/data/classes.js';
-import { SLOTS } from '../public/src/data/items.js';
+import { SLOTS, SHIELD_CLASSES } from '../public/src/data/items.js';
 import { decodeClient, encode, REJECT, RateLimiter, TICK_DT, SNAPSHOT_EVERY, TICK_HZ, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { PVP_MIN_LEVEL } from '../public/src/core/power.js';
 import { Hub } from './hub.js';
@@ -21,7 +21,7 @@ export function buildServerChar(name, classId, seed) {
   c.level = LEVEL;
   const cls = CLASSES[classId], pts = POINTS_PER_LEVEL * (LEVEL - 1);
   c.alloc[cls.primary] += Math.round(pts * 0.6); c.alloc.vit += Math.round(pts * 0.3); c.alloc.agi += pts - Math.round(pts * 0.6) - Math.round(pts * 0.3);
-  for (const slot of SLOTS) c.equipment[slot] = generateItem(rng, LEVEL, { classId, slot, weaponType: slot === 'weapon' ? cls.weapon : undefined, rarityId: 'uncommon' });
+  for (const slot of SLOTS) if (slot !== 'offhand' || SHIELD_CLASSES.includes(classId)) c.equipment[slot] = generateItem(rng, LEVEL, { classId, slot, weaponType: slot === 'weapon' ? cls.weapon : undefined, rarityId: 'uncommon' });
   return c;
 }
 

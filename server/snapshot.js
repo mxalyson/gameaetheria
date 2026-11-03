@@ -1,12 +1,18 @@
 // Codificador de snapshots por delta (ver public/src/core/snapshot.js). Uma instância por sala.
 // frame(): recebe as entidades como tuplas e devolve { a, m, n, g, k } só com o que mudou desde o snapshot anterior (ou tudo, no quadro-chave).
 import { F, KEYFRAME_EVERY } from '../public/src/core/snapshot.js';
+import { lookCode } from '../public/src/core/aura.js';
 
 const r1 = (n) => Math.round(n * 10) / 10;
 // Tuplas são comparadas elemento a elemento com a anterior (guardada por referência: nunca é alterada depois); antes viravam texto a cada quadro.
 const sameT = (a, b) => { if (!b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
-export const actorTuple = (a, online, extra = 0) => [a.id, r1(a.x), r1(a.y), Math.round(a.hp), Math.round(a.facing * 100),
-  (a.dead ? F.DEAD : 0) | (a.moving ? F.MOVING : 0) | (a.swing > 0 ? F.SWING : 0) | (a.stunT > 0 ? F.STUN : 0) | (online ? 0 : F.OFFLINE) | extra, Math.round(a.shield)];
+// 8º elemento = aura de evolução (spec+tier, core/aura.js); só entra quando há aura, então o formato antigo continua válido.
+export const actorTuple = (a, online, extra = 0) => {
+  const t = [a.id, r1(a.x), r1(a.y), Math.round(a.hp), Math.round(a.facing * 100),
+    (a.dead ? F.DEAD : 0) | (a.moving ? F.MOVING : 0) | (a.swing > 0 ? F.SWING : 0) | (a.stunT > 0 ? F.STUN : 0) | (online ? 0 : F.OFFLINE) | extra, Math.round(a.shield)];
+  if (a.spec) { const lk = lookCode(a); if (lk) t.push(lk); }
+  return t;
+};
 export const mobTuple = (m) => [m.id, r1(m.x), r1(m.y), Math.round(m.hp), Math.round(m.facing * 100), (m.dead ? F.DEAD : 0) | (m.moving ? F.MOVING : 0) | (m.swing > 0 ? F.SWING : 0)];
 // Marcas extras (mini-chefe, esbirro, acampamento) só entram quando existem; o nome vai uma vez só, no estático.
 export const mobStatic = (m) => {

@@ -143,7 +143,7 @@ export function mobPortrait(id) {
   return res;
 }
 // carrega de antemão as criaturas da zona (chamado quando a zona muda)
-export function prepareMobs(zone) { if (!mobSpritesEnabled()) return; for (const [id] of zone.mobs ?? []) load(id); if (zone.boss?.id) load(zone.boss.id); }
+export function prepareMobs(zone) { if (!mobSpritesEnabled()) return; for (const [id] of zone.mobs ?? []) load(id); if (zone.boss?.id) load(zone.boss.id); for (const id of zone.preload ?? []) load(id); /* masmorra: criaturas das salas */ }
 
 // pesados: o golpe é uma pancada (ergue e bate); aéreos: recolhem e arremetem; os demais agacham e dão o bote
 const HEAVY = new Set(['golem', 'colossus', 'guardian', 'treant']), AIRY = new Set(['wisp', 'wraith']);

@@ -19,6 +19,7 @@ import { cleanName } from './core/savedoc.js';
 import { apiUrl, Online, CloudSave } from './online.js';
 import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
+import { decodeLook } from './core/aura.js';
 import { noticeText } from './ui/ui.js';
 import { skillOf } from './core/specs.js';
 import { SKILLS } from './data/skills.js';
@@ -48,6 +49,8 @@ export const FIXED_DT = 1 / 60;
 const MAX_TICKS = 8;
 const SERVER_COUNTED = new Set(['teleport', 'visit', 'spiritStage']); // eventos de diário que o servidor de partidas conta (server/hub.js, server/tx.js); o cliente não os soma online
 
+// Cripta dos Ecos: recusas de crypt_enter (o texto exato vem do servidor em m.reason; estes são o reserva)
+const CRYPT_REJECT = { crypt_level: 'Nível 20 para entrar na Cripta dos Ecos.', crypt_locked: 'Chegue às Ruínas Sombrias a pé para encontrar a entrada.', crypt_wait: 'A Cripta ainda recupera o fôlego: espere ou use uma Chave de Eco.', crypt_over: 'Essa expedição já terminou: aguarde o grupo sair.', not_here: 'Volte à Vila antes de entrar na Cripta.' };
 const TELEPORT_REJECT = { not_visited: 'Você ainda não visitou esse mapa.', no_scroll: 'Sem pergaminho de teletransporte.', in_combat: 'Em combate: espere uns segundos para viajar.', teleport_wait: 'Calma: espere alguns segundos entre viagens.' };
 
 // papel do NPC → painel do serviço (Porto de Marfim; ver docs/gameplay/porto.md)
@@ -205,6 +208,8 @@ class Game {
       case 'item': this.ui.isOpen('shop') ? this.sell(arg) : this.ui.isOpen('bank') ? this.bankPut(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
       case 'enhance': this.enhanceItem(arg); break;
+      case 'crypt-enter': this.enterCrypt(); break;
+      case 'craft-echo': this.craftEcho(arg); break;
       case 'alloc': this.alloc(arg); break;
       case 'spec': this.pickSpec(arg); break;
       case 'sort-inv': this.sortInventory(); break;
@@ -438,7 +443,7 @@ class Game {
         queue: () => { refresh(); },
         invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (botão 👥)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
-        reject: (m) => { this.zoneBusy = false; this.teleportPending = false; this.portalCd = 4; /* recusa (ex.: sala cheia): espera antes de tentar o portal de novo, sem laço de pedidos */ if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
+        reject: (m) => { this.zoneBusy = false; this.teleportPending = false; this.portalCd = 4; /* recusa (ex.: sala cheia): espera antes de tentar o portal de novo, sem laço de pedidos */ if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(CRYPT_REJECT[m.code] ? 'Cripta dos Ecos' : TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', m.reason ?? CRYPT_REJECT[m.code] ?? TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
@@ -496,7 +501,7 @@ class Game {
     this.netDec = new SnapshotDecoder().init(m);
     if (this.cloud) this.cloud.paused = true; // na instância o servidor altera o personagem
     const w = new World(m.zone, { visuals: true });
-    this.world = w; this.mode = 'net'; this.netInfo = info; this.netRitual = null; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
+    this.world = w; this.mode = 'net'; this.netInfo = info; this.netRitual = null; this.netCrypt = null; this.cryptLast = null; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
     this.netActors = new Map(); this.netMobs = new Map(); this.netSnaps = []; this.netLast = null; this.netPred = null; this.netT = 0; this.netCastPending = null; this.netVProj = [];
     for (const p of m.players) this.netAddHero(p, m.you);
     this.player = this.netActors.get(m.you);
@@ -524,6 +529,7 @@ class Game {
     if (r.gold) parts.push(`${r.gold > 0 ? '+' : ''}${r.gold} ouro`);
     if (r.xp) parts.push(`+${r.xp} XP`);
     if (r.items) parts.push(`${r.items} item(ns)`);
+    if (r.frags) parts.push(`+${r.frags} Fragmento(s) de Eco`);
     if (r.potions) parts.push(`+${r.potions} 🧪`);
     if (parts.length) this.ui.log(parts.join(' · '), '#ffd27a');
     if (r.deaths) this.ui.log('Você caiu: −10% do ouro.', '#ffb4a8');
@@ -608,6 +614,7 @@ class Game {
     s.at = performance.now();
     this.netSnaps.push(s); if (this.netSnaps.length > 24) this.netSnaps.shift();
     this.netLast = s;
+    if (s.cr) this.onCryptHud(s.cr);
     if (s.rt) this.netRitual = { have: s.rt[0], need: s.rt[1], cool: s.rt[2] * 60, omen: !!s.rt[3], alive: !!s.rt[4] }; // ritual do chefe (instância); delta sem `rt` = não mudou
     const w = this.world, my = this.netInfo.team;
     if (w.objective && s.match) { w.objective.owner = s.match.owner ? (s.match.owner === my ? 1 : 2) : 0; }
@@ -656,6 +663,7 @@ class Game {
       case 'boss_warn': if (e.stage === 'omen') this.ui.toast('O chão estremece…', `${e.name} desperta`, 'gold'); else this.ui.log(`<b>${e.name}</b> surgiu!`, '#ffb4a8'); break;
       case 'phase': { const m = this.netEntity(e.actor); if (e.phase === 3) this.ui.toast('Enfurecido!', `${m?.name ?? 'O chefe'} entrou em fúria`, 'gold'); else this.ui.log(`${m?.name ?? 'O chefe'} acelera!`, '#ffb4a8'); break; }
       case 'wave': this.ui.toast(e.boss ? 'Onda final: o chefe!' : `Onda ${e.n}`, '', 'gold'); break;
+      case 'crypt': this.onCryptEvent(e); break;
       case 'wave_clear': this.ui.toast(`Onda ${e.n} vencida!`, 'Recuperem o fôlego…', 'gold'); break;
       case 'revive': if (a) w.burst(a.x, a.y, '#ffe9a0', 20, 160); break;
       case 'left': if (this.netInfo?.mode !== 'zone') this.ui.log('Um jogador saiu da partida.', '#ffb4a8'); break;
@@ -711,6 +719,7 @@ class Game {
       ent.dead = se.dead; ent.deadT = se.dead ? ent.deadT + dt : 0;
       ent.swing = se.swing ? Math.max(ent.swing, 0.1) : Math.max(0, ent.swing - dt);
       ent.stunT = se.stun ? 1 : 0; ent.shield = se.shield ?? 0;
+      if (!isMob && ent !== this.player && ent.lookCode !== se.look) { ent.lookCode = se.look; const lk = decodeLook(se.look); ent.spec = lk.spec; ent.mastery = lk.tier === 2; } // aura dos outros jogadores
       ent.hitFlash = Math.max(0, (ent.hitFlash ?? 0) - dt);
       if (se.moving) ent.walk += dt * (se.spd ?? 200) / 28;
     };
@@ -1367,6 +1376,35 @@ class Game {
     this.refreshStats();
     this.ui.render();
     this.save();
+  }
+
+  // ---- Cripta dos Ecos (masmorra por instância, decisão 0017; server/crypt.js) ----
+  // Entrada pelo nó do mapa: só online, e de uma cidade (na instância de um mapa de farm, volte à Vila). O servidor confere tudo e responde zone_joined (ou reject).
+  async enterCrypt() {
+    if (this.zoneBusy) return;
+    if (!(this.online && this.net?.joined)) return this.ui.toast('Cripta dos Ecos', 'A masmorra só abre com o servidor de partidas conectado.', '');
+    if (this.inNetZone()) return this.ui.toast('Cripta dos Ecos', CRYPT_REJECT.not_here, '');
+    if (this.mode !== 'explore') return;
+    this.zoneBusy = true; this.portalCd = 3;
+    setTimeout(() => { this.zoneBusy = false; }, 6000);
+    this.ui.closePanels();
+    await this.cloud?.flush(); // grava o progresso antes: o servidor confere nível e mapas visitados pelo documento salvo
+    this.net.send({ t: 'crypt_enter' });
+  }
+  // HUD da masmorra: tupla do servidor [sala, onda, ondas, fase, vivos, saída] (ui.js mostra no lugar do ritual)
+  onCryptHud(cr) { this.netCrypt = { room: cr[0], wave: cr[1], waves: cr[2], phase: cr[3], left: cr[4], exit: cr[5] }; }
+  onCryptEvent(e) {
+    const u = this.ui;
+    if (e.stage === 'wave') u.toast(`Sala ${e.room} · onda ${e.wave}/${e.waves}`, 'Eles vêm do fundo do eco…', 'gold');
+    else if (e.stage === 'clear') u.toast(`Sala ${e.room} limpa!`, 'A porta se abriu: siga em frente.', 'gold');
+    else if (e.stage === 'room') u.log(`Sala ${e.room} de ${e.rooms}`, '#9fe0ea');
+    else if (e.stage === 'boss') u.toast('O Soberano dos Ecos desperta!', 'Atenção aos avisos no chão.', 'gold');
+    else if (e.stage === 'victory') u.toast('Cripta vencida!', `O portal de saída abre em ${e.exit} s (ou volte pelo menu).`, 'gold');
+  }
+  // Forja do Eco (Ferreiro Brok): só online (fragmentos e ouro são do servidor).
+  craftEcho(id) {
+    if (this.serverTx({ op: 'craft', id }, (m) => { this.ui.toast('Forjado!', m.name, 'gold'); this.refreshStats(); })) return;
+    this.ui.toast('Ferreiro Brok', 'A forja do Eco só funciona com o servidor de partidas conectado.', '');
   }
 
   enhanceItem(id) {

@@ -26,11 +26,16 @@ export const MOBS_EXTRA = {
   magmaslime: { name: 'Geleia de Magma', art: 'slime', tint: { hue: -115, sat: 1.4, bri: 1.1 }, shape: 'slime', color: '#ff8a4a', temper: 0.6, hp: 1.1, atk: 0.9, speed: 95, range: 30, cd: 1.0, size: 16, aggro: 240, xp: 1.0 },
   emberwolf: { name: 'Lobo de Brasa', art: 'wolf', tint: { mul: [1.5, 0.85, 0.55], bri: 1.05 }, shape: 'wolf', color: '#ff7a4a', hp: 1.2, atk: 1.25, speed: 170, range: 34, cd: 0.8, size: 17, aggro: 320, xp: 1.2 },
   cinderwraith: { name: 'Espectro de Cinzas', art: 'wraith', tint: { hue: 140, sat: 1.4, bri: 1.05 }, shape: 'wraith', color: '#ffb066', hp: 1.0, atk: 1.3, speed: 125, kind: 'ranged', range: 290, projSpeed: 340, projColor: '#ffb066', cd: 1.35, size: 15, aggro: 330, xp: 1.25 },
+  // Cripta dos Ecos (masmorra, decisão 0017): recolores das criaturas pintadas das Ruínas (sem arte nova). O chefe usa a arte do Guardião: PROVISÓRIO (prompt em docs/roadmap/depende-do-dono.md).
+  echoshade: { name: 'Sombra do Eco', crypt: true, art: 'wraith', tint: { mul: [0.7, 1.2, 1.3], bri: 1.1 }, shape: 'wraith', color: '#7fe0d8', hp: 0.9, atk: 1.2, speed: 125, kind: 'ranged', range: 290, projSpeed: 340, projColor: '#9ff2ea', cd: 1.4, size: 15, aggro: 340, xp: 1.2 },
+  echoknight: { name: 'Sentinela do Eco', crypt: true, art: 'knight', tint: { mul: [0.8, 1.15, 1.3], sat: 0.8 }, shape: 'knight', color: '#6fb8c8', hp: 1.45, atk: 1.3, speed: 108, range: 40, cd: 1.1, size: 18, aggro: 300, xp: 1.35, def: 1.3 },
+  echobrute: { name: 'Gárgula Rúnica', crypt: true, art: 'gargoyle', tint: { mul: [0.9, 1.1, 1.4], bri: 1.05 }, shape: 'golem', color: '#7aa0d8', hp: 1.4, atk: 1.25, speed: 125, range: 38, cd: 1.0, size: 19, aggro: 320, xp: 1.3 },
+  echolord: { name: 'Soberano dos Ecos', crypt: true, art: 'guardian', tint: { mul: [0.75, 1.15, 1.45], sat: 1.1, bri: 1.05 }, shape: 'knight', color: '#58d0e0', hp: 20, atk: 2.6, speed: 88, range: 72, cd: 1.25, size: 46, aggro: 480, xp: 1, boss: true, def: 1.4 },
   infernoknight: { name: 'Cavaleiro Rubro', art: 'guardian', tint: { mul: [1.4, 0.55, 0.6], sat: 1.25, bri: 0.95 }, shape: 'knight', color: '#e0553a', hp: 16, atk: 3.2, speed: 90, range: 70, cd: 1.2, size: 46, aggro: 460, xp: 1, boss: true, def: 1.5 },
 };
 Object.assign(MOBS, MOBS_EXTRA);
 
-export const NORMAL_MOBS = Object.keys(MOBS).filter((id) => !MOBS[id].boss);
+export const NORMAL_MOBS = Object.keys(MOBS).filter((id) => !MOBS[id].boss && !MOBS[id].crypt);
 
 // ---- Curva de dificuldade (medida com tools/boss-check.mjs; números em docs/gameplay/dificuldade.md) ----
 // Base por nível do mob; hp/atk/def de cada MOBS são multiplicadores sobre ela. Calibrada contra a curva de poder do herói
@@ -62,6 +67,13 @@ export const BOSS_PHASES = {
   },
   // Último chefe: invoca esbirros pequenos a partir da fase 2.
   infernoknight: { summon: { mobId: 'magmaslime', every: 14, count: 2, max: 4, levelMinus: 9 } },
+  // Soberano dos Ecos: 2 fases (a 2ª abaixo de 50% de vida; p3 < 0 = sem enrage), golpes em área telegrafados e esbirros (Sombras do Eco) na fase 2.
+  echolord: {
+    p2: 0.5, p3: -1,
+    speed: [1, 1.2], atkSpeed: [1, 1.3], power: [1, 1.15],
+    slam: { r: [130, 165], mult: [2.0, 2.5], cd: [5.5, 3.4], delay: [1.2, 1.0] },
+    summon: { mobId: 'echoshade', every: 12, count: 2, max: 4, levelMinus: 8 },
+  },
 };
 
 // Reaparição dos chefes (por id de mob). Padrão: volta `respawn` s depois de morrer.
