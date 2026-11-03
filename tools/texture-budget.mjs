@@ -6,7 +6,11 @@ import { join } from 'node:path';
 const ROOT = 'public/labs/iso-poc/art-local/atlas-rig';
 const HEROES = { paladino: 'Guerreiro', aprendiz: 'Mago', franco: 'Arqueiro', sacerdote: 'Clérigo' };
 // Variantes de evolução (hero-sprites.js VARIANT_ATLASES): carregadas sob demanda no lugar do atlas da classe; o pior caso numa partida é a soma de todas.
-const VARIANTS = { paladin_sun: 'Paladino Maestria (Guerreiro nv 25)' };
+const VARIANTS = {
+  paladin_sun: 'Paladino Maestria', berserker_nv25: 'Berserker Maestria', sniper_nv25: 'Franco-atirador Maestria',
+  gunslinger_nv25: 'Pistoleiro Maestria', warlock_nv25: 'Bruxo Maestria', guardian_nv25: 'Guardiao Maestria',
+};
+const VARIANT_TEX_K = 0.8; // igual a hero-sprites.js: variantes ficam a 80% da escala em média/baixa
 const SCALES = [['alta', 1], ['média (padrão em celular)', 0.75], ['baixa', 0.5]];
 // ORÇAMENTO ASSUMIDO (não medido em aparelho): ≤ 64 MiB de texturas de herói em celulares de 2–3 GB de RAM.
 export const BUDGET_MIB = 64;
@@ -32,12 +36,14 @@ if (process.argv[1]?.endsWith('texture-budget.mjs')) {
     console.log(`  ${cls} (${id})`.padEnd(22) + row.join(''));
   }
   console.log('  TOTAL (4 classes)'.padEnd(22) + totals.map((t) => mib(t).padStart(28)).join(''));
-  const vt = SCALES.map(() => 0);
+  const vt = SCALES.map(() => 0); const vs = SCALES.map(() => []);
   for (const [id, nome] of Object.entries(VARIANTS)) {
     if (!existsSync(join(ROOT, id))) continue;
-    console.log(`  + ${id}`.padEnd(22) + SCALES.map(([, k]) => mib(heroBytes(id, k)).padStart(28)).join('') + `   (${nome})`);
-    SCALES.forEach(([, k], i) => { vt[i] += heroBytes(id, k); });
+    console.log(`  + ${id}`.padEnd(22) + SCALES.map(([, k]) => mib(heroBytes(id, k < 1 ? k * VARIANT_TEX_K : k)).padStart(28)).join('') + `   (${nome})`);
+    SCALES.forEach(([, k], i) => { const b = heroBytes(id, k < 1 ? k * VARIANT_TEX_K : k); vt[i] += b; vs[i].push(b); });
   }
   console.log('  TOTAL c/ variante'.padEnd(22) + totals.map((t, i) => mib(t + vt[i]).padStart(28)).join(''));
+  const v3 = SCALES.map((_, i) => totals[i] + vs[i].sort((x, y) => y - x).slice(0, 3).reduce((x, y) => x + y, 0));
+  console.log('  4 classes + 3 variantes'.padEnd(22) + v3.map((t) => mib(t).padStart(28)).join('') + '   (própria + 2 de outros, as maiores)');
   console.log(`\nOrçamento assumido: ${BUDGET_MIB} MiB. Partida 4×4 com as 4 classes: ` + SCALES.map(([n], i) => `${n}: ${totals[i] / 1048576 <= BUDGET_MIB ? 'dentro' : 'ACIMA'}`).join(' · '));
 }

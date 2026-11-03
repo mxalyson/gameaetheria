@@ -14,12 +14,17 @@ const FEET_Y = 12;                    // os pés do herói antigo ficam em a.y +
 // Visual de evolução de um personagem ou ator (arte do dono). tier 0 = comum, 1 = especialização (nv 15, aura), 2 = Maestria (nv 25, aura refinada).
 // `atlasVariant` é o id do atlas de variante (pasta em atlas-rig/) quando existe arte para `classe:spec:tier`; senão undefined e vale o atlas da classe + aura (render/aura.js).
 // Para acrescentar um herói de evolução: gerar o atlas (ver docs/art-direction/personagens-miniatura.md) e registrar aqui. Ver docs/art-direction/aura-evolucao.md.
-const VARIANT_ATLASES = { 'warrior:paladin:2': 'paladin_sun' }; // Paladino com a Maestria (Nv 25): "Cavaleiro do Sol"
+const VARIANT_ATLASES = { // Maestria (Nv 25): arte do dono por especialização; carrega sob demanda, com fallback ao atlas da classe
+  'warrior:paladin:2': 'paladin_sun', 'warrior:berserker:2': 'berserker_nv25',
+  'archer:sniper:2': 'sniper_nv25', 'archer:gunslinger:2': 'gunslinger_nv25',
+  'mage:warlock:2': 'warlock_nv25', 'cleric:guardian:2': 'guardian_nv25',
+};
 export function heroLook(o) {
   const tier = auraTier(o), spec = tier ? auraSpec(o) : null;
   return { tier, spec, atlasVariant: spec ? VARIANT_ATLASES[`${o?.classId}:${spec}:${tier}`] : undefined };
 }
 
+export const VARIANT_TEX_K = 0.8;
 export const stats = { drawn: 0, loaded: 0, texBytes: 0, texScale: 1 };
 
 // Escala das texturas (memória de GPU): cada herói tem ≈ 20–24 MiB decodificados em resolução cheia (4 classes ≈ 87 MiB).
@@ -58,7 +63,8 @@ function load(id) {
       const meta = await (await fetch(`${BASE}${id}/${id}.json`)).json();
       for (const name of Object.keys(meta.clips)) {
         const img = new Image(); img.src = `${BASE}${id}/${name}.png`; await img.decode();
-        const k = (stats.texScale = textureScale());
+        const k0 = (stats.texScale = textureScale());
+        const k = k0 < 1 && !Object.values(CLASS_TO_HERO).includes(id) ? k0 * VARIANT_TEX_K : k0; // variantes de evolução: um pouco menores em média/baixa (orçamento de memória; ver texture-budget)
         // reduz ao carregar: a imagem cheia é liberada e só a reduzida fica na memória de GPU
         const sheet = k < 1 ? await createImageBitmap(img, { resizeWidth: Math.round(img.naturalWidth * k), resizeHeight: Math.round(img.naturalHeight * k), resizeQuality: 'medium' }) : img;
         stats.texBytes += sheet.width * sheet.height * 4;

@@ -58,11 +58,16 @@ test('código de rede: ida e volta para os 8 specs x 2 tiers, 0 sem aura', () =>
 test('heroLook: atlas de variante só para Paladino com Maestria (Nv 25); demais seguem o atlas da classe', () => {
   assert.deepEqual(heroLook(hero('archer', 10, null)), { tier: 0, spec: null, atlasVariant: undefined });
   const l = heroLook(hero('archer', 25, 'gunslinger', true));
-  assert.equal(l.tier, 2); assert.equal(l.spec, 'gunslinger'); assert.equal(l.atlasVariant, undefined);
+  assert.equal(l.tier, 2); assert.equal(l.spec, 'gunslinger'); assert.equal(l.atlasVariant, 'gunslinger_nv25');
+  assert.equal(heroLook(hero('archer', 25, 'sniper', true)).atlasVariant, 'sniper_nv25');
+  assert.equal(heroLook(hero('mage', 25, 'warlock', true)).atlasVariant, 'warlock_nv25');
+  assert.equal(heroLook(hero('cleric', 25, 'guardian', true)).atlasVariant, 'guardian_nv25');
+  assert.equal(heroLook(hero('archer', 20, 'sniper', false)).atlasVariant, undefined, 'tier 1 usa o atlas base');
   assert.equal(heroLook(hero('warrior', 25, 'paladin', true)).atlasVariant, 'paladin_sun');
   assert.equal(heroLook(hero('warrior', 20, 'paladin', false)).atlasVariant, undefined, 'tier 1 (só especialização) usa o atlas base');
   assert.equal(heroLook({ classId: 'warrior', spec: 'paladin', mastery: true }).atlasVariant, 'paladin_sun', 'ator (jogo/rede) também');
-  assert.equal(heroLook(hero('warrior', 25, 'berserker', true)).atlasVariant, undefined);
+  assert.equal(heroLook(hero('warrior', 25, 'berserker', true)).atlasVariant, 'berserker_nv25');
+  assert.equal(heroLook(hero('mage', 25, 'arcane', true)).atlasVariant, undefined, 'Arcano ainda sem arte');
 });
 
 test('snapshot: aura viaja no 8º elemento da tupla e só quando existe', () => {

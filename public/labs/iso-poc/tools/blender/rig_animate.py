@@ -115,6 +115,7 @@ for i, (name, parent, hd, tl, r) in enumerate(bones):
         if not wp.get('rigid'): inside &= RAW[:, i] < body_raw * 0.8   # rigid: tudo dentro da cápsula é 100% do adereço (sem 'mole')
         if 'ymax' in wp: inside &= co[:, 1] <= yb_ + wp['ymax']          # corte por profundidade (ex.: escudo só a parte à frente do peito)
         if 'ymin' in wp: inside &= co[:, 1] >= yb_ + wp['ymin']
+        if 'xmax_px' in wp: inside &= co[:, 0] <= cx + (wp['xmax_px'] - 400) / S   # corte lateral (máximo)
         if 'xmin_px' in wp: inside &= co[:, 0] >= cx + (wp['xmin_px'] - 400) / S   # corte lateral (pixel da vista frontal): ex.: escudo não pega o ombro do mesmo lado
         Wt[inside] = 0; Wt[inside, i] = 1.0
 keep = np.argsort(-Wt, axis=1)[:, :4]
@@ -201,7 +202,8 @@ def attack(f, n, big=False):
         fa = [-0.2, -0.5, -0.7, -0.4, -0.3, -0.2]
         lean = [0, -0.08, -0.12, 0.12, 0.05, 0]; twist = [0, 0, 0, 0, 0, 0]
         o = [-0.2, -0.9, -1.3, -1.1, -0.6, -0.2]
-    rot = {W: [(AX, a[f] * k)], 'fore_arm.' + WS: [(AX, fa[f])], O: [(AX, o[f] * AMP)],
+    WA = spec.get('w_amp', 1.0)  # < 1: arma grande/rígida no braço (arco, cajado) não pode varrer o corpo
+    rot = {W: [(AX, a[f] * k * WA)], 'fore_arm.' + WS: [(AX, fa[f])], O: [(AX, o[f] * AMP)],
            'hips': [(AX, lean[f] * k), (AZ, twist[f] * k)], 'spine': [(AZ, twist[f] * 0.5)]}
     return dict(rot=rot, hipz=0.01 * f / n if f < 4 else 0.0)
 
@@ -210,7 +212,8 @@ def skill(f, n):
     arms = [-0.2, -0.4, -0.9, -1.5, -1.3, -0.7, -0.3, -0.1]
     lean = [0, -0.1, -0.2, 0.0, 0.3, 0.15, 0.05, 0]
     crouch = [0, 0.5, 0.2, 0, 0.2, 0.3, 0.1, 0]
-    rot = {'upper_arm.R': [(AX, arms[f])], 'upper_arm.L': [(AX, arms[f])], 'hips': [(AX, lean[f])],
+    WA = spec.get('w_amp', 1.0)  # braço da arma grande sobe menos (arco/cajado não cobre o rosto)
+    rot = {'upper_arm.R': [(AX, arms[f] * (WA if WS == 'R' else 1.0))], 'upper_arm.L': [(AX, arms[f] * (WA if WS == 'L' else 1.0))], 'hips': [(AX, lean[f])],
            'thigh.R': [(AX, -crouch[f])], 'thigh.L': [(AX, -crouch[f])], 'shin.R': [(AX, crouch[f] * 1.6)], 'shin.L': [(AX, crouch[f] * 1.6)],
            'head': [(AX, -0.1 if f < 3 else 0.1)]}
     return dict(rot=rot, hipz=up[f])
