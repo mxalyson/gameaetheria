@@ -3,8 +3,6 @@
 export const BLOCK = {
   arc: (140 * Math.PI) / 180, // arco frontal que protege
   reduce: 0.6,                // fração do dano removida num bloqueio
-  recoilStun: 0.4,            // s de atordoamento do atacante corpo a corpo
-  recoilReach: 150,           // px: acima disso o atacante é distante (projétil) e não sofre recuo
   stillT: 0.6,                // s parado encarando o alvo para ganhar o bônus
   stillBonus: 10,             // pontos percentuais de chance
   cap: 75,

@@ -609,7 +609,6 @@ export class World {
     if (t.stats.block > 0 && !opts.dot && src !== t && inFrontArc(t.facing, t.x, t.y, src.x, src.y) && this.rng.next() < blockChance(t.stats, t.stillT) * (src.kind === 'mob' ? 1 : BLOCK.pvpMul)) {
       mult *= 1 - BLOCK.reduce;
       blocked = true;
-      if (Math.hypot(src.x - t.x, src.y - t.y) <= BLOCK.recoilReach && src.kind === 'mob') src.stunT = Math.max(src.stunT, src.boss ? BLOCK.recoilStun * 0.3 : BLOCK.recoilStun);
     }
     const res = computeHit(this.rng,
       { power: src.stats.power, crit: src.stats.crit, critMult: src.stats.critMult, dmgBonus: this.buffVal(src, 'dmg') },

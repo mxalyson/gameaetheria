@@ -1171,12 +1171,12 @@ function duelo(seed, { shield, front = true, n = 400, ranged = false }) {
     p.hp = p.maxHp; p.stunT = 0; m.stunT = 0; p.x = 500; p.y = 500; m.x = front ? 530 : 470; m.y = 500; // o recuo de cada golpe empurra o herói: recoloca
     const before = w.events.length;
     w.damage(m, p, 1);
-    for (const e of w.events.slice(before)) { if (e.type === 'hit') hits++; if (e.type === 'block') { blocked++; assert.ok(m.stunT > 0 && m.stunT <= BLOCK.recoilStun + 1e-9); } }
+    for (const e of w.events.slice(before)) { if (e.type === 'hit') hits++; if (e.type === 'block') { blocked++; assert.equal(m.stunT, 0, 'bloquear não atordoa o atacante'); } }
   }
   return { blocked, hits };
 }
 
-test('bloqueio no sim: só com escudo e golpe frontal; taxa perto da chance; atordoa o atacante; determinístico', () => {
+test('bloqueio no sim: só com escudo e golpe frontal; taxa perto da chance; não atordoa o atacante; determinístico', () => {
   const a = duelo(11, { shield: true });
   assert.ok(a.blocked > 400 * 0.3 && a.blocked < 400 * 0.5, `taxa ${a.blocked}/400 (lendário 40%)`);
   assert.deepEqual(duelo(11, { shield: true }), a, 'mesma semente, mesmo resultado');
