@@ -46,8 +46,4 @@ export function saveChar(char) {
   write(KEY, JSON.stringify(char));
 }
 
-export function clearChar() {
-  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
-}
-
 export { parseSave, buildExport as exportSave };

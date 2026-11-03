@@ -15,7 +15,6 @@ export function hdWanted(search = '', dpr = 1, tier = 'medium') {
 }
 // hd_X substitui X (Quaternius) e m_X (Meshy)
 export const hdKey = (n) => 'hd_' + (n.startsWith('m_') ? n.slice(2) : n);
-export const hdReady = () => !!hdAtlas;
 // com o HD carregado, tipos de árvore passam a sortear só entre as variantes que têm versão HD (se houver 2+); árvores secas ficam como estão
 function applyHdVariants() {
   for (const tipos of Object.values(SET)) for (const cfg of Object.values(tipos)) {
@@ -73,8 +72,6 @@ export function loadNature() {
   })();
   return loading;
 }
-export const natureReady = () => !!atlas;
-export const spriteNames = () => (meta ? Object.keys(meta) : []);
 
 // que sprites cada tipo de decoração usa em cada zona (os que não estão aqui continuam no desenho antigo, ex.: árvores rosa e cristais da Planície)
 const P = (n, a, b) => { const o = []; for (let i = a; i <= b; i++) o.push(`${n}_${i}`); return o; };

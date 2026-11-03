@@ -18,7 +18,6 @@ function load() {
       img = i; used = c;
     }).catch(() => { img = null; });
 }
-export function prepareProps() { load(); }
 
 // Desenha o baú `c` com a base em (c.x, c.y + 14); `ready` = ainda não aberto (com brilho dourado pulsando).
 export function drawChestSprite(g, c, ready, t) {

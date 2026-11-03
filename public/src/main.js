@@ -29,7 +29,7 @@ import { claimDaily, ensureJournal, recordEvent, offeredBy, readyFor, activeFor,
 import { TIPS } from './data/dialogs.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
-import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue } from './shop.js';
+import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue, harborPrice } from './shop.js';
 import { TouchControls } from './touch.js';
 import { interactTarget } from './touch-logic.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality, resolveScale } from './prefs.js';
@@ -135,9 +135,9 @@ class Game {
       if (!this.portrait.matches) bad = !this.guard('update', () => this.step(dt)) || bad;
       bad = !this.guard('draw', () => {
         const p = this.player;
-        if (this.mode === 'explore' && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
-        const exploring = this.mode === 'explore';
-        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: exploring ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: exploring ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
+        if ((this.mode === 'explore' || this.inNetZone()) && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; if (this.mode === 'explore') this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
+        const exploring = this.mode === 'explore', chestView = exploring || this.inNetZone();
+        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: chestView ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: chestView ? this.chestsOpen : null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
         if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
         this.ui.updateHud(this);
         this.touch.update(this);
@@ -436,6 +436,7 @@ class Game {
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
+        txResult: (m) => this.onTxResult(m),
         zoneExit: (m) => this.leaveNetMatch(m),
         snap: (s) => this.onNetSnap(s),
         reward: (m) => this.onNetReward(m),
@@ -468,7 +469,7 @@ class Game {
   togglePanel(id) {
     if ((id === 'journal' || id === 'map') && this.mode !== 'explore' && !(id === 'map' && this.inNetZone())) return; // diário e mapa só no mundo normal (o mapa também abre na instância online: lá o nó da Vila é o retorno)
     if (id === 'party' && !this.online) return;
-    if (this.inNetZone() && ['inventory', 'character', 'spirits'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à Vila pelo Mapa para mexer no equipamento e nos atributos.', '');
+    if (this.inNetZone() && ['inventory', 'character'].includes(id)) return this.ui.toast('Na exploração online', 'Volte à Vila pelo Mapa para mexer no equipamento e nos atributos. Spirit e poções funcionam aqui.', '');
     this.ui.toggle(id);
   }
   async enterZoneOnline(zone, from) {
@@ -496,6 +497,7 @@ class Game {
     const st = computeStats(this.char);
     Object.assign(this.player, { stats: st, maxHp: st.maxHp, hp: st.maxHp, classId: this.char.classId, spec: activeSpec(this.char), level: this.char.level, x: m.x, y: m.y });
     this.netPred = { x: m.x, y: m.y };
+    this.spawnSpiritVisual();
     this.cam = this.renderer.camera(w, this.player);
     this.ui.banner(null);
     const z = w.zone;
@@ -523,6 +525,50 @@ class Game {
     for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     for (const id of r.achievements ?? []) this.announceAchievements([id]);
     try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char, { paused: true }); } } catch { /* tenta no próximo lote */ }
+  }
+
+  // ---------------- transações do servidor (P11.3/P11.4; server/tx.js) ----------------
+  // Online com o servidor de partidas conectado, loja, ferreiro, banco, contratos, missões, baú, poção e spirit são DECIDIDOS pelo servidor:
+  // o cliente só pede (nada local muda antes) e adota o documento oficial quando a resposta chega. Sem servidor conectado, segue o caminho local.
+  get txOnline() { return !!(this.online && this.net?.joined && this.charId != null && this.cloud?.charId != null); }
+  shopKind() { return this.ui.shopAnchor === 'harbor' ? 'harbor' : 'town'; }
+  // Devolve true se o pedido foi (ou será) enviado; `done(m)` roda com o resultado bem-sucedido, depois de adotar o documento.
+  serverTx(msg, done = null) {
+    if (!this.txOnline) return false;
+    (async () => {
+      const zone = this.inNetZone();
+      if (!zone) { await this.cloud.flush(); this.cloud.paused = true; } // grava o progresso ANTES; durante o pedido a nuvem não grava por cima da transação
+      const req = (this.txReq = (this.txReq ?? 0) + 1);
+      (this.txPending ??= new Map()).set(req, { op: msg.op, done, zone });
+      setTimeout(() => { if (this.txPending?.delete(req) && !this.inNetZone()) this.cloud.paused = false; }, 8000); // sem resposta: libera a nuvem
+      this.net.send({ t: 'tx', req, ...msg });
+    })();
+    return true;
+  }
+  async onTxResult(m) {
+    const pend = this.txPending?.get(m.req);
+    if (!pend) return;
+    this.txPending.delete(m.req);
+    const free = () => { if (!this.inNetZone() && !this.txPending.size) this.cloud.paused = false; };
+    if (!m.ok) { free(); if (m.code === 'cooldown' || m.code === 'full' || m.code === 'dead') return this.ui.log(m.reason, '#ffb4a8'); return this.ui.toast('Servidor', m.reason ?? 'Pedido recusado.', ''); }
+    if (m.sync) { // o servidor mudou o documento: relê o oficial e religa a nuvem na revisão nova
+      try { const r = await this.online.getCharacter(this.charId); this.char = r.character; this.cloud.attach(this.charId, r.rev, () => this.char, { paused: this.inNetZone() }); } catch { /* o próximo lote relê */ }
+    } else if (m.op === 'potion') this.char.potions = m.potions;
+    else if (m.op === 'spirit_set') this.char.activeSpirit = m.spirit;
+    free();
+    this.refreshShopStocks();
+    if (this.player && !this.inNetZone() && this.mode === 'explore') this.refreshStats();
+    if (m.levels && this.mode === 'explore') this.onLevelUp();
+    for (const id of m.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
+    this.announceAchievements(m.achievements ?? []);
+    pend.done?.(m);
+    if (this.ui.anyOpen()) this.ui.render();
+  }
+  // Spirit na instância: o servidor simula o de verdade (ataca, busca); aqui só um ator que segue o herói, para aparecer na tela.
+  spawnSpiritVisual() { if (this.inNetZone() && this.player) this.spawnSpirit(this.player, this.char); }
+  refreshShopStocks() {
+    this.shopLevel = null; this.refreshShop();
+    if (this.harborStock) this.harborStock = buildShopStock(this.char, { harbor: true });
   }
 
   enterNetMatch(m) {
@@ -709,6 +755,11 @@ class Game {
     w.telegraphs = w.telegraphs.filter((tg) => !tg.done);
     w.time += dt;
     w.updateVisuals(dt);
+    if (this.netInfo.mode === 'zone') {
+      const me = this.player, k = Math.min(1, dt * 6);
+      for (const sa of w.actors) if (sa.kind === 'spirit' && sa.owner === me.id) { sa.x += (me.x - 20 - sa.x) * k; sa.y += (me.y - 10 - sa.y) * k; }
+      this.nearChest = (w.zone.chests ?? []).find((c) => Math.hypot(c.x - me.x, c.y - me.y) < 70)?.id ?? null; // botão de interagir / dica do baú
+    }
     if (this.netInfo.mode === 'zone') { this.ui.banner(this.player.dead ? 'Você caiu… renasce na entrada em instantes' : null); return; }
     // faixa de informação da partida
     if (!this.netOver) {
@@ -1012,17 +1063,20 @@ class Game {
 
   // ---------------- Porto: banco e contratos ----------------
   bankPut(id) {
+    if (this.serverTx({ op: 'bank_deposit', id })) return;
     const r = depositItem(this.char, id);
     if (!r.ok) return this.ui.toast('Banco', r.reason, '');
     this.gameEvent({ type: 'bank' }); // missão do Porto (objetivo `bank`) e contador de depósitos
     this.ui.render(); this.save();
   }
   bankTake(id) {
+    if (this.serverTx({ op: 'bank_withdraw', id })) return;
     const r = withdrawItem(this.char, id);
     if (!r.ok) return this.ui.toast('Banco', r.reason, '');
     this.ui.render(); this.save();
   }
   dailyClaim(id) {
+    if (this.serverTx({ op: 'claim_daily', id }, (m) => this.ui.toast('Contrato entregue!', `+${m.reward.gold} ouro · +${m.reward.xp} XP · +${m.reward.potions} poção(ões)`, 'gold'))) return;
     const r = claimDaily(this.char, id);
     if (!r.ok) return this.ui.toast('Contrato', r.reason, '');
     const R = r.reward;
@@ -1056,12 +1110,18 @@ class Game {
   announceAchievements(list) { for (const id of list) this.ui.toast('Conquista!', ACH[id].name + (ACH[id].title ? ` · título "${ACH[id].title}"` : ''), 'gold'); }
 
   questAccept(id) {
+    if (this.serverTx({ op: 'quest_accept', id }, () => this.ui.toast('Missão aceita', QUESTS[id].name, 'gold'))) return;
     const r = acceptQuest(this.char, id);
     if (!r.ok) return this.ui.toast('Missão', r.reason, '');
     this.ui.toast('Missão aceita', QUESTS[id].name, 'gold');
     this.save(); this.ui.render();
   }
   questTurnIn(id) {
+    if (this.serverTx({ op: 'quest_turnin', id }, (m) => {
+      this.ui.toast('Missão concluída!', [QUESTS[id].name, m.reward.gold ? `+${m.reward.gold} ouro` : '', m.reward.xp ? `+${m.reward.xp} XP` : ''].filter(Boolean).join(' · '), 'gold');
+      for (const it of m.reward.items ?? []) this.ui.log(`Recompensa: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
+      if (id === 'maestria') { const mu = masteryUnlock(this.char.classId); this.ui.toast('Nova habilidade: ' + SKILLS[mu.id].name, SKILLS[mu.id].desc, 'gold'); }
+    })) return;
     const r = turnInQuest(this.char, id, this.rng);
     if (!r.ok) return this.ui.toast('Missão', r.reason, '');
     const R = r.reward;
@@ -1081,6 +1141,7 @@ class Game {
   // Botão de interagir (toque) e tecla E: NPC por perto conversa; senão abre o baú.
   interact() {
     const t = interactTarget(this.player, this.world);
+    if (this.inNetZone()) { if (t?.kind === 'chest' && !this.player.dead) this.useChest(t.ref.id); return; } // instância online: só o baú (NPCs e placas ficam nas cidades)
     if (t?.kind === 'npc') this.talk(t.ref);
     else if (t?.kind === 'chest') this.useChest(t.ref.id);
     else if (t?.kind === 'lore') this.readLore(t.ref);
@@ -1099,7 +1160,17 @@ class Game {
 
   useChest(id) {
     const chest = (this.world.zone.chests ?? []).find((c) => c.id === id);
-    if (!chest || this.mode !== 'explore') return;
+    if (!chest || (this.mode !== 'explore' && !this.inNetZone())) return;
+    if (this.inNetZone()) { // o servidor confere a distância, a recarga e sorteia o prêmio
+      if (this.chestsOpen?.has(id)) return this.ui.log('O baú está vazio por enquanto.', '#ffb4a8');
+      this.serverTx({ op: 'chest', id }, (m) => {
+        this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
+        this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${m.gold}`, size: 15, color: '#ffd34d' });
+        this.ui.chestReward({ gold: m.gold, item: m.item });
+        this.chestsOpen = new Set(Object.keys(this.char.chests ?? {}).filter((k) => !chestReady(this.char, k)));
+      });
+      return;
+    }
     const r = openChest(this.char, chest, this.world.zoneId, this.rng);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
     this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
@@ -1114,7 +1185,12 @@ class Game {
 
   usePotion() {
     const p = this.player, c = this.char;
-    if (this.inNetZone()) return this.ui.log('Poções ainda não funcionam nas instâncias do servidor (em breve).', '#ffb4a8');
+    if (this.inNetZone()) { // instância online: o servidor cura, debita a poção e controla a recarga de 8 s
+      if (p.dead || this.potionCd > 0 || p.hp >= p.maxHp) return;
+      if (!c.potions) return this.ui.log('Sem poções! Compre com a Mercadora Lia.', '#ffb4a8');
+      this.serverTx({ op: 'potion' }, () => { this.potionCd = 8; this.world.burst(p.x, p.y, '#ff7a8a', 14, 120); });
+      return;
+    }
     if (this.mode === 'pvp' || this.mode === 'net') return this.ui.log('Poções são proibidas nas partidas.', '#ffb4a8');
     if (p.dead || this.potionCd > 0) return;
     if (!c.potions) return this.ui.log('Sem poções! Compre com a Mercadora Lia.', '#ffb4a8');
@@ -1282,6 +1358,7 @@ class Game {
   }
 
   enhanceItem(id) {
+    if (this.serverTx({ op: 'enhance', id }, (m) => { this.ui.log(`${m.name} aprimorado para +${m.plus} (-${m.cost} ouro)`, '#ffd34d'); this.refreshStats(); })) return;
     const r = enhance(this.char, id);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
     const it = findGear(this.char, id);
@@ -1294,6 +1371,7 @@ class Game {
   sellPrice(it) { return this.ui.shopAnchor === 'harbor' && this.ui.isOpen('shop') ? harborSellValue(it) : sellValue(it); }
 
   sell(id) {
+    if (this.serverTx({ op: 'sell', id, shop: this.shopKind() }, (m) => this.ui.log(`Vendido (+${m.pay} ouro)`, '#ffd34d'))) return;
     const c = this.char, idx = c.inventory.findIndex((i) => i.id === id);
     if (idx < 0) return;
     const it = c.inventory[idx], pay = this.sellPrice(it);
@@ -1305,6 +1383,7 @@ class Game {
   }
 
   sellBulk(maxRarity) {
+    if (this.serverTx({ op: 'sell_bulk', n: maxRarity, shop: this.shopKind() }, (m) => this.ui.log(`${m.count} itens vendidos (+${m.pay} ouro)`, '#ffd34d'))) return;
     const c = this.char;
     const sold = c.inventory.filter((i) => RARITY[i.rarity].index <= maxRarity);
     if (!sold.length) return;
@@ -1354,6 +1433,7 @@ class Game {
   }
 
   evolveSpirit(id) {
+    if (this.inNetZone()) return this.ui.toast('Na exploração online', 'Evoluir, comprar e libertar spirits só na Vila.', '');
     const r = evolveSpirit(this.char, id);
     if (!r.ok) return this.ui.toast('Não dá para evoluir', r.reason, '');
     const sp = this.char.spirits.find((s) => s.id === id), S = SPIRITS[sp.type];
@@ -1382,13 +1462,15 @@ class Game {
 
   buyScroll(n) {
     if ((this.char.scrolls ?? 0) + n > SCROLL_MAX) return this.ui.toast('Pergaminhos', `Você já carrega o máximo (${SCROLL_MAX}).`, ''); // B25: recusa antes de gastar
-    if (!this.spend(PRICES.scroll(this.char.level) * n)) return;
+    if (this.serverTx({ op: 'buy_scroll', n, shop: this.shopKind() })) return;
+    if (!this.spend((this.shopKind() === 'harbor' ? harborPrice('scroll', this.char.level) : PRICES.scroll(this.char.level)) * n)) return;
     this.char.scrolls = (this.char.scrolls ?? 0) + n;
     this.ui.render(); this.save();
   }
 
   buyPotion(n) {
-    if (!this.spend(PRICES.potion(this.char.level) * n)) return;
+    if (this.serverTx({ op: 'buy_potion', n, shop: this.shopKind() })) return;
+    if (!this.spend((this.shopKind() === 'harbor' ? harborPrice('potion', this.char.level) : PRICES.potion(this.char.level)) * n)) return;
     this.char.potions += n;
     this.ui.render();
     this.save();
@@ -1398,6 +1480,7 @@ class Game {
     const harbor = this.ui.shopAnchor === 'harbor', stock = harbor ? this.harborStock : this.shopStock, it = stock[i];
     if (!it) return;
     if (this.char.inventory.length >= INVENTORY_SIZE) return this.ui.log('Inventário cheio.', '#ffb4a8');
+    if (this.serverTx({ op: 'buy_item', id: it.id, shop: harbor ? 'harbor' : 'town' }, (m) => this.ui.log(`Comprado: <b>${m.name}</b>`))) return;
     if (!this.spend(it.price ?? it.value * PRICES.itemMarkup)) return;
     stock.splice(i, 1);
     delete it.price; // só serve para exibir; o item guardado não leva o campo
@@ -1409,6 +1492,7 @@ class Game {
   }
 
   buyEssence(kind) {
+    if (this.inNetZone()) return this.ui.toast('Na exploração online', 'Evoluir, comprar e libertar spirits só na Vila.', '');
     const c = this.char;
     if (c.spirits.length >= MAX_SPIRITS) return this.ui.log('Limite de spirits atingido. Liberte algum primeiro.', '#ffb4a8');
     const cost = kind === 'prism' ? PRICES.prism(c.level) : PRICES.essence(c.level);
@@ -1419,6 +1503,7 @@ class Game {
   }
 
   setSpirit(id) {
+    if (this.serverTx({ op: 'spirit_set', id }, () => { this.spawnSpiritVisual(); })) return; // online: o servidor troca o spirit da instância e grava
     this.char.activeSpirit = id;
     this.spawnSpirit(this.player, this.char);
     this.ui.render();
@@ -1426,6 +1511,7 @@ class Game {
   }
 
   freeSpirit(id) {
+    if (this.inNetZone()) return this.ui.toast('Na exploração online', 'Evoluir, comprar e libertar spirits só na Vila.', '');
     const c = this.char, sp = c.spirits.find((s) => s.id === id);
     if (!sp) return;
     const gold = Math.round(30 * sp.level * SPIRIT_RARITY_MUL[sp.rarity]);

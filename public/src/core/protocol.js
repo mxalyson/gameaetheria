@@ -21,7 +21,19 @@ export const REJECT = {
   PARTY_FULL: 'party_full', PARTY_TOO_BIG: 'party_too_big', NO_SUCH_PLAYER: 'no_such_player', NO_INVITE: 'no_invite', ALREADY_IN_PARTY: 'already_in_party', SELF: 'self', MEMBER_OFFLINE: 'member_offline',
   BAD_ZONE: 'bad_zone', AUTH_REQUIRED: 'auth_required', BAD_SESSION: 'bad_session', BAD_CHARACTER: 'bad_character', ALREADY_ONLINE: 'already_online',
   NOT_VISITED: 'not_visited', NO_SCROLL: 'no_scroll', IN_COMBAT: 'in_combat', TELEPORT_WAIT: 'teleport_wait', NOT_AT_PORTAL: 'not_at_portal', // teletransporte online
+  TX_WAIT: 'tx_wait', NOT_HERE: 'not_here', // transações do servidor (P11.4): pedidos rápidos demais · serviço indisponível neste lugar (ex.: loja dentro da instância)
 };
+
+// Transações de personagem decididas pelo servidor (P11.3/P11.4): o cliente só PEDE (op + id/quantidade); preço, estoque, sorteio e ouro são do servidor.
+// `id` = item/missão/contrato/baú/spirit; `shop` = 'town' | 'harbor'; `n` = quantidade (poções/pergaminhos) ou raridade máxima (sell_bulk).
+export const TX_OPS = {
+  chest: { id: true }, potion: {}, spirit_set: { id: true },
+  buy_item: { id: true, shop: true }, buy_potion: { n: [1, 99], shop: true }, buy_scroll: { n: [1, 99], shop: true },
+  sell: { id: true, shop: true }, sell_bulk: { n: [0, 5], shop: true }, enhance: { id: true },
+  bank_deposit: { id: true }, bank_withdraw: { id: true }, claim_daily: { id: true },
+  quest_accept: { id: true }, quest_turnin: { id: true },
+};
+const TX_ID = /^[A-Za-z0-9_:.-]{1,48}$/;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -72,6 +84,15 @@ export function parseClientMessage(data) {
       return ZONES[data.zone]?.mobs && (data.from === 'town' || ZONES[data.from]?.mobs || ZONES[data.from]?.hub) ? { ok: true, msg: { t: 'zone_enter', zone: data.zone, from: data.from } } : { ok: false, code: REJECT.BAD_MESSAGE };
     case 'zone_teleport': // teletransporte para mapa já visitado: só o destino; visitado, pergaminho, combate e limite de uso são conferidos no servidor
       return typeof data.zone === 'string' && (data.zone === 'town' || ZONES[data.zone]?.mobs || ZONES[data.zone]?.hub) ? { ok: true, msg: { t: 'zone_teleport', zone: data.zone } } : { ok: false, code: REJECT.BAD_MESSAGE };
+    case 'tx': { // transação do servidor: lista branca de operações e de campos
+      const spec = typeof data.op === 'string' && Object.hasOwn(TX_OPS, data.op) ? TX_OPS[data.op] : null;
+      if (!spec) return { ok: false, code: REJECT.BAD_MESSAGE };
+      const msg = { t: 'tx', op: data.op, req: Number.isInteger(data.req) && data.req >= 0 && data.req < 2 ** 31 ? data.req : 0 };
+      if (spec.id) { if (typeof data.id !== 'string' || !TX_ID.test(data.id)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.id = data.id; }
+      if (spec.shop) { if (data.shop !== undefined && data.shop !== 'town' && data.shop !== 'harbor') return { ok: false, code: REJECT.BAD_MESSAGE }; msg.shop = data.shop ?? 'town'; }
+      if (spec.n) { if (!Number.isInteger(data.n) || data.n < spec.n[0] || data.n > spec.n[1]) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.n = data.n; }
+      return { ok: true, msg };
+    }
     case 'queue_cancel': case 'party_create': case 'party_leave': case 'zone_leave':
       return { ok: true, msg: { t: data.t } };
     case 'party_invite': case 'party_kick':

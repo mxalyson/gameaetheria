@@ -70,7 +70,7 @@ Relatórios completos com tabelas e correções sugeridas: `auditoria-visual.md`
 
 ## Técnico pendente
 - [ ] Prova de conceito **Canvas 2D × PixiJS** (decisão 0001 segue valendo).
-- [ ] Exploração PvE ainda é calculada no cliente (servidor só aplica limites de plausibilidade). **Decidido: instâncias solo/grupo. P11.1 (servidor) e P11.2 (cliente) feitas; faltam P11.3 a P11.6 (`docs/decisions/0015-exploracao-no-servidor-instancias.md`).**
+- [ ] Exploração PvE: **instâncias solo/grupo feitas (P11.1 a P11.4 e P11.6, 2026-11-03)**: baú, poção, spirit, loja, ferreiro, banco, contratos e missões são transações do servidor (`server/tx.js`); `plausible.js` tem o modo estrito (`STRICT_PVE=1`, DESLIGADO por padrão); pico de CPU −20% com resultado idêntico (teste de digest). **Falta:** ligar o modo estrito por padrão (migrar libertar/comprar/evoluir spirit, reciclar e a exploração local de contingência), equipamento e atributos dentro da instância, proximidade a NPC, e2e dos diálogos pelo servidor, picos do 1º tick e carga longa (`docs/decisions/0015-exploracao-no-servidor-instancias.md`).
 - [ ] Rodar `docs/roadmap/teste-android.md` no seu aparelho e me trazer FPS/RAM.
 - [x] Heróis em miniatura viraram o padrão (jogo e app instalado); `?visual=original` volta ao antigo. Monstros/NPCs/cenário seguem no visual antigo (fases B2–B5).
 - [ ] Picos de coleta de lixo no servidor (perfil `--cpu-prof` em carga longa; reuso de objetos).
@@ -249,3 +249,10 @@ Relatórios completos com tabelas e correções sugeridas: `auditoria-visual.md`
 - [ ] Missão `porto_duelo` segue só offline (`OFFLINE_TYPES`). Sem e2e no navegador para o HUD do ritual online e o duelo amistoso online.
 - [ ] Reescrita da linha de B15/B19–B30 e G11–G13 perdeu detalhes: conferir `auditoria-bugs.md`/`auditoria-jogabilidade.md`.
 - [ ] O que depende do dono: ver `docs/roadmap/depende-do-dono.md`.
+
+## Rodada 2026-11-03 (grande)
+- [x] P11.3/P11.4/P11.6 (transações do servidor `tx`, poção/spirit/baú na instância, otimização com digest determinístico); e2e do ritual online e do duelo amistoso online; 9 exports mortos removidos (restam `ACHIEVEMENT_IDS`, `QUEST_IDS`, `BOSS_MOBS`, `ARMOR_TYPES` em `data/`).
+- [ ] `STRICT_PVE` (plausible.js) segue DESLIGADO: ainda há ganhos locais (libertar/comprar/evoluir spirit, reciclar, exploração de contingência). Ligar só depois de virarem transação.
+- [ ] Servidor sem checagem de proximidade ao NPC; objetivos `visit`, `teleport`, `lore`, `spiritStage` ainda somados pelo cliente.
+- [ ] Duelos: Guerreiro/Arqueiro Nv30 duram 17–18 s (meta 20–40); ciclos Mago×Clérigo 89% e Mago×Arqueiro 14% parecem vir da IA (kiting), não dos números.
+- [ ] NÃO feitos por não haver como validar aqui ou por exigirem decisão: PostgreSQL (sem servidor Postgres nesta máquina; exige dependência nova), snapshots binários/compressão, Canvas 2D × PixiJS (decisão 0001 vale), Docker (Dockerfile/compose existem, nunca construídos: sem Docker instalado), SIGTERM real no Linux, rede real, CAPTCHA.

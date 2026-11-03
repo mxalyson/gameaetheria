@@ -12,7 +12,6 @@ export const NPC_ALIAS = {
   duelist: { art: 'arena', tint: { hue: 12, sat: 1.15, bri: 1 } },     // mestre da arena em rubro
   captain: { art: 'guard', tint: { hue: 40, sat: 1, bri: 1.05 } },     // soldado em azul-mar
 };
-export const npcArt = (id) => NPC_ALIAS[id]?.art ?? id;
 const WORLD_PER_PX = 0.4; // altura no mundo = altura da imagem (px) × isto: mantém as proporções entre os NPCs
 const items = new Map();
 export const stats = { drawn: 0 };

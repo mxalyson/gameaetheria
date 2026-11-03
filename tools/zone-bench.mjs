@@ -11,6 +11,7 @@ for (let r = 0; r < rooms; r++) {
   const room = new ZoneRoom({ id: r + 1, key: 'k' + r, zoneId: ['forest', 'plains', 'ruins'][r % 3], seed: 100 + r, db: null, send: sent });
   for (let i = 0; i < per; i++) {
     const doc = { ...newOfficialCharacter('B' + r + i, ['warrior', 'mage', 'archer', 'cleric'][i % 4]), level: 8 };
+    if (process.env.NOSPIRIT) { doc.spirits = []; doc.activeSpirit = null; } // compara o custo sem o ator do spirit
     const s = { char: doc, name: doc.name, ws: {}, room: null, player: null };
     const p = room.join(s, { x: 600 + i * 40, y: 900 });
     p.input = { mx: 0, my: 0, aimX: 0, aimY: 0, attack: true, cast: null };

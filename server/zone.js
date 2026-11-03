@@ -3,7 +3,7 @@
 // envia intenções. Recompensas acumulam por jogador e são gravadas em lote numa operação idempotente (a cada FLUSH_EVERY s, ao sair e ao fechar).
 // Mesma interface das outras salas (o Hub trata todas igual). Loot é individual: cada membro rola o seu (classe própria → arma certa).
 import { randomBytes } from 'node:crypto';
-import { World, makeHeroActor } from '../public/src/game/sim.js';
+import { World, makeHeroActor, makeSpiritActor } from '../public/src/game/sim.js';
 import { makeRng } from '../public/src/core/rng.js';
 import { mobXp, createSpirit } from '../public/src/core/progression.js';
 import { rollMobLoot } from '../public/src/core/loot.js';
@@ -11,6 +11,7 @@ import { applyZoneBatch } from '../public/src/core/rewards.js';
 import { MOBS, XP_MULT } from '../public/src/data/mobs.js';
 import { ZONES } from '../public/src/data/zones.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
+import { POTION_HEAL, POTION_COOLDOWN } from './tx.js';
 import { wire } from './wire.js';
 import { DeltaEncoder, actorTuple, mobTuple, mobStatic } from './snapshot.js';
 
@@ -54,9 +55,34 @@ export class ZoneRoom {
     const p = { actor, team: 1, session, bot: false, left: false, charId: session.charId ?? null, accountId: session.accountId ?? null,
       name: session.name, classId: session.char.classId, lastSeq: -1, input: idle(), dropT: null, slot: 1, entry: { ...at }, deadAt: null, portalCd: 1, pend: emptyBatch(), pity: { epic: 0, legendary: 0, opal: 0, ...(session.char.pity ?? {}) } }; // pity: azar acumulado do personagem (loot.js); o servidor grava de volta no lote
     this.players.set(actor.id, p);
+    this.spawnSpirit(p);
     session.room = this; session.player = p;
     this.joined.push(p);
     return p;
+  }
+
+  // Spirit ativo do documento como ator da sala (ataca, busca e dá o bônus de velocidade do Zéfiro, igual ao jogo). Troca de spirit = chamar de novo.
+  spawnSpirit(p) {
+    const w = this.world, c = p.session?.char;
+    w.actors = w.actors.filter((a) => !(a.kind === 'spirit' && a.owner === p.actor.id));
+    const sp = c?.spirits?.find((x) => x.id === c.activeSpirit);
+    p.actor.speedMul = sp?.type === 'zephyr' ? 1.12 : 1;
+    if (sp) w.add(makeSpiritActor(sp, p.actor));
+  }
+
+  // Poção: pode usar? (vivo, vida incompleta, recarga). Devolve o código de recusa ou null. O débito da poção é feito pela transação (server/tx.js).
+  potionProblem(p) {
+    if (p.left || p.actor.dead) return 'dead';
+    if (p.actor.hp >= p.actor.maxHp) return 'full';
+    if (this.clock < (p.potionAt ?? -Infinity) + POTION_COOLDOWN) return 'cooldown';
+    return null;
+  }
+  // Depois de uma transação aplicada com sucesso: efeitos na simulação (cura da poção, spirit novo, nível/atributos do documento novo).
+  afterTx(p, m, doc) {
+    if (p.session) p.session.char = doc;
+    if (m.op === 'potion') { p.potionAt = this.clock; this.world.heal(p.actor, p.actor.maxHp * POTION_HEAL); }
+    else if (m.op === 'spirit_set') this.spawnSpirit(p);
+    this.syncLevel(p, doc);
   }
 
   input(session, m) {
@@ -75,20 +101,23 @@ export class ZoneRoom {
       if (!p.left && p.session && !p.session.ws && p.dropT != null && this.clock - p.dropT > this.reconnectSec) this.leave(p, 'timeout');
     }
     const intents = {};
+    let ref = null; // primeiro jogador vivo (referência dos respawns), sem montar arrays
     for (const p of this.players.values()) {
       if (p.left) continue;
       intents[p.actor.id] = p.actor.dead ? { mx: 0, my: 0 } : { ...p.input };
       p.input.cast = null;
+      if (!ref && !p.actor.dead) ref = p.actor;
     }
-    const ref = this.alive()[0]?.actor;
     if (ref) this.world.updateSpawns(TICK_DT, ref);
     this.world.update(TICK_DT, intents);
-    for (const ev of this.world.events.splice(0)) {
+    const evs = this.world.events;
+    for (let i = 0; i < evs.length; i++) { const ev = evs[i];
       if (ev.type === 'death' && ev.actor.kind === 'mob') this.onMobKilled(ev.actor);
       else if (ev.type === 'death' && ev.actor.kind === 'player') this.onPlayerDeath(ev.actor);
       else if (ev.type === 'cast' && ev.actor.kind === 'player') this.players.get(ev.actor.id)?.pend.skills.push(ev.skill); // Prova do Mestre / Maestria (skillUse)
       const w = wire(ev); if (w) this.events.push(w);
     }
+    evs.length = 0;
     for (const p of this.players.values()) {
       if (p.left) continue;
       const a = p.actor;
@@ -173,7 +202,7 @@ export class ZoneRoom {
     if (p.left) return;
     this.flush(p);
     p.left = true;
-    this.world.actors = this.world.actors.filter((a) => a !== p.actor);
+    this.world.actors = this.world.actors.filter((a) => a !== p.actor && !(a.kind === 'spirit' && a.owner === p.actor.id));
     this.left.push(p.actor.id);
     if (p.session) { p.session.room = null; p.session.player = null; }
     this.events.push({ e: 'left', actor: p.actor.id });
@@ -195,7 +224,9 @@ export class ZoneRoom {
   frameFor(commit) {
     const tuples = [...this.players.values()].filter((p) => !p.left).map((p) => actorTuple(p.actor, !!p.session?.ws));
     const ms = this.mobs().filter((m) => !m.dead || m.deadT < 0.6);
-    return this.enc.frame(tuples, ms.map(mobTuple), new Map(ms.map((m) => [m.id, mobStatic(m)])), { commit, forceKey: !commit });
+    const byId = (this._msById ??= new Map()); byId.clear(); // reutilizado: o estático só é montado para monstros novos (frame chama por id)
+    for (const m of ms) byId.set(m.id, m);
+    return this.enc.frame(tuples, ms.map(mobTuple), (id) => { const m = byId.get(id); return m ? mobStatic(m) : undefined; }, { commit, forceKey: !commit });
   }
   // Ritual do chefe final para o HUD: [abates, necessário, recarga em minutos, presságio 0|1, chefe vivo 0|1]; null se a zona não tem ritual.
   // Vai só quando muda (e em todo quadro-chave): a recarga é em minutos inteiros, então são poucos envios.

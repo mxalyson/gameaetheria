@@ -62,11 +62,31 @@ const plusById = (c) => new Map(gearList(c).map((i) => [i.id, i.plus ?? 0]));
 const spiritIds = (c) => new Set((c.spirits ?? []).map((s) => s.id));
 
 // Devolve { ok:true, doc } com os campos "do servidor" restaurados, ou { ok:false, reason }.
-export function checkSave(oldDoc, neuDoc, now = Date.now()) {
+// Modo ESTRITO de PvE (P11.3), para servidor com a exploração autoritativa: o que o PvE rende é decidido SÓ pelo servidor (lotes da instância
+// e transações de server/tx.js), então um salvamento do cliente que AUMENTA XP/nível, ouro, poções, itens, aprimoramento, abates, baús ou
+// missões concluídas é recusado. Gastar ouro, mover/equipar itens, distribuir pontos e trocar spirit seguem valendo. O que o cliente ainda
+// ganha por conta própria (libertar spirit, comprar essência, reciclar) NÃO está coberto: por isso o modo é opcional (STRICT_PVE=1) até migrar.
+export const PVE_STATS = ['kills', 'bossKills', 'chests', 'spiritKills', 'skillUses', 'upgrades', 'deposits', 'contracts', 'quests'];
+export function pveProblem(old, neu) {
+  if (neu.level > old.level || totalXp(neu) > totalXp(old)) return 'pve_xp';
+  if (neu.gold > old.gold) return 'pve_gold';
+  if (neu.potions > old.potions) return 'pve_potions';
+  const had = itemIds(old);
+  for (const id of itemIds(neu)) if (!had.has(id)) return 'pve_items';
+  const plusOld = plusById(old);
+  for (const [id, p] of plusById(neu)) if (p > (plusOld.get(id) ?? 0)) return 'pve_plus';
+  for (const k of PVE_STATS) if ((neu.stats[k] ?? 0) > (old.stats[k] ?? 0)) return 'pve_stat_' + k;
+  for (const id of Object.keys(neu.quests.done)) if (old.quests.done[id] == null) return 'pve_quest';
+  for (const id of Object.keys(neu.chests ?? {})) if (old.chests[id] == null || neu.chests[id] > old.chests[id]) return 'pve_chest';
+  return null;
+}
+
+export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   const old = ensureJournal(structuredClone(oldDoc)), neu = ensureJournal(structuredClone(neuDoc));
   if (neu.classId !== old.classId) return { ok: false, reason: 'class_changed' };
   if (neu.name !== old.name) return { ok: false, reason: 'name_changed' };
   if (neu.created !== old.created) return { ok: false, reason: 'created_changed' };
+  if (opts.strictPve) { const bad = pveProblem(old, neu); if (bad) return { ok: false, reason: bad }; }
   if (neu.level < old.level) return { ok: false, reason: 'level_decreased' };
   if (neu.level > old.level + LIMITS.levelJump) return { ok: false, reason: 'level_jump' };
   if (neu.gold - old.gold > LIMITS.goldBase + LIMITS.goldPerLevel * neu.level) return { ok: false, reason: 'gold_jump' };

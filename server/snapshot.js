@@ -3,6 +3,8 @@
 import { F, KEYFRAME_EVERY } from '../public/src/core/snapshot.js';
 
 const r1 = (n) => Math.round(n * 10) / 10;
+// Tuplas são comparadas elemento a elemento com a anterior (guardada por referência: nunca é alterada depois); antes viravam texto a cada quadro.
+const sameT = (a, b) => { if (!b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
 export const actorTuple = (a, online, extra = 0) => [a.id, r1(a.x), r1(a.y), Math.round(a.hp), Math.round(a.facing * 100),
   (a.dead ? F.DEAD : 0) | (a.moving ? F.MOVING : 0) | (a.swing > 0 ? F.SWING : 0) | (a.stunT > 0 ? F.STUN : 0) | (online ? 0 : F.OFFLINE) | extra, Math.round(a.shield)];
 export const mobTuple = (m) => [m.id, r1(m.x), r1(m.y), Math.round(m.hp), Math.round(m.facing * 100), (m.dead ? F.DEAD : 0) | (m.moving ? F.MOVING : 0) | (m.swing > 0 ? F.SWING : 0)];
@@ -19,16 +21,23 @@ export class DeltaEncoder {
   constructor() { this.prevA = new Map(); this.prevM = new Map(); this.known = new Set(); this.count = 0; }
 
   // commit=false gera um quadro-chave SEM alterar o estado do codificador (usado para quem reconecta no meio da partida)
+  // Sem alocar à toa (P11.6): sem texto por tupla (compara elemento a elemento) e laços simples no lugar de filter/map encadeados. Saída idêntica.
+  // `mobStatics`: Map id -> estático, ou função id -> estático (só chamada para monstros novos: evita montar o estático de todos a cada quadro).
   frame(actorTuples, mobTuples = [], mobStatics = new Map(), { commit = true, forceKey = false } = {}) {
     const key = forceKey || this.count % KEYFRAME_EVERY === 0;
-    const pick = (list, prev) => list.filter((t) => key || prev.get(t[0]) !== t.join(','));
-    const a = pick(actorTuples, this.prevA), m = pick(mobTuples, this.prevM);
-    const alive = new Set(mobTuples.map((t) => t[0]));
-    const n = [...alive].filter((id) => forceKey && !commit ? true : !this.known.has(id)).map((id) => mobStatics.get(id)).filter(Boolean);
-    const g = commit ? [...this.known].filter((id) => !alive.has(id)) : [];
+    const a = [], m = [];
+    for (let i = 0; i < actorTuples.length; i++) if (key || !sameT(actorTuples[i], this.prevA.get(actorTuples[i][0]))) a.push(actorTuples[i]);
+    for (let i = 0; i < mobTuples.length; i++) if (key || !sameT(mobTuples[i], this.prevM.get(mobTuples[i][0]))) m.push(mobTuples[i]);
+    const alive = new Set();
+    for (const t of mobTuples) alive.add(t[0]);
+    const n = [];
+    const fresh = forceKey && !commit;
+    for (const id of alive) if (fresh || !this.known.has(id)) { const st = typeof mobStatics === 'function' ? mobStatics(id) : mobStatics.get(id); if (st) n.push(st); }
+    const g = [];
+    if (commit) for (const id of this.known) if (!alive.has(id)) g.push(id);
     if (commit) {
-      for (const t of actorTuples) this.prevA.set(t[0], t.join(','));
-      for (const t of mobTuples) this.prevM.set(t[0], t.join(','));
+      for (let i = 0; i < actorTuples.length; i++) this.prevA.set(actorTuples[i][0], actorTuples[i]);
+      for (let i = 0; i < mobTuples.length; i++) this.prevM.set(mobTuples[i][0], mobTuples[i]);
       for (const id of g) { this.known.delete(id); this.prevM.delete(id); }
       for (const id of alive) this.known.add(id);
       this.count++;

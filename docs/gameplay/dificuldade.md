@@ -204,3 +204,15 @@ Ajustes em dados: Arqueiro (ataque básico 0,7 → 0,6; Tiro Perfurante 2,3 → 
 | 30 com Maestria depois | 50% | 46% | 47% | 51% |
 
 Duelos de 14 a 28 s (abaixo de 20 s só o Guerreiro e o Arqueiro com Maestria). Início (`node tools/boss-check.mjs --only early`): contra 2 lobos do mesmo nível o Clérigo vence 100% (perde 64% da vida no Nv 4); Guerreiro 80% no Nv 4 (perde 80%), Arqueiro 90%.
+
+### Rodada de duelos 2 (2026-11-03): durabilidade em nível alto e Clérigo
+Mudanças: vida +12 por nível acima do 4 (`core/stats.js`; início do jogo intacto, nível 4 = antes); Guerreiro Força 2,9 → 3,0 por nível; Colosso: investida 1,2 → 1,0 e impacto 1,8 → 1,2; Tempestade de Flechas 2,0 → 1,9 por rajada; Meteoro 19 → 21; Clérigo Int 3,5 → 3,65, Luz Sagrada cura 18% → 16%, Julgamento 2,4 → 2,6. Testado e descartado: defesa por Vit (favorece o Clérigo e prejudica o Arqueiro), vida base de Mago/Arqueiro, recarga do Tiro Perfurante e da Nova de Gelo (não mexem no ciclo Mago × Arqueiro).
+
+| Nível | Guerreiro | Mago | Arqueiro | Clérigo |
+|---|---|---|---|---|
+| 20 antes | 46% · 14 s | 53% · 26 s | 48% · 25 s | 45% · 19 s |
+| 20 depois | 45% · 16 s | 55% · 29 s | 47% · 28 s | 46% · 22 s |
+| 30 Maestria antes | 50% · 14 s | 46% · 19 s | 47% · 14 s | 51% · 26 s |
+| 30 Maestria depois | 45% · 17 s | 44% · 23 s | 43% · 18 s | 53% · 30 s |
+
+Pendente: Guerreiro ainda abaixo de 20 s (mata Mago/Arqueiro rápido) e ciclos Mago × Clérigo (89%) e Mago × Arqueiro (14%) no Nv 20 seguem; o Guerreiro perde 7% para o Clérigo no Nv 30. Início (`boss-check --only early`, 2 lobos Nv 4): Guerreiro 80% (igual), Clérigo 100% (igual, perde 64% da vida), Arqueiro 90%. PvE: chefes e ondas praticamente iguais (coop 4j Nv20 sobe de 88% para 100%).

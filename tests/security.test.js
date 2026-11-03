@@ -21,10 +21,10 @@ function rand(depth = 0) {
     case 0: return null; case 1: return rng.chance(0.5); case 2: return pick(WEIRD_NUM); case 3: return pick(WEIRD_STR);
     case 4: return rng.int(-1000, 1000); case 5: return undefined;
     case 6: return Array.from({ length: rng.int(0, 4) }, () => rand(depth + 1));
-    default: { const o = {}; for (let i = 0; i < rng.int(0, 6); i++) o[pick(['t', 'v', 'mode', 'name', 'seq', 'mx', 'my', 'aimX', 'aimY', 'attack', 'cast', 'partyId', 'session', 'characterId', 'token', 'classId', '__proto__', 'constructor', 'ts'])] = rand(depth + 1); return o; }
+    default: { const o = {}; for (let i = 0; i < rng.int(0, 6); i++) o[pick(['t', 'v', 'mode', 'name', 'seq', 'mx', 'my', 'aimX', 'aimY', 'attack', 'cast', 'partyId', 'session', 'characterId', 'token', 'classId', '__proto__', 'constructor', 'ts', 'op', 'id', 'n', 'shop', 'req'])] = rand(depth + 1); return o; }
   }
 }
-const TYPES = ['hello', 'input', 'ping', 'queue', 'queue_cancel', 'party_create', 'party_invite', 'party_accept', 'party_decline', 'party_leave', 'party_kick', 'damage', 'x'];
+const TYPES = ['hello', 'input', 'ping', 'queue', 'queue_cancel', 'party_create', 'party_invite', 'party_accept', 'party_decline', 'party_leave', 'party_kick', 'damage', 'x', 'tx', 'tx', 'tx'];
 
 test('fuzz do protocolo: 30 000 entradas aleatórias nunca lançam exceção e o que passa é limpo e limitado', () => {
   let ok = 0;
@@ -38,6 +38,7 @@ test('fuzz do protocolo: 30 000 entradas aleatórias nunca lançam exceção e o
       ok++;
       const m = r.msg;
       if (m.t === 'input') { for (const k of ['mx', 'my']) assert.ok(Number.isFinite(m[k]) && Math.abs(m[k]) <= 1); for (const k of ['aimX', 'aimY']) assert.ok(Number.isFinite(m[k]) && Math.abs(m[k]) <= 10000); assert.ok(Number.isInteger(m.seq) && m.seq >= 0); assert.ok([null, 0, 1, 2].includes(m.cast)); }
+      if (m.t === 'tx') { assert.ok(['chest', 'potion', 'spirit_set', 'buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk', 'enhance', 'bank_deposit', 'bank_withdraw', 'claim_daily', 'quest_accept', 'quest_turnin'].includes(m.op)); if (m.n !== undefined) assert.ok(Number.isInteger(m.n) && m.n >= 0 && m.n <= 99); if (m.id !== undefined) assert.match(m.id, /^[A-Za-z0-9_:.-]{1,48}$/); assert.ok(Object.keys(m).every((k) => ['t', 'op', 'req', 'id', 'shop', 'n'].includes(k))); }
       if (m.t === 'hello') { assert.ok(!/[<>"&]/.test(m.name ?? '') ); }
       assert.ok(!Object.keys(m).includes('__proto__'), 'sem chaves perigosas'); assert.ok(Object.getPrototypeOf(m) === Object.prototype);
     }

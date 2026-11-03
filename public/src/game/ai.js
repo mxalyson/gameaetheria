@@ -7,26 +7,36 @@ import { riverX } from './layout.js';
 
 // Rio: a água bloqueia o movimento (não os projéteis). Se a reta até (tx, ty) cruza um rio, devolve o próximo ponto de passagem
 // pela ponte que menos desvia do caminho (margem de aproximação -> pela lacuna -> margem oposta); senão null.
+// Ponto de passagem reutilizado (P11.6): waterWaypoint roda várias vezes por tick por monstro e alocava 2 objetos por ponte; quem chama lê x/y na hora.
+const WP = { x: 0, y: 0 };
 export function waterWaypoint(w, a, tx, ty) {
   const rivers = w.layout.rivers;
   if (!rivers?.length) return null;
-  let best = null, bc = Infinity;
+  let found = false, bc = Infinity;
   for (const rv of rivers) {
     const sa = Math.sign(a.x - riverX(rv, a.y)), sb = Math.sign(tx - riverX(rv, ty));
     if (!sa || sa === sb) continue; // mesma margem: caminho livre
     const off = rv.w / 2 + 75;
     for (const b of rv.bridges) {
-      const ap = { x: b.x + sa * off, y: b.y }, ex = { x: b.x - sa * off, y: b.y };
-      const c = Math.hypot(ap.x - a.x, ap.y - a.y) + 2 * off + Math.hypot(tx - ex.x, ty - ex.y);
-      if (c < bc) { bc = c; best = Math.abs(a.y - b.y) <= b.hw - 14 ? ex : ap; }
+      const apx = b.x + sa * off, exx = b.x - sa * off; // margem de aproximação / margem oposta (y = b.y nas duas)
+      const c = Math.hypot(apx - a.x, b.y - a.y) + 2 * off + Math.hypot(tx - exx, ty - b.y);
+      if (c < bc) {
+        bc = c; found = true;
+        WP.x = Math.abs(a.y - b.y) <= b.hw - 14 ? exx : apx; WP.y = b.y;
+      }
     }
   }
-  return best;
+  return found ? WP : null;
 }
 
-const toward = (a, x, y, spd = 1, w = null) => {
-  const wp = w && waterWaypoint(w, a, x, y);
-  return { mx: (wp ?? { x }).x - a.x, my: (wp ?? { y }).y - a.y, aimX: x, aimY: y, spd };
+// Intenção do monstro reutilizada (uma por monstro): a simulação consome na hora (applyIntent) e ninguém a guarda. Todos os campos são
+// reescritos a cada chamada (spd/cast `undefined` = ausente, igual ao objeto novo de antes).
+const intentFor = (m) => (m.ai.it ??= { mx: 0, my: 0, aimX: 0, aimY: 0, spd: undefined, attack: false, cast: undefined });
+const toward = (m, x, y, spd = 1, w = null) => {
+  const wp = w && waterWaypoint(w, m, x, y);
+  const it = intentFor(m);
+  it.mx = (wp ? wp.x : x) - m.x; it.my = (wp ? wp.y : y) - m.y; it.aimX = x; it.aimY = y; it.spd = spd; it.attack = false; it.cast = undefined;
+  return it;
 };
 
 export function mobIntent(m, w, dt) {
@@ -67,7 +77,8 @@ export function mobIntent(m, w, dt) {
     telegraph(w, m, tgt.x, tgt.y, 90, 1.5, 1.2, M.color);
     m.cds.slam = 7;
   }
-  const it = { aimX: tgt.x, aimY: tgt.y, mx: 0, my: 0, attack: false };
+  const it = intentFor(m);
+  it.aimX = tgt.x; it.aimY = tgt.y; it.mx = 0; it.my = 0; it.attack = false; it.spd = undefined; it.cast = undefined;
   if (M.kind === 'ranged') {
     if (d > M.range * 0.85) { const wp = waterWaypoint(w, m, tgt.x, tgt.y) ?? tgt; it.mx = wp.x - m.x; it.my = wp.y - m.y; }
     else if (d < M.range * 0.4) { it.mx = m.x - tgt.x; it.my = m.y - tgt.y; it.spd = 0.7; }

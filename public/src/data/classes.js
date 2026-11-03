@@ -6,7 +6,7 @@ export const CLASSES = {
   warrior: {
     id: 'warrior', name: 'Guerreiro', icon: '⚔️', color: '#e0635a', accent: '#f4c7a1',
     desc: 'Linha de frente. Muita vida e defesa, golpes corpo a corpo em área.',
-    primary: 'str', base: { str: 9, agi: 4, int: 2, vit: 9 }, growth: { str: 2.9, agi: 1, int: 0, vit: 3.2 },
+    primary: 'str', base: { str: 9, agi: 4, int: 2, vit: 9 }, growth: { str: 3.0, agi: 1, int: 0, vit: 3.2 },
     hpBase: 180, weapon: 'sword',
     basic: { kind: 'melee', range: 74, arc: 1.8, cd: 0.5, mult: 1.05, color: '#ffe1d0' },
     skills: ['whirlwind', 'charge', 'warcry'], mastery: 'colossus', // mastery = 4ª habilidade (slot s3), liberada pela Maestria
@@ -30,7 +30,7 @@ export const CLASSES = {
   cleric: {
     id: 'cleric', name: 'Clérigo', icon: '✨', color: '#e8c25a', accent: '#fff4cf',
     desc: 'Guerreiro sagrado: cura, escudos e controle. Difícil de derrubar.',
-    primary: 'int', base: { str: 5, agi: 3, int: 7, vit: 9 }, growth: { str: 1, agi: 0, int: 3.5, vit: 2.7 },
+    primary: 'int', base: { str: 5, agi: 3, int: 7, vit: 9 }, growth: { str: 1, agi: 0, int: 3.65, vit: 2.7 },
     hpBase: 150, weapon: 'mace', rookie: 3, // reforço de iniciante (core/stats.js): ataque lento e sem escudo antes do nível 5; some até o nível 10
     basic: { kind: 'melee', range: 76, arc: 1.5, cd: 0.65, mult: 1.1, color: '#fff3b0' },
     skills: ['holylight', 'divineshield', 'judgement'], mastery: 'intervention',

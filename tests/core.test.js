@@ -699,7 +699,7 @@ test('G10: reforço de iniciante do Clérigo existe só abaixo do nível 10 e o 
   assert.equal(rookieHp(PVP_MIN_LEVEL, CLASSES.cleric.rookie), 0);
   // no nível 10 a conta do Clérigo é a mesma de qualquer classe: sem bônus escondido nos duelos
   const c10 = computeStats(mk('cleric', 10)), base = CLASSES.cleric;
-  assert.equal(c10.maxHp, Math.round(base.hpBase + c10.vit * 12 + 9 * 8));
+  assert.equal(c10.maxHp, Math.round(base.hpBase + c10.vit * 12 + 9 * 8 + 6 * 12)); // + bônus de vida de nível alto (começa depois do nível 4)
   for (let i = 0; i < 3; i++) assert.ok(isSkillUnlocked(PVP_MIN_LEVEL, i), 'habilidade ' + i + ' liberada no nível mínimo do PvP');
 });
 
@@ -1079,4 +1079,13 @@ test('Maestria: a IA do rival só usa s3 se tiver a Maestria (e usa quando tem)'
   let used1 = false;
   for (let i = 0; i < 300; i++) { const it = rivalAi(r1, w1, 1 / 60); if (it?.cast === 3) used1 = true; w1.update(1 / 60, { [r1.id]: it ?? {} }); }
   assert.equal(used1, true);
+});
+
+test('Balanceamento: bônus de vida por nível só vale depois do nível 4 (início do jogo segue perigoso)', () => {
+  const mk = (level) => ({ classId: 'warrior', level, alloc: {}, equipment: {} });
+  const hp = (l) => computeStats(mk(l)).maxHp;
+  const vit = (l) => computeStats(mk(l)).vit;
+  const sem = (l) => Math.round(CLASSES.warrior.hpBase + vit(l) * 12 + (l - 1) * 8);
+  assert.equal(hp(4), sem(4) + rookieHp(4, CLASSES.warrior.rookie));
+  assert.equal(hp(30), sem(30) + 26 * 12);
 });

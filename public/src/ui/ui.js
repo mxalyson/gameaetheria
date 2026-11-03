@@ -12,7 +12,7 @@ import { MODES, getRating } from '../core/match.js';
 import { MOBS } from '../data/mobs.js';
 import { mobPortrait } from '../render/mob-sprites.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../core/power.js';
-import { PRICES } from '../shop.js';
+import { PRICES, harborPrice } from '../shop.js';
 import { pickBossTarget } from './boss-target.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, preloadSkillIcons, skillCategory, CATEGORIES } from '../render/skill-icons.js';
 import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
@@ -566,7 +566,8 @@ export class UI {
       <div class="shop-item">${this.itemCell(it, 'buy-item', i)}
         <div><div class="nm" style="color:${RARITY[it.rarity].color}">${esc(it.name)}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level}</div></div>
         <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${itemPrice(it)}</button></div>`).join('') || `<p class="empty-msg">${harbor ? 'Estoque do dia esgotado. O cais traz mercadoria nova amanhã.' : 'Estoque esgotado. Volte após subir de nível.'}</p>`;
-    const potion = PRICES.potion(char.level);
+    const price = (k) => (harbor ? harborPrice(k, char.level) : PRICES[k](char.level)); // Porto: -15% em poções e pergaminhos (o servidor cobra assim)
+    const potion = price('potion');
     return this.frame('shop', harbor ? 'Mercador do Porto' : this.shopAnchor === 'smith' ? 'Ferreiro Brok' : 'Mercadora Lia', `
       <p class="npc-line">${npcEmblem(harbor ? 'dealer' : this.shopAnchor === 'smith' ? 'smith' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e compro seus itens por 60% do valor."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
       <div class="shop-item"><div class="cell r-common"><span class="ic"><img class="it-img" src="${asset('assets/icons/item/res-potion-health.webp')}" alt="🧪" draggable="false"></span></div>
@@ -575,8 +576,8 @@ export class UI {
         <button class="btn small" data-action="buy-potion" data-arg="5">5 · ${COIN} ${potion * 5}</button></div></div>
       <div class="shop-item"><div class="cell r-uncommon"><span class="ic"><img class="it-img" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false"></span></div>
         <div><div class="nm">Pergaminho de Viagem</div><div class="sub">Teletransporte a mapa visitado · tem ${char.scrolls ?? 0}</div></div>
-        <div class="btn-col"><button class="btn small" data-action="buy-scroll" data-arg="1">1 · ${COIN} ${PRICES.scroll(char.level)}</button>
-        <button class="btn small" data-action="buy-scroll" data-arg="3">3 · ${COIN} ${PRICES.scroll(char.level) * 3}</button></div></div>
+        <div class="btn-col"><button class="btn small" data-action="buy-scroll" data-arg="1">1 · ${COIN} ${price('scroll')}</button>
+        <button class="btn small" data-action="buy-scroll" data-arg="3">3 · ${COIN} ${price('scroll') * 3}</button></div></div>
       <h3>${harbor ? 'Estoque do dia' : 'Equipamentos'}</h3>${stock}
       ${harbor ? '' : this.smithSection()}
       <h3>Vender em lote${harbor ? ' <span class="pts">60%</span>' : ''}</h3>

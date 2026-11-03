@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { MatchRoom } from './room.js';
 import { CoopRoom } from './coop.js';
 import { ZoneRoom, entryPoint } from './zone.js';
+import { runTx, placeProblem, TxError } from './tx.js';
 import { ZONES, FARM_ENTRY, FARM_MID } from '../public/src/data/zones.js';
 import { MODES } from '../public/src/core/match.js';
 import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from '../public/src/core/power.js';
@@ -22,6 +23,7 @@ const COOP_LEVEL_GAP = 8;
 export const TELEPORT_COOLDOWN = 5;      // s entre pedidos de teletransporte da mesma sessão (vale também para pedidos recusados)
 export const TELEPORT_COMBAT_SEC = 8;    // mesmo critério do cliente offline: sem dano causado/recebido nos últimos 8 s
 const TELEPORT_ENTRY = { x: FARM_ENTRY, y: FARM_MID }; // ponto oeste, igual ao de quem entra por portal (B22)
+export const TX_MIN_GAP = 0.1;           // s entre transações da mesma sessão (cada uma é uma gravação no banco)
 export const PORTAL_REACH = 80;          // px: distância máxima do ator ao portal para atravessá-lo (o servidor usa a posição do ator, nunca a do cliente)
 const RATING_WIN = [50, 400], POWER_WIN = [0.15, 0.5], WIDEN_SEC = 40; // a janela abre linearmente com a espera
 
@@ -108,6 +110,7 @@ export class Hub {
       case 'zone_enter': return this.zoneEnter(s, m.zone, m.from, no);
       case 'zone_leave': return this.zoneLeave(s);
       case 'zone_teleport': return this.zoneTeleport(s, m.zone, no);
+      case 'tx': return this.transaction(s, m, no);
     }
   }
 
@@ -395,6 +398,36 @@ export class Hub {
       players: room.statics([...room.players.values()].filter((q) => !q.left)).map((q) => ({ ...q, team: 1 })) });
     room.sendKeyframe(s);
   }
+  // Transações de personagem (P11.3/P11.4, server/tx.js): o cliente pede, o servidor confere no documento OFICIAL e responde `tx_result`.
+  // Dentro da instância valem só baú, poção e spirit; nas cidades, o resto (loja, ferreiro, banco, contratos, missões). Nunca durante partida PvP/coop.
+  transaction(s, m, no) {
+    if (!this.db || !s.charId) return no(REJECT.BAD_CHARACTER);
+    const room = s.room;
+    if (room && room.mode !== 'zone') return no(REJECT.IN_MATCH);
+    if (s.queued) return no(REJECT.ALREADY_QUEUED);
+    if (this.clock - (s.txAt ?? -9) < TX_MIN_GAP) return no(REJECT.TX_WAIT);
+    s.txAt = this.clock;
+    const reply = (extra) => this.out.send(s, { t: 'tx_result', op: m.op, req: m.req, ...extra });
+    const bad = placeProblem(m.op, { inZone: !!room, hubAt: s.hubAt, shop: m.shop });
+    if (bad) return reply({ ok: false, code: bad, reason: 'Isso não está disponível aqui.' });
+    const p = s.player;
+    if (m.op === 'potion') {
+      const why = room.potionProblem(p);
+      if (why) return reply({ ok: false, code: why, reason: why === 'cooldown' ? 'A poção ainda está em recarga.' : why === 'full' ? 'Sua vida já está cheia.' : 'Você está caído.' });
+    }
+    try {
+      const out = this.db.applyOperation(`tx:${s.token}:${s.txSeq = (s.txSeq ?? 0) + 1}`, s.charId, 'tx', (doc) => runTx(doc, m, { rng: this.rng, now: Date.now(), room, player: p, hubAt: s.hubAt }));
+      s.char = out.doc;
+      if (room) room.afterTx(p, m, out.doc);
+      if (m.op !== 'potion' && m.op !== 'spirit_set') this.db.audit('tx', { accountId: s.accountId, detail: JSON.stringify({ char: s.charId, op: m.op, id: m.id, gold: out.summary.goldTotal }) });
+      reply({ ok: true, sync: m.op !== 'potion' && m.op !== 'spirit_set', ...out.summary });
+    } catch (e) {
+      if (e instanceof TxError) return reply({ ok: false, reason: e.message });
+      this.fail('tx', e, { op: m.op });
+      reply({ ok: false, reason: 'Erro no servidor.' });
+    }
+  }
+
   zoneLeave(s) {
     const room = s.room;
     if (!room || room.mode !== 'zone') return;

@@ -31,7 +31,6 @@ export function ensureJournal(doc) { // documentos antigos/incompletos ganham os
 // ---------- missões ----------
 // Mestres de Classe: a missão com `giver: 'master'` é do mestre da classe do jogador (npc `master_<classId>`).
 export const masterNpcId = (classId) => 'master_' + classId;
-export const isMasterNpc = (npcId) => typeof npcId === 'string' && npcId.startsWith('master_');
 // Id do NPC que oferece/recebe a missão PARA este personagem (a UI do diário usa isto em vez de `q.giver`).
 export const questGiverId = (doc, q) => (q.giver === 'master' ? masterNpcId(doc.classId) : q.giver);
 // O NPC é o "dono" (oferece/recebe) da missão para este personagem?

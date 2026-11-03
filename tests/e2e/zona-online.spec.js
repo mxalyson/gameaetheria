@@ -94,3 +94,46 @@ test('cliente editado não consegue enviar ganhos: o servidor ignora e o ouro do
   expect(db.character(who.id).doc.gold).toBe(g0);
   await ctx.close();
 });
+
+// P11.3/P11.4 no jogo real: compra na Vila, baú, poção e spirit na instância são transações do servidor (o cliente só pede e adota o documento oficial).
+test('transações do servidor no jogo real: comprar poção na Vila, abrir baú e beber poção na instância; spirit aparece', async ({ browser }) => {
+  const who = await conta('zona3@teste.com', 'Zona3', 'warrior');
+  db.applyOperation('seed-gold-' + who.id, who.id, 'test', (d) => ({ doc: { ...d, gold: 5000, potions: 1 }, summary: {} }));
+  const ctx = await browser.newContext({ viewport: { width: 1100, height: 760 } });
+  const page = await ctx.newPage();
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(([t]) => localStorage.setItem('aetheria_session', t), [who.token]);
+  await page.goto('/?api=' + encodeURIComponent(apiBase) + '&visual=original');
+  await page.click(`[data-action="char-select"][data-arg="${who.id}"]`);
+  await page.waitForFunction(() => window.game.net?.joined, null, { timeout: 10000 });
+  // Vila: a compra é do servidor (o ouro local não muda antes da resposta; depois adota o oficial)
+  await page.evaluate(() => window.game.buyPotion(2));
+  await expect.poll(() => db.character(who.id).doc.potions, { timeout: 8000 }).toBe(3);
+  await page.waitForFunction(() => window.game.char.potions === 3, null, { timeout: 8000 });
+  const ouro = db.character(who.id).doc.gold;
+  expect(ouro).toBeLessThan(5000);
+  expect(await page.evaluate(() => window.game.char.gold)).toBe(ouro);
+  // instância
+  await page.evaluate(() => { const p = window.game.player; p.x = 1650; p.y = 620; window.game.portalCd = 0; });
+  await page.waitForFunction(() => window.game.mode === 'net' && window.game.netInfo?.mode === 'zone' && window.game.netLast, null, { timeout: 15000 });
+  expect(await page.evaluate(() => window.game.world.actors.some((a) => a.kind === 'spirit'))).toBe(true);
+  const room = [...game.hub.zoneRooms.values()].find((r) => [...r.players.values()].some((p) => p.charId === who.id));
+  const me = [...room.players.values()].find((p) => p.charId === who.id);
+  const chest = room.world.zone.chests[0];
+  me.actor.x = chest.x + 25; me.actor.y = chest.y; me.actor.lastCombat = -999;
+  await page.evaluate(([x, y]) => { const g = window.game; g.netPred = { x, y }; g.player.x = x; g.player.y = y; }, [chest.x + 25, chest.y]);
+  await page.waitForFunction(() => !!window.game.nearChest, null, { timeout: 5000 });
+  await page.evaluate(() => window.game.interact());
+  await expect.poll(() => db.character(who.id).doc.stats.chests, { timeout: 8000 }).toBe(1);
+  expect(db.character(who.id).doc.gold).toBeGreaterThan(ouro);
+  await page.waitForFunction((id) => window.game.chestsOpen?.has(id), chest.id, { timeout: 8000 });
+  // poção: o servidor cura e debita
+  const antes = db.character(who.id).doc.potions; // o baú pode ter dado uma poção: compara com o valor de antes
+  me.actor.hp = Math.round(me.actor.maxHp * 0.3);
+  await page.evaluate(() => window.game.usePotion());
+  await expect.poll(() => db.character(who.id).doc.potions, { timeout: 8000 }).toBe(antes - 1);
+  expect(me.actor.hp).toBeGreaterThan(me.actor.maxHp * 0.6);
+  await page.waitForFunction((n) => window.game.char.potions === n, antes - 1, { timeout: 8000 });
+  expect(errors).toEqual([]);
+  await ctx.close();
+});

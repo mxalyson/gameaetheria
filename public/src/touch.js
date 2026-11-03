@@ -185,7 +185,9 @@ export class TouchControls {
     pot.querySelector('.count').textContent = String(game.char.potions);
     pot.classList.toggle('empty', !game.char.potions || game.mode === 'pvp');
     // botão contextual: balão pintado para NPC, baú pintado para baú
-    const tg = game.mode === 'explore' ? interactTarget(p, game.world) : null, act = this.root.querySelector('.act');
+    let tg = game.mode === 'explore' || game.inNetZone?.() ? interactTarget(p, game.world) : null;
+    if (tg && game.mode !== 'explore' && tg.kind !== 'chest') tg = null; // na instância online só o baú (o servidor abre)
+    const act = this.root.querySelector('.act');
     act.classList.toggle('hidden', !tg);
     if (tg && act.dataset.kind !== tg.kind) {
       act.dataset.kind = tg.kind;

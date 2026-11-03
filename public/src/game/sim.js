@@ -72,6 +72,16 @@ export function makeSpiritActor(sp, owner) {
   });
 }
 
+// Ordenação de inteiros distintos por inserção (listas curtas: dezenas). Sem comparador/closure por chamada; mesmo resultado de sort((p, q) => p - q).
+function sortInts(v) {
+  for (let i = 1; i < v.length; i++) {
+    const x = v[i]; let j = i - 1;
+    while (j >= 0 && v[j] > x) { v[j + 1] = v[j]; j--; }
+    v[j + 1] = x;
+  }
+}
+const cellOf = (v, max, C) => Math.max(0, Math.min(max - 1, Math.floor(v / C)));
+
 export class World {
   // visuals:false (servidor, simulador de balanceamento): nada de partículas/textos/efeitos é criado — só estado de jogo e eventos.
   // bossState: objeto de quem chama que sobrevive à troca de mundo (contador do ritual e recarga do chefe) — sem ele, cada visita recomeça.
@@ -368,7 +378,7 @@ export class World {
     let st = ++g.stamp;
     if (st > 0x7ffffff0) { g.seen.fill(0); g.stamp = st = 1; } // B30: Int32Array não pode estourar; recomeça com a lista limpa
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) for (const i of g.cells[cy * g.cols + cx]) if (g.seen[i] !== st) { g.seen[i] = st; ids.push(i); }
-    ids.sort((p, q) => p - q);
+    sortInts(ids); // ordem crescente = a da busca linear (índices únicos: qualquer ordenação dá o mesmo resultado)
     const out = g.out; out.length = 0;
     for (const i of ids) out.push(obs[i]);
     return out;
@@ -390,21 +400,20 @@ export class World {
     if (!g || g.cols !== cols || g.rows !== rows) g = this._sepGrid = { cols, rows, head: new Int32Array(cols * rows), next: new Int32Array(64), cand: [] };
     if (g.next.length < n) g.next = new Int32Array(n * 2);
     g.head.fill(-1);
-    const cell = (v, max) => Math.max(0, Math.min(max - 1, Math.floor(v / C)));
     for (let i = n - 1; i >= 0; i--) { // inserção de trás para frente: cada lista fica em ordem crescente de índice
-      const k = cell(list[i].y, rows) * cols + cell(list[i].x, cols);
+      const k = cellOf(list[i].y, rows, C) * cols + cellOf(list[i].x, cols, C);
       g.next[i] = g.head[k]; g.head[k] = i;
     }
     const cand = g.cand;
     for (let i = 0; i < n; i++) {
-      const a = list[i], cx = cell(a.x, cols), cy = cell(a.y, rows);
+      const a = list[i], cx = cellOf(a.x, cols, C), cy = cellOf(a.y, rows, C);
       cand.length = 0;
       for (let yy = Math.max(0, cy - 1); yy <= Math.min(rows - 1, cy + 1); yy++) {
         for (let xx = Math.max(0, cx - 1); xx <= Math.min(cols - 1, cx + 1); xx++) {
           for (let j = g.head[yy * cols + xx]; j !== -1; j = g.next[j]) if (j > i) cand.push(j);
         }
       }
-      if (cand.length > 1) cand.sort((p, q) => p - q);
+      if (cand.length > 1) sortInts(cand);
       for (let c = 0; c < cand.length; c++) this.pushApart(a, list[cand[c]]);
     }
   }

@@ -3,7 +3,6 @@ import { CLASSES } from '../data/classes.js';
 import { SKILL_UNLOCK } from '../data/skills.js';
 
 export const MASTERY_IDX = 3; // slot s3: habilidade de Maestria (nível 25 + missão `maestria`)
-export const SKILL_SLOTS = 4;
 
 // Nível em que o slot idx (0..3) é liberado.
 export const skillUnlockLevel = (idx) => SKILL_UNLOCK[idx] ?? 1;

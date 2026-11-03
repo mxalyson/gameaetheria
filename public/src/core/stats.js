@@ -40,7 +40,7 @@ export function computeStats(char) {
   const p = primaryStats(char);
   return {
     ...p,
-    maxHp: Math.round(cls.hpBase + p.vit * 12 + (char.level - 1) * 8 + rookieHp(char.level, cls.rookie) + (g.hp ?? 0)),
+    maxHp: Math.round(cls.hpBase + p.vit * 12 + (char.level - 1) * 8 + Math.max(0, char.level - 4) * 12 + rookieHp(char.level, cls.rookie) + (g.hp ?? 0)),
     power: Math.round((g.atk ?? 4) + p[cls.primary] * 2.2 + char.level * 1.5 + rookiePower(char.level, cls.rookie)),
     def: Math.round((g.def ?? 0) + p.vit * 0.4 + p.agi * 0.2),
     crit: Math.min(60, 5 + p.agi * 0.25 + (g.crit ?? 0)),
@@ -56,8 +56,6 @@ export function computeStats(char) {
 export const itemClassId = (item) => item.classId ?? (item.slot === 'weapon' ? WEAPON_TYPES[item.weaponType]?.classId ?? null : null);
 // Texto legível da restrição ("Mago"), para tooltips e células da mochila/loja. '' se o item é de legado sem classe.
 export const itemClassName = (item) => CLASSES[itemClassId(item)]?.name ?? '';
-// "Apenas para Mago" (ou '' se sem restrição conhecida).
-export const reqClass = (item) => (itemClassId(item) ? `Apenas para ${itemClassName(item)}` : '');
 
 export function canEquip(char, item) {
   if (item.kind !== 'gear') return { ok: false, reason: 'Não é equipável.' };
