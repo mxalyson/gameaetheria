@@ -1,3 +1,4 @@
+import { TESTE, buildTesteChar, installTesteUi } from './teste.js'; // modo ?teste= (sandbox); primeiro, para window.TESTE existir antes dos demais módulos
 import { enhance, findGear } from './core/enhance.js';
 import './no-zoom.js';
 import { heroSpritesEnabled, preloadHero, showHeroLoading } from './render/hero-sprites.js';
@@ -84,10 +85,13 @@ class Game {
     this.shopLevel = 0;
     this.titleWorld = new World('town');
     // Com API configurada o jogo exige conta (login → personagens na nuvem). Sem API, segue offline como antes.
-    const base = apiUrl();
+    const base = TESTE ? '' : apiUrl(); // ?teste=: sempre offline e sem login (apiUrl também gravaria no aparelho)
     this.online = null; this.cloud = null; this.charId = null;
     document.body.classList.remove('online');
-    if (base) {
+    if (TESTE) {
+      installTesteUi(this);
+      this.testeSwitch(TESTE, 'town');
+    } else if (base) {
       this.online = new Online(base);
       document.body.classList.add('online'); // libera os botões que só fazem sentido com conta (grupo)
       this.cloud = new CloudSave(this.online, { onSync: (doc) => this.mergeServerFields(doc), onReject: (doc, e) => this.resync(doc, e) });
@@ -270,6 +274,25 @@ class Game {
       const sp = SPIRITS[char.spirits[0].type];
       this.ui.log(`Um spirit te acompanha: <b style="color:${sp.color}">${sp.name}</b> (${sp.element}).`, sp.color);
     }
+  }
+
+  // Modo ?teste=: troca o herói descartável (look/classe) e/ou a zona sem recarregar. Nada é gravado (save.js é no-op).
+  testeSwitch(kind, zoneId = null) {
+    const char = buildTesteChar(kind);
+    const zone = zoneId ?? this.world?.zoneId ?? 'town';
+    const at = zone === 'town' ? TOWN : { x: FARM_ENTRY + 120, y: FARM_MID }; // entrada do mapa de caça
+    window.TESTE.kind = kind;
+    this.char = char; this.skillLv = char.level;
+    this.ui.hideScreen();
+    this.ui.setupHud(char);
+    this.touch.setup(char);
+    char.visited = { town: 1, forest: 1, plains: 1 };
+    showHeroLoading(preloadHero(char));
+    this.enterZone(zone, at.x, at.y);
+    this.refreshStats?.();
+    this.player.hp = this.player.maxHp;
+    this.ui.render();
+    document.dispatchEvent(new CustomEvent('teste-changed', { detail: { kind, zone } }));
   }
 
   // Ao sair de uma zona, guarda a recarga de quem está morto; quem estava vivo reaparece inteiro na volta.

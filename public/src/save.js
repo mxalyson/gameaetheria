@@ -11,9 +11,11 @@ let lastBackup = 0;
 let info = null; // avisos do último carregamento, consumidos uma vez por takeLoadInfo()
 
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-const write = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+const sandbox = () => typeof window !== 'undefined' && !!window.TESTE; // modo ?teste=: nada do save é lido nem escrito
+const write = (k, v) => { if (sandbox()) return false; try { localStorage.setItem(k, v); return true; } catch { return false; } };
 
 export function loadChar() {
+  if (sandbox()) return null;
   const raw = read(KEY);
   if (!raw) return null;
   const r = parseSave(raw);
@@ -38,6 +40,7 @@ export function loadChar() {
 export function takeLoadInfo() { const i = info; info = null; return i; }
 
 export function saveChar(char) {
+  if (sandbox()) return;
   const now = Date.now();
   if (now - lastBackup > BACKUP_EVERY_MS) {
     const cur = read(KEY);

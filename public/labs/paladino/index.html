@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Paladino Nv25 · visualizador</title>
+<style>
+  :root { --bg: #141a2e; --fg: #f3e8c8; --btn: #2c2552; --line: #8d7a3a; --stage: #1d2340; }
+  body.claro { --bg: #e9e4d6; --fg: #2a2540; --btn: #fff8e6; --line: #b59a3f; --stage: #f6f1e2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 700 13px Nunito, system-ui, sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  header { display: flex; gap: 8px; align-items: center; padding: 6px 10px; flex-wrap: wrap; }
+  h1 { font-size: 14px; margin: 0 8px 0 0; }
+  main { display: flex; gap: 10px; padding: 0 10px 10px; align-items: flex-start; flex-wrap: wrap; }
+  .stage { display: flex; gap: 8px; flex-wrap: wrap; }
+  figure { margin: 0; background: var(--stage); border: 1px solid var(--line); border-radius: 12px; padding: 4px; text-align: center; }
+  figcaption { font-size: 12px; padding: 2px; }
+  canvas { display: block; margin: 0 auto; }
+  .panel { display: flex; flex-direction: column; gap: 8px; min-width: 200px; }
+  .row { display: flex; gap: 4px; flex-wrap: wrap; }
+  button { min-width: 44px; min-height: 36px; padding: 4px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--btn); color: var(--fg); font: 800 12px Nunito, system-ui, sans-serif; cursor: pointer; }
+  button.on { background: #ffcf4a; color: #2a1c00; border-color: #ffcf4a; }
+  .dirs { display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; }
+  .dirs button { min-width: 44px; padding: 0; }
+  #msg { font-size: 11px; opacity: .8; }
+</style>
+</head>
+<body>
+<header><h1>Paladino Nv25 (Cavaleiro do Sol)</h1><span id="msg">carregando…</span></header>
+<main>
+  <div class="stage">
+    <figure><canvas id="c-evo"></canvas><figcaption>Paladino Nv25 (paladin_sun)</figcaption></figure>
+    <figure><canvas id="c-base"></canvas><figcaption>Guerreiro base (paladino)</figcaption></figure>
+  </div>
+  <div class="panel">
+    <div class="row" id="clips"></div>
+    <div class="dirs" id="dirs"></div>
+    <div class="row" id="scales"></div>
+    <div class="row" id="opts"></div>
+  </div>
+</main>
+<script type="module">
+// Visualizador leve: carrega os atlas (PNG + JSON) direto de iso-poc/art-local/atlas-rig/ e desenha como o jogo (8 vistas x quadros por clipe).
+const BASE = new URL('../iso-poc/art-local/atlas-rig/', import.meta.url).href;
+const CLIPS = [['idle', 'Parado'], ['walk', 'Andar'], ['attack', 'Ataque'], ['skill', 'Habilidade'], ['dash', 'Dash'], ['hit', 'Dano']];
+// vista: 0 S, 1 SE, 2 L, 3 NE, 4 N, 5 NO, 6 O, 7 SO — grade 3x3 como uma bússola (null = girar sozinho)
+const DIRS = [[5, '↖'], [4, '↑'], [3, '↗'], [6, '←'], [null, '⟳'], [2, '→'], [7, '↙'], [0, '↓'], [1, '↘']];
+const S = { clip: 'idle', view: 0, scale: 2, spin: false, loop: true, t0: performance.now(), dark: true };
+const msg = document.getElementById('msg');
+const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+async function loadAtlas(id) {
+  const meta = await (await fetch(`${BASE}${id}/${id}.json`)).json();
+  const sheets = {};
+  await Promise.all(Object.keys(meta.clips).map(async (n) => { const im = new Image(); im.src = `${BASE}${id}/${n}.png`; await im.decode(); sheets[n] = im; }));
+  return { meta, sheets };
+}
+
+const views = [
+  { id: 'paladin_sun', canvas: document.getElementById('c-evo') },
+  { id: 'paladino', canvas: document.getElementById('c-base') },
+];
+
+function mk(parent, label, on, cls) {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = label; if (cls) b.className = cls;
+  b.addEventListener('click', () => on(b)); parent.appendChild(b); return b;
+}
+const mark = (box, active) => [...box.children].forEach((b, i) => b.classList.toggle('on', i === active));
+
+const clipsBox = document.getElementById('clips');
+CLIPS.forEach(([id, label], i) => mk(clipsBox, label, () => { S.clip = id; S.t0 = performance.now(); mark(clipsBox, i); }));
+mark(clipsBox, 0);
+const dirsBox = document.getElementById('dirs');
+DIRS.forEach(([v, label], i) => mk(dirsBox, label, (b) => {
+  if (v === null) { S.spin = !S.spin; b.classList.toggle('on', S.spin); } else { S.spin = false; S.view = v; dirsBox.children[4].classList.remove('on'); [...dirsBox.children].forEach((x, j) => x.classList.toggle('on', j === i)); }
+}));
+dirsBox.children[7].classList.add('on');
+const scalesBox = document.getElementById('scales');
+[1, 2, 3].forEach((k, i) => mk(scalesBox, `${k}×`, () => { S.scale = k; mark(scalesBox, i); size(); }));
+mark(scalesBox, 1);
+const optsBox = document.getElementById('opts');
+mk(optsBox, 'Fundo claro', (b) => { S.dark = !S.dark; document.body.classList.toggle('claro', !S.dark); b.textContent = S.dark ? 'Fundo claro' : 'Fundo escuro'; });
+mk(optsBox, 'Repetir: sim', (b) => { S.loop = !S.loop; b.textContent = S.loop ? 'Repetir: sim' : 'Repetir: não'; });
+mk(optsBox, 'Tocar de novo', () => { S.t0 = performance.now(); });
+
+function size() {
+  for (const v of views) {
+    const m = v.atlas?.meta; if (!m) continue;
+    const w = Math.round(m.frame.w * S.scale), h = Math.round(m.frame.h * S.scale);
+    v.canvas.width = w * dpr; v.canvas.height = h * dpr; v.canvas.style.width = w + 'px'; v.canvas.style.height = h + 'px';
+  }
+}
+
+function draw(now) {
+  const el = (now - S.t0) / 1000;
+  for (const v of views) {
+    if (!v.atlas) continue;
+    const { meta, sheets } = v.atlas, c = meta.clips[S.clip], g = v.canvas.getContext('2d');
+    let f;
+    if (c.loop) f = Math.floor(el * c.fps) % c.frames;
+    else { const n = el * c.fps; f = S.loop ? Math.floor(n % (c.frames + c.fps * 0.5)) : Math.floor(n); f = Math.min(f, c.frames - 1); }
+    const view = S.spin ? Math.floor(now / 700) % 8 : S.view;
+    const sheet = sheets[S.clip], rows = meta.rows ?? meta.views, cw = sheet.width / c.frames, ch = sheet.height / rows;
+    const flip = meta.mirror && view > 4, row = flip ? meta.views - view : view;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, v.canvas.width, v.canvas.height);
+    g.setTransform(dpr * S.scale, 0, 0, dpr * S.scale, 0, 0);
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'low';
+    // chão: elipse sob os pés (pivô)
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(meta.pivot.x, meta.pivot.y, 30, 11, 0, 0, 7); g.fill();
+    if (flip) { g.translate(meta.frame.w, 0); g.scale(-1, 1); }
+    g.drawImage(sheet, f * cw, row * ch, cw, ch, 0, 0, meta.frame.w, meta.frame.h);
+  }
+  requestAnimationFrame(draw);
+}
+
+try {
+  const loaded = await Promise.all(views.map((v) => loadAtlas(v.id)));
+  views.forEach((v, i) => { v.atlas = loaded[i]; });
+  size(); msg.textContent = 'pronto';
+  window.paladinoViewer = { S, views };
+  requestAnimationFrame(draw);
+} catch (e) { msg.textContent = 'erro ao carregar: ' + e.message; console.error(e); }
+</script>
+</body>
+</html>

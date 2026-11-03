@@ -39,6 +39,7 @@ export function textureScale() {
 let enabled = null;
 export function heroSpritesEnabled() {
   if (enabled !== null) return enabled;
+  if (typeof window !== 'undefined' && window.TESTE) { enabled = true; window.heroSprites = stats; return true; } // modo ?teste=: sempre o visual novo, sem tocar no aparelho
   try {
     const q = new URLSearchParams(location.search).get('visual');
     if (q === 'miniatura' || q === 'original') localStorage.setItem(KEY, q);
