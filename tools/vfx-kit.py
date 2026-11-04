@@ -4,6 +4,7 @@ Cada sprite guarda a INTENSIDADE (0..1) nos canais RGB (cinza) e a opacidade no 
 rampa de cor por paleta (borda escura -> cor -> cor clara -> branco no nucleo), por isso o mesmo sprite serve ao fogo laranja, a brasa vermelha, etc.
 Uso: python tools/vfx-kit.py [--preview caminho.png]
 Arte pintada do dono: tools/vfx-sheet.py (parte deste kit e troca os sprites que as folhas cobrem).
+"""
 import json, sys, os
 import numpy as np
 from PIL import Image, ImageDraw

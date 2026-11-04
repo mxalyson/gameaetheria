@@ -110,13 +110,14 @@ function bit(f, x, y, z, vx, vy, vz, size, life, a = 1) {
     case 2: em(rnd() < 0.4 ? SP.star8 : SP.spark, rnd() < 0.5 ? f.m : f.h, 0, x, y, z, vx, vy, vz, size * 0.8, size * 0.2, life, 0, 0, a, 1.5, 10); break;
     case 3: em(SP.wisp0 + ((rnd() * 2) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.5, life, rnd() * TAU, (rnd() - 0.5) * 3, a * 0.9, 1.3, -30); break;
     case 4: em(SP.spark, rnd() < 0.5 ? f.m : f.h, 0, x, y, z, vx, vy, vz, size * 0.8, size * 0.25, life, 0, 0, a, 1.2, -25); break;
-    default: em(SP.leaf0 + ((rnd() * 2) | 0), f.m, 1, x, y, z, vx, vy, vz, size * 0.55, size * 0.4, life, rnd() * TAU, (rnd() - 0.5) * 9, a, 1.0, 40); break;
+    default: em(LEAVES[(rnd() * 4) | 0], f.m, 1, x, y, z, vx, vy, vz, size * 0.55, size * 0.4, life, rnd() * TAU, (rnd() - 0.5) * 9, a, 1.0, 40); break;
   }
 }
 // fagulha: metade faísca, metade cintila em cruz (twinkle, maior porque o brilho do sprite é fino)
 const spark = (f, x, y, z, vx, vy, vz, size, life, a = 1) => (rnd() < 0.45 ? em(SP.twinkle0 + ((rnd() * 4) | 0), f.h, 0, x, y, z, vx, vy, vz, size * 1.7, size * 0.4, life, rnd() * 1.5, (rnd() - 0.5) * 3, a, 1.6, 60) : em(SP.spark, f.h, 0, x, y, z, vx, vy, vz, size, size * 0.2, life, 0, 0, a, 1.6, 60));
-const ember = (f, x, y, z, vx, vy, vz, size, life, a = 1) => em(rnd() < 0.4 ? SP.flamelet0 + ((rnd() * 4) | 0) : SP.ember0 + ((rnd() * 2) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.3, life, 0, 0, a, 0.8, 120);
+const ember = (f, x, y, z, vx, vy, vz, size, life, a = 1) => em(rnd() < 0.4 ? SP.flamelet0 + ((rnd() * 4) | 0) : EMBERS[(rnd() * 4) | 0], f.m, 0, x, y, z, vx, vy, vz, size, size * 0.3, life, 0, 0, a, 0.8, 120);
 const smoke = (f, x, y, z, vx, vy, vz, size, life, a = 0.4) => em(SP.smoke0 + ((rnd() * 3) | 0), f.fam === 3 ? PL.toxic : f.fam === 0 ? PL.smoke : PL.dust, 2, x, y, z, vx, vy, vz, size * 0.5, size, life, rnd() * TAU, (rnd() - 0.5) * 1.2, a, 1.5, -25);
+const LEAVES = [SP.leaf0, SP.leaf1, SP.leaf2, SP.leaf3], EMBERS = [SP.ember0, SP.ember1, SP.ember2, SP.ember3];
 const chunk = (x, y, vx, vy, vz, size, life) => em(SP.shard0 + ((rnd() * 2) | 0), PL.stone, 2, x, y, 4, vx, vy, vz, size, size * 0.85, life, rnd() * TAU, (rnd() - 0.5) * 14, 1, 0.2, 900);
 
 // tremor de câmera discreto (golpes fortes): o renderer soma isto ao deslocamento da câmera
@@ -323,6 +324,7 @@ function drawWhirl(g, f, k, el, cx, cy) {
   const R = f.r, e = ease(k), o = 1 - k, sc = R * 0.95 / 96;
   put(g, SP.shock, f.m, 0, cx, cy, R * 2.5 * (0.45 + 0.55 * e), R * 2.5 * (0.45 + 0.55 * e), el * 2, o * 0.85);
   for (let i = 0; i < 3; i++) put(g, i === 1 ? SP.slash1 : SP.slash0, i === 1 ? f.h : f.m, 0, cx, cy, 150 * sc, 225 * sc, k * TAU * 1.6 + i * TAU / 3, Math.min(1, o * 1.3));
+  if (!LITE) for (let i = 0; i < 2; i++) put(g, SP.gust0 + Math.min(3, (k * 4) | 0), i ? f.h : f.m, 0, cx, cy, R * 2.1, R * 2.1, -k * TAU * 1.3 + i * Math.PI, o * 0.8);
   burstOnce(f, cx, cy, 10, 220, 30);
   if (el < 0.4) for (let n = rate(f, 110); n > 0; n--) {
     const a = rnd() * TAU, r = R * (0.65 + rnd() * 0.35), tx = -Math.sin(a) * 160, ty = Math.cos(a) * 160;
@@ -430,9 +432,11 @@ function drawBlink(g, f, k, el, cx, cy) {
 // Fúria do Colosso: rastro dourado, onda de choque com pedras ao chegar e aura que dura o reforço
 function drawColossus(g, f, el, cx, cy, world) {
   drawDash(g, f, Math.min(el, 0.69), cx, cy, 34, world);
+  if (f.t3 !== undefined && el - f.t3 < 0.6) { const u = (el - f.t3) / 0.6, st = Math.min(3, (u * 4) | 0); put(g, SP.rock0 + st, PL.stone, 0, cx, cy + 10, 150, 150, 0, 1 - u * u * 0.8); }
   if (el > 0.3 && f.n < 3) { f.n = 3; // chegada: pedras, poeira, onda dupla, tremor
     for (let i = cnt(9); i > 0; i--) { const a = rnd() * TAU, v = 90 + rnd() * 160; chunk(cx, cy, Math.cos(a) * v, Math.sin(a) * v * 0.7, 260 + rnd() * 220, 14 + rnd() * 12, 1.4); }
     for (let i = cnt(8); i > 0; i--) { const a = rnd() * TAU; smoke(f, cx + Math.cos(a) * 30, cy + Math.sin(a) * 24, 4, Math.cos(a) * 80, Math.sin(a) * 60, 20, 40 + rnd() * 20, 0.9, 0.5); }
+    f.t3 = el;
     shake(world, 5, 0.45);
   }
   if (el > 0.28 && el < 1.1) { const u = (el - 0.28) / 0.82, e = ease(u); put(g, SP.shock, f.m, 0, cx, cy, 380 * e, 380 * e, 0, (1 - u) * 0.95); put(g, SP.shock, f.h, 0, cx, cy, 300 * e * 0.8, 300 * e * 0.8, 1, (1 - u) * 0.7); put(g, SP.burst, f.h, 0, cx, cy - 6, 70 + 120 * e, 70 + 120 * e, 0, (1 - u)); put(g, SP.glow, f.m, 1, cx, cy, 300 * e, 300 * e, 0, (1 - u) * 0.6); }

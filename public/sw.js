@@ -2,7 +2,7 @@
 // Código (HTML/JS/CSS/manifesto): REDE PRIMEIRO, ignorando o cache HTTP do servidor (o GitHub Pages manda max-age=600, o que deixava versões velhas por 10 min),
 // e cai no cache só se estiver offline. Arte pesada (PNG, fontes, SVG): cache primeiro e atualiza em segundo plano.
 // Nada de WebSocket, API ou outras origens (login/salvamento na nuvem passam direto). Subir VERSION invalida o cache antigo.
-const VERSION = 'aetheria-154f9b0b';
+const VERSION = 'aetheria-d2d19e6c';
 const HEAVY = /\.(png|ttf|woff2?|svg|jpg|webp)$/i;
 
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(VERSION).then((c) => c.addAll(['./', 'index.html', 'style.css', 'fonts/fonts.css', 'manifest.webmanifest', 'icon.svg']))); });

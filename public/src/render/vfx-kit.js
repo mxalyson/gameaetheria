@@ -7,7 +7,9 @@ export const NAMES = ['glow', 'ring', 'shock', 'flame0', 'flame1', 'flame2', 'fl
   'crystal0', 'crystal1', 'crystal2', 'flake', 'bolt0', 'bolt1', 'bolt2', 'ribbon0', 'ribbon1', 'wind', 'leaf0', 'leaf1', 'smoke0', 'smoke1', 'smoke2',
   'wisp0', 'wisp1', 'shard0', 'shard1', 'cross', 'bubble', 'rune0', 'rune1', 'slash0', 'slash1',
   // extras da arte pintada (tools/vfx-sheet.py): espinhos de gelo, chamas pequenas, cintilas, anel pequeno e estrela média de impacto
-  'spikes', 'flamelet0', 'flamelet1', 'flamelet2', 'flamelet3', 'twinkle0', 'twinkle1', 'twinkle2', 'twinkle3', 'shock2', 'burst2'];
+  'spikes', 'flamelet0', 'flamelet1', 'flamelet2', 'flamelet3', 'twinkle0', 'twinkle1', 'twinkle2', 'twinkle3', 'shock2', 'burst2',
+  // folha 4 (animada): brasas e folhas extras, crescentes de vento em 4 estágios e cristais de pedra brotando em 4 estágios
+  'ember2', 'ember3', 'leaf2', 'leaf3', 'gust0', 'gust1', 'gust2', 'gust3', 'rock0', 'rock1', 'rock2', 'rock3'];
 export const SP = {}; NAMES.forEach((n, i) => { SP[n] = i; });
 
 // paletas: [borda escura, cor, clara]; o núcleo (intensidade > 0,8) vai ao branco

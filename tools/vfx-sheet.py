@@ -178,8 +178,27 @@ def build():
         L, m = region(s3, box, 24, 4, 'largest')
         put(f'rune{i}', fit(*to_IA(L, m, 5, 36, .8), (192, 192), (2, 2, 188, 188)), (96, 96))
 
+    # ---- FOLHA 4 (animada, 5x5 por efeito, células de 200 px com grade): vento (gust0..3), brasas (ember0..3), folhas (leaf0..3), pedras (rock0..3)
+    s4 = load('vfx-folha-4-animada.jpg')
 
-kit.PREV.update({'spikes': 'ice', 'flamelet': 'fire', 'twinkle': 'gold', 'shock2': 'fire', 'burst2': 'fire'})
+    def cell4(R, C):
+        return (200 * C + 4, 200 * R + 4, 200 * C + 197, 200 * R + 197)
+
+    def painted(name, R, C, size, align=('c', 'c'), a=5, b=36, gamma=.8, thr=18):
+        L, m = region(s4, cell4(R, C), thr, 3, 'largest')
+        put(name, fit(*to_IA(L, m, a, b, gamma), (size, size), (2, 2, size - 4, size - 4), align), (size // 2, size // 2))
+
+    for i, (R, C) in enumerate([(0, 4), (1, 4), (2, 4), (3, 3)]):  # crescentes de vento em 4 estágios (cresce e some)
+        painted(f'gust{i}', R, C, 128, thr=14)
+    for i, (R, C) in enumerate([(1, 9), (2, 9), (3, 9), (4, 5)]):  # brasas com fagulhas
+        painted(f'ember{i}', R, C, 64, ('c', 'b'), thr=14)
+    for i, (R, C) in enumerate([(7, 0), (6, 1), (5, 4), (8, 0)]):  # folhas em ângulos diferentes
+        painted(f'leaf{i}', R, C, 96, thr=16)
+    for i, (R, C) in enumerate([(5, 9), (6, 9), (7, 9), (8, 9)]):  # cristais de pedra brotando (4 estágios)
+        painted(f'rock{i}', R, C, 128, ('c', 'b'), thr=22)
+
+
+kit.PREV.update({'spikes': 'ice', 'flamelet': 'fire', 'twinkle': 'gold', 'shock2': 'fire', 'burst2': 'fire', 'gust': 'toxic', 'rock': 'fire'})
 
 
 def main():
