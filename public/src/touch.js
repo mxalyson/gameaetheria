@@ -145,7 +145,7 @@ export class TouchControls {
       clearTimeout(st.timer);
       st.b.classList.remove('down');
       arrow.classList.add('hidden');
-      if (st.held) this.game.ui?.hideSkillCard();
+      this.game.ui?.hideSkillCard(); // sempre: no iOS o toque longo pode terminar em pointercancel/ponteiro perdido e o cartão ficava preso
       if (st.t === 'attack') { this.attack = false; return; }
       if (!fire || st.held || st.locked) return; // segurou para ler (ou está bloqueada): soltar não conjura
       const g = this.game;
@@ -155,6 +155,12 @@ export class TouchControls {
     };
     tb.addEventListener('pointerup', (e) => release(e, true));
     tb.addEventListener('pointercancel', (e) => release(e, false));
+    tb.addEventListener('lostpointercapture', (e) => release(e, false));
+    // Rede de segurança: qualquer fim de toque, perda de foco ou aba oculta fecha o cartão de explicação (e o balão) se não restar botão de skill pressionado.
+    const noHold = () => { if (![...this.btns.values()].some((b) => b.held)) { this.game.ui?.hideSkillCard(); this.game.ui?.hideTooltip?.(); } };
+    for (const ev of ['pointerup', 'pointercancel', 'touchend', 'touchcancel']) window.addEventListener(ev, noHold, true);
+    window.addEventListener('blur', () => { for (const [id, st] of [...this.btns]) release({ pointerId: id }, false); noHold(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { for (const [id] of [...this.btns]) release({ pointerId: id }, false); noHold(); } });
     // Sem menu de contexto (toque longo) nem seleção sobre os controles.
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
   }

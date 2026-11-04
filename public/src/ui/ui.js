@@ -653,8 +653,10 @@ export class UI {
     if (!d) return;
     this.skillCard.innerHTML = `<div class="sk-top">${this.skillHead(d)}</div><p class="sk-sum">${esc(d.summary)}</p>${this.skillLinesHtml(d)}${d.unlock?.locked ? `<div class="sk-lock">${LOCK} ${esc(d.unlock.text)}</div>` : ''}`;
     this.skillCard.classList.remove('hidden');
+    this.hideTooltip?.(); // o balão comum não deve ficar junto do cartão
+    clearTimeout(this.cardT); this.cardT = setTimeout(() => this.hideSkillCard(), 6000); // nunca fica preso: some sozinho
   }
-  hideSkillCard() { this.skillCard?.classList.add('hidden'); }
+  hideSkillCard() { clearTimeout(this.cardT); this.skillCard?.classList.add('hidden'); }
 
   panel_skills() {
     const char = this.game.char, spec = activeSpec(char), o = this.skillOpts();

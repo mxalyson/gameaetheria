@@ -54,3 +54,32 @@ for (const vp of [{ width: 844, height: 390 }, { width: 667, height: 375 }]) {
     expect(errors).toEqual([]);
   });
 }
+
+// Regressão (iPhone): o cartão ficava preso quando o toque longo terminava sem o `pointerup` normal (pointercancel, ponteiro perdido, foco perdido). Agora fecha sempre.
+test('cartão de explicação nunca fica preso: cancelamento, perda de foco e tempo limite', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto('/?teste=paladino&api=');
+  await page.waitForFunction(() => window.game?.player && !document.getElementById('screen').classList.contains('visible'));
+  await page.waitForSelector('#hero-loading', { state: 'detached', timeout: 20000 });
+  await page.waitForTimeout(500);
+  const t = await touchApi(page);
+  const p = await center(page, '.tbtn.sk0');
+  // 1) pointercancel simulado
+  await t.down(1, p.x, p.y); await page.waitForTimeout(700);
+  await expect(page.locator('#skill-card')).toBeVisible();
+  await page.evaluate(() => document.querySelector('.tbtn.sk0').dispatchEvent(new PointerEvent('pointercancel', { pointerId: [...window.game.touch.btns.keys()][0], bubbles: true })));
+  await expect(page.locator('#skill-card')).toBeHidden();
+  await t.up(1);
+  // 2) perda de foco da janela
+  await t.down(2, p.x, p.y); await page.waitForTimeout(700);
+  await expect(page.locator('#skill-card')).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect(page.locator('#skill-card')).toBeHidden();
+  await t.up(2);
+  // 3) sem nenhum evento de soltar: some sozinho em até 6 s
+  await t.down(3, p.x, p.y); await page.waitForTimeout(700);
+  await expect(page.locator('#skill-card')).toBeVisible();
+  await page.evaluate(() => { const ui = window.game.ui; ui.showSkillCard(0); });
+  await expect(page.locator('#skill-card')).toBeHidden({ timeout: 8000 });
+  await t.up(3);
+});
