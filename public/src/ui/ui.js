@@ -399,7 +399,7 @@ export class UI {
     // Barra de chefe / rival.
     const boss = game.mode === 'pvp' ? game.rival : this.barTarget(world, player);
     if (boss && !boss.dead) {
-      this.set('boss-bar', 'class', '');
+      this.set('boss-bar', 'class', game.mode === 'pvp' || game.mode === 'waves' || game.mode === 'net' ? 'compact' : ''); // partidas: barra fina sem nome (o nome já aparece sobre o inimigo)
       this.set('boss-name', 'text', `${boss.name} · Nv ${boss.level}`);
       this.set('boss-fill', 'width', `${(100 * boss.hp) / boss.maxHp}%`);
       // retrato: vista frontal do sprite pintado do monstro (o rival do PvP e criaturas sem arte ficam sem retrato)

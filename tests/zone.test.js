@@ -81,6 +81,27 @@ test('movimento é do servidor: andar é limitado pela velocidade', async () => 
   await closeAll(srv, c);
 });
 
+test('correr: o servidor aplica +30% quando o cliente pede e está fora de combate; em combate o pedido é ignorado', async () => {
+  const andar = async (extra, prep) => {
+    const { srv, players } = await setup(1);
+    const { c } = players[0];
+    c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+    const j = await c.waitFor((m) => m.t === 'zone_joined');
+    const room = srv.hub.zoneRooms.values().next().value;
+    const a = srv.actor(j.you); a.hp = a.maxHp = 1e9;
+    for (const m of room.mobs()) { m.x = 9999; m.y = 9999; m.dead = true; } // sem monstros por perto: só a regra de correr
+    if (prep) prep(a, room);
+    c.send(input(1, 1, 0, extra)); await c.sync(); srv.step(5); // a chegada do input varia em ticks: mede só uma janela fixa depois dela
+    const x0 = a.x; srv.step(30);
+    const d = (a.x - x0) / a.speedMul; await closeAll(srv, c); return d;
+  };
+  const walk = await andar({}), run = await andar({ run: true });
+  assert.ok(walk > 20, `andou (${walk.toFixed(0)})`);
+  assert.ok(Math.abs(run / walk - 1.3) < 0.1, `razão ${(run / walk).toFixed(3)}`);
+  const emCombate = await andar({ run: true }, (a, room) => { a.lastCombat = room.world.time; });
+  assert.ok(Math.abs(emCombate / walk - 1) < 0.1, 'em combate: sem bônus');
+});
+
 test('matar monstros gera recompensa decidida e gravada pelo servidor; ganhos enviados pelo cliente são recusados', async () => {
   const { db, srv, players } = await setup(1);
   const { c, ch } = players[0];

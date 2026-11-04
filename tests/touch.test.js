@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stickVector, nearestTarget, pickAim, aimModeFor, dragAim, interactTarget, skillLayout, TB_GAP, STICK_RADIUS, DEADZONE } from '../public/src/touch-logic.js';
+import { stickVector, nearestTarget, pickAim, aimModeFor, dragAim, interactTarget, skillLayout, TB_GAP, STICK_RADIUS, DEADZONE, stepRun, RUN_EDGE, RUN_HOLD_S } from '../public/src/touch-logic.js';
 import { loadPrefs, changePref, resolveQuality, SCALE_MIN, SCALE_MAX } from '../public/src/prefs.js';
 import { SKILLS } from '../public/src/data/skills.js';
 
 const close = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
 
 test('joystick: zona morta, direção e limite do botão', () => {
-  assert.deepEqual(stickVector(0, 0), { x: 0, y: 0, mag: 0, knobX: 0, knobY: 0 });
+  assert.deepEqual(stickVector(0, 0), { x: 0, y: 0, mag: 0, knobX: 0, knobY: 0, raw: 0 });
   const tremor = stickVector(STICK_RADIUS * DEADZONE * 0.9, 0);
   assert.equal(tremor.mag, 0, 'dentro da zona morta não move');
   const full = stickVector(500, 0);
@@ -128,4 +128,20 @@ test('botões de toque: distância entre centros >= 1,15 × (r1 + r2) e nada sai
     // alvo de toque físico: a habilidade (50 px) na escala mínima 0,8 continua com 40 px
     assert.ok(L.items.s0.d * L.scale >= 40 - 1e-6);
   }
+});
+
+test('correr: joystick na borda (>90% do raio) por 0,25 s ativa; soltar ou voltar ao meio desliga', () => {
+  assert.ok(stickVector(STICK_RADIUS * 0.95, 0).raw > RUN_EDGE);
+  assert.ok(stickVector(STICK_RADIUS * 0.85, 0).raw < RUN_EDGE);
+  const st = { t: 0, on: false };
+  assert.equal(stepRun(st, 0.95, 0.1), false);
+  assert.equal(stepRun(st, 0.95, 0.1), false);
+  assert.equal(stepRun(st, 0.95, 0.06), true); // 0,26 s
+  assert.equal(stepRun(st, 0.7, 0.05), true); // histerese: continua enquanto passar de metade do raio
+  assert.equal(stepRun(st, 0.3, 0.05), false); // voltou ao meio
+  assert.equal(stepRun(st, 0.95, 0.1), false); // tem que esperar 0,25 s de novo
+  const st2 = { t: 0, on: false };
+  stepRun(st2, 0.95, 0.2); stepRun(st2, 0.5, 0.05); // saiu da borda antes de 0,25 s: zera
+  assert.equal(stepRun(st2, 0.95, 0.2), false);
+  assert.equal(RUN_HOLD_S, 0.25);
 });

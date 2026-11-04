@@ -73,3 +73,15 @@ test('categorias e estado indisponível: selo de categoria em cada habilidade, t
   expect(await page.evaluate(() => document.querySelectorAll('#touch .tbtn.sk.blocked').length)).toBe(0);
   await ctx.close();
 });
+
+test('Maestria bloqueada (Nv 25) na arena PvP: botão s3 com arte carregada, placa visível e cadeado', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
+  const page = await ctx.newPage();
+  await criar(page, 'warrior');
+  await page.evaluate(() => { const g = window.game; g.char.level = 20; g.startMatch('2v2'); g.world.frozen = 0; g.player.hp = g.player.maxHp = 1e7; for (let i = 0; i < 60; i++) g.step(1 / 30); });
+  await page.waitForTimeout(800);
+  const r = await page.evaluate(() => { const b = document.querySelector('#touch .sk3'), im = b.querySelector('img.art'), rc = b.getBoundingClientRect(), cs = getComputedStyle(b); return { locked: b.classList.contains('locked'), nw: im?.naturalWidth ?? 0, w: rc.width, h: rc.height, bg: cs.backgroundImage, banner: document.querySelector('#arena-banner').textContent, bannerH: document.querySelector('#arena-banner').getBoundingClientRect().height }; });
+  expect(r.locked).toBe(true); expect(r.nw).toBeGreaterThan(0); expect(r.w).toBeGreaterThan(30); expect(r.h).toBeGreaterThan(30); expect(r.bg).not.toBe('none');
+  expect(r.banner).toMatch(/\d×\d · 2v2 · \d+:\d\d/); expect(r.bannerH).toBeLessThan(30);
+  await ctx.close();
+});

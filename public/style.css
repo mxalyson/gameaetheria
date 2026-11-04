@@ -606,7 +606,11 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .portal-label, .npc-name { font-family: Cinzel, serif; }
 
 /* Habilidade ainda não aprendida: cadeado + nível (--lv é definido por touch.js / ui.js) */
-.slot.locked .icon, .tbtn.sk.locked .icon { filter: grayscale(1) brightness(.4); }
+/* filtro na <img> (não no contêiner: no Safari/iOS o filtro no span absoluto com font-size 0 sumia com a arte) + placa escura própria, para o botão nunca ficar só "cadeado flutuando" */
+.slot.locked .icon, .tbtn.sk.locked .icon { filter: none; }
+.slot.locked .icon img, .tbtn.sk.locked .icon img { filter: grayscale(1) brightness(.5); opacity: 1; visibility: visible; }
+.tbtn.sk.locked { background: radial-gradient(circle at 50% 40%, #2a2630, #0e0c12 80%); border: 2px solid #5a4a30; box-shadow: inset 0 0 8px #000c, 0 2px 4px #0008; border-radius: 14%; }
+.tbtn.sk.locked::after { background: rgba(8,6,12,.35); border-radius: 14%; }
 .slot.locked::after, .tbtn.sk.locked::after { content: '🔒 Nv ' var(--lv); position: absolute; inset: 0; display: grid; place-items: center; text-align: center; white-space: pre-wrap; color: #ffe9a0; font: 900 11px Nunito, sans-serif; text-shadow: 0 1px 4px #000; pointer-events: none; z-index: 3; }
 .tbtn.sk.locked { pointer-events: none; }
 .cc-skills small { opacity: .7; font-size: .8em; }
@@ -923,3 +927,10 @@ body:has(#hud-gold .pts) #qtrack { top: calc(8px + var(--card-w) * .637 + 12px +
 .tbtn.sk, .tbtn.pot, .tbtn.act { width: calc(var(--d) * 1px); height: calc(var(--d) * 1px); right: calc(var(--cx) * 1px - var(--d) * .5px); bottom: calc(var(--cy) * 1px - var(--d) * .5px); }
 /* com a barra do chefe/elite na tela o rastreador vira só os medalhões (mapa e seta): o texto longo ia por baixo da barra */
 body.boss-on #qtrack .qt-txt { display: none; }
+
+/* ---- Partidas (PvP/ondas/arena online): HUD central compacto, sem cobrir o campo ---- */
+body #arena-banner { top: 50px; font-size: 12px; font-weight: 700; letter-spacing: .02em; padding: 2px 12px; background: rgba(20,14,8,.72); border: 1px solid rgba(201,162,74,.6); border-radius: 10px; text-shadow: 0 1px 0 #000; white-space: nowrap; line-height: 1.3; pointer-events: none; }
+body.touch #boss-bar.compact, #boss-bar.compact { top: 74px; width: min(150px, 24vw); left: 50%; transform: translateX(-50%); }
+#boss-bar.compact #boss-name, #boss-bar.compact #boss-portrait { display: none; }
+#boss-bar.compact .bar { height: 6px; border-width: 1px; border-radius: 4px; box-shadow: none; }
+#boss-bar.compact .fill { border-radius: 3px; }

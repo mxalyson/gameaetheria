@@ -6,6 +6,18 @@ export const DEADZONE = 0.18;   // fração do raio ignorada (tremor do dedo)
 export const AUTO_AIM_RANGE = 620; // px do jogo
 export const DRAG_AIM_MIN = 26;    // px de arrasto para um botão de skill virar "mirar na mão"
 
+export const RUN_EDGE = 0.9;   // fração do raio do joystick: acima disso o dedo está na borda externa
+export const RUN_HOLD_S = 0.25; // tempo na borda para ativar o correr
+export const RUN_KEEP = 0.5;    // depois de ativo, continua correndo enquanto o dedo passar de metade do raio
+
+// Correr: `st` = { t, on }; raw = deslocamento/raio (0..1+, sem zona morta); dt em segundos. Sem botão: soltar o joystick zera.
+export function stepRun(st, raw, dt) {
+  if (raw > RUN_EDGE) st.t += dt; else if (!(st.on && raw > RUN_KEEP)) st.t = 0;
+  st.on = st.on ? raw > RUN_KEEP : st.t >= RUN_HOLD_S;
+  if (!st.on && raw <= RUN_EDGE) st.t = 0;
+  return st.on;
+}
+
 const len = (x, y) => Math.hypot(x, y);
 
 export const HOLD_MS = 400; // segurar um botão de skill por este tempo (parado) abre a explicação em vez de conjurar
@@ -17,12 +29,12 @@ export const isHold = (elapsed, moved = 0, ms = HOLD_MS, min = DRAG_AIM_MIN) => 
 // dx, dy: deslocamento do dedo a partir do ponto onde tocou. Devolve direção (0..1) e a posição do botão do joystick.
 export function stickVector(dx, dy, radius = STICK_RADIUS, dead = DEADZONE) {
   const d = len(dx, dy);
-  if (d < 1e-6) return { x: 0, y: 0, mag: 0, knobX: 0, knobY: 0 };
+  if (d < 1e-6) return { x: 0, y: 0, mag: 0, knobX: 0, knobY: 0, raw: 0 };
   const k = Math.min(d, radius);
   const knobX = (dx / d) * k, knobY = (dy / d) * k;
   const raw = k / radius;
   const mag = raw < dead ? 0 : Math.min(1, (raw - dead) / (1 - dead));
-  return { x: mag ? (dx / d) * mag : 0, y: mag ? (dy / d) * mag : 0, mag, knobX, knobY };
+  return { x: mag ? (dx / d) * mag : 0, y: mag ? (dy / d) * mag : 0, mag, knobX, knobY, raw };
 }
 
 export function nearestTarget(player, enemies, maxR = AUTO_AIM_RANGE) {

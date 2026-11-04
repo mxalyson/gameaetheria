@@ -48,6 +48,13 @@ Missões (12), diálogos, baús, mapa (M), diário (J), conquistas e títulos: v
 - Não há aviso de golpe (`windup`) nem aparo manual: foram descartados pela decisão do dono (bloqueio passivo).
 - Servidor: `stats.block` vem do documento (computeStats); `itemCeiling` (plausible.js) conhece o escudo.
 
+## Correr (sprint) e HUD de partida (2026-11-04)
+- **Correr, sem botão novo:** empurrar o joystick até a borda externa (> 90% do raio, `RUN_EDGE`) por 0,25 s (`RUN_HOLD_S`) liga o correr; segue ligado enquanto o dedo passar de metade do raio e cai ao soltar. **+30% de velocidade de movimento** (`RUN_MUL` em `game/sim.js`) e poeira/vento leve nos pés (`drawRunDust` no renderer, sprites `smoke`/`wisp` do kit VFX).
+- **Quando vale:** só em cidade e zonas de farm (`RUN_ZONES`: town, forest, plains, harbor, ruins, glacier, ember), nunca na arena PvP, nas Ondas nem na Cripta. Cai ao atacar/usar habilidade no quadro e por 3 s depois de atacar ou levar dano (`lastCombat`, `RUN_COMBAT_GRACE`).
+- **Servidor autoritativo:** o cliente só envia a intenção `run: true` (campo aditivo de `input` em `core/protocol.js`; omitido quando falso). Quem decide é `World.applyIntent` (a mesma regra roda no servidor da zona, `server/zone.js`): fora de zona permitida ou em combate o pedido é ignorado. Testes: `tests/core.test.js`, `tests/zone.test.js`, `tests/touch.test.js` (limiar do joystick).
+- **Montaria:** não implementada; desenho em `docs/roadmap/montaria.md`.
+- **HUD de partida compacto:** placar vira pílula pequena sob o menu (`2×1 · 2v2 · 1:34`), barra do rival fica fina (6 px, sem nome, classe `compact`), nomes de jogadores no canvas ~60% menores, só o nome, translúcidos quando há outro ator a menos de 40 px e nunca sobre o herói do jogador; números de dano 28% menores e 30% mais curtos.
+
 ## Especializações e reespecialização paga (2026-11-03)
 **Regra (decisão do dono).** No nível 15, depois da Prova do Mestre, a PRIMEIRA escolha é grátis. Trocar depois exige 1 **Selo de Reespecialização**, consumível vendido pelo Mestre de Classe da própria classe por **15.000 de ouro** (`SEAL_PRICE`; máximo 9 carregados). `char.seals` guarda os Selos e `char.specChanges` conta as trocas pagas (histórico simples); ambos entram no documento (`core/savedoc.js`). O botão do Selo só aparece no painel aberto pelo serviço do Mestre ("Especialização e Selos"); a troca pede confirmação do próprio jogo. Offline vale a mesma regra, localmente (`chooseSpec`/`buySeal` em `core/specs.js`).
 

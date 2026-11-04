@@ -1257,3 +1257,27 @@ test('Soberano dos Ecos: só 2 fases (sem fúria), golpes em área com AVISO mai
   let drops = 0; for (let i = 0; i < 2000; i++) if (rollEchoDrop(rng, 26, 'mage')) drops++;
   assert.ok(drops > 2000 * CRYPT.itemChance * 0.8 && drops < 2000 * CRYPT.itemChance * 1.2, 'chance do item Eco ~' + CRYPT.itemChance + ': ' + drops);
 });
+
+// Correr (sprint): +30% só fora de combate e só em zonas de farm/cidade (nunca arena PvP, ondas ou Cripta)
+test('correr: +30% em zona de farm fora de combate; sem efeito em arena, em combate ou atacando', () => {
+  const dist = (zone, it, prep) => {
+    const w = new World(zone, { seed: 1, visuals: false });
+    const p = w.add(makeHeroActor(newCharacter('T', 'warrior', makeRng(1)), 1000, 1000));
+    if (prep) prep(w, p);
+    const x0 = p.x;
+    for (let i = 0; i < 20; i++) w.update(1 / 60, { [p.id]: { mx: 1, my: 0, aimX: p.x + 100, aimY: p.y, ...it } });
+    return { d: p.x - x0, running: p.running };
+  };
+  const walk = dist('town', {}), run = dist('town', { run: true });
+  assert.ok(walk.d > 50, 'andou');
+  assert.ok(Math.abs(run.d / walk.d - 1.3) < 0.02, `razão ${(run.d / walk.d).toFixed(3)}`);
+  const noRun = dist('arena_team', { run: true }), noWaves = dist('waves', { run: true }), noCrypt = dist('crypt', { run: true });
+  for (const r of [noRun, noWaves, noCrypt]) assert.ok(!r.running);
+  assert.ok(Math.abs(noRun.d - dist('arena_team', {}).d) < 1e-6, 'arena PvP: sem bônus');
+  assert.ok(Math.abs(noWaves.d - dist('waves', {}).d) < 1e-6, 'ondas: sem bônus');
+  const hit = dist('town', { run: true }, (w, p) => { p.lastCombat = w.time; });
+  assert.ok(Math.abs(hit.d - walk.d) < 1e-6 && !hit.running, 'em combate (últimos 3 s): sem bônus');
+  const atk = dist('town', { run: true, attack: true });
+  assert.ok(atk.d <= walk.d + 1e-6 && !atk.running, 'atacando: cai o correr');
+  assert.ok(dist('town', { run: true }, (w, p) => { p.lastCombat = w.time - 3.1; }).running, 'passados 3 s volta a correr');
+});

@@ -7,6 +7,7 @@ import { drawAuraBack, drawAuraMotes } from './aura.js';
 
 let auraQ = 2; // qualidade para a aura de evolução (0 só halo, 1 meio, 2 cheio); atualizada em setQuality
 import { drawSkillVfx, drawSkillProjectile, drawBasicSlash, vfxShake, trackActors } from './skill-vfx.js';
+import { sprite as vfxSprite, SP as VSP, PL as VPL, loadVfxKit as loadVfx, vfxKitReady } from './vfx-kit.js';
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
 import { drawChestSprite } from './prop-sprites.js';
 import { GroundCache, quantScale } from './ground-tiles.js';
@@ -168,6 +169,7 @@ export class Renderer {
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
     for (const f of world.fx) drawFx(g, f);
+    drawRunDust(g, world.actors, t);
     drawSkillVfx(g, world, this.quality === 0); // efeitos próprios das 12 habilidades (só apresentação)
     trackActors(world);
     drawDayNight(g, world, cam, this.ww, this.wh, this.zoom, view.player, this.quality); // dia e noite (render/sky.js): ar da hora, luzes e halo do herói; barras e nomes ficam por cima
@@ -178,6 +180,7 @@ export class Renderer {
     const hud = this.hud, zm = this.zoom;
     PROMPTS.length = 0; SAFE.cx = cam.x; SAFE.cy = cam.y; SAFE.zm = zm; SAFE.vw = this.vw; SAFE.vh = this.vh; SAFE.hud = hud;
     const covered = (a) => { const sx = (a.x - cam.x) * zm, sy = (a.y - cam.y) * zm - 40 * zm; for (const [x0, y0, x1, y1] of hud) if (sx > x0 && sx < x1 && sy > y0 && sy < y1) return true; return false; };
+    _lblCtx.player = player; _lblCtx.actors = world.actors;
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y) && (a === player || a.kind !== 'mob' || a.boss || !covered(a))) drawBars(g, a, a === player, this.labels);
     for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortalLabel(g, p, cam.x + 10, cam.x + this.ww - 10);
     labelLifts(g, z.npcs, vis, view.questMarks, view.guideNpc);
@@ -190,11 +193,13 @@ export class Renderer {
     }
     for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : 'Toque para abrir');
     for (const tx of world.texts) {
-      const a = 1 - Math.max(0, (tx.t - tx.life * 0.6) / (tx.life * 0.4));
+      const L = tx.life * 0.7; // número de dano: menor e mais curto, para não encobrir o combate
+      if (tx.t > L) continue;
+      const a = 1 - Math.max(0, (tx.t - L * 0.6) / (L * 0.4));
       g.globalAlpha = a;
-      g.font = `800 ${tx.size}px Nunito, system-ui, sans-serif`;
+      g.font = `800 ${Math.round(tx.size * 0.72)}px Nunito, system-ui, sans-serif`;
       g.textAlign = 'center';
-      g.lineWidth = 3.5;
+      g.lineWidth = 2.5;
       g.strokeStyle = 'rgba(20,20,35,0.75)';
       const s = tx.t < 0.12 ? 1 + (0.12 - tx.t) * 4 : 1;
       g.save(); g.translate(tx.x, tx.y); g.scale(s, s);
@@ -904,6 +909,27 @@ function drawObjective(g, ob, t) {
   g.restore();
 }
 
+// Poeira/vento nos pés de quem corre (a.running vem da simulação): 3 baforadas de fumaça que sobem e somem atrás do ator. Só apresentação.
+const _dustPrev = new WeakMap();
+function drawRunDust(g, actors, t) {
+  let any = false;
+  for (const a of actors) if (a.running && a.moving && !a.dead) { any = true; break; }
+  if (!any) return;
+  loadVfx(); if (!vfxKitReady()) return;
+  for (const a of actors) {
+    if (!a.running || !a.moving || a.dead) continue;
+    const pv = _dustPrev.get(a); let dx = 0, dy = 0;
+    if (pv) { dx = a.x - pv.x; dy = a.y - pv.y; const l = Math.hypot(dx, dy); if (l > 0.01) { dx /= l; dy /= l; pv.dx = dx; pv.dy = dy; } else { dx = pv.dx; dy = pv.dy; } }
+    _dustPrev.set(a, { x: a.x, y: a.y, dx, dy });
+    for (let k = 0; k < 3; k++) {
+      const ph = (t * 3.2 + k / 3) % 1, sp = vfxSprite((k === 1 ? VSP.wisp0 : VSP.smoke0 + k), VPL.dust); if (!sp) continue;
+      const sz = 10 + ph * 12, x = a.x - dx * (6 + ph * 26), y = a.y + 12 - dy * (6 + ph * 26) * 0.6 - ph * 8;
+      g.globalAlpha = (1 - ph) * 0.42; g.drawImage(sp.cv, x - sz / 2, y - sz / 2, sz, sz * (sp.h / sp.w));
+    }
+  }
+  g.globalAlpha = 1;
+}
+const _lblCtx = { player: null, actors: null }; // contexto do quadro para as etiquetas de nome (herói próprio e vizinhos)
 const LABEL_STEPS = [14, 28, 42, -14, -28]; // degraus (mundo) tentados para a etiqueta de nome: sobe, depois desce
 function drawBars(g, a, isPlayer, placed) {
   if (a.kind === 'spirit') return;
@@ -928,11 +954,12 @@ function drawBars(g, a, isPlayer, placed) {
     if (a.mark === 'ally') { g.moveTo(mx, my - 5); g.lineTo(mx + 5, my); g.lineTo(mx, my + 5); g.lineTo(mx - 5, my); g.closePath(); } else g.rect(mx - 4, my - 4, 8, 8);
     g.fill(); g.stroke();
   }
-  g.font = '800 11px Cinzel, Nunito, serif';
+  const small = a.kind === 'rival'; // nomes de jogadores: ~60% do tamanho, só o nome (o nível fica para a barra/toque)
+  g.font = small ? '700 7px Cinzel, Nunito, serif' : '800 11px Cinzel, Nunito, serif';
   g.textAlign = 'center';
-  g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
+  g.lineWidth = small ? 2 : 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
   let label = null;
-  if (a.kind === 'rival') label = `${a.name} · Nv ${a.level}`;
+  if (a.kind === 'rival') label = a.name;
   else if (a.kind === 'mob') label = `Nv ${a.level}${a.boss || a.elite ? ' · ' + a.name : ''}`;
   if (label) {
     // etiquetas coladas se afastam para cima (V21): até 3 degraus de 12 px; a posição fica registrada no quadro
@@ -945,9 +972,14 @@ function drawBars(g, a, isPlayer, placed) {
     const by = ly;
     for (let n = 0; n < LABEL_STEPS.length && busy(); n++) ly = by + LABEL_STEPS[n];
     if (placed) placed.push({ x: lx, y: ly, hw });
+    const pl = _lblCtx.player;
+    if (small && pl && pl !== a && Math.abs(pl.x - lx) < hw + 10 && ly > pl.y - 52 && ly < pl.y + 8) return; // nunca sobre o herói do próprio jogador
+    const near = small && _lblCtx.actors && _lblCtx.actors.some((o) => o !== a && !o.dead && o.kind !== 'spirit' && Math.hypot(o.x - a.x, o.y - a.y) < 40);
+    const ga = g.globalAlpha; if (near) g.globalAlpha = ga * 0.45; // outro ator colado: etiqueta translúcida
     g.strokeText(label, lx, ly);
     g.fillStyle = a.boss ? '#ffb4a8' : a.elite ? '#ffd27a' : a.kind === 'rival' && a.team === 1 ? '#bfe0ff' : '#ffffff';
     g.fillText(label, lx, ly);
+    g.globalAlpha = ga;
   }
 }
 

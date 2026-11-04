@@ -832,7 +832,7 @@ class Game {
       const my = this.netInfo.team;
       if (last.mode === 'coop') this.ui.banner(last.state === 'countdown' ? `Começa em ${Math.ceil(last.countdown)}` : last.coop.rest > 0 ? `Onda ${last.coop.wave + 1}/${last.coop.total} em ${Math.ceil(last.coop.rest)}s` : `Onda ${last.coop.wave}/${last.coop.total} · ${last.coop.mobs} monstros`);
       else if (last.state === 'countdown') this.ui.banner(`${this.netInfo.mode} — começa em ${Math.ceil(last.countdown)}`);
-      else if (last.match) this.ui.banner(`${last.match.score[my]} × ${last.match.score[my === 1 ? 2 : 1]} · ${last.match.left}s`);
+      else if (last.match) this.ui.banner(`${last.match.score[my]}×${last.match.score[my === 1 ? 2 : 1]} · ${Math.floor(last.match.left / 60)}:${String(Math.floor(last.match.left % 60)).padStart(2, '0')}`);
     }
   }
 
@@ -1873,7 +1873,7 @@ class Game {
     const win = matchWinner(M, alive1.length, alive2.length, alive1.reduce((s, a) => s + a.hp, 0), alive2.reduce((s, a) => s + a.hp, 0));
     const left = Math.max(0, Math.ceil(M.limit - M.time));
     this.duelGo += dt;
-    this.ui.banner(this.duelGo < 1 ? 'LUTE!' : `${Math.floor(M.score[1])} × ${Math.floor(M.score[2])} · ${alive1.length} vs ${alive2.length} vivos · ${left}s`);
+    this.ui.banner(this.duelGo < 1 ? 'LUTE!' : `${Math.floor(M.score[1])}×${Math.floor(M.score[2])} · ${alive1.length}v${alive2.length} · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`);
     if (win) this.endMatch(win);
   }
 

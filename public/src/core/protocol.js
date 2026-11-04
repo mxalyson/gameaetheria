@@ -81,6 +81,7 @@ export function parseClientMessage(data) {
         mx: clamp(data.mx, -1, 1), my: clamp(data.my, -1, 1),
         aimX: clamp(data.aimX, -10000, 10000), aimY: clamp(data.aimY, -10000, 10000),
         attack: data.attack === true, cast: data.cast ?? null,
+        ...(data.run === true ? { run: true } : {}), // correr: campo aditivo; o servidor só o honra fora de combate e em zonas de farm (game/sim.js)
       } };
     }
     case 'queue':

@@ -92,7 +92,7 @@ export class ZoneRoom {
     if (!p || p.left) return;
     if (m.seq <= p.lastSeq) { this.send.stats.staleInputs++; return; }
     p.lastSeq = m.seq;
-    p.input = { mx: m.mx, my: m.my, aimX: m.aimX, aimY: m.aimY, attack: m.attack, cast: m.cast ?? p.input.cast };
+    p.input = { mx: m.mx, my: m.my, aimX: m.aimX, aimY: m.aimY, attack: m.attack, cast: m.cast ?? p.input.cast, run: m.run === true };
   }
   dropped(session) { const p = session.player; if (p && !p.left) { p.dropT = this.clock; p.input = idle(); } }
   resumed(session) { const p = session.player; if (p && !p.left) p.dropT = null; }

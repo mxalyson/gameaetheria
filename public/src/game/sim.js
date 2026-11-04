@@ -22,6 +22,8 @@ const TAU = Math.PI * 2;
 // Spirit coletor: fora de combate busca o drop mais próximo (até `range` px do dono) e o traz; `hand` = distância em que entrega ao dono.
 export const SPIRIT_FETCH = { range: 260, speed: 320, grab: 16, hand: 30 };
 export const DROP_LIFE = 120, DROP_BLINK = 10, DROP_MAX = 120; // drops no chão: vida (s), piscar final (s) e teto por mundo
+export const RUN_MUL = 1.3, RUN_COMBAT_GRACE = 3; // correr (sprint): +30% fora de combate (docs/gameplay/sistemas.md)
+export const RUN_ZONES = new Set(['town', 'forest', 'plains', 'harbor', 'ruins', 'glacier', 'ember']); // nunca arena PvP, ondas nem Cripta (equilíbrio do PvP)
 export const PVP_DAMAGE = 0.28; // duelos entre heróis mais longos e táticos (medido com npm run balance; 0,32 deixava Guerreiro/Arqueiro Nv30 com Maestria em 17–18 s)
 let nextId = 1;
 
@@ -328,12 +330,14 @@ export class World {
     const len = Math.hypot(mx, my);
     if (len > 0.01) {
       mx /= len; my /= len;
-      const sp = a.stats.moveSpeed * a.speedMul * (it.spd ?? 1) * (a.slowT > 0 ? 1 - a.slowAmt : 1) * (a.buffs.length ? 1 + this.buffVal(a, 'move') : 1);
+      // Correr: só em zonas de farm/cidade/instância PvE, fora de combate (3 s) e sem atacar/conjurar neste quadro; o servidor ignora o pedido do cliente se algo disso falhar
+      a.running = it.run === true && a.kind === 'player' && RUN_ZONES.has(this.zoneId) && !it.attack && it.cast == null && this.time - a.lastCombat >= RUN_COMBAT_GRACE;
+      const sp = a.stats.moveSpeed * a.speedMul * (a.running ? RUN_MUL : 1) * (it.spd ?? 1) * (a.slowT > 0 ? 1 - a.slowAmt : 1) * (a.buffs.length ? 1 + this.buffVal(a, 'move') : 1);
       this.moveActor(a, mx * sp * dt, my * sp * dt);
       a.moving = true;
       a.walk += dt * sp / 28;
       a.stillT = 0;
-    } else { a.moving = false; a.stillT = (a.stillT ?? 0) + dt; } // parado encarando: bônus de bloqueio do escudo
+    } else { a.moving = false; a.running = false; a.stillT = (a.stillT ?? 0) + dt; } // parado encarando: bônus de bloqueio do escudo
     if (it.attack && a.cds.basic <= 0) this.basicAttack(a, it.aimX, it.aimY);
     if (it.cast != null) this.castSkill(a, it.cast, it.aimX, it.aimY);
   }
