@@ -25,7 +25,7 @@ const duel = (classId, spec, enemyClass = 'warrior', lvl = 20) => {
   return { w, a, b, step: (n, it) => { for (let i = 0; i < n; i++) w.update(1 / 60, { [a.id]: { ...NONE, aimX: b.x, aimY: b.y, ...(i === 0 ? it : null) }, [b.id]: NONE }); } };
 };
 
-test('as 8 especializações: nomes, descrições (até 140 caracteres), ícones e só ajustam o que a classe já tem', () => {
+test('as 8 especializações: nomes, descrições (até 140 caracteres), ícones e kit próprio', () => {
   assert.deepEqual(Object.fromEntries(Object.entries(SPECS).map(([k, v]) => [k, Object.keys(v)])), {
     warrior: ['paladin', 'berserker'], mage: ['arcane', 'warlock'], archer: ['sniper', 'gunslinger'], cleric: ['guardian', 'inquisitor'],
   });
@@ -34,11 +34,9 @@ test('as 8 especializações: nomes, descrições (até 140 caracteres), ícones
     const sp = SPECS[cid][sid], cls = CLASSES[cid];
     assert.ok(sp.name && sp.icon && sp.desc, sid + ' sem textos');
     assert.ok(sp.desc.length <= 140, `${sid}: descrição com ${sp.desc.length} caracteres`);
-    for (const [skillId, mod] of Object.entries(sp.skills)) {
-      assert.ok(cls.skills.includes(skillId), `${cid}/${sid} mexe em ${skillId}, que não é da classe`);
-      assert.ok(mod.desc && mod.desc.length <= 140, `${sid}/${skillId}: desc`);
-      for (const f of Object.keys(mod)) assert.ok(f === 'desc' || f in SKILLS[skillId] || SKILL_EXTRA_FIELDS.includes(f), `${sid}/${skillId}: campo desconhecido "${f}"`);
-    }
+    assert.equal(sp.skills, undefined, 'as habilidades vêm do kit próprio (data/kits.js), não de ajustes nas da classe');
+    assert.equal(sp.kit.skills.length, 3); assert.ok(SKILLS[sp.kit.mastery]);
+    for (const id of sp.kit.skills) assert.ok(!cls.skills.includes(id), `${sid}: ${id} é da classe`);
     assert.doesNotMatch(sp.desc, /tecla|clique|botão/i, 'sem citar teclas');
   }
   assert.equal(Object.keys(CLASSES).length, 4, 'continuam 4 classes');
@@ -65,15 +63,11 @@ test('migração dos saves: ids antigos viram os novos (documento e normSpec); s
   assert.equal(validate(hero('mage', 20)).char.spec, null);
 });
 
-test('skillOf: sem especialização devolve a habilidade original; com ela mescla (inclusive buff campo a campo)', () => {
+test('skillOf: as especializações não alteram as habilidades da classe (têm kit próprio) e o dado original é intocado', () => {
   assert.equal(skillOf('warrior', null, 'warcry'), SKILLS.warcry);
-  assert.equal(skillOf('warrior', 'paladin', 'whirlwind'), SKILLS.whirlwind, 'skill não alterada pela spec fica igual');
-  const w = skillOf('warrior', 'paladin', 'warcry');
-  assert.equal(w.dur, 12); assert.equal(w.buff.dr, SPECS.warrior.paladin.skills.warcry.buff.dr); assert.equal(w.buff.dmg, 0.15);
-  assert.equal(w.kind, SKILLS.warcry.kind); assert.equal(w.name, SKILLS.warcry.name);
-  assert.equal(SKILLS.warcry.dur, 6, 'o dado original não é alterado');
-  assert.equal(skillOf('warrior', 'paladin', 'warcry'), w, 'cache estável');
-  assert.equal(skillOf('mage', 'arcane', 'fireball').name, 'Projétil Arcano');
+  for (const [cid, sid] of ALL) for (const id of CLASSES[cid].skills) assert.equal(skillOf(cid, sid, id), SKILLS[id], `${sid}/${id}`);
+  assert.equal(SKILLS.warcry.dur, 6);
+  assert.equal(skillOf('mage', 'arcane', 'arc_prism').name, 'Raio Prismático');
 });
 
 test('escolha: só no nível 15 com a Prova; a PRIMEIRA é grátis e sem Selo', () => {
@@ -165,15 +159,11 @@ test('na simulação (Mago): Arcano perfura e atordoa, Bruxo queima ao longo do 
   w.update(1 / 60, { [a.id]: { ...NONE, aimX: 550, aimY: 300, cast: 0 }, [b1.id]: NONE, [b2.id]: NONE });
   for (let i = 0; i < 60; i++) w.update(1 / 60, { [a.id]: NONE, [b1.id]: NONE, [b2.id]: NONE });
   assert.ok(b1.hp < hp[0] && b2.hp < hp[1], 'os dois levaram dano');
-  assert.ok(Math.abs(a.cds.s0 - (SPECS.mage.arcane.skills.fireball.cd - 1)) < 0.05, 'recarga da spec');
-  // Nova Arcana atordoa (inimigo dentro do raio)
-  const n = duel('mage', 'arcane'); n.b.y = 560; n.step(1, { cast: 1 });
-  assert.ok(n.b.stunT > 0.8, `Nova Arcana atordoa (stunT=${n.b.stunT})`);
-  const n0 = duel('mage', null); n0.b.y = 560; n0.step(1, { cast: 1 });
-  assert.equal(n0.b.stunT, 0, 'a Nova de Gelo comum não atordoa');
-  // Teleporte do Arcano recarrega mais depressa
-  const t = duel('mage', 'arcane'); t.step(1, { cast: 2 });
-  assert.ok(t.a.cds.s2 < SKILLS.blink.cd - 1);
+  assert.ok(Math.abs(a.cds.s0 - (SKILLS.arc_prism.cd - 1)) < 0.05, 'recarga do Raio Prismático');
+  // Passo Fase deixa uma mina que atordoa quem ficar na origem
+  const n = duel('mage', 'arcane'); n.b.y = 560; n.step(1, { cast: 2, aimX: 550, aimY: 900 });
+  n.b.x = 550; n.b.y = 600; n.step(90);
+  assert.ok(n.b.hp < n.b.maxHp, 'a mina explodiu na origem');
   // Bruxo: dano ao longo do tempo
   const k = duel('mage', 'warlock'); k.b.y = 580; k.step(1, { cast: 0 });
   k.step(30);
@@ -189,35 +179,27 @@ test('na simulação (Guerreiro): Paladino protege aliados; Berserker bate mais 
   const a = w.add(makeHeroActor(c, 550, 600, 'player', 1));
   const ally = w.add(makeHeroActor(hero('mage', 20), 600, 600, 'rival', 1));
   const foe = w.add(makeHeroActor(hero('warrior', 20), 550, 400, 'rival', 2));
-  w.update(1 / 60, { [a.id]: { ...NONE, aimX: foe.x, aimY: foe.y, cast: 2 }, [ally.id]: NONE, [foe.id]: NONE });
-  assert.equal(a.buffs[0].t > 11.9, true, 'Grito dura 12s');
-  assert.equal(w.buffVal(a, 'dr'), 0.28); assert.equal(w.buffVal(ally, 'dr'), 0.28, 'aliado por perto recebe o mesmo reforço');
-  // Investida do Paladino: escudo para o aliado
-  const w2 = new World('arena', { seed: 8, visuals: false });
-  const c2 = hero('warrior', 20); c2.spec = 'paladin';
-  const p2 = w2.add(makeHeroActor(c2, 550, 600, 'player', 1));
-  const al2 = w2.add(makeHeroActor(hero('mage', 20), 600, 600, 'rival', 1));
-  w2.update(1 / 60, { [p2.id]: { ...NONE, aimX: 550, aimY: 300, cast: 1 }, [al2.id]: NONE });
-  assert.ok(al2.shield > 0, 'a Investida ampara o aliado');
-  const dmgAt = (spec, frac) => { const m = duel('warrior', spec); m.b.y = 540; m.a.hp = m.a.maxHp * frac; const hp0 = m.b.hp; m.step(1, { cast: 0 }); return hp0 - m.b.hp; };
-  assert.ok(dmgAt('berserker', 1) > dmgAt(null, 1) * 1.3, 'Golpe Giratório mais forte');
+  w.update(1 / 60, { [a.id]: { ...NONE, aimX: foe.x, aimY: foe.y, cast: 1 }, [ally.id]: NONE, [foe.id]: NONE });
+  assert.equal(a.buffs[0].t > 7.9, true, 'Aura dura 8s');
+  assert.equal(w.buffVal(a, 'dr'), 0.2); assert.equal(w.buffVal(ally, 'dr'), 0.2, 'aliado por perto recebe a mesma aura');
+  const dmgAt = (spec, frac, idx) => { const m = duel('warrior', spec); m.b.y = 540; m.a.hp = m.a.maxHp * frac; const hp0 = m.b.hp; m.step(1, { cast: idx }); return hp0 - m.b.hp; };
+  assert.ok(dmgAt('berserker', 1, 2) > dmgAt(null, 1, 0) * 1.3, 'Machadada em Arco bate mais forte que o Golpe Giratório da classe');
   assert.equal(lowHpBonus({ spec: 'berserker', classId: 'warrior', hp: 100, maxHp: 100 }), 0);
   assert.ok(lowHpBonus({ spec: 'berserker', classId: 'warrior', hp: 25, maxHp: 100 }) > 0.15);
   assert.equal(lowHpBonus({ spec: 'paladin', classId: 'warrior', hp: 1, maxHp: 100 }), 0, 'só o Berserker');
-  let lo = 0, hi = 0; for (let i = 0; i < 6; i++) { lo += dmgAt('berserker', 0.2); hi += dmgAt('berserker', 1); }
+  let lo = 0, hi = 0; for (let i = 0; i < 6; i++) { lo += dmgAt('berserker', 0.2, 2); hi += dmgAt('berserker', 1, 2); }
   assert.ok(lo > hi * 1.1, `com pouca vida bate mais forte (${lo} vs ${hi})`);
 });
 
 test('na simulação (Arqueiro): Franco-atirador acerta um tiro devastador; Pistoleiro dispara rajada em leque e rola mais rápido', () => {
-  const shot = (spec) => { const m = duel('archer', spec); const hp0 = m.b.hp; m.step(1, { cast: 1 }); m.step(90); return hp0 - m.b.hp; };
-  const base = shot(null), sn = shot('sniper'), gun = shot('gunslinger');
-  assert.ok(sn > base * 1.4, `Tiro Perfurante do Franco-atirador ${sn} vs ${base}`);
-  assert.ok(gun > 0, 'a Rajada acerta');
-  const g = duel('archer', 'gunslinger'); g.step(1, { cast: 1 });
-  assert.equal(g.w.projectiles.length, 3, 'três virotes em leque');
+  const shot = (spec, idx) => { const m = duel('archer', spec); const hp0 = m.b.hp; m.step(1, { cast: idx }); m.step(90); return hp0 - m.b.hp; };
+  const base = shot(null, 1), sn = shot('sniper', 0), gun = shot('gunslinger', 0);
+  assert.ok(sn > base * 1.4, `Tiro Mira Perfeita do Franco-atirador ${sn} vs ${base}`);
+  assert.ok(gun > 0, 'a Rajada em Leque acerta');
+  const g = duel('archer', 'gunslinger'); g.step(1, { cast: 0 });
+  assert.equal(g.w.projectiles.length, 5, 'cinco virotes em leque');
   const r = duel('archer', 'gunslinger'); r.step(1, { cast: 2 });
-  assert.ok(r.a.cds.s2 < SKILLS.roll.cd - 0.5 && r.a.cds.s2 > 2.9);
-  assert.ok(skillOf('archer', 'gunslinger', 'roll').cd < SKILLS.roll.cd);
+  assert.ok(r.a.cds.s2 <= 0.3 + 1e-6, 'Rolamento Duplo: a 2ª esquiva fica pronta logo');
 });
 
 test('rivais de nível 15+ vêm com especialização; abaixo disso não', () => {
@@ -298,7 +280,6 @@ test('rival Berserker nasce sem escudo; a spec é mais forte em dano físico (po
   const st = (spec) => { const c = hero('warrior', 20); c.spec = spec; return computeStats(c); };
   assert.ok(st('berserker').power > st('paladin').power);
   assert.ok(basicOf('warrior', 'berserker').mult > basicOf('warrior', 'paladin').mult);
-  assert.ok(skillOf('warrior', 'berserker', 'whirlwind').mult > skillOf('warrior', 'paladin', 'whirlwind').mult * 1.4);
-  assert.ok(skillOf('warrior', 'berserker', 'charge').mult > skillOf('warrior', 'paladin', 'charge').mult * 1.8);
+  assert.ok(SKILLS.bsk_cleave.mult > SKILLS.whirlwind.mult, 'a Machadada bate mais que o Golpe Giratório da classe');
   assert.ok(st('berserker').def < st('paladin').def);
 });

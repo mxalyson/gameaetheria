@@ -1,7 +1,9 @@
 // Ícones das habilidades (arte em public/assets/icons). Um só lugar decide o caminho: a UI, o toque e os tooltips usam estas funções.
 // A mecânica não depende disto (data/skills.js segue com o emoji como reserva se a imagem não carregar).
 import { asset } from '../assets-version.js';
-export const skillIconUrl = (id) => `assets/icons/skills/${id}.webp`;
+import { SKILLS } from '../data/skills.js';
+// `art` (data/kits.js): habilidades de especialização reaproveitam o ícone existente mais parecido até o dono entregar a arte própria
+export const skillIconUrl = (id) => `assets/icons/skills/${SKILLS[id]?.art ?? id}.webp`;
 // Ataque básico: um emblema por classe (escudo de bronze, runas arcanas, folhas, asas de ouro)
 export const attackIconUrl = (classId) => `assets/icons/attack/atk-${classId}.webp`;
 export const attackImg = (classId, emoji = '', cls = 'art') => iconImg(attackIconUrl(classId), emoji, cls);

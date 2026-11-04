@@ -134,3 +134,55 @@ test('itens por classe, evolução de spirit só com a missão e opção de dia 
   await expect(page.locator('[data-arg^="daynight"]')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('Praça dos Mestres de Estilo: 8 mentores com arte, fala própria, conversa conta para a Prova do Mestre e a escolha só libera depois', async ({ page }) => {
+  const errors = await criar(page, 'mage');
+  await page.evaluate(async () => {
+    const { acceptQuest } = await import('/src/core/journal.js'), g = window.game;
+    g.char.level = 16; g.enterZone('harbor', 1500, 560); acceptQuest(g.char, 'prova_do_mestre');
+  });
+  const npcs = await page.evaluate(() => window.game.world.zone.npcs.filter((n) => n.role === 'mentor').map((n) => n.id));
+  expect(npcs).toHaveLength(8);
+  await falarCom(page, 'mentor_paladin'); // outra classe: só curiosidade
+  await expect(page.locator('.p-dialog')).toContainText('Sir Aurelion');
+  await expect(page.locator('.p-dialog')).toContainText('Paladino');
+  await expect(page.locator('.p-dialog [data-action="spec"]')).toHaveCount(0);
+  expect(await page.evaluate(() => window.game.char.quests.active.prova_do_mestre.p[2])).toBe(0);
+  await page.evaluate(() => window.game.ui.closePanels());
+  await falarCom(page, 'mentor_arcane');
+  await expect(page.locator('.p-dialog')).toContainText('Maga Velyra');
+  await expect(page.locator('.p-dialog')).toContainText('Falta a Prova do Mestre'); // sem a prova concluída: sem botão de escolha
+  expect(await page.evaluate(() => window.game.char.quests.active.prova_do_mestre.p[2])).toBe(1);
+  await page.evaluate(() => window.game.ui.closePanels());
+  await falarCom(page, 'mentor_warlock');
+  expect(await page.evaluate(() => window.game.char.quests.active.prova_do_mestre.p[2])).toBe(2);
+  await page.evaluate(() => { window.game.ui.closePanels(); window.game.char.quests.done.prova_do_mestre = Date.now(); window.game.ui.openPanel('dialog'); }); // prova concluída: o mentor oferece a escolha
+  await expect(page.locator('.p-dialog [data-action="spec"][data-arg="warlock"]')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test('loja: sem abas; Selecionar vários marca/desmarca, mostra contador e total, confirma épico e vende só os marcados', async ({ page }) => {
+  const errors = await criar(page);
+  await page.evaluate(async () => {
+    const { generateItem } = await import('/src/core/loot.js'), { makeRng } = await import('/src/core/rng.js'), g = window.game;
+    ['common', 'common', 'uncommon', 'epic'].forEach((r, i) => g.char.inventory.push(generateItem(makeRng(30 + i), 5, { classId: 'warrior', rarityId: r })));
+    g.char.equipment.weapon = generateItem(makeRng(99), 5, { classId: 'warrior', slot: 'weapon', rarityId: 'rare' });
+    g.char.gold = 10; g.ui.openPanel('shop');
+  });
+  await expect(page.locator('.p-shop [data-action="shop-tab"]')).toHaveCount(0);
+  await expect(page.locator('.p-shop [data-action="buy-item"]').first()).toBeVisible();
+  await page.click('[data-action="sel-toggle"]');
+  await page.click('[data-action="sel-mark"][data-arg="1"]'); // comuns + incomuns: 3
+  await expect(page.locator('.p-inventory .cell.sel')).toHaveCount(3);
+  await expect(page.locator('.sel-count')).toContainText('3 marcados');
+  await page.locator('.p-inventory .cell:not(.empty)').nth(3).click(); // o épico entra na seleção com 1 toque
+  await expect(page.locator('.p-inventory .cell.sel')).toHaveCount(4);
+  await page.locator('.p-inventory .cell:not(.empty)').nth(0).click(); // e um comum sai
+  await expect(page.locator('.p-inventory .cell.sel')).toHaveCount(3);
+  await page.click('[data-action="sell-selected"]');
+  await expect(page.locator('.confirm-veil')).toBeVisible(); // épico na seleção: ui.confirm (nunca o confirm() do navegador)
+  await page.locator('.confirm-veil [data-yes]').click();
+  const r = await page.evaluate(() => ({ inv: window.game.char.inventory.map((i) => i.rarity), eq: window.game.char.equipment.weapon?.rarity, gold: window.game.char.gold }));
+  expect(r.inv).toEqual(['common']); expect(r.eq).toBe('rare'); expect(r.gold).toBeGreaterThan(10);
+  expect(errors).toEqual([]);
+});

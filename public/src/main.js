@@ -6,6 +6,8 @@ import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { UI, esc } from './ui/ui.js';
 import { World, makeHeroActor, makeMobActor, makeSpiritActor } from './game/sim.js';
+import { waterWaypoint } from './game/ai.js';
+import { questTarget, guideGoal, pickTracked, trackerText, buildNavGrid, findPath, followPath, lineFree } from './core/autopath.js';
 import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore, hasMastery } from './core/stats.js';
 import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit } from './core/progression.js';
@@ -27,13 +29,14 @@ import { SKILLS } from './data/skills.js';
 import { newlyUnlocked, masteryUnlock } from './core/unlocks.js';
 import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
 import { depositItem, withdrawItem } from './core/bank.js';
-import { claimDaily, ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, evolvedSpirits, readLore } from './core/journal.js';
+import { claimDaily, ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, evolvedSpirits, readLore, mentorSeen } from './core/journal.js';
 import { TIPS } from './data/dialogs.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
 import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue, harborPrice, needsSellConfirm } from './shop.js';
 import { TouchControls } from './touch.js';
 import { interactTarget } from './touch-logic.js';
+import { PHOENIX, applyDeath, hasDeathPenalty, setCheckpoint, respawnPoint } from './core/phoenix.js';
 import { QualityGovernor } from './quality-governor.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality, resolveScale } from './prefs.js';
 import { CLASSES } from './data/classes.js';
@@ -148,9 +151,9 @@ class Game {
       if (!this.portrait.matches) bad = !this.guard('update', () => this.step(dt)) || bad;
       bad = !this.guard('draw', () => {
         const p = this.player;
-        if ((this.mode === 'explore' || this.inNetZone()) && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; if (this.mode === 'explore') this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
+        if ((this.mode === 'explore' || this.inNetZone()) && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; this.refreshGuide(); if (this.mode === 'explore') this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
         const exploring = this.mode === 'explore', chestView = exploring || this.inNetZone();
-        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: chestView ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: chestView ? this.chestsOpen : null, crypt: this.netCrypt, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
+        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: chestView ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: chestView ? this.chestsOpen : null, cpSaved: this.char?.checkpoint?.zone === this.world.zoneId ? this.char.checkpoint : null, guide: this.guide?.goal ?? null, route: this.auto && this.auto.path?.length ? [{ x: p.x, y: p.y }, ...this.auto.path] : null, autoOn: !!this.auto && !this.auto.paused, crypt: this.netCrypt, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
         if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
         this.ui.updateHud(this);
         this.touch.update(this);
@@ -173,7 +176,12 @@ class Game {
       case 'continue': this.loadGame(loadChar()); break;
       case 'quest-accept': this.questAccept(arg); break;
       case 'quest-turnin': this.questTurnIn(arg); break;
-      case 'quest-abandon': abandonQuest(this.char, arg); this.save(); this.ui.render(); break;
+      case 'quest-abandon': abandonQuest(this.char, arg); if (this.trackId === arg) this.setTrack(null); this.save(); this.ui.render(); break;
+      case 'quest-track': this.setTrack(arg); this.ui.render(); break;
+      case 'quest-go': this.setTrack(arg); this.autoGo(); break;
+      case 'auto-go': this.autoGo(); break;
+      case 'auto-stop': this.autoStop(); break;
+      case 'auto-resume': this.autoResume(); break;
       case 'set-title': setTitle(this.char, arg || null); this.save(); this.ui.render(); break;
       case 'dialog-service': this.openService(arg); break;
       case 'bank-take': this.bankTake(arg); break;
@@ -209,7 +217,7 @@ class Game {
       }
       case 'close': this.ui.close(arg); break;
       case 'toggle': this.togglePanel(arg); document.getElementById('menu-btns')?.classList.remove('open'); break;
-      case 'item': this.ui.sellMode() ? this.sell(arg) : this.ui.isOpen('bank') ? this.bankPut(arg) : this.equip(arg); break;
+      case 'item': this.ui.selecting() ? this.ui.toggleSel(arg) : this.ui.sellMode() ? this.sell(arg) : this.ui.isOpen('bank') ? this.bankPut(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
       case 'enhance': this.enhanceItem(arg); break;
       case 'crypt-enter': this.enterCrypt(); break;
@@ -222,10 +230,15 @@ class Game {
       case 'fullscreen': this.toggleFullscreen(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'buy-potion': this.buyPotion(Number(arg)); break;
       case 'buy-scroll': this.buyScroll(Number(arg)); break;
+      case 'buy-phoenix': this.buyPhoenix(Number(arg)); break;
+      case 'respawn-point': this.respawnAtPoint(); break;
+      case 'respawn-online': this.ui.hideScreen(); this.deathCard = false; this.net?.send({ t: 'zone_respawn' }); break;
       case 'buy-item': this.buyItem(Number(arg)); break;
-      case 'sell-bulk': this.sellBulk(Number(arg)); break;
+      case 'sel-toggle': this.ui.selMode = !this.ui.selMode; this.ui.sel = new Set(); this.ui.render(); break;
+      case 'sel-mark': this.ui.markSel(Number(arg) === 1 ? 1 : 0); break;
+      case 'sel-clear': this.ui.sel = new Set(); this.ui.render(); break;
+      case 'sell-selected': this.sellSelected(); break;
       case 'sell': this.sell(arg); break;
-      case 'shop-tab': this.ui.shopTab = arg === 'sell' ? 'sell' : 'buy'; this.ui.render(); break;
       case 'buy-essence': this.buyEssence(arg); break;
       case 'spirit-on': this.setSpirit(arg); break;
       case 'spirit-free': this.freeSpirit(arg); break;
@@ -558,7 +571,13 @@ class Game {
     if (r.frags) parts.push(`+${r.frags} Fragmento(s) de Eco`);
     if (r.potions) parts.push(`+${r.potions} 🧪`);
     if (parts.length) this.ui.log(parts.join(' · '), '#ffd27a');
-    if (r.deaths) this.ui.log('Você caiu: −10% do ouro.', '#ffb4a8');
+    if (r.deaths) { // queda na instância: o servidor já cobrou (ou gastou o Amuleto da Fênix)
+      const dr = { saved: (r.deathsSaved ?? 0) >= r.deaths, gold: r.lostGold ?? 0, xp: r.lostXp ?? 0 };
+      if (hasDeathPenalty(r.zone)) {
+        this.ui.log(dr.saved ? `${PHOENIX.name} usado.` : `Você perdeu ${dr.gold} ouro e ${dr.xp} XP.`, dr.saved ? '#ffd27a' : '#ffb4a8');
+        { this.deathCard = performance.now() + 900; this.ui.showResult({ title: 'Você caiu…', sub: ZONES[r.zone]?.name ?? '', lines: [this.deathLine(dr, r.phoenix ?? 0), 'Você renasce no último ponto salvo deste mapa.'], button: 'Renascer no ponto salvo', action: 'respawn-online', tone: 'lose' }); }
+      } else this.ui.log('Você caiu.', '#ffb4a8');
+    }
     if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos em Personagem.', 'gold');
     for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     for (const id of r.achievements ?? []) this.announceAchievements([id]);
@@ -678,9 +697,10 @@ class Game {
         a.swing = 0.3;
         spawnSkillVfx(w, { actor: a, skill: e.skill, ang: e.ang ?? a.facing, tx: e.tx, ty: e.ty });
         const s = skillOf(a.classId, a.spec ?? null, e.skill);
+        if (s.kind === 'cone') w.addFx({ type: 'slash', x: a.x, y: a.y, ang: e.ang ?? a.facing, arc: s.arc, r: s.range, t: 0, life: 0.28, color: s.color });
         if (s.kind === 'aoe_self' || s.kind === 'buff') { w.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius ?? 60, color: s.color, t: 0, life: 0.45, follow: s.kind === 'buff' ? a : undefined }); w.burst(a.x, a.y, s.color, 18, 180); }
         else if (s.kind === 'projectile') this.netShoot(a, e.ang ?? a.facing, s);
-        else if (s.kind === 'ground_aoe' && e.tx != null) { w.addFx({ type: 'ring', x: e.tx, y: e.ty, r: s.radius, color: s.color, t: 0, life: 0.6 }); w.burst(e.tx, e.ty, s.color, 20, 160); }
+        else if ((s.kind === 'ground_aoe' || s.kind === 'trap' || s.kind === 'zone') && e.tx != null) { w.addFx({ type: 'ring', x: e.tx, y: e.ty, r: s.radius, color: s.color, t: 0, life: 0.6 }); w.burst(e.tx, e.ty, s.color, 20, 160); }
         else { w.burst(a.x, a.y, s.color ?? '#fff', 14, 150); }
         break;
       }
@@ -715,6 +735,7 @@ class Game {
         aimX: inp.mouse.x / this.renderer.zoom + this.cam.x, aimY: inp.mouse.y / this.renderer.zoom + this.cam.y, attack: inp.mouse.down, cast,
       };
     }
+    if (this.inNetZone() && !p.dead && this.auto) this.autoDrive(intent, dt); // instância online: o mesmo movimento normal, sem teleporte
     if (intent.cast != null) this.netCastPending = intent.cast;
     this.netIntent = intent;
     if (this.netInfo && this.netLast?.state !== 'over' && ((this.netT += dt) >= 1 / 30 || this.netCastPending != null)) {
@@ -802,7 +823,7 @@ class Game {
       for (const sa of w.actors) if (sa.kind === 'spirit' && sa.owner === me.id) { sa.x += (me.x - 20 - sa.x) * k; sa.y += (me.y - 10 - sa.y) * k; }
       this.nearChest = (w.zone.chests ?? []).find((c) => Math.hypot(c.x - me.x, c.y - me.y) < 70)?.id ?? null; // botão de interagir / dica do baú
     }
-    if (this.netInfo.mode === 'zone') { this.ui.banner(this.player.dead ? 'Você caiu… renasce na entrada em instantes' : null); return; }
+    if (this.netInfo.mode === 'zone') { if (this.deathCard && !this.player.dead && performance.now() > this.deathCard) { this.deathCard = false; this.ui.hideScreen(); } this.ui.banner(this.player.dead ? 'Você caiu… renasce no ponto salvo em instantes' : null); return; }
     // faixa de informação da partida
     if (!this.netOver) {
       const my = this.netInfo.team;
@@ -986,6 +1007,7 @@ class Game {
           };
         }
       }
+      if (!p.dead && this.auto) this.autoDrive(intents[p.id], dt); // auto-viagem: troca o movimento pelo caminho (o joystick/ataque pausam)
       this.acc = Math.min((this.acc ?? 0) + dt, FIXED_DT * MAX_TICKS);
       while (this.acc >= FIXED_DT) {
         this.acc -= FIXED_DT;
@@ -1088,6 +1110,7 @@ class Game {
   talk(npc) {
     const c = this.char;
     const hasQuest = npc.role === 'quest' || offeredBy(c, npc.id, { server: !!this.online }).length || readyFor(c, npc.id).length || activeFor(c, npc.id).length;
+    if (npc.role === 'mentor') return this.talkMentor(npc);
     // Doran offline: sem missões do servidor, a primeira conversa da sessão mostra a fala dele (depois abre a arena direto)
     const offlineDoran = npc.id === 'arena' && !this.online && !this.metDoran && (this.metDoran = true);
     if (hasQuest || offlineDoran) { this.dialogNpc = npc.id; this.ui.openPanel('dialog'); return; }
@@ -1096,6 +1119,17 @@ class Game {
     else if (npc.role === 'spirit') this.ui.openPanel('sage');
     else if (npc.role === 'smith') this.ui.openPanel('shop:smith'); // abre a loja já rolada até o Ferreiro (aprimoramento)
     else if (SERVICE_OF_ROLE[npc.role]) this.openService(SERVICE_OF_ROLE[npc.role]); // Porto: bank, board, harborshop, duel
+  }
+
+  // Mentor de especialização (Porto): a conversa conta para a Prova do Mestre (bit em stats.mentors; online é o servidor que conta) e abre a fala com a explicação da especialização.
+  talkMentor(npc) {
+    if (!mentorSeen(this.char, npc.id) && !this.serverTx({ op: 'mentor_talk', id: npc.id })) {
+      const out = recordEvent(this.char, { type: 'talk', npc: npc.id });
+      for (const q of out.quests) if (q.complete) this.ui.toast('Missão pronta!', QUESTS[q.id].name + ' — volte ao Mestre da sua classe na Vila (marca ?)', 'gold');
+      this.announceAchievements(out.achievements);
+      this.save();
+    }
+    this.dialogNpc = npc.id; this.ui.openPanel('dialog');
   }
 
   // Abre o painel de um serviço de NPC (`service.panel` de data/dialogs.js). Loja do Porto refaz o estoque do dia; duelo amistoso inicia a luta.
@@ -1132,6 +1166,89 @@ class Game {
   }
 
   // marca sobre o NPC: '!' tem missão, '?' pronta para entregar, 'none' nada (só para quem existe só por missões)
+  // ---------------- guia de missão e auto-viagem (core/autopath.js) ----------------
+  // O rastreador mostra o objetivo da missão escolhida (ou da primeira pronta/ativa); "Ir até lá" liga a auto-viagem, que só troca o
+  // movimento do herói por um caminho calculado sobre a mesma colisão (nada de teleporte; online vai como entrada normal).
+  guideReady() { return !!this.char && !!this.player && !this.player.dead && (this.mode === 'explore' || this.inNetZone()); }
+  setTrack(id) {
+    this.trackId = id || null;
+    try { if (id) localStorage.setItem('aetheria_track', id); else localStorage.removeItem('aetheria_track'); } catch { /* sem armazenamento */ }
+    if (this.auto && this.auto.qid !== this.trackId) this.autoStop(true);
+    this.refreshGuide();
+  }
+  refreshGuide() {
+    if (!this.guideReady()) { this.guide = null; if (this.auto && this.mode !== 'explore' && !this.inNetZone()) this.auto = null; return; }
+    if (this.trackId === undefined) { try { this.trackId = localStorage.getItem('aetheria_track') || null; } catch { this.trackId = null; } }
+    const id = pickTracked(this.char, this.trackId);
+    if (!id) { this.guide = null; if (this.auto) this.autoStop(true); return; }
+    const p = this.player, zid = this.world.zoneId;
+    const target = questTarget(this.char, id, { zoneId: zid, x: p.x, y: p.y });
+    const goal = target ? guideGoal(target, zid) : null;
+    this.guide = { id, target, goal, tk: trackerText(this.char, id), dist: goal ? Math.hypot(goal.x - p.x, goal.y - p.y) : 0 };
+    if (this.auto) {
+      if (this.auto.qid !== id) this.autoStop(true);
+      else if (target && target.kind !== 'none') this.auto.target = target; // acompanha o alvo (baú já aberto, missão pronta...)
+    }
+  }
+  autoGo() {
+    if (!this.guideReady()) return;
+    this.refreshGuide();
+    const g = this.guide;
+    if (!g) return this.ui.toast('Sem missão', 'Aceite uma missão com um morador da Vila.', '');
+    if (!g.goal) return this.ui.toast('Sem destino no mapa', g.target?.why ?? 'Este objetivo não tem um lugar fixo.', '');
+    this.ui.closePanels();
+    this.auto = { qid: g.id, target: g.target, path: null, key: '', paused: null, hp: this.player.hp, probe: { x: this.player.x, y: this.player.y, t: 0 }, fails: 0 };
+    this.ui.toast('Auto-viagem', `Rumo a: ${g.target.label ?? g.tk.name}. Mexa o joystick para parar.`, '');
+  }
+  autoStop(silent = false) { if (this.auto && !silent) this.ui.toast('Auto-viagem cancelada', '', ''); this.auto = null; }
+  autoPause(reason) {
+    if (!this.auto || this.auto.paused) return;
+    this.auto.paused = reason; this.auto.path = null;
+    this.ui.toast('Auto-viagem pausada', reason === 'combat' ? 'Combate! Toque em Continuar quando acabar.' : reason === 'blocked' ? 'Caminho bloqueado. Ande um pouco e tente de novo.' : 'Toque em Continuar para seguir.', '');
+  }
+  autoResume() {
+    const a = this.auto;
+    if (!a) return;
+    a.paused = null; a.path = null; a.fails = 0; a.hp = this.player.hp; a.probe = { x: this.player.x, y: this.player.y, t: 0 };
+  }
+  // Chamada uma vez por quadro com a intenção do jogador (mutada): pausa se o jogador tocou, atacou ou apanhou; senão anda pelo caminho.
+  autoDrive(intent, dt) {
+    const a = this.auto, p = this.player, w = this.world;
+    if (!a || !intent || !this.guideReady()) return;
+    const manual = Math.hypot(intent.mx, intent.my) > 0.05 || intent.attack || intent.cast != null;
+    const hit = p.hp < a.hp - 0.5; a.hp = p.hp;
+    if (a.paused) return;
+    if (manual) return this.autoPause('manual');
+    if (hit || w.time - p.lastCombat < 0.8 || p.stunT > 0) return this.autoPause('combat');
+    const goal = a.target && guideGoal(a.target, w.zoneId);
+    if (!goal) return this.autoStop(true);
+    const d = Math.hypot(goal.x - p.x, goal.y - p.y);
+    if (!goal.portal && d <= goal.reach) {
+      this.auto = null;
+      this.ui.toast('Você chegou', a.target.label ?? '', 'gold');
+      return;
+    }
+    const key = `${w.zoneId}:${goal.x}:${goal.y}`;
+    if (a.key !== key || !a.path) { // (re)calcula: zona nova, alvo novo ou travou
+      a.key = key;
+      const grid = buildNavGrid(w.zoneId, w.zone, w.layout);
+      const to = goal.portal ? { x: Math.max(goal.x, 52), y: goal.y } : goal;
+      a.path = findPath(grid, p, to);
+      if (!a.path) a.path = lineFree(grid, p.x, p.y, to.x, to.y) ? [{ x: to.x, y: to.y }] : [{ ...(waterWaypoint(w, p, to.x, to.y) ?? to) }]; // sem caminho na grade: rio pela ponte, senão reta
+      a.probe = { x: p.x, y: p.y, t: 0 };
+    }
+    const mv = followPath(a.path, p, 20);
+    if (!mv) { a.path = null; if (goal.portal) { intent.mx = Math.sign(goal.x - p.x) * 0.5; intent.my = 0; intent.spd = 1; } return; } // chegou ao fim do caminho: encosta no portal / recalcula
+    intent.mx = mv.mx; intent.my = mv.my; intent.spd = 1; intent.attack = false; intent.cast = null;
+    intent.aimX = p.x + mv.mx * 200; intent.aimY = p.y + mv.my * 200;
+    // travado? (sem andar 6 px em 1,3 s): recalcula; 3 vezes seguidas pausa
+    a.probe.t += dt;
+    if (a.probe.t >= 1.3) {
+      if (Math.hypot(p.x - a.probe.x, p.y - a.probe.y) < 6) { a.path = null; if (++a.fails >= 3) this.autoPause('blocked'); } else a.fails = 0;
+      a.probe = { x: p.x, y: p.y, t: 0 };
+    }
+  }
+
   computeMarks() {
     const marks = {};
     for (const n of this.world.zone.npcs ?? []) {
@@ -1165,7 +1282,7 @@ class Game {
     if (this.serverTx({ op: 'quest_turnin', id }, (m) => {
       this.ui.toast('Missão concluída!', [QUESTS[id].name, m.reward.gold ? `+${m.reward.gold} ouro` : '', m.reward.xp ? `+${m.reward.xp} XP` : ''].filter(Boolean).join(' · '), 'gold');
       for (const it of m.reward.items ?? []) this.ui.log(`Recompensa: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
-      if (id === 'maestria') { const mu = masteryUnlock(this.char.classId); this.ui.toast('Nova habilidade: ' + SKILLS[mu.id].name, SKILLS[mu.id].desc, 'gold'); }
+      if (id === 'maestria') { const mu = masteryUnlock(this.char.classId, activeSpec(this.char)); this.ui.toast('Nova habilidade: ' + SKILLS[mu.id].name, SKILLS[mu.id].desc, 'gold'); }
     })) return;
     const r = turnInQuest(this.char, id, this.rng);
     if (!r.ok) return this.ui.toast('Missão', r.reason, '');
@@ -1175,7 +1292,7 @@ class Game {
     if (R.levels) this.onLevelUp();
     this.refreshStats();
     if (id === 'maestria') { // a Maestria também ensina a habilidade do 4º slot
-      const m = masteryUnlock(this.char.classId);
+      const m = masteryUnlock(this.char.classId, activeSpec(this.char));
       this.ui.toast('Nova habilidade: ' + SKILLS[m.id].name, SKILLS[m.id].desc, 'gold');
       this.ui.log(`Nova habilidade: <b>${SKILLS[m.id].name}</b>.`, '#ffd34d');
     }
@@ -1186,9 +1303,10 @@ class Game {
   // Botão de interagir (toque) e tecla E: NPC por perto conversa; senão abre o baú.
   interact() {
     const t = interactTarget(this.player, this.world);
-    if (this.inNetZone()) { if (this.player.dead) return; if (t?.kind === 'chest') this.useChest(t.ref.id); else if (t?.kind === 'lore') this.readLore(t.ref); return; } // instância online: baú e placa de lore (NPCs ficam nas cidades)
+    if (this.inNetZone()) { if (this.player.dead) return; if (t?.kind === 'chest') this.useChest(t.ref.id); else if (t?.kind === 'checkpoint') this.useCheckpoint(t.ref); else if (t?.kind === 'lore') this.readLore(t.ref); return; } // instância online: baú e placa de lore (NPCs ficam nas cidades)
     if (t?.kind === 'npc') this.talk(t.ref);
     else if (t?.kind === 'chest') this.useChest(t.ref.id);
+    else if (t?.kind === 'checkpoint') this.useCheckpoint(t.ref);
     else if (t?.kind === 'lore') this.readLore(t.ref);
   }
 
@@ -1467,21 +1585,24 @@ class Game {
     this.save();
   }
 
-  sellBulk(maxRarity) {
-    const list = this.char.inventory.filter((i) => RARITY[i.rarity].index <= maxRarity), risky = list.filter(needsSellConfirm);
+  // Venda em lote dos itens marcados na mochila (equipados nunca estão lá). Confirma (ui.confirm) com item épico+ ou total acima de 1000 de ouro.
+  sellSelected() {
+    const list = this.ui.selItems();
     if (!list.length) return;
-    if (risky.length) return this.ui.confirm(`Vender ${list.length} itens por ${list.reduce((t, i) => t + this.sellPrice(i), 0)} de ouro? Inclui: ${risky.map((i) => i.name).join(', ')}.`, () => this.sellBulkNow(maxRarity), 'Vender');
-    this.sellBulkNow(maxRarity);
+    const total = list.reduce((t, i) => t + this.sellPrice(i), 0), risky = list.filter(needsSellConfirm), ids = list.map((i) => i.id);
+    if (risky.length || total > 1000) return this.ui.confirm(`Vender ${list.length} ite${list.length === 1 ? 'm' : 'ns'} por ${total} de ouro?${risky.length ? ` Inclui: ${risky.map((i) => i.name).join(', ')}.` : ''}`, () => this.sellManyNow(ids), 'Vender');
+    this.sellManyNow(ids);
   }
 
-  sellBulkNow(maxRarity) {
-    if (this.serverTx({ op: 'sell_bulk', n: maxRarity, shop: this.shopKind() }, (m) => this.ui.log(`${m.count} itens vendidos (+${m.pay} ouro)`, '#ffd34d'))) return;
-    const c = this.char;
-    const sold = c.inventory.filter((i) => RARITY[i.rarity].index <= maxRarity);
+  sellManyNow(ids) {
+    const done = () => { this.ui.sel = new Set(); };
+    if (this.serverTx({ op: 'sell_bulk', ids, shop: this.shopKind() }, (m) => { done(); this.ui.log(`${m.count} itens vendidos (+${m.pay} ouro)`, '#ffd34d'); })) return;
+    const c = this.char, set = new Set(ids), sold = c.inventory.filter((i) => set.has(i.id));
     if (!sold.length) return;
     const gold = sold.reduce((s, i) => s + this.sellPrice(i), 0);
-    c.inventory = c.inventory.filter((i) => RARITY[i.rarity].index > maxRarity);
+    c.inventory = c.inventory.filter((i) => !set.has(i.id));
     c.gold += gold;
+    done();
     this.ui.log(`${sold.length} itens vendidos (+${gold} ouro)`, '#ffd34d');
     this.ui.render();
     this.save();
@@ -1587,6 +1708,34 @@ class Game {
     if (!this.spend((this.shopKind() === 'harbor' ? harborPrice('scroll', this.char.level) : PRICES.scroll(this.char.level)) * n)) return;
     this.char.scrolls = (this.char.scrolls ?? 0) + n;
     this.ui.render(); this.save();
+  }
+
+  // Amuleto da Fênix: preço fixo (core/phoenix.js), pilha até PHOENIX.max. Online o servidor cobra (tx buy_phoenix).
+  buyPhoenix(n) {
+    if ((this.char.phoenix ?? 0) + n > PHOENIX.max) return this.ui.toast(PHOENIX.name, `Você já carrega o máximo (${PHOENIX.max}).`, '');
+    if (this.serverTx({ op: 'buy_phoenix', n, shop: this.shopKind() }, (m) => this.ui.toast(PHOENIX.name, `Você tem ${m.phoenix}. Evita a perda de ouro e XP ao cair.`, 'gold'))) return;
+    if (!this.spend(PHOENIX.price * n)) return;
+    this.char.phoenix = (this.char.phoenix ?? 0) + n;
+    this.ui.toast(PHOENIX.name, `Você tem ${this.char.phoenix}. Evita a perda de ouro e XP ao cair.`, 'gold');
+    this.ui.render(); this.save();
+  }
+
+  // Pedra de Retorno: grava o ponto de renascimento da zona (online o servidor confere a zona e a proximidade).
+  useCheckpoint(stone) {
+    if (!stone || (this.mode !== 'explore' && !this.inNetZone()) || this.player?.dead) return;
+    const done = () => this.ui.toast('Ponto de retorno salvo', 'Se você cair neste mapa, renasce aqui.', 'gold');
+    if (this.serverTx({ op: 'checkpoint_set', id: stone.id }, done)) return;
+    if (this.inNetZone()) return;
+    if (setCheckpoint(this.char, this.world.zoneId, stone.id)) { done(); this.save(); }
+  }
+
+  // Botão da tela de morte (offline): volta ao mapa na última Pedra de Retorno, ou na entrada se não houver.
+  respawnAtPoint() {
+    const d = this.deathPoint;
+    this.ui.hideScreen();
+    if (!d) return this.enterZone('town', TOWN.x, TOWN.y);
+    this.deathPoint = null;
+    this.enterZone(d.zone, d.x, d.y);
   }
 
   buyPotion(n) {
@@ -1807,6 +1956,12 @@ class Game {
     }
   }
 
+  // Texto da perda de morte (tela de morte e HUD): r = { saved, gold, xp }
+  deathLine(r, left) {
+    if (r.saved) return `<b>${PHOENIX.name} usado</b>: nada foi perdido (restam ${left}).`;
+    return r.gold || r.xp ? `Você perdeu <b>${r.gold}</b> ouro e <b>${r.xp}</b> XP.` : 'Nada foi perdido.';
+  }
+
   onPlayerDeath() {
     const c = this.char;
     if (this.mode === 'pvp') { this.ui.log('Você caiu — acompanhe o time!', '#ffb4a8'); return; }
@@ -1820,10 +1975,14 @@ class Game {
       this.save();
       return;
     }
-    const lost = Math.floor(c.gold * 0.1);
-    c.gold -= lost;
+    const zid = this.world.zoneId, z = this.world.zone;
+    const r = hasDeathPenalty(zid) ? applyDeath(c) : { saved: false, gold: 0, xp: 0 }; // Amuleto da Fênix evita a perda; sem ele, −10% do ouro e do XP do nível
     this.mode = 'ended';
-    this.ui.showResult({ title: 'Você caiu…', sub: this.world.zone.name, lines: [lost ? `Perdeu ${lost} ouro` : 'Nada foi perdido.'], button: 'Renascer na vila', tone: 'lose' });
+    const at = respawnPoint(c, zid, z.spawn ?? { x: FARM_ENTRY, y: FARM_MID });
+    this.deathPoint = hasDeathPenalty(zid) ? { zone: zid, x: at.x, y: at.y } : null;
+    const lines = [this.deathLine(r, c.phoenix ?? 0), at.saved ? 'Você renasce na Pedra de Retorno.' : 'Você renasce na entrada do mapa.'];
+    this.ui.showResult({ title: 'Você caiu…', sub: z.name, lines, button: at.saved ? 'Renascer no ponto salvo' : 'Renascer na entrada', action: this.deathPoint ? 'respawn-point' : 'return-town', tone: 'lose' });
+    this.ui.log(r.saved ? `${PHOENIX.name} usado.` : r.gold || r.xp ? `Você perdeu ${r.gold} ouro e ${r.xp} XP.` : 'Você caiu.', r.saved ? '#ffd27a' : '#ffb4a8');
     this.save();
   }
 }

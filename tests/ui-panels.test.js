@@ -106,10 +106,10 @@ test('especialização: primeira escolha grátis; trocar mostra o Selo; o Selo (
 import { needsSellConfirm } from '../public/src/shop.js';
 
 const item = (over = {}) => ({ id: 'i' + Math.random().toString(36).slice(2, 7), name: 'Espada', slot: 'weapon', weaponType: 'sword', rarity: 'common', level: 3, value: 40, stats: { str: 2 }, ...over });
-const shopUi = (anchor, tab = 'buy', inventory = []) => {
+const shopUi = (anchor, tab = 'buy', inventory = []) => { // `tab` ficou só por compatibilidade das chamadas: a loja não tem mais abas
   const ui = mk({ sellPrice: (it) => Math.floor(it.value / 2), shopStock: [item({ id: 'shop-1' })], harborStock: [] });
   Object.assign(ui.game.char, { level: 5, classId: 'warrior', inventory, potions: 2, scrolls: 1 });
-  ui.open.add('shop'); ui.shopAnchor = anchor; ui.shopTab = tab;
+  ui.open.add('shop'); ui.shopAnchor = anchor; ui.sel = new Set(); ui.selMode = false;
   return ui;
 };
 
@@ -122,27 +122,43 @@ test('Ferreiro: painel só tem aprimorar e Forja do Eco; sem compra, estoque, ve
   assert.equal(ui.sellMode(), false, 'tocar na mochila não vende no Ferreiro');
 });
 
-test('lojas da Vila e do Porto: abas Comprar/Vender, sem Ferreiro dentro', () => {
+test('lojas da Vila e do Porto: painel único (sem abas), estoque à esquerda e venda pela mochila; sem Ferreiro dentro', () => {
   const ui = shopUi(null, 'buy');
   let h = ui.panel_shop();
-  assert.match(h, /Mercadora Lia/); assert.match(h, /data-action="buy-potion"/); assert.match(h, /buy-item/); assert.match(h, /data-arg="sell"[^>]*>Vender</);
-  assert.doesNotMatch(h, /smith-section|Forja do Eco|data-action="enhance"/);
+  assert.match(h, /Mercadora Lia/); assert.match(h, /data-action="buy-potion"/); assert.match(h, /buy-item/);
+  assert.doesNotMatch(h, /shop-tab|shop-tabs|>Comprar<|>Vender<|smith-section|Forja do Eco|data-action="enhance"|data-action="sell"/);
   assert.equal(ui.sellMode(), true);
   ui.shopAnchor = 'harbor'; assert.match(ui.panel_shop(), /Mercador do Porto/);
 });
 
-test('aba Vender: seções Itens e Materiais, preço e botão Vender por linha, lote por raridade; épico+ avisa confirmação', () => {
-  const inv = [item({ id: 'c1', value: 40 }), item({ id: 'e1', rarity: 'epic', name: 'Lâmina Épica', value: 400 })];
-  const ui = shopUi(null, 'sell', inv);
-  const h = ui.panel_shop();
-  assert.match(h, /<h3>Itens /); assert.match(h, /<h3>Materiais<\/h3>/); assert.match(h, /Vender em massa/);
-  assert.equal((h.match(/<button class="btn small" data-action="sell" data-arg=/g) ?? []).length, 2, 'um botão Vender por item');
-  assert.match(h, /<b>20<\/b>/); assert.match(h, /<b>200<\/b>/, 'preço visível em cada linha');
-  assert.equal((h.match(/pede confirmação/g) ?? []).length, 1, 'só o épico avisa');
-  assert.doesNotMatch(h, /buy-potion|buy-item/);
-  assert.match(h, /sell-bulk" data-arg="0"\s*>Todos Comuns · 1/);
-  ui.game.char.inventory = [];
-  assert.match(ui.panel_shop(), /sell-bulk" data-arg="0" disabled/);
+test('mochila ao lado da loja: Selecionar vários liga a seleção; marcados ficam visíveis, com contador e total; equipados nunca entram', () => {
+  const inv = [item({ id: 'c1', value: 40 }), item({ id: 'u1', rarity: 'uncommon', value: 80 }), item({ id: 'e1', rarity: 'epic', name: 'Lâmina Épica', value: 400 })];
+  const ui = shopUi(null, 'buy', inv);
+  ui.game.char.equipment = { weapon: item({ id: 'eq1' }) };
+  let h = ui.panel_inventory();
+  assert.match(h, /data-action="sel-toggle">Selecionar vários</); assert.doesNotMatch(h, /sell-selected|Marcar comuns/);
+  assert.equal(ui.selecting(), false);
+  ui.selMode = true; ui.sel = new Set();
+  h = ui.panel_inventory();
+  assert.match(h, /Marcar comuns/); assert.match(h, /Marcar até incomum/); assert.match(h, /data-action="sel-clear"/);
+  assert.match(h, /sell-selected" disabled/, 'sem marcados, o botão fica desligado');
+  assert.match(h, /<b>0<\/b> marcados/);
+  ui.toggleSel = UI.prototype.toggleSel; ui.render = () => {};
+  ui.toggleSel('c1'); ui.toggleSel('e1'); ui.toggleSel('eq1'); // equipado não está na mochila: ignorado
+  assert.deepEqual([...ui.sel].sort(), ['c1', 'e1']);
+  h = ui.panel_inventory();
+  assert.equal((h.match(/class="cell sel /g) ?? []).length, 2, 'duas células marcadas'); assert.equal((h.match(/class="selmk"/g) ?? []).length, 2, 'check visível');
+  assert.match(h, /<b>2<\/b> marcados · [\s\S]*?<b>220<\/b>/, '20 + 200 de ouro');
+  assert.doesNotMatch(h, /sell-selected" disabled/);
+  ui.toggleSel('c1'); assert.deepEqual([...ui.sel], ['e1'], 'tocar de novo desmarca');
+  ui.markSel(1); // comuns + incomuns (nunca épico+: esse só por toque)
+  assert.deepEqual([...ui.sel].sort(), ['c1', 'e1', 'u1']);
+  assert.match(ui.panel_inventory(), /Toque nos itens para <b>marcar<\/b>/);
+});
+
+test('Ferreiro: a seleção de venda nunca existe (selecting() falso mesmo com selMode ligado)', () => {
+  const ui = shopUi('smith', 'buy', [item()]);
+  ui.selMode = true; assert.equal(ui.selecting(), false);
 });
 
 test('needsSellConfirm: épico, lendário, opala, Eco e forjado pedem confirmação; abaixo de épico não', () => {
@@ -162,4 +178,23 @@ test('equipamento: escudo na mesma grade, logo depois da arma; classe sem escudo
   const h = ui.panel_character();
   assert.deepEqual(slots(h), ['Arma', 'Escudo', 'Elmo', 'Armadura', 'Botas', 'Anel', 'Amuleto']);
   c.classId = 'mage'; assert.deepEqual(slots(ui.panel_character()), ['Arma', 'Elmo', 'Armadura', 'Botas', 'Anel', 'Amuleto']);
+});
+
+test('painel Habilidades e cartões de especialização: texto completo, sem teclas, com cadeado nas bloqueadas', async () => {
+  const { newCharacter } = await import('../public/src/core/progression.js');
+  const { makeRng } = await import('../public/src/core/rng.js');
+  const char = newCharacter('T', 'warrior', makeRng(4));
+  char.level = 6; char.spec = null;
+  const ui = mk({ char });
+  const html = ui.panel_skills();
+  assert.match(html, /Golpe Giratório/);
+  assert.match(html, /Ataque básico/);
+  assert.match(html, /sk-lock[^>]*>.*Libera no Nv 10/s, 'Grito de Guerra ainda bloqueado');
+  assert.match(html, /Libera no nível 15/);
+  assert.doesNotMatch(html, /undefined|NaN|\[object|tecla/);
+  char.level = 20;
+  const cards = ui.skillCards('berserker');
+  assert.match(cards, /Salto Brutal/);
+  assert.match(cards, /Substitui/);
+  assert.doesNotMatch(cards, /undefined|NaN/);
 });

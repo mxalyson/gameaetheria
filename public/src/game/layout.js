@@ -244,6 +244,12 @@ export function buildLayout(zoneId) {
     decor.push({ type: l.kind, x: l.x, y: l.y, s, v: srng.next() });
     obstacles.push({ x: l.x, y: l.y, r: s * collR, block: true });
   }
+  // Pedras de Retorno (data/zones.js `checkpoints`): reaproveitam a pedra rúnica do cenário; o brilho e o rótulo vêm do renderer.
+  for (const c of z.checkpoints ?? []) {
+    keepOut.push({ x: c.x, y: c.y, r: 70 });
+    decor.push({ type: 'runestone', x: c.x, y: c.y, s: 30, v: srng.next(), cp: c.id });
+    obstacles.push({ x: c.x, y: c.y, r: 16, block: true });
+  }
   if (sc?.beds) for (const h of z.houses ?? []) for (const bx of [h.x + 38, h.x + h.w - 38]) { decor.push({ type: 'flowerbed', x: bx, y: h.y + h.h + 30, s: 20, v: srng.next() }); obstacles.push({ x: bx, y: h.y + h.h + 30, r: 20 }); }
 
   place(z.treeType ?? 'tree', z.decor.trees, 28, 42, 0.45);

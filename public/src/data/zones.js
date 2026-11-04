@@ -232,6 +232,15 @@ export const ZONES = {
       { id: 'dealer', name: 'Mercador Bartolomeu', x: 1330, y: 910, color: '#c28a3a', accent: '#fff0c8', role: 'harborshop' },
       { id: 'duelist', name: 'Duelista Kael', x: 2050, y: 780, color: '#b8484e', accent: '#ffd8d0', role: 'duel' },
       { id: 'captain', name: 'Capitã Maré', x: 520, y: 780, color: '#3f8aa8', accent: '#d8f2ff', role: 'quest' },
+      // Praça dos Mestres de Estilo (fileira em zigue-zague ao norte da praça, dois a dois por classe: os nomes ficam em alturas diferentes e não se sobrepõem; a rua central fica livre): mentores das 8 especializações (data/mentors.js); a rua central fica livre
+      { id: 'mentor_paladin', name: 'Sir Aurelion, Paladino', x: 1045, y: 330, color: '#d9b44a', accent: '#fff2c4', role: 'mentor' },
+      { id: 'mentor_berserker', name: 'Grumak, Berserker', x: 1175, y: 395, color: '#b5483a', accent: '#ffd9c4', role: 'mentor' },
+      { id: 'mentor_arcane', name: 'Maga Velyra, Arcana', x: 1305, y: 330, color: '#8d6cf0', accent: '#e6dcff', role: 'mentor' },
+      { id: 'mentor_warlock', name: 'Morvain, Bruxo', x: 1435, y: 395, color: '#6b3f9a', accent: '#e2c8ff', role: 'mentor' },
+      { id: 'mentor_sniper', name: 'Lyra, Franco-atiradora', x: 1565, y: 330, color: '#4f9a6a', accent: '#d8f5c8', role: 'mentor' },
+      { id: 'mentor_gunslinger', name: 'Dom Cálix, Pistoleiro', x: 1695, y: 395, color: '#a87a3a', accent: '#ffe6b8', role: 'mentor' },
+      { id: 'mentor_guardian', name: 'Irmã Aurora, Guardiã', x: 1825, y: 330, color: '#e8d58a', accent: '#fffbe0', role: 'mentor' },
+      { id: 'mentor_inquisitor', name: 'Inquisidor Valdor', x: 1955, y: 395, color: '#9a3a4a', accent: '#ffd2d8', role: 'mentor' },
     ],
     // Serviços do Porto: NPC que presta cada um (a UI de cada painel é do agente de UI; ver docs/gameplay/porto.md).
     services: { bank: 'banker', board: 'hunter', shop: 'dealer', recycle: 'dealer', duel: 'duelist' },
@@ -330,6 +339,12 @@ ZONES.crypt = {
   atmosphere: { tint: 'rgba(80,200,220,0.07)', edge: 'rgba(6,4,20,0.65)', fog: { n: 6, color: '160,220,235', alpha: 0.08 }, motes: { n: 30, color: '130,230,240', drift: 3, rise: 10 } },
   portals: [{ x: CG.exit.x, y: CG.exit.y, to: 'town', tx: 850, ty: 790, label: 'Vila de Lúmen' }],
 };
+
+// Pedras de Retorno (ponto de renascimento): 2 por zona de farm, uma perto da entrada oeste e outra no meio do mapa, entre os dois rios (core/phoenix.js).
+// Tocar grava `char.checkpoint`; ao cair o herói renasce na última pedra da zona (ou na entrada). Posições conferidas contra o layout em tests/checkpoint.test.js.
+for (const id of ['forest', 'plains', 'ruins', 'glacier', 'ember']) {
+  ZONES[id].checkpoints = [{ id: id + ':cp1', x: 330, y: FARM_MID - 170, name: 'Pedra de Retorno' }, { id: id + ':cp2', x: 2250, y: FARM_MID + 20, name: 'Pedra de Retorno' }];
+}
 
 // Baús dos acampamentos: o centro de cada acampamento com `chest` (tier) vira um baú da zona (ids `<zona>:c<n>`), igual aos demais.
 for (const z of Object.values(ZONES)) {

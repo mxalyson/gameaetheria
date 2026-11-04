@@ -21,7 +21,7 @@ test('dados: toda missão é coerente (giver/after/objetivos/recompensa) e o enc
   const npcs = new Set(Object.values(ZONES).flatMap((z) => (z.npcs ?? []).map((n) => n.id)));
   for (const q of Object.values(QUESTS)) {
     assert.ok(npcs.has(q.giver) || (q.giver === 'master' && ['warrior', 'mage', 'archer', 'cleric'].every((c) => npcs.has('master_' + c))), `${q.id}: NPC ${q.giver} não existe`);
-    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage', 'miniboss', 'skillUse', 'spiritKill', 'bank', 'daily', 'friendlyDuel', 'crypt'].includes(o.type)));
+    assert.ok(q.objectives.length >= 1 && q.objectives.every((o) => o.label && ['kill', 'boss', 'chest', 'spirit', 'level', 'pvp', 'coop', 'teleport', 'upgrade', 'spiritStage', 'miniboss', 'skillUse', 'spiritKill', 'bank', 'daily', 'friendlyDuel', 'crypt', 'talk'].includes(o.type)));
     assert.ok(q.text.offer && q.text.progress && q.text.done);
     // coerência de nível ↔ zona: ninguém pede para caçar numa zona muito acima do nível da missão
     for (const o of q.objectives) if (o.zone && o.zone !== 'any') assert.ok(q.level >= ZONES[o.zone].level[0] - 2, `${q.id}: nível ${q.level} baixo demais para ${o.zone}`);
@@ -479,4 +479,57 @@ test('Cripta dos Ecos: missão da Yun, evento só do servidor, conquistas, Chave
   const dd = ensureJournal(hero(15)); const board = J.dailyBoard(dd, J.dayUTC());
   J.dailyState(dd, J.dayUTC()).p[board[0].id] = board[0].count;
   const cl = J.claimDaily(dd, board[0].id); assert.equal(cl.reward.key, 1); assert.equal(dd.echo.keys, 1);
+});
+
+// ---------- mentores de especialização: objetivo `talk` da Prova do Mestre ----------
+import { mentorSeen, mentorsTalked } from '../public/src/core/journal.js';
+import { MENTORS, mentorsOfClass } from '../public/src/data/mentors.js';
+import { chooseSpec } from '../public/src/core/specs.js';
+import { CLASSES } from '../public/src/data/classes.js';
+
+test('mentores: dados coerentes (2 por classe, ids mentor_<spec>, bits únicos, NPCs no Porto, falas)', () => {
+  assert.equal(MENTORS.length, 8);
+  for (const m of MENTORS) { assert.equal(m.id, 'mentor_' + m.spec); assert.equal(mentorsOfClass(m.classId).length, 2); assert.ok(ZONES.harbor.npcs.some((n) => n.id === m.id && n.name === m.name), m.id); assert.ok(DIALOGS[m.id].greet.length >= 2, 'fala própria de ' + m.id); }
+  assert.deepEqual(Object.values(QUESTS.prova_do_mestre.objectives).map((o) => o.type), ['miniboss', 'skillUse', 'talk']);
+});
+
+test('Prova do Mestre: só os DOIS mentores da própria classe completam o objetivo; os de outra classe são só curiosidade; repetir não soma', () => {
+  const c = hero(15, 'mage'); c.quests.done = {};
+  assert.ok(acceptQuest(c, 'prova_do_mestre').ok);
+  const p = () => c.quests.active.prova_do_mestre.p[2];
+  recordEvent(c, { type: 'talk', npc: 'mentor_paladin' }); assert.equal(p(), 0); assert.ok(mentorSeen(c, 'mentor_paladin'), 'bit gravado mesmo assim');
+  recordEvent(c, { type: 'talk', npc: 'mentor_arcane' }); assert.equal(p(), 1);
+  recordEvent(c, { type: 'talk', npc: 'mentor_arcane' }); assert.equal(p(), 1);
+  recordEvent(c, { type: 'talk', npc: 'mentor_nada' }); assert.equal(p(), 1, 'id desconhecido é ignorado');
+  recordEvent(c, { type: 'talk', npc: 'mentor_warlock' }); assert.equal(p(), 2);
+  assert.equal(mentorsTalked(c), 2);
+  assert.equal(isComplete(c, 'prova_do_mestre'), false, 'faltam o mini-chefe e a assinatura');
+  recordEvent(c, { type: 'kill', mobId: 'x', zoneId: 'forest', mini: true });
+  for (let i = 0; i < 10; i++) recordEvent(c, { type: 'skill', skillId: CLASSES.mage.skills[0] });
+  assert.ok(isComplete(c, 'prova_do_mestre')); assert.ok(turnInQuest(c, 'prova_do_mestre', rng).ok);
+});
+
+test('Prova do Mestre: quem visitou os mentores ANTES de aceitar já entra com o progresso; sem os dois, a escolha continua bloqueada', () => {
+  const c = hero(15, 'archer');
+  recordEvent(c, { type: 'talk', npc: 'mentor_sniper' }); recordEvent(c, { type: 'talk', npc: 'mentor_gunslinger' });
+  assert.ok(acceptQuest(c, 'prova_do_mestre').ok);
+  assert.equal(c.quests.active.prova_do_mestre.p[2], 2);
+  const d = hero(15, 'warrior');
+  assert.equal(chooseSpec(d, 'paladin').ok, false, 'sem a Prova concluída não escolhe'); assert.match(chooseSpec(d, 'paladin').reason, /mentores/);
+  d.quests.done.prova_do_mestre = 1; assert.ok(chooseSpec(d, 'paladin').ok);
+});
+
+test('saves antigos: quem já tem especialização conta como tendo conversado com os dois mentores (Prova ativa completa o objetivo sem refazer)', () => {
+  const c = hero(20, 'cleric'); c.spec = 'guardian';
+  assert.equal(mentorsTalked(c), 2);
+  assert.ok(acceptQuest(c, 'prova_do_mestre').ok);
+  assert.equal(c.quests.active.prova_do_mestre.p[2], 2);
+  const old = hero(20, 'cleric'); old.spec = 'inquisitor'; old.quests.active.prova_do_mestre = { p: [0, 0], at: 1 }; // formato antigo: 2 objetivos
+  recordEvent(old, { type: 'level', level: 20 }); assert.equal(old.quests.active.prova_do_mestre.p[2], 2);
+});
+
+test('servidor (plausible): talk é objetivo só do servidor no modo estrito e o bit de mentor não vem do cliente', () => {
+  const oldD = hero(16, 'warrior'); const neu = structuredClone(oldD); neu.stats.mentors = 1;
+  assert.equal(checkSave(oldD, neu, Date.now(), { strictPve: true }).reason, 'pve_mentors');
+  assert.ok(checkSave(oldD, neu, Date.now(), {}).ok, 'modo não estrito aceita (como a lore)');
 });

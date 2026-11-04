@@ -113,6 +113,7 @@ export class Hub {
       case 'queue_cancel': if (s.queued) this.cancelQueue(s); return;
       case 'zone_enter': return this.zoneEnter(s, m.zone, m.from, no);
       case 'zone_leave': return this.zoneLeave(s);
+      case 'zone_respawn': if (s.room?.mode === 'zone') s.room.respawnNow?.(s.player); return; // botão "Renascer no ponto salvo": antecipa o renascimento (a espera mínima é conferida na sala)
       case 'crypt_enter': return this.cryptEnter(s, no);
       case 'zone_teleport': return this.zoneTeleport(s, m.zone, no);
       case 'tx': return this.transaction(s, m, no);

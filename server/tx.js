@@ -15,6 +15,8 @@ import { QUESTS } from '../public/src/data/quests.js';
 import { CLASSES } from '../public/src/data/classes.js';
 import { craftEcho } from '../public/src/core/echo.js';
 import { chooseSpec, buySeal } from '../public/src/core/specs.js';
+import { MENTOR_BY_ID } from '../public/src/data/mentors.js';
+import { PHOENIX, setCheckpoint } from '../public/src/core/phoenix.js';
 
 export class TxError extends Error {}
 const fail = (msg) => { throw new TxError(msg); };
@@ -26,14 +28,14 @@ export const CHEST_REACH = 130;    // px entre o ATOR do servidor e o baú (o cl
 
 // Onde cada operação existe: dentro da instância baú/poção/lore e equipamento/atributos/spirit ativo; nas cidades, o resto. Devolve o código de recusa ou null.
 export function placeProblem(op, { inZone, hubAt, shop = 'town' }) {
-  const inst = op === 'chest' || op === 'potion' || op === 'lore'; // só existem dentro da instância
+  const inst = op === 'chest' || op === 'potion' || op === 'lore' || op === 'checkpoint_set'; // só existem dentro da instância
   const both = ['spirit_set', 'equip', 'unequip', 'alloc', 'alloc_auto'].includes(op); // valem na instância e nas cidades
   if (inZone) return both || inst ? null : 'not_here';
   if (inst) return 'not_here';
-  const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily' || op === 'recycle';
+  const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily' || op === 'recycle' || op === 'mentor_talk';
   if (harborOnly && hubAt !== 'harbor') return 'not_here';
   if (shop === 'harbor' && hubAt !== 'harbor') return 'not_here';
-  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk', 'craft', 'respec', 'respec_buy'].includes(op)) return 'not_here'; // lojas da Vila só na Vila
+  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'buy_phoenix', 'sell', 'sell_bulk', 'craft', 'respec', 'respec_buy'].includes(op)) return 'not_here'; // lojas da Vila só na Vila
   return null;
 }
 
@@ -99,6 +101,23 @@ export function runTx(doc, m, ctx) {
       c.gold -= price; c.scrolls = (c.scrolls ?? 0) + m.n; s.price = price; s.scrolls = c.scrolls;
       break;
     }
+    case 'buy_phoenix': { // Amuleto da Fênix: preço fixo, pilha até PHOENIX.max (o Porto cobra o mesmo: não há desconto)
+      if ((c.phoenix ?? 0) + m.n > PHOENIX.max) fail(`Você já carrega o máximo (${PHOENIX.max}).`);
+      const price = PHOENIX.price * m.n;
+      if (c.gold < price) fail('Ouro insuficiente.');
+      c.gold -= price; c.phoenix = (c.phoenix ?? 0) + m.n; Object.assign(s, { price, phoenix: c.phoenix });
+      break;
+    }
+    case 'checkpoint_set': { // Pedra de Retorno: o servidor confere a zona (a da sala), a pedra, a proximidade do ATOR e que está vivo
+      const a = ctx.player?.actor, zid = ctx.room?.zoneId;
+      const stone = ctx.room?.world?.zone?.checkpoints?.find((x) => x.id === m.id);
+      if (!a || !stone) fail('Pedra inexistente aqui.');
+      if (a.dead) fail('Você está caído.');
+      if (Math.hypot(a.x - stone.x, a.y - stone.y) > CHEST_REACH) fail('Chegue mais perto da pedra.');
+      setCheckpoint(c, zid, stone.id);
+      Object.assign(s, { zone: zid, stone: stone.id });
+      break;
+    }
     case 'sell': {
       const i = c.inventory.findIndex((x) => x.id === m.id);
       if (i < 0) fail('Item não está na mochila.');
@@ -106,11 +125,21 @@ export function runTx(doc, m, ctx) {
       c.inventory.splice(i, 1); c.gold += pay; s.pay = pay;
       break;
     }
-    case 'sell_bulk': { // vende da mochila tudo até a raridade `n` (índice em RARITY)
-      const sold = c.inventory.filter((x) => RARITY[x.rarity].index <= m.n);
+    case 'sell_bulk': { // vende da mochila a lista de ids (cada um precisa estar na mochila: equipado nunca está) ou, sem lista, tudo até a raridade `n` (índice em RARITY)
+      let sold, keep;
+      if (m.ids) {
+        if (!Array.isArray(m.ids) || !m.ids.length || m.ids.length > INVENTORY_SIZE || new Set(m.ids).size !== m.ids.length) fail('Seleção inválida.');
+        const set = new Set(m.ids);
+        sold = c.inventory.filter((x) => set.has(x.id));
+        if (sold.length !== m.ids.length) fail('Algum item da seleção não está na mochila.');
+        keep = c.inventory.filter((x) => !set.has(x.id));
+      } else {
+        sold = c.inventory.filter((x) => RARITY[x.rarity].index <= m.n);
+        keep = c.inventory.filter((x) => RARITY[x.rarity].index > m.n);
+      }
       if (!sold.length) fail('Nada para vender.');
       const pay = sold.reduce((t, x) => t + (harbor ? harborSellValue : sellValue)(x), 0);
-      c.inventory = c.inventory.filter((x) => RARITY[x.rarity].index > m.n);
+      c.inventory = keep;
       c.gold += pay; s.pay = pay; s.count = sold.length;
       break;
     }
@@ -150,6 +179,12 @@ export function runTx(doc, m, ctx) {
       const r = turnInQuest(c, m.id, ctx.rng, now);
       if (!r.ok) fail(r.reason);
       Object.assign(s, { reward: r.reward, quests: questsReady(r), achievements: r.achievements, levels: r.reward.levels, level: c.level });
+      break;
+    }
+    case 'mentor_talk': { // mentor de especialização no Porto: grava o bit e avança o objetivo `talk` da Prova do Mestre (qualquer classe pode conversar por curiosidade)
+      if (!MENTOR_BY_ID[m.id]) fail('Mentor inexistente.');
+      const ev = recordEvent(c, { type: 'talk', npc: m.id }, now);
+      Object.assign(s, { npc: m.id, quests: questsReady(ev), achievements: ev.achievements });
       break;
     }
     case 'lore': { // placa/estátua da zona: servidor confere zona, proximidade e a 1ª leitura (bit em stats.lore + conquista)

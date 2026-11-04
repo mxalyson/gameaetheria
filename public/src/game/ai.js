@@ -168,7 +168,7 @@ export function rivalIntent(r, w, dt) {
   // mira à frente: tempo de voo = distância / velocidade do projétil (o ataque básico ou a habilidade lançada agora)
   let lead = 0;
   if (!melee) {
-    const sk = ai.cast ? skillOf(r.classId, r.spec, skillIdAt(r.classId, ai.cast.idx)) : null;
+    const sk = ai.cast ? skillOf(r.classId, r.spec, skillIdAt(r.classId, ai.cast.idx, r.spec)) : null;
     const sp = sk ? (sk.kind === 'projectile' ? sk.speed : 0) : basic.speed;
     if (sp) lead = Math.min(0.9, d / sp) * LEAD;
   }
@@ -205,7 +205,7 @@ const CHOOSE_ORDER = [3, 0, 1, 2];
 function chooseSkill(r, tgt, d, w) {
   for (const i of CHOOSE_ORDER) { // a Maestria (s3, se o rival a tem) vem primeiro: é a jogada decisiva
     if (r.cds['s' + i] > 0 || !isSkillUnlocked(r.level == null ? 30 : r, i)) continue;
-    const s = skillOf(r.classId, r.spec, skillIdAt(r.classId, i));
+    const s = skillOf(r.classId, r.spec, skillIdAt(r.classId, i, r.spec)); // kit da especialização
     switch (s.kind) {
       case 'meteor':
         if (d < s.range * 0.9) return { idx: i };
@@ -223,13 +223,30 @@ function chooseSkill(r, tgt, d, w) {
         if (d < s.range) return { idx: i };
         break;
       case 'buff':
+        if (s.cost?.hp && r.hp < r.maxHp * (s.cost.hp + 0.25)) break; // não paga vida quando está no fio
         if (d < 260 || r.hp < r.maxHp * 0.5) return { idx: i };
         break;
       case 'dash':
+        if (s.slam) { if (d > 110 && d < s.dist) return { idx: i }; break; } // salto/investida com impacto: vai em cima do alvo
         if (s.mult > 0 ? d > 110 && d < s.dist : d < 110) return { idx: i, away: s.mult === 0 };
         break;
       case 'blink':
         if (d < 120) return { idx: i, away: true };
+        break;
+      case 'cone':
+        if (d < s.range * 0.9) return { idx: i };
+        break;
+      case 'channel':
+        if (d < s.range * 0.9) return { idx: i };
+        break;
+      case 'summon':
+        if (d < s.range && r.hp > r.maxHp * ((s.cost?.hp ?? 0) + 0.3)) return { idx: i };
+        break;
+      case 'trap':
+        if (d < s.range * 0.9 && d > s.radius) return { idx: i };
+        break;
+      case 'zone':
+        if (d < s.radius * 0.9 || r.hp < r.maxHp * 0.6) return { idx: i };
         break;
     }
   }

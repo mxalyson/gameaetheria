@@ -35,7 +35,7 @@ export const ACHIEVEMENTS = [
 ];
 export const ACH = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 // Contadores do personagem. `SERVER_STATS` só o servidor altera (vêm de partidas decididas lá).
-export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin', 'teleports', 'upgrades', 'tips', 'lore', 'spiritKills', 'skillUses', 'deposits', 'contracts', 'friendlyWins', 'harborVisits', 'cryptClears'];
+export const STAT_KEYS_PROGRESS = ['kills', 'bossKills', 'chests', 'quests', 'pvpWins', 'pvpGames', 'coopClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin', 'teleports', 'upgrades', 'tips', 'lore', 'spiritKills', 'skillUses', 'deposits', 'contracts', 'friendlyWins', 'harborVisits', 'cryptClears', 'mentors'];
 // `tips` e `lore` não são contadores: são máscaras de bits (dicas já mostradas, core/journal.js TIP_BITS; inscrições lidas, LORE_ZONES); o servidor une os bits em vez de limitar o salto.
-export const FLAG_STATS = ['tips', 'lore'];
+export const FLAG_STATS = ['tips', 'lore', 'mentors']; // `mentors`: um bit por mentor de especialização já visitado (data/mentors.js)
 export const SERVER_STATS = ['pvpWins', 'pvpGames', 'coopClears', 'cryptClears', 'pvpHour', 'pvpHourN', 'pvpFoe', 'pvpFoeN', 'pvpFoeMin']; // os 5 últimos limitam o XP de PvP (core/rewards.js)

@@ -22,16 +22,18 @@ test('painel do personagem: especialização travada antes do nível 15 e com 2 
   expect(errors).toEqual([]);
 });
 
-test('escolher Arcano: fica salvo, vale no herói e o Projétil Arcano muda (nome, dica e recarga)', async ({ page }) => {
+test('escolher Arcano: fica salvo, vale no herói e a barra passa ao kit do Arcano (Raio Prismático)', async ({ page }) => {
   const errors = await criar(page);
   await page.evaluate(() => { window.game.char.level = 15; window.game.char.quests.done.prova_do_mestre = Date.now(); window.game.ui.openPanel('character'); }); // exige a Prova do Mestre da classe
   await page.click('[data-action="spec"][data-arg="arcane"]'); // primeira escolha: sem confirmação, grátis
   const r = await page.evaluate(async () => {
     const g = window.game;
     const { skillOf } = await import('/src/core/specs.js');
-    return { char: g.char.spec, actor: g.player.spec, gold: g.char.gold, cd: skillOf('mage', g.player.spec, 'fireball').cd, name: skillOf('mage', g.player.spec, 'fireball').name, saved: JSON.parse(localStorage.getItem('aetheria_save_v1')).spec };
+    const { skillIdAt } = await import('/src/core/unlocks.js');
+    const id = skillIdAt('mage', 0, g.player.spec);
+    return { char: g.char.spec, actor: g.player.spec, gold: g.char.gold, cd: skillOf('mage', g.player.spec, id).cd, name: skillOf('mage', g.player.spec, id).name, saved: JSON.parse(localStorage.getItem('aetheria_save_v1')).spec };
   });
-  expect(r.char).toBe('arcane'); expect(r.actor).toBe('arcane'); expect(r.saved).toBe('arcane'); expect(r.name).toBe('Projétil Arcano');
+  expect(r.char).toBe('arcane'); expect(r.actor).toBe('arcane'); expect(r.saved).toBe('arcane'); expect(r.name).toBe('Raio Prismático');
   expect(r.gold).toBe(60); // primeira escolha é grátis
   await expect(page.locator('[data-action="spec"]')).toHaveCount(1); // sobra a outra opção, agora desabilitada (precisa de Selo)
   await expect(page.locator('[data-action="spec"]')).toBeDisabled();

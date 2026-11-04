@@ -1,11 +1,13 @@
-// Kit de sprites de efeito (VFX): atlas public/assets/vfx/vfx.webp + vfx.json, gerados por tools/vfx-kit.py (ou arte do dono, mesmo formato).
+// Kit de sprites de efeito (VFX): atlas public/assets/vfx/vfx.webp + vfx.json, gerados por tools/vfx-sheet.py (arte pintada do dono em docs/art-direction/fontes-vfx + procedurais de tools/vfx-kit.py para o que a folha não cobre).
 // Cada sprite guarda INTENSIDADE (cinza) + alfa; aqui ele é pintado com uma rampa de cor por paleta (borda escura -> cor -> clara -> branco no núcleo)
 // e guardado em um canvas pequeno (cache por sprite x paleta, criado só no primeiro uso). Carregamento sob demanda (loadVfxKit); só apresentação.
 import { asset } from '../assets-version.js';
 
 export const NAMES = ['glow', 'ring', 'shock', 'flame0', 'flame1', 'flame2', 'flame3', 'ember0', 'ember1', 'spark', 'star8', 'burst', 'rays',
   'crystal0', 'crystal1', 'crystal2', 'flake', 'bolt0', 'bolt1', 'bolt2', 'ribbon0', 'ribbon1', 'wind', 'leaf0', 'leaf1', 'smoke0', 'smoke1', 'smoke2',
-  'wisp0', 'wisp1', 'shard0', 'shard1', 'cross', 'bubble', 'rune0', 'rune1', 'slash0', 'slash1'];
+  'wisp0', 'wisp1', 'shard0', 'shard1', 'cross', 'bubble', 'rune0', 'rune1', 'slash0', 'slash1',
+  // extras da arte pintada (tools/vfx-sheet.py): espinhos de gelo, chamas pequenas, cintilas, anel pequeno e estrela média de impacto
+  'spikes', 'flamelet0', 'flamelet1', 'flamelet2', 'flamelet3', 'twinkle0', 'twinkle1', 'twinkle2', 'twinkle3', 'shock2', 'burst2'];
 export const SP = {}; NAMES.forEach((n, i) => { SP[n] = i; });
 
 // paletas: [borda escura, cor, clara]; o núcleo (intensidade > 0,8) vai ao branco

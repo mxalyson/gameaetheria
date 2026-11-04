@@ -112,6 +112,7 @@ SET.glacier = {
 };
 SET.ember = { ...SET.ruins, pine: { h: 3.2, ref: 11, v: P('DeadTree', 1, 3), behind: true } };
 // postes e guarda-corpos das pontes (layout.js › bridges): lampião e tronco; nas ruínas, braseiro (desenho de código) e laje
+for (const k of ['forest', 'plains', 'glacier']) SET[k].runestone = { w: 2.1, ref: 0, v: ['m_boulder'] }; // Pedra de Retorno (data/zones.js checkpoints)
 for (const k of ['forest', 'plains', 'glacier']) { SET[k].lantern = { h: 5.6, ref: 0, v: ['m_lamp'] }; SET[k].log = { w: 4.1, ref: 0, v: ['m_log'] }; SET[k].signpost = { h: 5, ref: 0, v: ['m_sign'] }; } // placa de lore (data/zones.js lore)
 // vila: casas por canto (cada casa do layout ganha o seu desenho), lanternas e placa
 export const HOUSE_SET = { town: { house: { house: true, v: ['m_house_tile', 'm_house_big', 'm_house_thatch', 'm_house_porch'], pick: (d) => (d.x < 850 ? 0 : 1) + (d.y < 600 ? 0 : 2) }, lantern: { h: 5.6, ref: 0, v: ['m_lamp'] }, signpost: { h: 5, ref: 0, v: ['m_sign'] } } };

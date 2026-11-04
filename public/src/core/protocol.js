@@ -26,17 +26,19 @@ export const REJECT = {
 };
 
 // Transações de personagem decididas pelo servidor (P11.3/P11.4): o cliente só PEDE (op + id/quantidade); preço, estoque, sorteio e ouro são do servidor.
-// `id` = item/missão/contrato/baú/spirit; `shop` = 'town' | 'harbor'; `n` = quantidade (poções/pergaminhos) ou raridade máxima (sell_bulk).
+// `id` = item/missão/contrato/baú/spirit; `shop` = 'town' | 'harbor'; `n` = quantidade (poções/pergaminhos) ou raridade máxima (sell_bulk). `ids` = lista de itens a vender (sell_bulk, 1 a 30; sem `n`).
 export const TX_OPS = {
   chest: { id: true }, potion: {}, spirit_set: { id: true },
   buy_item: { id: true, shop: true }, buy_potion: { n: [1, 99], shop: true }, buy_scroll: { n: [1, 99], shop: true },
-  sell: { id: true, shop: true }, sell_bulk: { n: [0, 5], shop: true }, enhance: { id: true },
+  sell: { id: true, shop: true }, sell_bulk: { n: [0, 5], nOpt: true, idsMax: 30, shop: true }, enhance: { id: true },
   bank_deposit: { id: true }, bank_withdraw: { id: true }, claim_daily: { id: true },
   quest_accept: { id: true }, quest_turnin: { id: true },
   // ganhos que antes eram locais: spirits (libertar/comprar/evoluir), reciclagem, placa de lore; equipamento e atributos (valem também na instância)
   spirit_free: { id: true }, spirit_evolve: { id: true }, buy_essence: { kind: ['essence', 'prism'] }, recycle: { ids: 3 }, lore: { id: true },
   equip: { id: true }, unequip: { slot: true }, alloc: { stat: true, n: [1, 999] }, alloc_auto: {},
+  mentor_talk: { id: true }, // conversa com um mentor de especialização no Porto (objetivo `talk` da Prova do Mestre; o servidor confere que o jogador está no Porto)
   respec_buy: {}, respec: { id: true }, // Mestre de Classe: comprar o Selo de Reespecialização / escolher ou trocar de especialização (o Selo é conferido e gasto no servidor)
+  buy_phoenix: { n: [1, 20], shop: true }, checkpoint_set: { id: true }, // Amuleto da Fênix (preço e teto do servidor) / Pedra de Retorno (o servidor confere zona e proximidade)
   craft: { id: true }, // forja do Ferreiro: item Eco (fragmentos da Cripta + ouro); id = receita (data/crypt.js ECHO_RECIPES)
 };
 const TX_ID = /^[A-Za-z0-9_:.-]{1,48}$/;
@@ -100,10 +102,14 @@ export function parseClientMessage(data) {
       if (spec.slot) { if (!['weapon', 'armor', 'helm', 'boots', 'ring', 'amulet', 'offhand'].includes(data.slot)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.slot = data.slot; }
       if (spec.stat) { if (!['str', 'agi', 'int', 'vit'].includes(data.stat)) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.stat = data.stat; }
       if (spec.ids) { if (!Array.isArray(data.ids) || data.ids.length !== spec.ids || !data.ids.every((x) => typeof x === 'string' && TX_ID.test(x))) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.ids = [...data.ids]; }
-      if (spec.n) { if (!Number.isInteger(data.n) || data.n < spec.n[0] || data.n > spec.n[1]) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.n = data.n; }
+      if (spec.idsMax && data.ids !== undefined) { // venda em lote por lista de ids: 1..idsMax, sem repetidos
+        if (!Array.isArray(data.ids) || data.ids.length < 1 || data.ids.length > spec.idsMax || !data.ids.every((x) => typeof x === 'string' && TX_ID.test(x)) || new Set(data.ids).size !== data.ids.length) return { ok: false, code: REJECT.BAD_MESSAGE };
+        msg.ids = [...data.ids];
+        if (data.n !== undefined) return { ok: false, code: REJECT.BAD_MESSAGE }; // ou lista, ou raridade
+      } else if (spec.n) { if (!Number.isInteger(data.n) || data.n < spec.n[0] || data.n > spec.n[1]) return { ok: false, code: REJECT.BAD_MESSAGE }; msg.n = data.n; }
       return { ok: true, msg };
     }
-    case 'queue_cancel': case 'party_create': case 'party_leave': case 'zone_leave': case 'crypt_enter': // crypt_enter: o servidor confere nível, mapa visitado, espera/Chave e a posição (nada vem no pedido)
+    case 'queue_cancel': case 'party_create': case 'party_leave': case 'zone_leave': case 'zone_respawn': case 'crypt_enter': // crypt_enter: o servidor confere nível, mapa visitado, espera/Chave e a posição (nada vem no pedido)
       return { ok: true, msg: { t: data.t } };
     case 'party_invite': case 'party_kick':
       if (typeof data.name !== 'string' || data.name.length < 1 || data.name.length > 40) return { ok: false, code: REJECT.BAD_MESSAGE };

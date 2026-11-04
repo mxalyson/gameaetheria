@@ -5,13 +5,13 @@ import { NPC_ART } from '../public/src/render/npc-sprites.js';
 import { ZONES } from '../public/src/data/zones.js';
 
 // NPCs pintados: todo id em NPC_ART é um NPC da vila e tem imagem + medidas coerentes e leves.
-const townNpcs = new Set(ZONES.town.npcs.map((n) => n.id));
+const townNpcs = new Set([...ZONES.town.npcs, ...ZONES.harbor.npcs.filter((n) => n.role === 'mentor')].map((n) => n.id)); // vila + mentores do Porto
 test('NPCs pintados: ids existem na vila e os arquivos estão íntegros', () => {
   for (const id of NPC_ART) {
     assert.ok(townNpcs.has(id), 'NPC desconhecido: ' + id);
     assert.ok(existsSync(`public/assets/npcs/${id}.webp`) && existsSync(`public/assets/npcs/${id}.json`), 'arquivos de ' + id);
     const m = JSON.parse(readFileSync(`public/assets/npcs/${id}.json`, 'utf8'));
-    assert.ok(m.w > 40 && m.h > 80 && m.ax >= 0 && m.ax <= m.w && m.ay > m.h * 0.9 && m.ay <= m.h, 'medidas de ' + id);
+    assert.ok(m.w > 40 && m.h > 80 && m.ax >= 0 && m.ax <= m.w && m.ay > m.h * (id.startsWith('mentor_') ? 0.8 : 0.9) && m.ay <= m.h, 'medidas de ' + id); // mentores: capa/escudo pendem abaixo dos pés
     assert.ok(statSync(`public/assets/npcs/${id}.webp`).size < 120_000, id + ' pesado demais');
   }
 });
@@ -68,4 +68,20 @@ test('stackLabels: alturas diferentes não empilham; resultado independe da orde
   assert.equal(t[1], 14);
   // o teto de degraus vale para qualquer passo
   assert.ok(Math.max(...stackLabels(Array.from({ length: 10 }, () => ({ x: 0, w: 80, y: 0 })), 10, 2)) <= 20);
+});
+
+test('mentores de especialização: 8 NPCs no Porto com arte do atlas Nv 25, fora da Vila, na praça norte sem sobrepor a rua nem as casas', async () => {
+  const { MENTORS } = await import('../public/src/data/mentors.js');
+  const { SPECS } = await import('../public/src/data/specs.js');
+  const h = ZONES.harbor, ms = h.npcs.filter((n) => n.role === 'mentor');
+  assert.equal(ms.length, 8); assert.ok(!ZONES.town.npcs.some((n) => n.id.startsWith('mentor_')), 'a Vila está cheia');
+  assert.deepEqual(ms.map((n) => n.id).sort(), MENTORS.map((m) => m.id).sort());
+  for (const m of MENTORS) { assert.ok(SPECS[m.classId][m.spec], m.id); assert.ok(NPC_ART.has(m.id), 'arte de ' + m.id); assert.ok(existsSync(`public/assets/npcs/${m.id}.webp`), m.id); }
+  assert.deepEqual(MENTORS.map((m) => m.classId), ['warrior', 'warrior', 'mage', 'mage', 'archer', 'archer', 'cleric', 'cleric'], 'dois por classe, lado a lado');
+  for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) assert.ok(Math.hypot(ms[i].x - ms[j].x, ms[i].y - ms[j].y) >= 120, 'rótulos colados: ' + ms[i].id + ' ' + ms[j].id);
+  for (const n of ms) {
+    assert.ok(Math.abs(n.x - 1500) > 40, n.id + ' na rua central'); // a rua principal (x=1500) fica livre
+    for (const hs of h.houses) assert.ok(n.x < hs.x - 30 || n.x > hs.x + hs.w + 30 || n.y < hs.y - 80 || n.y > hs.y + hs.h + 20, `${n.id} perto da casa`);
+    for (const o of h.npcs.filter((o) => o.role !== 'mentor')) assert.ok(Math.hypot(n.x - o.x, n.y - o.y) >= 150, `${n.id} perto de ${o.id}`);
+  }
 });

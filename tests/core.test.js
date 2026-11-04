@@ -899,7 +899,7 @@ test('Prova do Mestre/evolução (servidor): lote de zona soma abates com spirit
   acceptQuest(d, SPIRIT_EVO_QUEST.ember); acceptQuest(d, 'prova_do_mestre');
   const r = applyZoneBatch(d, { zoneId: 'forest', kills: [{ mobId: 'wolf', spiritType: 'ember', mini: true }, { mobId: 'wolf', spiritType: 'ember' }], skills: [CLASSES.archer.skills[0], CLASSES.archer.skills[0], CLASSES.archer.skills[1]] });
   assert.equal(r.doc.quests.active.evolucao_do_spirit_fogo.p[0], 2);
-  assert.deepEqual(r.doc.quests.active.prova_do_mestre.p, [1, 2], 'mini-chefe 1; 2 usos da assinatura; a outra habilidade não conta');
+  assert.deepEqual(r.doc.quests.active.prova_do_mestre.p, [1, 2, 0], 'mini-chefe 1; 2 usos da assinatura; a outra habilidade não conta; 0 mentores (só o servidor conta a conversa)');
   assert.equal(r.doc.stats.skillUses, 3);
   const neu = structuredClone(r.doc); neu.stats.skillUses += 1501;
   assert.equal(checkSave(r.doc, neu).reason, 'stat_jump_skillUses');
@@ -934,6 +934,12 @@ test('Prova do Mestre: mini-chefe + 10 usos da habilidade assinatura liberam a e
   assert.equal(readyFor(c, 'master_mage').length, 0);
   recordEvent(c, { type: 'kill', mobId: 'wolf', zoneId: 'forest', mini: true });
   recordEvent(c, { type: 'skill', skillId: CLASSES.mage.skills[0] });
+  assert.equal(readyFor(c, 'master_mage').length, 0, 'falta conversar com os dois mentores do Mago no Porto');
+  recordEvent(c, { type: 'talk', npc: 'mentor_arcane' });
+  assert.equal(readyFor(c, 'master_mage').length, 0, 'um só não basta');
+  recordEvent(c, { type: 'talk', npc: 'mentor_paladin' }); // mentor de outra classe não conta
+  assert.equal(readyFor(c, 'master_mage').length, 0);
+  recordEvent(c, { type: 'talk', npc: 'mentor_warlock' });
   assert.deepEqual(readyFor(c, 'master_mage'), ['prova_do_mestre']);
   assert.deepEqual(readyFor(c, 'master_warrior'), [], 'outro mestre não recebe');
   assert.ok(turnInQuest(c, 'prova_do_mestre', makeRng(1)).ok);

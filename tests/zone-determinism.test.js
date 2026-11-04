@@ -9,10 +9,11 @@ import { makeRng } from '../public/src/core/rng.js';
 // das otimizações, com a sala real (ZoneRoom), 3 zonas, 2 heróis por sala (com spirit) atacando e usando habilidades por 1 800 ticks (30 s).
 // Se uma mudança em game/sim.js, game/ai.js ou server/zone.js alterar qualquer posição, vida, abate ou evento, este teste falha.
 // Mudou a REGRA do jogo de propósito (não uma otimização)? Recalcule com `node tests/zone-determinism.test.js --print` e atualize GOLDEN.
+// 2026-11-03: as Pedras de Retorno (data/zones.js `checkpoints`) entraram no layout como obstáculos pequenos (mudou a regra, não uma otimização): digests recalculados.
 const GOLDEN = {
-  forest: '17beef1e5ec3d2fb46202bd4c8379dfd262cd959',
-  plains: 'abb65f8854588442f7b2b4073129334fa6698de3',
-  ruins: '7bfc6dbf33a1735d5d35d89649d6b50d6981ea07',
+  forest: '23f05623e6d3ce1da8430a79a12818afaeb1fc23',
+  plains: 'b5da17efd67aeeabfa5d6fab4e55449a59057dd2',
+  ruins: 'ff44fe7ab734e73d89ac928bc1af7940d0a2319d',
 };
 
 function run(zoneId) {

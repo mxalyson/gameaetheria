@@ -31,6 +31,17 @@ Hoje são recolores dourados dos ícones antigos. Prompt: *"fantasy game skill i
 - **Tempestade de Flechas Ardentes** (Arqueiro): chuva de flechas em chamas num céu de brasas. → `arrowstorm.webp`
 - **Intervenção Divina** (Clérigo): mãos erguidas, coluna de luz dourada, asas translúcidas. → `intervention.webp`
 
+### A4b. Ícones dos 32 kits de especialização (512×512, fundo transparente) — NOVO
+Cada especialização (nível 15+) tem 3 habilidades + 1 de Maestria próprias (`public/src/data/kits.js`). Hoje cada uma **empresta o ícone existente mais parecido** (campo `art`) e a barra põe uma **moldura na cor da especialização**. Ao receber a arte, grave `assets/icons/skills/<id>.webp` e apague o campo `art` da habilidade em `data/kits.js` (`tests/kits.test.js` confere que existe um ícone). Prompt-base: *"fantasy game skill icon, hand-painted, ornate frame in <cor da especialização>, centered, glowing, dark transparent background"* +
+- **Paladino** (dourado): `pal_hammer` martelo de luz girando · `pal_aura` escudo com aura radiante · `pal_rush` escudo avançando com lasca de luz · `pal_sanctuary` sol sobre círculo de runas
+- **Berserker** (brasa): `bsk_leap` machado de duas mãos caindo do alto, chão rachado · `bsk_frenzy` gota de sangue com olhos vermelhos · `bsk_cleave` arco de machadada com gotas · `bsk_fury` rosto de fera em brasa
+- **Arcano** (violeta): `arc_prism` feixe de luz atravessando prisma · `arc_barrier` escudo hexagonal arcano · `arc_phase` silhueta dupla com portal de runa · `arc_comet` cometa roxo com cauda de estrelas
+- **Bruxo** (verde tóxico): `wl_curse` caveira com fumaça verde · `wl_drain` mão sugando fios de vida · `wl_pact` dois espectros e pacto escrito · `wl_souls` chuva de almas
+- **Franco-atirador** (turquesa): `sn_aim` mira de luneta com ponto brilhante · `sn_trap` armadilha de cristal de gelo · `sn_retreat` botas com rastro de vento e seta para trás · `sn_lethal` bala perfurante com ondas de choque
+- **Pistoleiro** (âmbar): `gs_fan` cinco virotes em leque · `gs_grenade` granada com pavio · `gs_roll2` duas setas de rolamento encadeadas · `gs_barrage` chuva de virotes em linhas
+- **Guardião** (branco-dourado): `gd_light` flor de luz curando · `gd_ward` vários escudos de luz ligados · `gd_word` livro aberto emitindo luz · `gd_celestial` anjo de asas abertas, coluna de luz
+- **Inquisidor** (violeta-âmbar): `inq_judge` raio sagrado em chamas · `inq_mark` pena com selo brilhante · `inq_flame` leque de fogo sagrado · `inq_verdict` livro grande em chamas
+
 ### A5. Ícone do ataque básico das 4 classes (512×512, mesma moldura dos ícones de skill)
 Espada curva (Guerreiro), orbe/cajado arcano (Mago), arco com flecha de luz (Arqueiro), maça sagrada com halo (Clérigo). → `assets/icons/skills/basic-<classe>.webp`
 
@@ -100,3 +111,6 @@ Hoje os efeitos usam um kit gerado por código (`tools/vfx-kit.py` -> `public/as
 5. **Veneno/sombra:** *"2 curling wisps of toxic smoke with small bubbles, painterly anime game VFX, grayscale, black background"* + *"3 soft smoke puffs, billowing, grayscale"*
 6. **Impacto:** *"shockwave ring seen from above, irregular streaky edge, bright thin outer rim, dust streaks inside, grayscale, black background"* + *"explosion flash burst with radial rays, white-hot center, grayscale"* + *"2 crescent sword slash arcs, tapered tips, bright outer edge, motion streaks, grayscale"*
 7. **Runas:** *"magic circle top view, concentric rings with runic glyphs between rings and a star inside, thin glowing lines, grayscale, black background"* (2 variações: hexagrama e pentagrama)
+
+**Status (2026-11-03): folhas 1, 2 e 3 RECEBIDAS e integradas** (`docs/art-direction/fontes-vfx/vfx-folha-{1,2,3}.jpg`; `python tools/vfx-sheet.py` gera `vfx.webp`/`vfx.json` a partir delas + procedurais; depois `node tools/bump-assets.mjs`). Prioridade 3 > 2 > 1 por sprite: folha 3 = gelo (cristais, floco, **spikes**), luz (rays, burst, **burst2**, star8, spark, **twinkle0..3**), fumaça/fiapos, impacto (shock, **shock2**, slash0/1), runas e chamas pequenas (**flamelet0..3**); folha 2 = raio (bolt0..2 em 512 px, ramos finos) e fogo grande (flame0..3). Os nomes em negrito são novos (ainda sem uso nas skills: espinhos para armadilha/Nova de gelo, flamelets para fagulhas de fogo, twinkles para cintilas). Atlas 1024x928 (3,6 MiB decodificado, 49 sprites).
+**Ainda procedural / o que falta pedir:** vento (`wind`), folhas (`leaf0..1`), pedras (`shard0..1`), cruz, bolha, fitas (`ribbon0..1`), brasas (`ember0..1`), brilho (`glow`), anel (`ring`); raio com mais variações (hoje 3; ideais 5-6, incluindo vertical/bifurcado), gelo com mais cristais soltos, fumaça tóxica verde própria, cortes em meia-lua com mais variações, arco de energia/projétil, círculos de runa extras (2 hoje).

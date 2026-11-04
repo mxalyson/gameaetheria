@@ -4,6 +4,7 @@
 //   doc.title = id de conquista | null, doc.chests = { idDoBaú: instante da última abertura }
 import { QUESTS, SPIRIT_EVO_QUEST } from '../data/quests.js';
 import { CLASSES } from '../data/classes.js';
+import { skillIdAt, kitSpec } from './unlocks.js';
 import { SPIRITS } from '../data/spirits.js';
 import { ACHIEVEMENTS, ACH, STAT_KEYS_PROGRESS } from '../data/achievements.js';
 import { INVENTORY_SIZE } from '../data/items.js';
@@ -13,11 +14,13 @@ import { ZONES } from '../data/zones.js';
 import { MOBS, MOBS_EXTRA } from '../data/mobs.js';
 import { makeRng, hashString } from './rng.js';
 import { grantEchoKey } from './echo.js';
+import { MENTOR_BY_ID, mentorsOfClass } from '../data/mentors.js';
+import { SPECS } from '../data/specs.js';
 
 export const SERVER_TYPES = new Set(['pvp', 'coop', 'crypt']); // objetivos que só o servidor soma
 export const OFFLINE_TYPES = new Set(); // objetivos que só existem no jogo solo (vazio desde que o duelo amistoso passou a rodar online: o servidor conta a vitória)
 // Objetivos que, no modo ESTRITO de PvE (server/plausible.js), só o servidor soma (transações `lore`/`spirit_evolve`, teletransporte/visita no hub, vitória no duelo amistoso).
-export const PVE_SERVER_TYPES = new Set(['visit', 'teleport', 'lore', 'spiritStage', 'friendlyDuel']);
+export const PVE_SERVER_TYPES = new Set(['visit', 'teleport', 'lore', 'spiritStage', 'friendlyDuel', 'talk']);
 export const MAX_ACTIVE = 5;
 export const CHEST_COOLDOWN_MS = 10 * 60 * 1000;
 
@@ -29,6 +32,14 @@ export function ensureJournal(doc) { // documentos antigos/incompletos ganham os
   doc.stats = { ...b.stats, ...(doc.stats ?? {}) };
   doc.achievements ??= {}; doc.title ??= null; doc.chests ??= {};
   return doc;
+}
+
+// ---------- mentores de especialização (Porto de Marfim) ----------
+// Quantos dos mentores da PRÓPRIA classe o personagem já visitou (bits em stats.mentors). Quem já escolheu uma especialização (saves antigos) conta como tendo visitado os dois.
+export const mentorSeen = (doc, mentorId) => { const m = MENTOR_BY_ID[mentorId]; return !!m && ((doc.stats?.mentors ?? 0) & (1 << m.bit)) !== 0; };
+export function mentorsTalked(doc) {
+  if (doc.spec && SPECS[doc.classId]?.[doc.spec]) return 2;
+  return mentorsOfClass(doc.classId).filter((m) => mentorSeen(doc, m.id)).length;
 }
 
 // ---------- missões ----------
@@ -85,7 +96,7 @@ function matches(o, ev, doc) {
   switch (o.type) {
     case 'miniboss': return ev.type === 'kill' && !!ev.mini;
     case 'spiritKill': return ev.type === 'kill' && ev.spiritType === o.spirit;
-    case 'skillUse': return ev.type === 'skill' && (o.skill !== 'signature' || ev.skillId === CLASSES[doc.classId]?.skills[0]);
+    case 'skillUse': return ev.type === 'skill' && (o.skill !== 'signature' || ev.skillId === skillIdAt(doc.classId, 0, kitSpec(doc)) || ev.skillId === CLASSES[doc.classId]?.skills[0]);
     case 'kill': return ev.type === 'kill' && (o.mob === 'any' || o.mob === ev.mobId) && (o.zone === 'any' || o.zone === ev.zoneId);
     case 'boss': return ev.type === 'kill' && ev.boss && (o.mob === 'any' || o.mob === ev.mobId);
     case 'chest': return ev.type === 'chest' && (o.zone === 'any' || o.zone === ev.zoneId);
@@ -118,6 +129,7 @@ export function recordEvent(doc, ev, now = Date.now()) {
   else if (ev.type === 'daily') st.contracts++;
   else if (ev.type === 'friendlyDuel') { if (ev.won) st.friendlyWins++; }
   else if (ev.type === 'visit' && ev.zoneId === 'harbor') st.harborVisits++;
+  else if (ev.type === 'talk' && MENTOR_BY_ID[ev.npc]) st.mentors = (st.mentors | (1 << MENTOR_BY_ID[ev.npc].bit)) >>> 0; // visita ao mentor (qualquer classe, por curiosidade)
   for (const [id, a] of Object.entries(doc.quests.active)) {
     const q = QUESTS[id]; let changed = false;
     q.objectives.forEach((o, i) => {
@@ -126,6 +138,7 @@ export function recordEvent(doc, ev, now = Date.now()) {
       if (o.type === 'level' && ev.type === 'level') v = Math.max(before, Math.min(max, ev.level));
       else if (o.type === 'spirit' && ev.type === 'spirit') v = Math.max(before, Math.min(max, ev.count));
       else if (o.type === 'spiritStage' && ev.type === 'spiritStage') v = Math.max(before, Math.min(max, ev.count));
+      else if (o.type === 'talk' && (ev.type === 'talk' || ev.type === 'level')) v = Math.max(before, Math.min(max, mentorsTalked(doc))); // derivado dos bits: também vale ao aceitar a missão e para saves com especialização
       else if (matches(o, ev, doc)) v = Math.min(max, before + 1);
       if (v !== before) { a.p[i] = v; changed = true; }
     });

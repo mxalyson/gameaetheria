@@ -12,6 +12,7 @@ import { ZONES } from '../data/zones.js';
 import { BANK_SIZE } from './bank.js';
 import { ACH, STAT_KEYS_PROGRESS } from '../data/achievements.js';
 import { CRYPT } from '../data/crypt.js';
+import { PHOENIX, stoneAt } from './phoenix.js';
 
 export { SAVE_VERSION };
 export const SAVE_FORMAT = 'aetheria-save';
@@ -198,13 +199,15 @@ export function validate(doc) {
     version: SAVE_VERSION, visited, name: cleanName(doc.name), quests, stats, achievements, title, chests, daily, classId: doc.classId, level,
     xp: int(doc.xp, 0, 1e9, 0), statPoints, alloc,
     seals: int(doc.seals, 0, SEAL_MAX, 0), specChanges: int(doc.specChanges, 0, 9999, 0), // Selos de Reespecialização e trocas pagas (histórico)
-    gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0), scrolls: int(doc.scrolls, 0, 99, 0),
+    gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0), scrolls: int(doc.scrolls, 0, 99, 0), phoenix: int(doc.phoenix, 0, PHOENIX.max, 0), // Amuletos da Fênix (core/phoenix.js)
     equipment, inventory, bank, spirits, activeSpirit, spec,
     arena: { rating: int(a.rating, 0, 5000, 1000), wins: int(a.wins, 0, 1e6, 0), losses: int(a.losses, 0, 1e6, 0), bestWave: int(a.bestWave, 0, 1e4, 0), ratings },
     pity: { epic: int(doc.pity?.epic, 0, 9999, 0), legendary: int(doc.pity?.legendary, 0, 9999, 0), opal: int(doc.pity?.opal, 0, 99, 0) }, // proteção de azar do loot
     created: int(doc.created, 0, 4e12, Date.now()),
     echo: { frags: int(doc.echo?.frags, 0, CRYPT.frags.cap, 0), keys: int(doc.echo?.keys, 0, CRYPT.keyMax, 0), entry: int(doc.echo?.entry, 0, 4e12, 0) }, // Cripta dos Ecos (core/echo.js)
   };
+  const cp = doc.checkpoint; // Pedra de Retorno salva: só vale se for uma pedra real da zona (campo opcional)
+  if (isObj(cp) && typeof cp.zone === 'string' && stoneAt(cp.zone, cp.x, cp.y)) char.checkpoint = { zone: cp.zone, x: cp.x, y: cp.y };
   if (char.name !== doc.name) warnings.push('nome ajustado');
   return { ok: true, char, warnings };
 }

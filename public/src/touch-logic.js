@@ -8,6 +8,12 @@ export const DRAG_AIM_MIN = 26;    // px de arrasto para um botão de skill vira
 
 const len = (x, y) => Math.hypot(x, y);
 
+export const HOLD_MS = 400; // segurar um botão de skill por este tempo (parado) abre a explicação em vez de conjurar
+
+// O toque virou "segurar para explicar"? elapsed em ms desde o toque; moved = distância (px do jogo) que o dedo andou.
+// Arrastar além do limite de mira é mirar na mão, não segurar.
+export const isHold = (elapsed, moved = 0, ms = HOLD_MS, min = DRAG_AIM_MIN) => elapsed >= ms && moved < min;
+
 // dx, dy: deslocamento do dedo a partir do ponto onde tocou. Devolve direção (0..1) e a posição do botão do joystick.
 export function stickVector(dx, dy, radius = STICK_RADIUS, dead = DEADZONE) {
   const d = len(dx, dy);
@@ -45,7 +51,8 @@ export function pickAim({ player, enemies = [], move, override = null, mode = 'e
 // Skills de deslocamento (esquiva, teleporte) seguem o movimento; as demais, o alvo.
 export function aimModeFor(skill) {
   if (!skill) return 'enemy';
-  return skill.kind === 'blink' || (skill.kind === 'dash' && skill.invuln) ? 'move' : 'enemy';
+  // recuo (back) e salto (jump) miram o inimigo: o recuo foge dele e o salto cai em cima dele
+  return skill.kind === 'blink' || (skill.kind === 'dash' && skill.invuln && !skill.back && !skill.jump) ? 'move' : 'enemy';
 }
 
 // Direção (vetor unitário) do arrasto de um botão de skill, ou null se foi só um toque.
@@ -57,7 +64,7 @@ export function dragAim(dx, dy, min = DRAG_AIM_MIN) {
 // Alvo do botão de interagir: NPC (raio 80) tem prioridade; senão baú (raio 70). Devolve {kind, ref} ou null.
 // 'opened' (opcional) é o conjunto de baús já abertos: o alvo continua valendo (o jogo avisa que está vazio).
 // Prioridade NPC > baú > lore (placa/estátua de zona, raio 80).
-export const NPC_REACH = 80, CHEST_REACH = 70, LORE_REACH = 80;
+export const NPC_REACH = 80, CHEST_REACH = 70, LORE_REACH = 80, CHECKPOINT_REACH = 80;
 export function interactTarget(player, world) {
   const zone = world?.zone;
   if (!player || !zone) return null;
@@ -65,6 +72,8 @@ export function interactTarget(player, world) {
   if (npc) return { kind: 'npc', ref: npc };
   const chest = (zone.chests ?? []).find((c) => len(c.x - player.x, c.y - player.y) < CHEST_REACH);
   if (chest) return { kind: 'chest', ref: chest };
+  const cp = (zone.checkpoints ?? []).find((c) => len(c.x - player.x, c.y - player.y) < CHECKPOINT_REACH);
+  if (cp) return { kind: 'checkpoint', ref: cp };
   const lore = (zone.lore ?? []).find((l) => len(l.x - player.x, l.y - player.y) < LORE_REACH);
   return lore ? { kind: 'lore', ref: lore } : null;
 }

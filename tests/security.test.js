@@ -38,7 +38,7 @@ test('fuzz do protocolo: 30 000 entradas aleatórias nunca lançam exceção e o
       ok++;
       const m = r.msg;
       if (m.t === 'input') { for (const k of ['mx', 'my']) assert.ok(Number.isFinite(m[k]) && Math.abs(m[k]) <= 1); for (const k of ['aimX', 'aimY']) assert.ok(Number.isFinite(m[k]) && Math.abs(m[k]) <= 10000); assert.ok(Number.isInteger(m.seq) && m.seq >= 0); assert.ok([null, 0, 1, 2].includes(m.cast)); }
-      if (m.t === 'tx') { assert.ok(['chest', 'potion', 'spirit_set', 'buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk', 'enhance', 'bank_deposit', 'bank_withdraw', 'claim_daily', 'quest_accept', 'quest_turnin'].includes(m.op)); if (m.n !== undefined) assert.ok(Number.isInteger(m.n) && m.n >= 0 && m.n <= 99); if (m.id !== undefined) assert.match(m.id, /^[A-Za-z0-9_:.-]{1,48}$/); assert.ok(Object.keys(m).every((k) => ['t', 'op', 'req', 'id', 'shop', 'n'].includes(k))); }
+      if (m.t === 'tx') { assert.ok(['chest', 'potion', 'spirit_set', 'buy_item', 'buy_potion', 'buy_scroll', 'sell', 'sell_bulk', 'enhance', 'bank_deposit', 'bank_withdraw', 'claim_daily', 'quest_accept', 'quest_turnin'].includes(m.op)); if (m.n !== undefined) assert.ok(Number.isInteger(m.n) && m.n >= 0 && m.n <= 99); if (m.id !== undefined) assert.match(m.id, /^[A-Za-z0-9_:.-]{1,48}$/); assert.ok(Object.keys(m).every((k) => ['t', 'op', 'req', 'id', 'ids', 'shop', 'n'].includes(k))); }
       if (m.t === 'hello') { assert.ok(!/[<>"&]/.test(m.name ?? '') ); }
       assert.ok(!Object.keys(m).includes('__proto__'), 'sem chaves perigosas'); assert.ok(Object.getPrototypeOf(m) === Object.prototype);
     }

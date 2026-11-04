@@ -56,6 +56,39 @@ export const DIALOGS = {
     { when: { done: 'coracao_de_cristal' }, text: 'Ainda cheiro cristal nas suas botas. Sente-se, querido, tenho chá. E se achar baús pelo caminho, abra-os.' },
     { text: 'As ervas do bosque não colhem sozinhas. Se encontrar baús pelo caminho, abra-os: nunca se sabe o que guardam.' },
   ], service: null },
+  // ---- Mentores de especialização (Porto de Marfim, data/mentors.js): a fala explica a especialização; o painel do diálogo mostra as habilidades e o botão de escolha (ui.js) ----
+  mentor_paladin: { greet: [
+    { when: { classId: 'warrior' }, text: 'Escudo erguido, fé firme. O Paladino segura a linha para que o grupo avance: o Grito de Guerra dura mais e ampara aliados, a Investida é curta e dá escudo a quem está perto. Menos brilho, mais muralha.' },
+    { text: 'Sou Sir Aurelion, e carrego a muralha do grupo. O caminho do escudo é de guerreiros; o seu é outro, mas honro quem protege.' },
+  ], service: null },
+  mentor_berserker: { greet: [
+    { when: { classId: 'warrior' }, text: 'Sem escudo, sem medo! O Berserker empunha as duas mãos e luta melhor quanto menos vida tem: Golpe Giratório e Investida muito mais fortes. Quem se esconde atrás de ferro não sente a fúria.' },
+    { text: 'Grumak! Eu golpear forte, eu sangrar, eu vencer. Isso é caminho de guerreiro. Você ter outro? Tudo bem. Grumak respeita.' },
+  ], service: null },
+  mentor_arcane: { greet: [
+    { when: { classId: 'mage' }, text: 'Precisão e controle, jovem. O Arcano atravessa fileiras com o projétil arcano, atordoa com a Nova Arcana e vai e volta num Teleporte mais longo. Cada gesto é um cálculo.' },
+    { text: 'Velyra, a serviço da trama arcana. A arte do controle é dos magos; a sua escola é outra, mas toda magia nasce do mesmo silêncio.' },
+  ], service: null },
+  mentor_warlock: { greet: [
+    { when: { classId: 'mage' }, text: 'Ah, uma alma curiosa... O Bruxo vive do frio do eco: maldições que corroem, gelo que prende e a vida dos inimigos escorrendo para você. Não é para os de estômago fraco.' },
+    { text: 'Morvain, às ordens das sombras. O caminho do frio é de magos. O seu é outro? Pois guarde os arrepios para si.' },
+  ], service: null },
+  mentor_sniper: { greet: [
+    { when: { classId: 'archer' }, text: 'Respire, mire, solte. A Franco-atiradora vê longe e acerta mais: flecha perfurante, tiro certeiro e alcance que nenhuma presa imagina. Um disparo, uma história.' },
+    { text: 'Lyra. Sou do alcance, e o alcance é dos arqueiros. Seu caminho é outro; ainda assim, mire alto.' },
+  ], service: null },
+  mentor_gunslinger: { greet: [
+    { when: { classId: 'archer' }, text: 'Rajada, granada e rolamento! O Pistoleiro dispara a besta de repetição em leque, joga explosivos e some num rolamento duplo. Perto ou longe, ninguém dorme. Tem fogo, tem estilo!' },
+    { text: 'Dom Cálix, para servi-lo! Besta de repetição é coisa de arqueiro. Você segue outro caminho? Pois que seja com estilo!' },
+  ], service: null },
+  mentor_guardian: { greet: [
+    { when: { classId: 'cleric' }, text: 'A luz cuida de quem fica ao lado. A Guardiã cura em área, ergue escudo sobre todos os aliados e traz de volta a esperança com a Palavra de Salvação e a Intervenção Celestial. Ninguém cai sozinho.' },
+    { text: 'Irmã Aurora, a serviço da luz. Esse caminho é de clérigos. O seu é outro, mas a luz alcança todos.' },
+  ], service: null },
+  mentor_inquisitor: { greet: [
+    { when: { classId: 'cleric' }, text: 'A luz também sabe queimar. O Inquisidor julga, marca o culpado para sofrer mais dano e purifica com chama sagrada, até o Livro do Veredito. A fé como sentença.' },
+    { text: 'Valdor, inquisidor. A sentença sagrada é caminho de clérigos. O seu é outro? Que a sua consciência o julgue com justiça.' },
+  ], service: null },
   // ---- Porto de Marfim (zona `harbor`): `service.panel` é o painel que a UI deve abrir (ver docs/gameplay/porto.md) ----
   banker: { greet: [
     { when: { done: 'porto_chegada' }, text: 'O primeiro item no cofre é sempre o mais difícil de largar. Os outros, o senhor guarda de olhos fechados.' },

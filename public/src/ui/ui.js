@@ -1,6 +1,7 @@
 import { CLASSES, STAT_KEYS, STAT_NAMES } from '../data/classes.js';
 import { SKILLS } from '../data/skills.js';
-import { isSkillUnlocked, skillUnlockLevel } from '../core/unlocks.js';
+import { isSkillUnlocked, skillUnlockLevel, skillIdAt, kitIds } from '../core/unlocks.js';
+import { describeSkill, describeBasic, describeSpec, describeKit } from '../core/skilltext.js';
 import { skillOf, specsOf, specInfo, activeSpec, basicOf, sealsOf, SPEC_LEVEL, SEAL_PRICE } from '../core/specs.js';
 import { SHIELD_CLASSES, SLOTS, SLOT_NAMES, SLOT_ICONS, RARITY, RARITIES, WEAPON_TYPES, STAT_LABELS, PERCENT_STATS, INVENTORY_SIZE } from '../data/items.js';
 import { SPIRITS, MAX_SPIRITS } from '../data/spirits.js';
@@ -22,10 +23,12 @@ import { DIALOGS, TIPS } from '../data/dialogs.js';
 import { ZONES, WORLD_ROUTE, WORLD_NODES, teleportCost } from '../data/zones.js';
 import { CRYPT, ECHO_RECIPES, ECHO_NAMES } from '../data/crypt.js';
 import { cryptEntryCheck, ownsEcho } from '../core/echo.js';
-import { offeredBy, readyFor, activeFor, serviceFor, questGiverId, spiritEvoStatus, dailyBoard, dailyState, dailyProgressOf, dailyComplete, dayUTC, titleText, achievementProgress, ensureJournal, greetFor, LORE_ZONES, loreSeen, loreCount, tipSeen } from '../core/journal.js';
+import { offeredBy, readyFor, activeFor, serviceFor, questGiverId, spiritEvoStatus, dailyBoard, dailyState, dailyProgressOf, dailyComplete, dayUTC, titleText, achievementProgress, ensureJournal, greetFor, LORE_ZONES, loreSeen, loreCount, tipSeen, mentorSeen } from '../core/journal.js';
+import { MENTOR_BY_ID, mentorsOfClass, MENTOR_SQUARE } from '../data/mentors.js';
 import { SCALE_MIN, SCALE_MAX, resolveScale } from '../prefs.js';
 import { asset } from '../assets-version.js';
 import { zoneHasCycle, isNight } from '../core/daycycle.js';
+import { PHOENIX } from '../core/phoenix.js';
 import { currentHour } from '../render/sky.js';
 
 // posições (%) dos nós no mapa-múndi: zigue-zague seguindo WORLD_ROUTE (serve para qualquer número de zonas)
@@ -69,7 +72,7 @@ const NPC_EMBLEM = { shop: `<img src="${asset('assets/icons/item/res-gold-coin.w
 // NPCs do Porto e mestres de classe usam o retrato do NPC/classe de que a arte foi derivada (mesmos apelidos de render/npc-sprites.js), com a cor ajustada.
 const NPC_FACE = { banker: ['sage', 70], hunter: ['guard', 80], dealer: ['merchant', 0], duelist: ['arena', 0], captain: ['guard', 150] };
 const npcEmblem = (id) => {
-  const m = /^master_(warrior|mage|archer|cleric)$/.exec(id), face = NPC_FACE[id];
+  const m = /^master_(warrior|mage|archer|cleric)$/.exec(id) ?? (MENTOR_BY_ID[id] && [0, MENTOR_BY_ID[id].classId]), face = NPC_FACE[id]; // mentor: retrato da classe dele
   const html = m ? classPortrait(m[1], '⚔')
     : ['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith'].includes(id) ? npcPortrait(id)
     : face ? npcPortrait(face[0]).replace('<img ', face[1] ? `<img style="filter:hue-rotate(${face[1]}deg)" ` : '<img ')
@@ -115,6 +118,7 @@ export class UI {
     this.cache = new Map();
     this.layer = $('panel-layer');
     this.tooltip = $('tooltip');
+    this.skillCard = document.getElementById('skill-card') ?? (() => { const d = document.createElement('div'); d.id = 'skill-card'; d.className = 'hidden'; document.body.appendChild(d); return d; })(); // cartão de segurar-para-explicar (toque)
     this.screen = $('screen');
 
     document.addEventListener('click', (e) => {
@@ -123,7 +127,7 @@ export class UI {
       e.preventDefault();
       // No toque não existe "passar o mouse": o 1º toque num item mostra os detalhes, o 2º executa a ação.
       const tip = el.dataset.tip;
-      if (game.touch?.active && tip?.startsWith('item:') && this.armedTip !== tip) {
+      if (game.touch?.active && tip?.startsWith('item:') && this.armedTip !== tip && !this.selecting()) { // no modo Selecionar o toque marca direto (sem passo de detalhes)
         this.armedTip = tip;
         this.showTooltip(tip, e);
         return;
@@ -288,18 +292,25 @@ export class UI {
     const cls = CLASSES[char.classId];
     $('hud-portrait').innerHTML = classPortrait(char.classId, cls.icon); // busto pintado da classe
     $('hud-portrait').style.setProperty('--cc', cls.color);
+    this.buildSkillbar(char);
+  }
+
+  // Barra de habilidades: as 4 vêm do kit da especialização (nível 15+) ou do kit base da classe; a moldura leva a cor da especialização.
+  buildSkillbar(char) {
+    const cls = CLASSES[char.classId], kit = kitIds(char), spec = activeSpec(char), sc = spec ? specInfo(char.classId, spec)?.color : null;
+    this.kitSig = char.classId + ':' + (spec ?? '');
     const slots = [
       { key: 'LMB', id: 'basic', icon: attackImg(char.classId, '🖱️'), art: true, tip: 'skill:basic' },
-      ...cls.skills.map((s, i) => ({ key: String(i + 1), id: 's' + i, icon: skillImg(s, SKILLS[s].icon), art: true, cat: skillCategory(skillOf(char.classId, null, s)), tip: 'skill:' + s })),
-      { key: '4', id: 's3', icon: skillImg(cls.mastery, SKILLS[cls.mastery].icon), art: true, cat: skillCategory(skillOf(char.classId, null, cls.mastery)), tip: 'skill:' + cls.mastery }, // Maestria
+      ...kit.slice(0, 3).map((s, i) => ({ key: String(i + 1), id: 's' + i, icon: skillImg(s, SKILLS[s].icon), art: true, cat: skillCategory(skillOf(char.classId, null, s)), tip: 'skill:' + s, spec: sc })),
+      { key: '4', id: 's3', icon: skillImg(kit[3], SKILLS[kit[3]].icon), art: true, cat: skillCategory(skillOf(char.classId, null, kit[3])), tip: 'skill:' + kit[3], spec: sc }, // Maestria
       { key: 'Q', id: 'potion', icon: iconImg(POTION_ICON, '🧪'), art: true, tip: 'potion' },
     ];
     $('skillbar').innerHTML = slots.map((s) => `
-      <div class="slot${s.art ? ' art' : ''}${s.medal ? ' medal' : ''}" id="slot-${s.id}" data-tip="${s.tip}">
+      <div class="slot${s.art ? ' art' : ''}${s.medal ? ' medal' : ''}" id="slot-${s.id}" data-tip="${s.tip}"${s.spec ? ` style="--spec:${s.spec};box-shadow:0 0 0 2px ${s.spec}, 0 0 8px ${s.spec}66"` : ''}>
         <span class="icon">${s.icon}</span>${s.cat ? `<i class="cat cat-${s.cat}" title="${CATEGORIES[s.cat]}"></i>` : ''}<span class="key">${s.key}</span>
         <div class="cd"></div><span class="cdt"></span>${s.id === 'potion' ? '<span class="count" id="potion-count"></span>' : ''}
       </div>`).join('') + '<div class="slot spirit" id="slot-spirit" data-tip="spirit-active"><span class="icon" id="spirit-icon"></span><span class="key">P</span></div>';
-    preloadSkillIcons([...cls.skills, cls.mastery], char.classId);
+    preloadSkillIcons(kit, char.classId);
     this.cache.clear();
   }
 
@@ -315,6 +326,24 @@ export class UI {
     else node.style.setProperty(prop, value);
   }
 
+  // Rastreador de missão (linha curta no HUD) + botão da auto-viagem (core/autopath.js; estado em game.guide / game.auto).
+  updateTracker(game) {
+    const el = $('qtrack');
+    if (!el) return;
+    const gd = game.guide, au = game.auto, show = !!gd?.tk && (game.mode === 'explore' || game.inNetZone?.());
+    let html = '';
+    if (show) {
+      const m = Math.round((gd.dist ?? 0) / 40 / 5) * 5; // 40 px = 1 m; arredondado de 5 em 5 para o texto não tremer
+      const where = !gd.goal ? '' : gd.goal.portal ? `Rumo a ${esc(ZONES[gd.goal.nextZone].name)}${gd.goal.hops > 1 ? ` (${gd.goal.hops} mapas)` : ''}` : `${gd.target.label ? esc(gd.target.label) + ' · ' : ''}${m} m`;
+      const btn = !gd.goal ? '' : !au ? '<button class="qt-btn" data-action="auto-go">Ir até lá</button>'
+        : au.paused ? '<button class="qt-btn" data-action="auto-resume">Continuar</button><button class="qt-btn stop" data-action="auto-stop" aria-label="Cancelar">✕</button>'
+        : '<button class="qt-btn stop" data-action="auto-stop">Parar</button>';
+      const state = au?.paused ? `<em class="warn">Auto-viagem pausada${au.paused === 'combat' ? ': combate' : au.paused === 'blocked' ? ': caminho bloqueado' : ''}</em>` : au ? '<em class="go">Auto-viagem…</em>' : where ? `<em>${where}</em>` : '';
+      html = `<div class="qt-txt" data-action="toggle" data-arg="journal"><b>${esc(gd.tk.name)}</b><span>${esc(gd.tk.text)}</span>${state}</div>${btn}`;
+    }
+    if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; el.classList.toggle('hidden', !html); }
+  }
+
   updateHud(game) {
     const { char, player, world } = game;
     if (!player) return;
@@ -325,6 +354,7 @@ export class UI {
       const txt = cr ? cryptHudText(cr) : !rp || rp.alive ? '' : rp.omen ? 'O chão estremece…' : rp.cool > 0 ? `Ritual em repouso · ${Math.ceil(rp.cool / 60)} min` : `Ritual ${rp.have}/${rp.need}`;
       if (rit.dataset.t !== txt) { rit.dataset.t = txt; rit.textContent = txt; rit.classList.toggle('hidden', !txt); }
     }
+    this.updateTracker(game);
     this.set('hud-name', 'text', char.name + (titleText(char) ? ' · ' + titleText(char) : ''));
     this.set('hud-level', 'text', `Nv ${char.level}`);
     this.set('hud-hp', 'width', `${(100 * player.hp) / player.maxHp}%`);
@@ -344,7 +374,8 @@ export class UI {
 
     const cdOf = { basic: player.cds.basic, s0: player.cds.s0, s1: player.cds.s1, s2: player.cds.s2, s3: player.cds.s3 ?? 0, potion: game.potionCd };
     const maxOf = { basic: basicOf(char.classId, activeSpec(char)).cd / player.stats.atkSpeed, potion: 8 };
-    [...CLASSES[char.classId].skills, CLASSES[char.classId].mastery].forEach((s, i) => { maxOf['s' + i] = skillOf(char.classId, activeSpec(char), s).cd; });
+    if (this.kitSig !== char.classId + ':' + (activeSpec(char) ?? '')) this.buildSkillbar(char); // escolheu/trocou a especialização: a barra passa ao novo kit
+    kitIds(char).forEach((s, i) => { maxOf['s' + i] = skillOf(char.classId, activeSpec(char), s).cd; });
     for (const id of Object.keys(cdOf)) {
       const cd = cdOf[id];
       const pct = cd > 0 ? Math.min(1, cd / maxOf[id]) : 0;
@@ -464,7 +495,7 @@ export class UI {
     if (id === 'character') this.specMaster = anchor === 'master'; // aberto pelo Mestre de Classe: o Selo de Reespecialização está à venda
     if (id === 'map') this.mapSel = null; // o mapa sempre abre selecionando onde você está
     this.open.add(id);
-    if (id === 'shop') { this.shopAnchor = anchor ?? null; this.shopTab = 'buy'; if (anchor === 'smith') this.open.delete('inventory'); else this.open.add('inventory'); } // Ferreiro só aprimora: sem mochila ao lado (tocar nela venderia) // título: Ferreiro Brok (anchor 'smith') ou Mercador do Porto ('harbor')
+    if (id === 'shop') { this.shopAnchor = anchor ?? null; this.selMode = false; this.sel = new Set(); if (anchor === 'smith') this.open.delete('inventory'); else this.open.add('inventory'); } // Ferreiro só aprimora: sem mochila ao lado (tocar nela venderia) // título: Ferreiro Brok (anchor 'smith') ou Mercador do Porto ('harbor')
     if (id === 'bank') this.open.add('inventory'); // mochila ao lado: tocar nela deposita
     this.render();
     if (anchor && anchor !== 'smith') { const go = () => this.layer.querySelector(`#${anchor}-section`)?.scrollIntoView({ block: 'start' }); go(); requestAnimationFrame(go); }
@@ -478,11 +509,16 @@ export class UI {
   closePanels() { this.hideTooltip(); this.open.clear(); this.render(); }
   // Modo venda: loja da Vila ou do Porto aberta (o Ferreiro não compra nem vende itens)
   sellMode() { return this.isOpen('shop') && this.shopAnchor !== 'smith'; }
+  // Seleção múltipla para vender vários itens de uma vez (botão Selecionar na mochila ao lado da loja). Equipados nunca estão na mochila, logo nunca entram.
+  selecting() { return this.sellMode() && !!this.selMode; }
+  selItems() { const set = this.sel ?? new Set(); return this.game.char.inventory.filter((i) => set.has(i.id)); }
+  toggleSel(id) { this.sel ??= new Set(); if (this.sel.has(id)) this.sel.delete(id); else if (this.game.char.inventory.some((i) => i.id === id)) this.sel.add(id); this.render(); }
+  markSel(maxRarity) { this.sel = new Set([...(this.sel ?? []), ...this.game.char.inventory.filter((i) => RARITY[i.rarity].index <= maxRarity && !needsSellConfirm(i)).map((i) => i.id)]); this.render(); }
 
   render() {
     this.hideTooltip();
     document.body.classList.toggle('panel-open', this.open.size > 0); // avisos ficam por baixo dos painéis (V10)
-    const order = ['character', 'arena', 'party', 'dialog', 'journal', 'map', 'sage', 'shop', 'bank', 'board', 'spirits', 'inventory', 'options'];
+    const order = ['character', 'arena', 'party', 'dialog', 'journal', 'map', 'sage', 'shop', 'bank', 'board', 'skills', 'spirits', 'inventory', 'options'];
     // Refazer o HTML a cada +1 ponto/ação fazia a janela "piscar" (a animação de abrir tocava de novo) e voltar ao topo: guardamos a rolagem e só animamos o que acabou de abrir.
     const pid = (el) => [...el.classList].find((c) => c.startsWith('p-'));
     const prev = new Map([...this.layer.querySelectorAll('.panel')].map((el) => [pid(el), el.querySelector('.body')?.scrollTop ?? 0]));
@@ -508,17 +544,29 @@ export class UI {
   }
 
   panel_inventory() {
-    const { char } = this.game;
+    const { char } = this.game, selecting = this.selecting(), sel = this.sel ?? new Set();
     const cells = [];
     for (let i = 0; i < INVENTORY_SIZE; i++) {
       const it = char.inventory[i];
-      cells.push(it ? this.itemCell(it, 'item', it.id) : '<div class="cell empty"></div>');
+      let c = it ? this.itemCell(it, 'item', it.id) : '<div class="cell empty"></div>';
+      if (selecting && it && sel.has(it.id)) c = c.replace('class="cell ', 'class="cell sel ').replace(/<\/div>$/, '<span class="selmk" aria-hidden="true">✓</span></div>');
+      cells.push(c);
     }
-    const hint = this.sellMode() ? 'Toque em um item para <b>vender</b>.' : this.isOpen('bank') ? 'Toque em um item para <b>guardar no banco</b>.' : 'Toque para equipar · atributos em Personagem.';
+    const hint = selecting ? 'Toque nos itens para <b>marcar</b> ou desmarcar.' : this.sellMode() ? 'Toque em um item para <b>vender</b>.' : this.isOpen('bank') ? 'Toque em um item para <b>guardar no banco</b>.' : 'Toque para equipar · atributos em Personagem.';
     return this.frame('inventory', `Inventário <small>${char.inventory.length}/${INVENTORY_SIZE}</small>`, `
+      ${this.sellMode() ? this.selBar() : ''}
       <div class="inv-grid">${cells.join('')}</div>
       <div class="inv-foot"><span class="inv-gold" title="Ouro (vai direto para a mochila)">${COIN}<b>${char.gold}</b></span><span class="inv-res">${POT} ${char.potions}</span><span class="inv-res">${SCROLL} ${char.scrolls ?? 0}</span><span class="hint">${hint}</span></div>
       <div class="row-btns"><button class="btn small" data-action="sort-inv">Ordenar</button></div>`);
+  }
+
+  // Barra de venda em lote (só com a loja aberta): Selecionar liga o modo; marcar/limpar/vender atuam sobre a seleção.
+  selBar() {
+    if (!this.selecting()) return '<div class="sel-bar"><button class="btn small" data-action="sel-toggle">Selecionar vários</button></div>';
+    const list = this.selItems(), gold = list.reduce((t, i) => t + this.game.sellPrice(i), 0);
+    return `<div class="sel-bar"><div class="sel-count"><b>${list.length}</b> marcado${list.length === 1 ? '' : 's'} · ${COIN} <b>${gold}</b></div>
+      <div class="row-btns"><button class="btn small" data-action="sel-mark" data-arg="0">Marcar comuns</button><button class="btn small" data-action="sel-mark" data-arg="1">Marcar até incomum</button><button class="btn small" data-action="sel-clear">Limpar</button></div>
+      <div class="row-btns"><button class="btn small primary" data-action="sell-selected" ${list.length ? '' : 'disabled'}>Vender selecionados</button><button class="btn small" data-action="sel-toggle">Sair</button></div></div>`;
   }
 
   panel_character() {
@@ -551,6 +599,7 @@ export class UI {
       <h3>Atributos ${char.statPoints ? `<span class="pts">${char.statPoints} pontos livres</span>` : ''}</h3>
       ${char.statPoints ? '<div class="row-btns"><button class="btn small" data-action="alloc-auto">Distribuir automático</button></div>' : ''}
       ${stats}
+      <div class="row-btns"><button class="btn small" data-action="toggle" data-arg="skills">Habilidades</button></div>
       ${this.specBlock(char)}
       </div></div>`);
   }
@@ -567,9 +616,56 @@ export class UI {
     const cards = Object.entries(list).map(([id, sp]) => `
       <div class="shop-item ${char.spec === id ? 'sel' : ''}"><div class="cell r-epic"><span class="ic">${sp.icon}</span></div>
         <div><div class="nm">${sp.name}${char.spec === id ? ' ✔' : ''}</div><div class="sub">${sp.desc}</div></div>
-        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}" ${has && !seals ? 'disabled' : ''}>${has ? 'Trocar · 1 Selo' : 'Escolher'}</button>`}</div>`).join('');
+        ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}" ${has && !seals ? 'disabled' : ''}>${has ? 'Trocar · 1 Selo' : 'Escolher'}</button>`}</div>
+      ${this.skillCards(id)}`).join('');
     const rule = has ? `<p class="hint">Trocar consome 1 Selo de Reespecialização. Você tem <b>${seals}</b>.</p>` : '<p class="hint">A primeira escolha é grátis. Trocar depois exige um Selo de Reespecialização.</p>';
     return `<h3 id="master-section">Especialização ${char.spec ? `<span class="pts">${specInfo(char.classId, char.spec).name}</span>` : '<span class="pts">escolha uma</span>'}</h3>${rule}${cards}${buy}`;
+  }
+
+  // ---- explicação das habilidades (texto gerado em core/skilltext.js) ----
+  skillOpts() { const c = this.game.char; let power; try { power = c ? computeStats(c).power : undefined; } catch { power = undefined; } return { power, level: c?.level }; }
+  skillLinesHtml(d) {
+    const rows = d.lines.map((l) => `<div class="sk-row"><span>${esc(l.k)}</span><b>${esc(l.v)}</b></div>`).join('');
+    const sp = d.spec.length ? `<div class="sk-spec"><div class="sk-h">${esc(d.specName ? 'Nesta especialização · ' + d.specName : 'Nesta especialização')}</div>${d.spec.map((l) => `<div class="sk-row"><span>${esc(l.k)}</span><b>${esc(l.v)}</b></div>`).join('')}</div>` : '';
+    return rows + sp;
+  }
+  skillHead(d, art = true) {
+    const ic = d.id === 'basic' ? attackImg(this.game.char?.classId, d.icon) : skillImg(d.art ?? d.id, d.icon);
+    return `<div class="sk-ic">${art ? ic : esc(d.icon)}</div><div class="sk-t"><div class="nm">${esc(d.name)}</div><div class="sub">${esc(d.type)}</div></div>`;
+  }
+  // Habilidades de uma especialização com a explicação (telas de escolha e mentores): <details> abre ao toque, sem script.
+  skillCards(specId, classId = this.game.char?.classId) {
+    const char = this.game.char, sp = char && describeSpec(classId, specId, this.skillOpts());
+    if (!sp || !sp.skills.length && !sp.mods.length) return '';
+    const mods = sp.mods.length ? `<div class="sk-mods">${sp.mods.map((m) => `<i>${esc(m)}</i>`).join('')}</div>` : '';
+    const list = sp.skills.map((d) => `<details class="sk-card"><summary>${this.skillHead(d)}</summary><p class="sk-sum">${esc(d.summary)}</p>${this.skillLinesHtml(d)}</details>`).join('');
+    return `<div class="sk-cards">${mods}${list}</div>`;
+  }
+  // Cartão flutuante do segurar-para-explicar (idx 0..3 = slots; -1 = ataque básico). Não conjura nada.
+  showSkillCard(idx) {
+    const char = this.game.char;
+    if (!char) return;
+    const o = this.skillOpts(), spec = activeSpec(char), cls = CLASSES[char.classId];
+    const d = idx < 0 ? describeBasic(char.classId, spec, o) : describeSkill(char.classId, spec, skillIdAt(char.classId, idx, spec), o);
+    if (!d) return;
+    this.skillCard.innerHTML = `<div class="sk-top">${this.skillHead(d)}</div><p class="sk-sum">${esc(d.summary)}</p>${this.skillLinesHtml(d)}${d.unlock?.locked ? `<div class="sk-lock">${LOCK} ${esc(d.unlock.text)}</div>` : ''}`;
+    this.skillCard.classList.remove('hidden');
+  }
+  hideSkillCard() { this.skillCard?.classList.add('hidden'); }
+
+  panel_skills() {
+    const char = this.game.char, spec = activeSpec(char), o = this.skillOpts();
+    const kit = describeKit(char.classId, spec, o);
+    const cards = kit.map((d) => {
+      const lock = d.unlock?.locked ? `<div class="sk-lock">${LOCK} ${esc(d.unlock.text)}</div>` : '';
+      return `<details class="sk-card${d.unlock?.locked ? ' locked' : ''}"><summary>${this.skillHead(d)}${d.unlock?.locked ? `<span class="sk-badge">${LOCK} Nv ${d.unlock.level}</span>` : ''}</summary>
+        <p class="sk-sum">${esc(d.summary)}</p>${lock}${this.skillLinesHtml(d)}</details>`;
+    }).join('');
+    const si = spec ? describeSpec(char.classId, spec, o) : null;
+    const specSec = si
+      ? `<h3>Especialização <span class="pts">${esc(si.name)}</span></h3><p class="hint">${esc(si.desc)}</p>${si.mods.length ? `<div class="sk-mods">${si.mods.map((m) => `<i>${esc(m)}</i>`).join('')}</div>` : ''}`
+      : `<h3>Especialização</h3><p class="hint">${char.level < SPEC_LEVEL ? `${LOCK} Libera no nível ${SPEC_LEVEL}: duas escolhas que ajustam suas habilidades.` : 'Você ainda não escolheu. Veja as opções no painel Personagem.'}</p>`;
+    return this.frame('skills', 'Habilidades', `<p class="hint">Toque numa habilidade para ver tudo. No jogo, segure o botão dela para ler sem conjurar.</p>${cards}${specSec}`);
   }
 
   panel_spirits() {
@@ -599,15 +695,13 @@ export class UI {
       <div class="sp-list">${list}</div>`);
   }
 
-  // Lojas de itens (Mercadora Lia na Vila, Mercador do Porto): abas Comprar / Vender. O Ferreiro Brok não vende nem compra (panel_smith).
+  // Lojas de itens (Mercadora Lia na Vila, Mercador do Porto): painel único; estoque aqui, mochila ao lado (tocar vende; "Selecionar vários" vende em lote). O Ferreiro Brok não vende nem compra (panel_smith).
   panel_shop() {
     if (this.shopAnchor === 'smith') return this.panel_smith();
-    const harbor = this.shopAnchor === 'harbor', sell = this.shopTab === 'sell';
-    const tab = (id, label) => `<button class="btn small ${(sell ? 'sell' : 'buy') === id ? 'primary' : ''}" data-action="shop-tab" data-arg="${id}">${label}</button>`;
+    const harbor = this.shopAnchor === 'harbor';
     return this.frame('shop', harbor ? 'Mercador do Porto' : 'Mercadora Lia', `
       <p class="npc-line">${npcEmblem(harbor ? 'dealer' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e compro seus itens por 60% do valor."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
-      <div class="shop-tabs">${tab('buy', 'Comprar')}${tab('sell', 'Vender')}</div>
-      ${sell ? this.sellTab(harbor) : this.buyTab(harbor)}`);
+      ${this.buyTab(harbor)}`);
   }
 
   buyTab(harbor) {
@@ -628,28 +722,11 @@ export class UI {
         <div><div class="nm">Pergaminho de Viagem</div><div class="sub">Teletransporte a mapa visitado · tem ${char.scrolls ?? 0}</div></div>
         <div class="btn-col"><button class="btn small" data-action="buy-scroll" data-arg="1">1 · ${COIN} ${price('scroll')}</button>
         <button class="btn small" data-action="buy-scroll" data-arg="3">3 · ${COIN} ${price('scroll') * 3}</button></div></div>
+      <div class="shop-item"><div class="cell r-legendary"><span class="ic"><img class="it-img" src="${asset('assets/icons/item/item-amulet.webp')}" alt="🔥" draggable="false"></span></div>
+        <div><div class="nm">${PHOENIX.name}</div><div class="sub">Ao cair num mapa de caça, é gasto e evita perder ouro e XP · tem ${char.phoenix ?? 0}/${PHOENIX.max}</div></div>
+        <div class="btn-col"><button class="btn small" data-action="buy-phoenix" data-arg="1">1 · ${COIN} ${PHOENIX.price}</button>
+        <button class="btn small" data-action="buy-phoenix" data-arg="3">3 · ${COIN} ${PHOENIX.price * 3}</button></div></div>
       <h3>${harbor ? 'Estoque do dia' : 'Equipamentos'}</h3>${stock}`;
-  }
-
-  // Aba Vender: seção Itens (preço e botão Vender em cada linha), Materiais (só informativo: não se vendem) e venda em massa por raridade.
-  sellTab(harbor) {
-    const { char } = this.game, inv = char.inventory;
-    const rows = inv.map((it) => {
-      const ask = needsSellConfirm(it);
-      return `<div class="shop-item sell-row">${this.itemCell(it, 'sell', it.id)}
-        <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level} · ${COIN} <b>${this.game.sellPrice(it)}</b>${ask ? ' · pede confirmação' : ''}</div></div>
-        <button class="btn small" data-action="sell" data-arg="${it.id}">Vender</button></div>`;
-    }).join('') || '<p class="empty-msg">Sua mochila está vazia.</p>';
-    const mat = (icon, name, n) => `<div class="shop-item"><div class="cell r-common"><span class="ic">${icon}</span></div><div><div class="nm">${name}</div><div class="sub">Você tem ${n}</div></div><span class="tag dim">Não se vende</span></div>`;
-    const img = (f, alt) => `<img class="it-img" src="${asset(`assets/icons/item/${f}.webp`)}" alt="${alt}" draggable="false">`;
-    const bulk = (n, label) => {
-      const list = inv.filter((i) => RARITY[i.rarity].index <= n), gold = list.reduce((t, i) => t + this.game.sellPrice(i), 0);
-      return `<button class="btn small" data-action="sell-bulk" data-arg="${n}" ${list.length ? '' : 'disabled'}>${label}${list.length ? ` · ${list.length} · ${COIN} ${gold}` : ''}</button>`;
-    };
-    return `<h3>Itens <span class="pts">${inv.length}/${INVENTORY_SIZE}${harbor ? ' · 60%' : ' · 50%'}</span></h3>${rows}
-      <h3>Materiais</h3>${mat(img('res-potion-health', '🧪'), 'Poção de Vida', char.potions)}${mat(img('res-scroll', '📜'), 'Pergaminho de Viagem', char.scrolls ?? 0)}${mat(img('res-eco-fragment', ''), 'Fragmento de Eco', char.echo?.frags ?? 0)}
-      <h3>Vender em massa</h3><div class="row-btns">${bulk(0, 'Todos Comuns')}${bulk(1, 'Comuns + Incomuns')}</div>
-      <p class="hint">Épico ou melhor (e itens Opala/Eco) sempre pedem confirmação.</p>`;
   }
 
   // Ferreiro Brok: SÓ fortalece (aprimorar +N) e forja o Eco. Não vende nem compra itens (isso é da Lia e do Mercador do Porto).
@@ -747,14 +824,31 @@ export class UI {
     const more = (offeredBy(char, npc.id, { server: !!g.online }).length > (offer ? 1 : 0)) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
     const S = serviceFor(char, D); // serviço do Mestre de Classe só aparece para a própria classe
     const svc = S ? `<button class="btn wide" data-action="dialog-service" data-arg="${S.panel}">${S.label}</button>` : '';
+    const mentor = MENTOR_BY_ID[npc.id];
+    if (mentor) { const mb = this.mentorBlock(char, mentor); body += mb.body; foot += mb.act; } // o botão de escolher fica no rodapé fixo
     const say = (Array.isArray(text) ? text : [text]).map(esc).join('<br>'); // `done` pode ser uma lista de falas (epílogo)
     // texto e lista rolam; recompensa e botões ficam num rodapé fixo, sempre visível (epílogos longos)
     return this.frame('dialog', npc.name, `<div class="dlg-scroll"><p class="npc-line">${npcEmblem(npc.id)}"${say}"</p>${body}${more}</div><div class="dlg-foot">${foot}${svc}</div>`);
   }
 
+  // Mentor de especialização: o que a especialização faz (descrição e habilidades) e, para a classe dele, o botão de escolher (mesmas regras do painel Personagem).
+  mentorBlock(char, m) {
+    const info = specInfo(m.classId, m.spec), own = char.classId === m.classId;
+    if (!info) return { body: '', act: '' };
+    let act;
+    if (!own) act = `<p class="hint">Esta é uma especialização de ${esc(CLASSES[m.classId].name)}. Conversar aqui não muda nada na sua classe.</p>`;
+    else if (char.spec === m.spec) act = '<p class="hint">✔ Esta é a sua especialização.</p>';
+    else if (char.level < SPEC_LEVEL) act = `<p class="hint">${LOCK} Libera no nível ${SPEC_LEVEL} (você está no ${char.level}).</p>`;
+    else if (char.quests?.done?.prova_do_mestre == null) act = `<p class="hint">${LOCK} Falta a Prova do Mestre, com o Mestre da sua classe na Vila (inclui conversar com os dois mentores da sua classe).</p>`;
+    else { const has = !!specInfo(char.classId, char.spec); act = `<button class="btn primary wide" data-action="spec" data-arg="${m.spec}" ${has && !sealsOf(char) ? 'disabled' : ''}>${has ? 'Trocar · 1 Selo' : 'Escolher esta especialização'}</button>`; }
+    return { body: `<h3>${info.icon} ${esc(info.name)} <span class="pts">${esc(CLASSES[m.classId].name)}</span></h3><p class="hint">${esc(info.desc)}</p>${this.skillCards(m.spec, m.classId)}`, act };
+  }
+
   questLines(char, id) {
     const q = QUESTS[id], a = char.quests.active[id];
-    return '<ul class="qlist">' + q.objectives.map((o, i) => { const max = o.count ?? 1, v = a?.p[i] ?? 0; return `<li class="${v >= max ? 'done' : ''}">${esc(o.label)} <b>${v}/${max}</b>${o.type === 'pvp' || o.type === 'coop' ? ' <small>(contado pelo servidor)</small>' : ''}</li>`; }).join('') + '</ul>';
+    // conversa com mentores: mostra quem já foi visto e onde fica a praça
+    const who = (o) => o.type === 'talk' ? ` <small>${mentorsOfClass(char.classId).map((m) => `${mentorSeen(char, m.id) || (char.spec && specInfo(char.classId, char.spec)) ? '✔ ' : ''}${esc(m.short)}`).join(' · ')} · ${MENTOR_SQUARE}, Porto de Marfim</small>` : '';
+    return '<ul class="qlist">' + q.objectives.map((o, i) => { const max = o.count ?? 1, v = a?.p[i] ?? 0; return `<li class="${v >= max ? 'done' : ''}">${esc(o.label)} <b>${v}/${max}</b>${o.type === 'pvp' || o.type === 'coop' ? ' <small>(contado pelo servidor)</small>' : ''}${who(o)}</li>`; }).join('') + '</ul>';
   }
 
   // nomes dos NPCs que dão missões (gerados de QUESTS + NPCs da Vila): "A, B e C"
@@ -770,7 +864,9 @@ export class UI {
     ensureJournal(char);
     const act = Object.keys(char.quests.active);
     const missions = act.length ? act.map((id) => `<div class="shop-item quest-card"><div class="qtxt"><div class="nm">${esc(QUESTS[id].name)}</div>${this.questLines(char, id)}<div class="sub">${esc(QUESTS[id].text.progress)}</div></div>
-      <button class="btn small" data-action="quest-abandon" data-arg="${id}">Abandonar</button></div>`).join('') : `<p class="hint">Nenhuma missão ativa. Converse com ${this.questGiverNames()}.</p>`;
+      <div class="btn-col"><button class="btn small primary" data-action="quest-go" data-arg="${id}">Ir até lá</button>
+      <button class="btn small${g.trackId === id || (!g.trackId && g.guide?.id === id) ? ' on' : ''}" data-action="quest-track" data-arg="${id}">${g.trackId === id || (!g.trackId && g.guide?.id === id) ? 'Rastreada ✔' : 'Rastrear'}</button>
+      <button class="btn small" data-action="quest-abandon" data-arg="${id}">Abandonar</button></div></div>`).join('') : `<p class="hint">Nenhuma missão ativa. Converse com ${this.questGiverNames()}.</p>`;
     const done = Object.keys(char.quests.done).length;
     const ach = ACHIEVEMENTS.map((a) => { const p = achievementProgress(char, a); return `<div class="shop-item ${p.earned ? '' : 'locked'}"><div class="cell ${p.earned ? 'r-epic' : ''}"><span class="ic">${p.earned ? TROPHY : LOCK_CELL}</span></div>
       <div><div class="nm">${esc(a.name)}</div><div class="sub">${esc(a.desc)} ${p.earned ? '' : `(${p.value}/${p.min})`}</div></div>
@@ -806,7 +902,7 @@ export class UI {
     const seen = id === 'town' || !!vis[id], cost = teleportCost(id), scrolls = c.scrolls ?? 0, net = g.inNetZone?.();
     const lv = z.level ? `Nv ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : 'zona segura';
     const boss = z.boss ? `Chefe: ${esc(MOBS[z.boss.id].name)}` : z.miniboss ? `Mini-chefe: ${esc(z.miniboss.name)}` : '';
-    const info = [lv, boss, z.chests ? `${z.chests.length} baús` : ''].filter(Boolean).join(' · ');
+    const info = [lv, boss, z.chests ? `${z.chests.length} baús` : '', id === 'harbor' ? `${MENTOR_SQUARE}: mentores das especializações` : ''].filter(Boolean).join(' · ');
     let act;
     if (id === here) act = `<span class="tag">${HERE} Você está aqui</span>`;
     else if (!seen) act = `<span class="tag dim">${LOCK} Ainda não visitado: chegue lá a pé, pelo portal de ${esc(ZONES[WORLD_ROUTE[Math.max(0, i - 1)]].name)}.</span>`;
@@ -933,14 +1029,10 @@ export class UI {
       return it ? this.itemTooltip(it) : null;
     }
     if (kind === 'skill') {
-      if (arg === 'basic') {
-        const b = basicOf(char.classId, activeSpec(char));
-        return `<div class="tt-name">Ataque básico</div><div class="tt-sub">Botão esquerdo · segure para atacar</div>
-          <div>${b.kind === 'melee' ? 'Golpe corpo a corpo em arco' : 'Projétil à distância'} · ${Math.round(b.mult * 100)}% do poder</div>`;
-      }
-      const s = skillOf(char.classId, activeSpec(char), arg);
-      return `<div class="tt-name">${skillImg(arg, s.icon, 'tt-ic')} ${s.name}</div><div class="tt-sub">Recarga ${s.cd}s · <span class="tt-cat cat-${skillCategory(s)}">${CATEGORIES[skillCategory(s)]}</span></div><div>${s.desc}</div>
-        ${s.mult ? `<div class="tt-stat">${Math.round(s.mult * 100)}% do poder${s.ticks ? ` × ${s.ticks}` : ''}</div>` : ''}`;
+      const d = arg === 'basic' ? describeBasic(char.classId, activeSpec(char), this.skillOpts()) : describeSkill(char.classId, activeSpec(char), arg, this.skillOpts());
+      if (!d) return null;
+      const sub = arg === 'basic' ? esc(d.type) : `<span class="tt-cat cat-${skillCategory(skillOf(char.classId, activeSpec(char), arg))}">${esc(d.type)}</span>`;
+      return `<div class="tt-name">${arg === 'basic' ? '' : skillImg(arg, d.icon, 'tt-ic')} ${esc(d.name)}</div><div class="tt-sub">${sub}</div><div>${esc(d.summary)}</div>${this.skillLinesHtml(d)}${d.unlock?.locked ? `<div class="tt-req">${esc(d.unlock.text)}</div>` : ''}`;
     }
     if (kind === 'potion') return `<div class="tt-name">${iconImg(POTION_ICON, '🧪', 'tt-ic')} Poção de Vida</div><div>Cura 35% da vida. Recarga 8s.</div><div class="tt-sub">Você tem ${char.potions}. Desativada no duelo PvP.</div>`;
     if (kind === 'spirit-active') {
@@ -978,6 +1070,7 @@ export class UI {
     else if (this.isOpen('bank')) action = this.game.char.bank?.some((b) => b.id === it.id) ? `${again} para retirar` : `${again} para guardar no banco`;
     else if (this.isOpen('shop') && this.shopAnchor === 'smith') action = ''; // no Ferreiro o item equipado só é aprimorado
     else if (equipped) action = `${again} para desequipar`;
+    else if (this.selecting()) action = this.game.touch?.active ? '' : 'Clique para marcar ou desmarcar';
     else if (this.sellMode()) action = `${again} para vender por ${COIN} ${this.game.sellPrice(it)}`;
     else if (ok.ok) action = `${again} para equipar`;
     return `<div class="tt-name${it.opal ? ' opal-name' : ''}" style="color:${R.color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="tt-sub">${sub}</div>${plusLine}${lines}

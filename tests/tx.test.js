@@ -598,3 +598,59 @@ test('Berserker sem escudo: respec devolve o escudo à mochila, equip de escudo 
   const pal = runTx(back, { op: 'respec', id: 'paladin' }, ctx).doc;
   assert.equal(runTx(pal, { op: 'equip', id: 'esc1' }, ctx).doc.equipment.offhand.id, 'esc1');
 });
+
+// ---------- venda em lote por lista de ids (modo Selecionar da loja) ----------
+test('protocolo: sell_bulk aceita raridade (n) OU lista de ids (1..30, sem repetidos, sem n junto)', () => {
+  assert.deepEqual(TX({ op: 'sell_bulk', n: 1, shop: 'harbor' }).msg, { t: 'tx', op: 'sell_bulk', req: 0, n: 1, shop: 'harbor' });
+  assert.deepEqual(TX({ op: 'sell_bulk', ids: ['a1', 'b2'], shop: 'town' }).msg, { t: 'tx', op: 'sell_bulk', req: 0, ids: ['a1', 'b2'], shop: 'town' });
+  assert.equal(TX({ op: 'sell_bulk', ids: [] }).ok, false, 'lista vazia');
+  assert.equal(TX({ op: 'sell_bulk', ids: Array.from({ length: 31 }, (_, i) => 'i' + i) }).ok, false, 'mais de 30');
+  assert.equal(TX({ op: 'sell_bulk', ids: Array.from({ length: 30 }, (_, i) => 'i' + i) }).ok, true);
+  assert.equal(TX({ op: 'sell_bulk', ids: ['a', 'a'] }).ok, false, 'repetido');
+  assert.equal(TX({ op: 'sell_bulk', ids: ['../x'] }).ok, false, 'id inválido');
+  assert.equal(TX({ op: 'sell_bulk', ids: 'a1' }).ok, false);
+  assert.equal(TX({ op: 'sell_bulk', ids: ['a1'], n: 1 }).ok, false, 'lista e raridade juntas');
+  assert.equal(TX({ op: 'sell_bulk' }).ok, false, 'sem nada');
+});
+
+test('runTx sell_bulk com ids: vende só os marcados pelo preço do servidor; item fora da mochila (ou equipado) recusa tudo', () => {
+  const doc = newOfficialCharacter('Lote', 'warrior');
+  const stock = buildShopStock(doc); doc.gold = 1e6;
+  const ctx = { rng: makeRng(2), now: Date.now() };
+  let d = doc;
+  for (const it of stock.slice(0, 3)) d = runTx(d, { op: 'buy_item', id: it.id, shop: 'town' }, ctx).doc;
+  const [a, b, c3] = d.inventory.map((i) => i.id);
+  d.equipment = { ...(d.equipment ?? {}) }; const eq = d.inventory.pop(); d.equipment[eq.slot] = eq; // c3 vira equipado
+  const before = d.gold;
+  const r = runTx(d, { op: 'sell_bulk', ids: [a, b], shop: 'town' }, ctx);
+  assert.equal(r.summary.count, 2); assert.equal(r.doc.inventory.length, 0);
+  assert.equal(r.doc.gold, before + r.summary.pay); assert.ok(r.summary.pay > 0);
+  assert.ok(Object.values(r.doc.equipment).some((i) => i.id === eq.id), 'equipado intacto');
+  assert.throws(() => runTx(d, { op: 'sell_bulk', ids: [a, eq.id], shop: 'town' }, ctx), /não está na mochila/, 'equipado nunca vende');
+  assert.throws(() => runTx(d, { op: 'sell_bulk', ids: [a, 'fantasma'], shop: 'town' }, ctx), TxError);
+  assert.throws(() => runTx(d, { op: 'sell_bulk', ids: [a, a], shop: 'town' }, ctx), /inválida/);
+  assert.equal(d.inventory.length, 2, 'original intacto'); void c3;
+  const bulkRar = runTx(d, { op: 'sell_bulk', n: 5, shop: 'town' }, ctx); // o modo por raridade continua valendo
+  assert.equal(bulkRar.summary.count, 2);
+});
+
+// ---------- mentores de especialização ----------
+test('tx mentor_talk: só no Porto; grava o bit, avança o objetivo talk da Prova do Mestre e é idempotente por mentor', async () => {
+  const { acceptQuest, mentorsTalked, mentorSeen, isComplete } = await import('../public/src/core/journal.js');
+  assert.equal(placeProblem('mentor_talk', { inZone: false, hubAt: null }), 'not_here', 'não vale na Vila');
+  assert.equal(placeProblem('mentor_talk', { inZone: false, hubAt: 'harbor' }), null);
+  assert.equal(placeProblem('mentor_talk', { inZone: true, hubAt: 'harbor' }), 'not_here');
+  assert.equal(TX({ op: 'mentor_talk', id: 'mentor_paladin' }).ok, true);
+  const doc = newOfficialCharacter('Aluno', 'warrior'); doc.level = 15;
+  assert.ok(acceptQuest(doc, 'prova_do_mestre').ok);
+  const ctx = { rng: makeRng(3), now: Date.now() };
+  assert.throws(() => runTx(doc, { op: 'mentor_talk', id: 'mentor_nada' }, ctx), /inexistente/);
+  const ask = (d, id) => runTx(d, { op: 'mentor_talk', id }, ctx).doc;
+  let d = ask(doc, 'mentor_arcane'); // mentor de OUTRA classe: só curiosidade, a Prova não avança
+  assert.ok(mentorSeen(d, 'mentor_arcane')); assert.equal(mentorsTalked(d), 0); assert.deepEqual(d.quests.active.prova_do_mestre.p.slice(2), [0]);
+  d = ask(d, 'mentor_paladin'); assert.equal(mentorsTalked(d), 1); assert.equal(d.quests.active.prova_do_mestre.p[2], 1);
+  d = ask(d, 'mentor_paladin'); assert.equal(d.quests.active.prova_do_mestre.p[2], 1, 'repetir o mesmo mentor não soma');
+  d = ask(d, 'mentor_berserker'); assert.equal(d.quests.active.prova_do_mestre.p[2], 2);
+  assert.equal(isComplete(d, 'prova_do_mestre'), false, 'ainda faltam o mini-chefe e a assinatura');
+  assert.equal(doc.stats.mentors, 0, 'original intacto');
+});

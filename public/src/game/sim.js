@@ -102,6 +102,7 @@ export class World {
     this.projectiles = [];
     this.areas = [];
     this.telegraphs = [];
+    this.queue = []; // ações adiadas (mira do franco-atirador, rajadas em sequência): { t, src, fn }
     this.drops = [];
     this.fx = [];
     this.particles = [];
@@ -285,6 +286,7 @@ export class World {
     this.separate();
     this.updateProjectiles(dt);
     this.updateAreas(dt);
+    this.updateQueue(dt);
     this.updateTelegraphs(dt);
     if (prune) this.actors = this.actors.filter((a) => !(a.dead && a.deadT > 0.6 && a.kind !== 'player'));
     this.updateVisuals(dt);
@@ -298,6 +300,11 @@ export class World {
     if (a.shieldT > 0) { a.shieldT -= dt; if (a.shieldT <= 0) a.shield = 0; }
     a.slowT = Math.max(0, a.slowT - dt);
     a.stunT = Math.max(0, a.stunT - dt);
+    if (a.markT > 0) { a.markT -= dt; if (a.markT <= 0) a.markAmt = 0; } // Marca (Martelo Sagrado, Marca da Pena...)
+    if (a.chg) for (const k in a.chg) { // Rolamento Duplo: janela da 2ª esquiva; sem usar, a recarga cheia começa quando a janela fecha
+      const c = a.chg[k];
+      if (c && (c.t -= dt) <= 0) { a.cds[k] = Math.max(a.cds[k], c.cd); a.chg[k] = null; }
+    }
     const bn = a.burn;
     if (bn) { // queimadura do Meteoro Arcano
       bn.t -= dt; bn.next -= dt;
@@ -312,7 +319,7 @@ export class World {
     if (a.stunT > 0) {
       a.moving = false;
       // só a Intervenção Divina (`castStunned`) rompe o atordoamento: remove o efeito e é lançada na hora
-      if (it.cast === 3 && a.cds.s3 <= 0 && isSkillUnlocked(a, 3) && skillOf(a.classId, a.spec, skillIdAt(a.classId, 3)).castStunned) this.castSkill(a, 3, it.aimX ?? a.x, it.aimY ?? a.y);
+      if (it.cast === 3 && a.cds.s3 <= 0 && isSkillUnlocked(a, 3) && skillOf(a.classId, a.spec, skillIdAt(a.classId, 3, a.spec)).castStunned) this.castSkill(a, 3, it.aimX ?? a.x, it.aimY ?? a.y);
       return;
     }
     if (a.dash) { this.stepDash(a, dt); return; }
@@ -321,7 +328,7 @@ export class World {
     const len = Math.hypot(mx, my);
     if (len > 0.01) {
       mx /= len; my /= len;
-      const sp = a.stats.moveSpeed * a.speedMul * (it.spd ?? 1) * (a.slowT > 0 ? 1 - a.slowAmt : 1);
+      const sp = a.stats.moveSpeed * a.speedMul * (it.spd ?? 1) * (a.slowT > 0 ? 1 - a.slowAmt : 1) * (a.buffs.length ? 1 + this.buffVal(a, 'move') : 1);
       this.moveActor(a, mx * sp * dt, my * sp * dt);
       a.moving = true;
       a.walk += dt * sp / 28;
@@ -441,7 +448,7 @@ export class World {
 
   basicAttack(a, ax, ay) {
     const b = this.basicSpec(a);
-    a.cds.basic = b.cd / (a.stats.atkSpeed || 1);
+    a.cds.basic = b.cd / ((a.stats.atkSpeed || 1) * (a.buffs.length ? 1 + this.buffVal(a, 'as') : 1));
     a.swing = 0.25;
     a.lastCombat = this.time;
     const ang = Math.atan2(ay - a.y, ax - a.x);
@@ -460,13 +467,14 @@ export class World {
     }
   }
 
-  spawnProjectile(a, ang, spec) {
+  spawnProjectile(a, ang, spec, from = a) { // from: origem do tiro (o espectro do Pacto Sombrio atira da posição dele, com o dano do dono)
+    const off = from === a ? a.r + 4 : 6;
     this.projectiles.push({
-      x: a.x + Math.cos(ang) * (a.r + 4), y: a.y + Math.sin(ang) * (a.r + 4),
+      x: from.x + Math.cos(ang) * off, y: from.y + Math.sin(ang) * off,
       vx: Math.cos(ang) * spec.speed, vy: Math.sin(ang) * spec.speed, ang,
       team: a.team, src: a, mult: spec.mult, radius: spec.radius ?? 6, color: spec.color ?? '#fff',
       range: spec.range ?? 500, traveled: 0, pierce: !!spec.pierce, explode: spec.explode ?? 0,
-      stun: spec.stun ?? 0, burn: spec.burn ?? null, hit: new Set(), dead: false, only: spec.only ?? null, // only: acerta só este alvo (tiro de spirit não machuca quem está no caminho)
+      stun: spec.stun ?? 0, burn: spec.burn ?? null, mark: spec.mark ?? null, hit: new Set(), dead: false, only: spec.only ?? null, // only: acerta só este alvo (tiro de spirit não machuca quem está no caminho)
     });
   }
 
@@ -474,10 +482,21 @@ export class World {
     const key = 's' + idx;
     if (a.cds[key] > 0 || a.dash) return false;
     if (!isSkillUnlocked(a, idx)) return false; // habilidade ainda não aprendida (a de Maestria exige nível 25 + missão): a intenção é ignorada (vale para cliente, servidor e rival)
-    const id = skillIdAt(a.classId, idx);
+    const id = skillIdAt(a.classId, idx, a.spec); // o kit da especialização (nível 15+) ocupa os slots
     if (!id) return false;
     const s = skillOf(a.classId, a.spec, id); // com os ajustes da especialização
+    if (s.cost?.hp) { // habilidade que custa vida (Frenesi, Pacto Sombrio): nunca mata quem a usa
+      const pay = a.maxHp * s.cost.hp;
+      if (a.hp <= pay + 1) return false;
+      a.hp -= pay;
+      this.addText({ x: a.x, y: a.y - a.r - 14, t: 0, life: 0.9, text: '-' + Math.round(pay), size: 15, color: '#ff6b6b' });
+    }
     a.cds[key] = s.cd;
+    if (s.twice) { // duas cargas (Rolamento Duplo): a 1ª recarrega em "gap"; a 2ª (dentro da janela) inicia a recarga cheia
+      const c = (a.chg ??= {});
+      if (c[key] && c[key].t > 0) c[key] = null;
+      else { c[key] = { t: s.twice.window, cd: s.cd }; a.cds[key] = s.twice.gap; }
+    }
     a.swing = 0.3;
     a.lastCombat = this.time;
     const ang = Math.atan2(ay - a.y, ax - a.x);
@@ -488,7 +507,7 @@ export class World {
       case 'aoe_self':
         this.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius, color: s.color, t: 0, life: 0.45 });
         for (const e of this.enemiesOf(a)) {
-          if (Math.hypot(e.x - a.x, e.y - a.y) <= s.radius + e.r) { this.damage(a, e, s.mult, { slow: s.slow, slowDur: s.slowDur, stun: s.stun }); if (s.burn) this.applyBurn(a, e, s.burn); }
+          if (Math.hypot(e.x - a.x, e.y - a.y) <= s.radius + e.r) { this.damage(a, e, s.mult, { slow: s.slow, slowDur: s.slowDur, stun: s.stun }); if (s.burn) this.applyBurn(a, e, s.burn); if (s.mark) this.applyMark(e, s.mark); }
         }
         if (s.heal) {
           this.heal(a, a.maxHp * s.heal);
@@ -496,8 +515,10 @@ export class World {
         }
         this.burst(a.x, a.y, s.color, 22, 220);
         break;
-      case 'dash':
-        a.dash = { vx: cos * s.speed, vy: sin * s.speed, t: s.dist / s.speed, mult: s.mult, stun: s.stun, hit: new Set(), invuln: !!s.invuln, color: s.color, slam: s.slam ?? null };
+      case 'dash': {
+        const dir = s.back ? -1 : 1; // Recuo Tático: impulso para trás
+        const dist = s.jump ? Math.max(90, Math.min(s.dist, Math.hypot(ax - a.x, ay - a.y))) : s.dist; // Salto Brutal: cai no cursor (até o alcance)
+        a.dash = { vx: cos * s.speed * dir, vy: sin * s.speed * dir, t: dist / s.speed, mult: s.mult, stun: s.stun, hit: new Set(), invuln: !!s.invuln, color: s.color, slam: s.slam ?? null, knock: s.knock ?? 0 };
         if (s.aegis) for (const al of this.alliesOf(a, s.aegis.range)) { // Investida do Paladino: escudo curto para aliados por perto
           al.shield = Math.max(al.shield, al.maxHp * s.aegis.shield); al.shieldT = Math.max(al.shieldT, 4);
           this.events.push({ type: 'status', actor: al, kind: 'shield', dur: 4, skill: id, from: a, t: this.time });
@@ -507,10 +528,11 @@ export class World {
           this.events.push({ type: 'status', actor: a, kind: 'buff', dur: s.dur, skill: id, t: this.time });
         }
         break;
+      }
       case 'meteor': { // área telegrafada: o impacto cai depois de `delay` s e queima (resolvido em updateTelegraphs)
         const d = Math.min(s.range, Math.hypot(ax - a.x, ay - a.y));
         castTarget = { x: a.x + cos * d, y: a.y + sin * d };
-        this.telegraphs.push({ x: castTarget.x, y: castTarget.y, r: s.radius, t: 0, delay: s.delay, src: a, mult: s.mult, color: s.color, stun: s.stun, burn: s.burn ?? null, always: true });
+        this.telegraphs.push({ x: castTarget.x, y: castTarget.y, r: s.radius, t: 0, delay: s.delay, src: a, mult: s.mult, color: s.color, stun: s.stun, burn: s.burn ?? null, mark: s.mark ?? null, slow: s.slow, slowDur: s.slowDur, always: true });
         this.events.push({ type: 'telegraph', x: castTarget.x, y: castTarget.y, r: s.radius, delay: s.delay, color: s.color });
         break;
       }
@@ -520,12 +542,16 @@ export class World {
           const self = t === a;
           t.stunT = 0; t.slowT = 0;
           this.heal(t, t.maxHp * s.heal * (self ? 1 : s.allyHeal));
-          t.shield = Math.max(t.shield, t.maxHp * s.shieldPct * (self ? 1 : s.allyHeal)); t.shieldT = Math.max(t.shieldT, s.dur);
-          this.events.push({ type: 'status', actor: t, kind: 'shield', dur: s.dur, skill: id, t: this.time });
+          if (s.shieldPct) {
+            t.shield = Math.max(t.shield, t.maxHp * s.shieldPct * (self ? 1 : s.allyHeal)); t.shieldT = Math.max(t.shieldT, s.dur);
+            this.events.push({ type: 'status', actor: t, kind: 'shield', dur: s.dur, skill: id, t: this.time });
+          }
+          if (s.buff) t.buffs.push({ id, t: s.dur, ...s.buff }); // Intervenção Celestial: -50% de dano por "dur"
           if (!self) this.addFx({ type: 'ring', x: t.x, y: t.y, r: 50, color: s.color, t: 0, life: 0.6, follow: t });
         }
         this.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius, color: s.color, t: 0, life: 0.7 });
         this.burst(a.x, a.y, s.color, 30, 240);
+        if (s.mult) for (const e of this.enemiesOf(a)) if (Math.hypot(e.x - a.x, e.y - a.y) <= s.radius + e.r) this.damage(a, e, s.mult, s.stun ? { stun: s.stun } : undefined);
         break;
       }
       case 'buff':
@@ -545,22 +571,73 @@ export class World {
             this.addFx({ type: 'ring', x: best.x, y: best.y, r: 50, color: s.color, t: 0, life: 0.5, follow: best });
           }
         }
+        if (s.groupShield) for (const al of this.alliesOf(a, s.groupShield.range)) { // Escudo Divino Reforçado: todos os aliados por perto
+          al.shield = Math.max(al.shield, al.maxHp * s.buff.shieldPct * s.groupShield.pct); al.shieldT = Math.max(al.shieldT, s.dur);
+          this.events.push({ type: 'status', actor: al, kind: 'shield', dur: s.dur, skill: id, from: a, t: this.time });
+          this.addFx({ type: 'ring', x: al.x, y: al.y, r: 50, color: s.color, t: 0, life: 0.5, follow: al });
+        }
         this.addFx({ type: 'ring', x: a.x, y: a.y, r: 60, color: s.color, t: 0, life: 0.5, follow: a });
         this.burst(a.x, a.y, s.color, 16, 120);
         break;
-      case 'projectile':
-        if (s.volley > 1) { // rajada em leque (Pistoleiro)
-          for (let i = 0; i < s.volley; i++) this.spawnProjectile(a, ang + (i - (s.volley - 1) / 2) * (s.spread ?? 0.15), s);
-        } else this.spawnProjectile(a, ang, s);
+      case 'projectile': {
+        const fire = () => {
+          if (s.volley > 1) { // rajada em leque (Pistoleiro)
+            for (let i = 0; i < s.volley; i++) this.spawnProjectile(a, ang + (i - (s.volley - 1) / 2) * (s.spread ?? 0.15), s);
+          } else this.spawnProjectile(a, ang, s);
+        };
+        if (s.windup) { // mira carregada (Franco-atirador): anda devagar enquanto mira; atordoamento cancela o tiro
+          a.slowT = Math.max(a.slowT, s.windup); a.slowAmt = Math.max(a.slowAmt, 0.6);
+          this.queue.push({ t: s.windup, src: a, fn: fire });
+        } else fire();
+        for (let w = 1; w < (s.waves ?? 1); w++) this.queue.push({ t: w * s.waveEvery, src: a, fn: fire }); // Saraivada: rajadas em sequência
         break;
+      }
       case 'ground_aoe': {
         const d = Math.min(s.range, Math.hypot(ax - a.x, ay - a.y));
         castTarget = { x: a.x + cos * d, y: a.y + sin * d };
-        this.areas.push({ x: a.x + cos * d, y: a.y + sin * d, r: s.radius, ticks: s.ticks, interval: s.interval, next: 0.2, src: a, mult: s.mult, color: s.color, t: 0, slow: s.slow, slowDur: s.slowDur });
+        this.areas.push({ x: a.x + cos * d, y: a.y + sin * d, r: s.radius, ticks: s.ticks, interval: s.interval, next: 0.2, src: a, mult: s.mult, color: s.color, t: 0, slow: s.slow, slowDur: s.slowDur, leech: s.leech });
         break;
       }
+      case 'cone': { // golpe em leque à frente (Machadada em Arco, Chama Purificadora)
+        this.addFx({ type: 'slash', x: a.x, y: a.y, ang, arc: s.arc, r: s.range, t: 0, life: 0.28, color: s.color });
+        this.burst(a.x + cos * s.range * 0.6, a.y + sin * s.range * 0.6, s.color, 16, 200);
+        for (const e of this.enemiesOf(a)) {
+          if (Math.hypot(e.x - a.x, e.y - a.y) <= s.range + e.r && Math.abs(angDiff(Math.atan2(e.y - a.y, e.x - a.x), ang)) <= s.arc / 2 + 0.15) {
+            this.damage(a, e, s.mult, { stun: s.stun });
+            if (s.burn && !e.dead) this.applyBurn(a, e, s.burn);
+            if (s.mark && !e.dead) this.applyMark(e, s.mark);
+          }
+        }
+        break;
+      }
+      case 'channel': // Drenar Vida: canaliza no inimigo mais próximo e devolve parte do dano como vida
+        this.areas.push({ kind: 'channel', x: a.x, y: a.y, r: s.range, ticks: s.ticks, interval: s.interval, next: 0.15, src: a, follow: a, mult: s.mult, color: s.color, t: 0, leech: s.leech });
+        break;
+      case 'summon': // Pacto Sombrio: espectros que orbitam o dono e atiram no inimigo mais próximo
+        this.areas.push({ kind: 'summon', x: a.x, y: a.y, r: s.range, ticks: Math.round(s.dur / s.interval), interval: s.interval, next: 0.3, src: a, follow: a, count: s.count ?? 1, spec: s, mult: s.mult, color: s.color, t: 0 });
+        this.addFx({ type: 'ring', x: a.x, y: a.y, r: 70, color: s.color, t: 0, life: 0.6, follow: a });
+        this.burst(a.x, a.y, s.color, 20, 170);
+        break;
+      case 'trap': { // Armadilha de Gelo: zona no chão; quem entra fica preso (uma vez por inimigo) e depois lento
+        const d = Math.min(s.range, Math.hypot(ax - a.x, ay - a.y));
+        castTarget = { x: a.x + cos * d, y: a.y + sin * d };
+        this.areas.push({ kind: 'trap', x: castTarget.x, y: castTarget.y, r: s.radius, ticks: Math.round(s.dur / s.interval), interval: s.interval, next: 0.1, src: a, mult: s.mult, color: s.color, t: 0, slow: s.slow, slowDur: s.slowDur, rootStun: s.rootStun, once: new Set() });
+        this.addFx({ type: 'ring', x: castTarget.x, y: castTarget.y, r: s.radius, color: s.color, t: 0, life: 0.5 });
+        break;
+      }
+      case 'zone': // Santuário do Sol: zona fixa que cura e protege aliados e queima inimigos
+        castTarget = { x: a.x, y: a.y };
+        this.areas.push({ kind: 'zone', x: a.x, y: a.y, r: s.radius, ticks: Math.round(s.dur / s.interval), interval: s.interval, next: 0.1, src: a, mult: s.mult, color: s.color, t: 0, zone: s.zone, zoneDur: s.interval * 1.6, zid: nextId++ });
+        this.addFx({ type: 'ring', x: a.x, y: a.y, r: s.radius, color: s.color, t: 0, life: 0.7 });
+        this.burst(a.x, a.y, s.color, 26, 220);
+        break;
       case 'blink': {
         const d = Math.min(s.dist, Math.hypot(ax - a.x, ay - a.y));
+        if (s.leave) { // Passo Fase: mina arcana no ponto de origem
+          const L = s.leave;
+          this.telegraphs.push({ x: a.x, y: a.y, r: L.radius, t: 0, delay: L.delay, src: a, mult: L.mult, color: s.color, stun: L.stun, burn: null, always: false });
+          this.events.push({ type: 'telegraph', x: a.x, y: a.y, r: L.radius, delay: L.delay, color: s.color });
+        }
         this.burst(a.x, a.y, s.color, 18, 160);
         a.x += cos * d; a.y += sin * d;
         this.collide(a);
@@ -583,6 +660,10 @@ export class World {
         if (!d.hit.has(e.id) && Math.hypot(e.x - a.x, e.y - a.y) < a.r + e.r + 14) {
           d.hit.add(e.id);
           this.damage(a, e, d.mult, { stun: d.stun });
+          if (d.knock && !e.boss && !e.dead) { // Investida do Escudo: empurra no sentido da investida
+            const sp = Math.hypot(d.vx, d.vy) || 1;
+            this.moveActor(e, d.vx / sp * d.knock, d.vy / sp * d.knock);
+          }
         }
       }
     }
@@ -593,7 +674,7 @@ export class World {
       if (sl) { // Fúria do Colosso: impacto em área ao chegar
         this.addFx({ type: 'ring', x: a.x, y: a.y, r: sl.radius, color: d.color, t: 0, life: 0.5 });
         this.burst(a.x, a.y, d.color, 30, 260);
-        for (const e of this.enemiesOf(a)) if (Math.hypot(e.x - a.x, e.y - a.y) <= sl.radius + e.r) this.damage(a, e, sl.mult, { stun: sl.stun });
+        for (const e of this.enemiesOf(a)) if (Math.hypot(e.x - a.x, e.y - a.y) <= sl.radius + e.r) { this.damage(a, e, sl.mult, { stun: sl.stun }); if (sl.burn && !e.dead) this.applyBurn(a, e, sl.burn); }
       }
     }
   }
@@ -601,7 +682,9 @@ export class World {
   // ---------- dano / cura ----------
   damage(src, t, mult, opts = {}) {
     if (!t || t.dead || t.untargetable || t.dash?.invuln) return 0;
+    if (t.buffs.length && this.buffVal(t, 'imm') > 0) return 0; // bloqueio total (Investida do Escudo)
     let blocked = false;
+    if (t.markT > 0 && !opts.reflect) mult *= 1 + t.markAmt; // alvo marcado recebe mais dano de qualquer fonte
     // Duelos entre heróis ficam mais longos e táticos.
     if (t.kind === 'player' || t.kind === 'rival') {
       if (src.kind === 'player' || src.kind === 'rival' || src.kind === 'spirit') mult *= PVP_DAMAGE;
@@ -620,9 +703,11 @@ export class World {
       mult *= 1 - BLOCK.reduce;
       blocked = true;
     }
-    const res = computeHit(this.rng,
-      { power: src.stats.power, crit: src.stats.crit, critMult: src.stats.critMult, dmgBonus: this.buffVal(src, 'dmg') + lowHpBonus(src) },
+    const critBuff = src.buffs.length ? this.buffVal(src, 'crit') : 0; // Recuo Tático: crítico garantido no próximo golpe
+    const res = opts.flat != null ? { amount: Math.max(1, Math.round(opts.flat)), crit: false } : computeHit(this.rng, // flat: dano fixo (reflexo de Aura/Barreira)
+      { power: src.stats.power, crit: src.stats.crit + critBuff, critMult: src.stats.critMult, dmgBonus: this.buffVal(src, 'dmg') + lowHpBonus(src) },
       { def: t.stats.def, dr: this.buffVal(t, 'dr') }, mult);
+    if (critBuff > 0 && !opts.dot) src.buffs = src.buffs.filter((b) => !b.once);
     let amt = res.amount;
     if (t.shield > 0) { const ab = Math.min(t.shield, amt); t.shield -= ab; amt -= ab; }
     t.hp -= amt;
@@ -632,7 +717,8 @@ export class World {
     src.lastCombat = this.time;
     if (src.kind === 'player' || src.kind === 'rival') { src.lastDealt = this.time; src.lastTarget = t.id; } // o spirit só ataca se o dono atacou ou foi atacado (não conta o dano do próprio spirit)
     if (t.kind === 'player' || t.kind === 'rival') t.lastAttacker = src.id;
-    if (src.stats.lifesteal > 0 && !src.dead) this.heal(src, res.amount * src.stats.lifesteal, true);
+    const ls = (src.stats.lifesteal || 0) + (src.buffs.length ? this.buffVal(src, 'ls') : 0);
+    if (ls > 0 && !src.dead && !opts.reflect) this.heal(src, res.amount * ls, true);
     if (opts.stun) t.stunT = Math.max(t.stunT, t.boss ? opts.stun * 0.3 : opts.stun);
     if (opts.slow) { t.slowT = opts.slowDur; t.slowAmt = t.boss ? opts.slow * 0.5 : opts.slow; }
     if (!t.boss) {
@@ -663,6 +749,10 @@ export class World {
       this.events.push({ type: 'death', actor: t, killer });
       if (t.kind === 'mob') this.onMobDeath(t);
       if (t.boss) for (const a of this.actors) if (a.summonedBy === t.id && !a.dead) { a.hp = 0; a.dead = true; a.deadT = 0; a.dash = null; } // os esbirros morrem com o chefe (sem evento: nada de XP/loot)
+      if (t.burn?.spread) this.spreadBurn(t); // Maldição: a praga salta para os vizinhos
+    } else if (!opts.reflect && !opts.dot && src !== t && t.buffs.length) {
+      const rf = this.buffVal(t, 'reflect'); // Aura de Bastião / Barreira Arcana: devolve parte do dano ao agressor
+      if (rf > 0 && !src.dead && src.kind !== 'spirit') this.damage(t, src, 0, { flat: res.amount * rf, reflect: true });
     }
     return res.amount;
   }
@@ -692,6 +782,7 @@ export class World {
           if (p.explode) { done = true; break; }
           this.damage(p.src, e, p.mult, { stun: p.stun });
           if (p.burn) this.applyBurn(p.src, e, p.burn);
+          if (p.mark && !e.dead) this.applyMark(e, p.mark);
           if (!p.pierce) done = true;
         }
       }
@@ -721,20 +812,88 @@ export class World {
   // Dano periódico (queimadura/veneno): renova, não acumula; o mesmo estado do Meteoro Arcano (`a.burn`).
   applyBurn(src, e, burn) {
     if (e.dead || e.untargetable) return;
-    e.burn = { t: burn.dur, every: burn.every, next: burn.every, mult: burn.mult, src };
+    e.burn = { t: burn.dur, every: burn.every, next: burn.every, mult: burn.mult, src, spread: burn.spread ?? 0 };
     this.events.push({ type: 'status', actor: e, kind: 'burn', dur: burn.dur, t: this.time });
+  }
+
+  // Marca: o alvo recebe +taken de dano por dur s (renova, não acumula).
+  applyMark(e, mark) {
+    if (e.dead || e.untargetable) return;
+    const keep = e.markT > 0 ? e.markAmt ?? 0 : 0;
+    e.markT = mark.dur; e.markAmt = Math.max(keep, mark.taken);
+    this.events.push({ type: 'status', actor: e, kind: 'mark', dur: mark.dur, t: this.time });
+  }
+
+  // Maldição do Bruxo: ao morrer amaldiçoado, a praga passa (sem encadear de novo) aos 2 inimigos mais próximos dentro do raio.
+  spreadBurn(t) {
+    const b = t.burn, near = [];
+    for (const e of this.enemiesOf(b.src)) { const d = Math.hypot(e.x - t.x, e.y - t.y); if (e !== t && d <= b.spread + e.r) near.push([d, e]); }
+    near.sort((p, q) => p[0] - q[0]);
+    for (const [, e] of near.slice(0, 2)) {
+      e.burn = { t: Math.max(1, b.t), every: b.every, next: b.every, mult: b.mult, src: b.src, spread: 0 };
+      this.events.push({ type: 'status', actor: e, kind: 'burn', dur: b.t, t: this.time });
+      this.burst(e.x, e.y, '#9ae06a', 10, 120);
+    }
+  }
+
+  // Ações adiadas (mira, rajadas): somem se quem as começou morreu ou foi atordoado.
+  updateQueue(dt) {
+    if (!this.queue.length) return;
+    const q = this.queue;
+    this.queue = [];
+    for (const it of q) {
+      it.t -= dt;
+      if (it.t > 0) { this.queue.push(it); continue; }
+      if (!it.src.dead && it.src.stunT <= 0) it.fn();
+    }
   }
 
   updateAreas(dt) {
     for (const ar of this.areas) {
       ar.t += dt;
       ar.next -= dt;
+      if (ar.follow) { // canalização e espectros acompanham o dono; morrer ou ser atordoado (canal) encerra
+        ar.x = ar.follow.x; ar.y = ar.follow.y;
+        if (ar.follow.dead || (ar.kind === 'channel' && ar.follow.stunT > 0)) { ar.ticks = 0; ar.next = -1; continue; }
+      }
       if (ar.next <= 0 && ar.ticks > 0) {
         ar.ticks--;
         ar.next = ar.interval;
+        if (ar.kind === 'channel') { // Drenar Vida: o inimigo mais próximo dentro do alcance
+          const e = this.nearestEnemy(ar.src, ar.r);
+          if (e) {
+            const got = this.damage(ar.src, e, ar.mult);
+            if (got > 0 && !ar.src.dead) this.heal(ar.src, got * ar.leech, true);
+            this.addFx({ type: 'ring', x: e.x, y: e.y, r: 34, color: ar.color, t: 0, life: 0.3, follow: e });
+            this.burst(e.x, e.y, ar.color, 6, 120);
+          }
+          continue;
+        }
+        if (ar.kind === 'summon') { // Pacto Sombrio: cada espectro atira no inimigo mais próximo
+          for (let k = 0; k < ar.count; k++) {
+            const ang0 = ar.t * 2.2 + k * (TAU / ar.count), sx = ar.x + Math.cos(ang0) * 46, sy = ar.y + Math.sin(ang0) * 30 - 24;
+            const e = this.nearestEnemy({ x: sx, y: sy, team: ar.src.team }, ar.r);
+            if (!e) continue;
+            this.spawnProjectile(ar.src, Math.atan2(e.y - sy, e.x - sx), ar.spec, { x: sx, y: sy });
+          }
+          continue;
+        }
+        if (ar.kind === 'zone') { // Santuário do Sol: aliados dentro (inclusive o dono) curam e ganham redução de dano renovada a cada tick
+          for (const al of this.actors) {
+            if (al.dead || al.team !== ar.src.team || (al.kind !== 'player' && al.kind !== 'rival') || Math.hypot(al.x - ar.x, al.y - ar.y) > ar.r + al.r) continue;
+            this.heal(al, al.maxHp * ar.zone.heal, true);
+            const b = al.buffs.find((x) => x.zid === ar.zid);
+            if (b) b.t = ar.zoneDur; else al.buffs.push({ id: 'zone', zid: ar.zid, t: ar.zoneDur, dr: ar.zone.dr });
+          }
+        }
         for (const e of this.actors) {
           if (e.dead || e.untargetable || e.team === ar.src.team) continue;
-          if (Math.hypot(e.x - ar.x, e.y - ar.y) <= ar.r + e.r) this.damage(ar.src, e, ar.mult, ar.slow ? { slow: ar.slow, slowDur: ar.slowDur } : undefined);
+          if (Math.hypot(e.x - ar.x, e.y - ar.y) <= ar.r + e.r) {
+            let opts = ar.slow ? { slow: ar.slow, slowDur: ar.slowDur } : undefined;
+            if (ar.rootStun && !ar.once.has(e.id)) { ar.once.add(e.id); opts = { ...opts, stun: ar.rootStun }; } // Armadilha: prende uma vez por inimigo
+            const got = this.damage(ar.src, e, ar.mult, opts);
+            if (ar.leech && got > 0 && !ar.src.dead) this.heal(ar.src, got * ar.leech, true); // Chuva de Almas
+          }
         }
         for (let i = 0; this.visuals && i < 8; i++) {
           const ang = this.vrng.next() * TAU, d = this.vrng.next() * ar.r;
@@ -755,7 +914,8 @@ export class World {
           this.burst(tg.x, tg.y, tg.color, 30, 260);
           for (const e of this.enemiesOf(tg.src)) {
             if (Math.hypot(e.x - tg.x, e.y - tg.y) <= tg.r + e.r) {
-              this.damage(tg.src, e, tg.mult, { stun: tg.stun ?? 0.5 });
+              this.damage(tg.src, e, tg.mult, { stun: tg.stun ?? 0.5, slow: tg.slow, slowDur: tg.slowDur });
+              if (tg.mark && !e.dead) this.applyMark(e, tg.mark);
               if (tg.burn && !e.dead) { // queimadura: dano periódico (renova, não acumula)
                 e.burn = { t: tg.burn.dur, every: tg.burn.every, next: tg.burn.every, mult: tg.burn.mult, src: tg.src };
                 this.events.push({ type: 'status', actor: e, kind: 'burn', dur: tg.burn.dur, t: this.time });

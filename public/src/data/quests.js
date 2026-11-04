@@ -2,6 +2,7 @@
 //   kill  {mob:'any'|id, zone:'any'|id}   boss {mob:'any'|id}   chest {zone:'any'|id}   spirit (ter N spirits)   level (alcançar o nível N)
 //   pvp {mode:'any'|1v1|2v2|4v4}   coop   ← estes dois são do SERVIDOR (só o servidor soma progresso; o cliente não consegue marcá-los)
 //   miniboss (abater mini-chefe)   skillUse {skill:'signature'|'any'}   spiritKill {spirit:id} (abates com aquele spirit ativo)
+//   talk {count} (conversar com os mentores de especialização da própria classe, no Porto: bits em stats.mentors, core/journal.js; o servidor conta)
 //   teleport (usar o teletransporte do mapa)   upgrade (aprimorar um equipamento no Ferreiro)   spiritStage (ter N spirits evoluídos, forma 2)
 // Cânone do arco final: 3 guardiões originais (Carvalho, Colosso, Guardião) e 2 reflexos (Ancião Gélido = gelo, Cavaleiro Rubro = brasa). `text.done` pode ser lista de falas (epílogo).
 // `giver` = NPC que oferece (e recebe a entrega, salvo `turnIn`). `after` = missão exigida antes. Recompensa: ouro, xp (×2,5 depois da curva de XP mais lenta), potions, items [{rarity}].
@@ -140,8 +141,8 @@ export const QUESTS = {
 Object.assign(QUESTS, {
   prova_do_mestre: {
     id: 'prova_do_mestre', name: 'Prova do Mestre', giver: 'master', level: 14, after: null,
-    text: { offer: 'Quem ensina a si mesmo tem um tolo por mestre. Prove-se: derrube um mini-chefe e mostre domínio da sua habilidade assinatura, dez vezes. Então falaremos de especialização.', progress: 'Um mini-chefe e dez usos da habilidade assinatura. Sem atalhos.', done: 'Está feito. Seu estilo agora tem nome e caminho. Abra o painel do personagem e escolha a especialização, com orgulho.' },
-    objectives: [{ type: 'miniboss', mob: 'any', count: 1, label: 'Derrote 1 mini-chefe' }, { type: 'skillUse', skill: 'signature', count: 10, label: 'Use a habilidade assinatura 10 vezes' }],
+    text: { offer: 'Quem ensina a si mesmo tem um tolo por mestre. Prove-se: um mini-chefe e dez usos da assinatura. E ouça os dois mentores da sua classe, na Praça dos Mestres de Estilo do Porto de Marfim. Então escolha o seu estilo.', progress: 'Um mini-chefe, dez usos da assinatura e a conversa com os dois mentores da sua classe, na Praça dos Mestres de Estilo (Porto de Marfim).', done: 'Está feito. Seu estilo agora tem nome e caminho. Abra o painel do personagem e escolha a especialização, com orgulho.' },
+    objectives: [{ type: 'miniboss', mob: 'any', count: 1, label: 'Derrote 1 mini-chefe' }, { type: 'skillUse', skill: 'signature', count: 10, label: 'Use a habilidade assinatura 10 vezes' }, { type: 'talk', count: 2, label: 'Converse com os 2 mentores da sua classe (Porto de Marfim)' }],
     reward: { gold: 500, xp: 3000, potions: 3 },
   },
   maestria: {

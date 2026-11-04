@@ -48,3 +48,4 @@ Lista viva e curta. Histórico completo (98 itens abertos antes desta revisão):
 - Opção "sempre dia": removida (dia e noite sempre ligados, 2026-11-03).
 - Itens de painéis "Ainda emoji/provisório" de B5 parte 2: absorvidos por arte nova do dono (acima).
 - Teste e2e `online-match` "grupo no jogo real": registrado como não-regressão; segue na lista "posso fazer" apenas para investigar a causa.
+- **Pedras de Retorno / Amuleto da Fênix / auto-viagem (2026-11-03):** feitos e testados em Node + navegador offline. Pendente: validar no navegador com `?api=` (instância online: `checkpoint_set`, `zone_respawn`, penalidade na queda), Pedra de Retorno na Cripta (hoje o checkpoint é automático por sala), arte própria da pedra (hoje a pedra rúnica do cenário + brilho de código), e a linha do Amuleto nos Materiais do inventário.

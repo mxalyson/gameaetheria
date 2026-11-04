@@ -286,7 +286,7 @@ test('Porto: spawn, portais, chegadas e NPCs livres de obstáculos e de água; 5
   for (const p of h.portals) clear(Lh, p, 40, 'portal do porto');
   for (const from of ['plains', 'ruins']) { const to = ZONES[from].portals.find((p) => p.to === 'harbor'); clear(Lh, { x: to.tx, y: to.ty }, 60, 'chegada no porto vinda de ' + from); }
   for (const n of h.npcs) { clear(Lh, n, 40, 'NPC ' + n.id); assert.ok(n.x > 40 && n.y > 40 && n.x < h.w - 40 && n.y < h.h - 40); }
-  assert.deepEqual(h.npcs.map((n) => n.role).sort(), ['bank', 'board', 'duel', 'harborshop', 'quest']);
+  assert.deepEqual(h.npcs.map((n) => n.role).sort(), ['bank', 'board', 'duel', 'harborshop', 'quest', ...Array(8).fill('mentor')].sort());
   for (let i = 0; i < h.npcs.length; i++) for (let j = i + 1; j < h.npcs.length; j++) assert.ok(Math.hypot(h.npcs[i].x - h.npcs[j].x, h.npcs[i].y - h.npcs[j].y) >= 120, `rótulos de ${h.npcs[i].id} e ${h.npcs[j].id} se sobrepõem`);
   for (const hs of h.houses) for (const q of [[hs.x, hs.y], [hs.x + hs.w, hs.y], [hs.x, hs.y + hs.h], [hs.x + hs.w, hs.y + hs.h]]) assert.ok(!Lh.rivers.some((rv) => nearRiver(rv, q[0], q[1], 20)), 'casa na água');
   for (const p of Lh.ponds) assert.ok(Lh.obstacles.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < p.rx), 'baía tem colisão');

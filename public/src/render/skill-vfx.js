@@ -19,8 +19,17 @@ const KIND = {
   holylight: 'sun', divineshield: 'bubble', judgement: 'beam',
   // Maestria: colossus e meteor têm desenho próprio; arrowstorm/intervention reaproveitam chuva/sol com mais tamanho e outra cor
   colossus: 'colossus', meteor: 'meteor', arrowstorm: 'rain', intervention: 'sun',
+  // Kits das especializações (data/kits.js): reaproveitam os efeitos acima (a cor sai da especialização); 'zone' é o anel de runas no chão (armadilha, santuário)
+  pal_hammer: 'muzzle', pal_aura: 'warcry', pal_rush: 'dashtrail', pal_sanctuary: 'zone',
+  bsk_leap: 'dashtrail', bsk_frenzy: 'warcry', bsk_cleave: 'muzzle', bsk_fury: 'warcry',
+  arc_prism: 'beam', arc_barrier: 'bubble', arc_phase: 'blink', arc_comet: 'meteor',
+  wl_curse: 'muzzle', wl_drain: 'frost', wl_pact: 'frost', wl_souls: 'rain',
+  sn_aim: 'muzzle', sn_trap: 'zone', sn_retreat: 'roll', sn_lethal: 'muzzle',
+  gs_fan: 'pierce', gs_grenade: 'muzzle', gs_roll2: 'roll', gs_barrage: 'pierce',
+  gd_light: 'sun', gd_ward: 'bubble', gd_word: 'sun', gd_celestial: 'sun',
+  inq_judge: 'beam', inq_mark: 'muzzle', inq_flame: 'muzzle', inq_verdict: 'meteor',
 };
-const LIFE = { colossus: 6.6, meteor: 1.9, crit: 0.32, absorb: 0.4, heal: 0.85, whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.45 };
+const LIFE = { zone: 6.4, colossus: 6.6, meteor: 1.9, crit: 0.32, absorb: 0.4, heal: 0.85, whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.45 };
 
 // ---- estilo (cores e família de partículas) por habilidade e por especialização ----
 const FAM = { fire: 0, ice: 1, arcane: 2, toxic: 3, holy: 4, nature: 5 };
@@ -158,7 +167,7 @@ export function spawnSkillVfx(world, ev) {
   const prev = lastPos.get(a), st = styleOf(ev.skill, a.spec);
   const f = {
     kind, skill: ev.skill, spec: a.spec ?? null, t0: world.time, life: s.vfxLife ?? (kind === 'bubble' || kind === 'warcry' ? Math.max(LIFE[kind], (s.dur ?? 0) + 0.4) : LIFE[kind]),
-    actor: a, x: a.x, y: a.y, ang: ev.ang ?? a.facing ?? 0, color: s.color, r: s.radius ?? 60,
+    actor: a, x: a.x, y: a.y, ang: ev.ang ?? a.facing ?? 0, color: s.color, r: s.radius ?? s.vfxR ?? 60,
     tx: ev.tx ?? null, ty: ev.ty ?? null, ox: prev ? prev.x : a.x, oy: prev ? prev.y : a.y,
     seed: ((world.time * 1000) | 0) ^ (a.id ?? 7), pts: kind === 'dashtrail' || kind === 'roll' || kind === 'colossus' ? [] : null, dur: s.dur ?? 0, range: s.range ?? 500,
     m: st.m, h: st.h, fam: st.fam, n: 0, acc: 0, mask: 0,
@@ -181,6 +190,7 @@ export function drawSkillProjectile(g, p, time) {
   else if (p.stun > 0 && p.radius >= 8) id = 'judgement';
   else if (cls === 'archer') id = p.radius >= 6 ? 'pierce' : 'basic_archer';
   else if (cls === 'mage') id = 'basic_mage';
+  else if (cls === 'cleric') id = 'judgement'; // Julgamento Ardente / Marca da Pena
   else return false;
   const st = id.startsWith('basic') ? (src.spec && SPEC[src.spec]) || BASE[id] : styleOf(id, src.spec);
   let rec = PT.get(p); if (!rec) { rec = { t: time }; PT.set(p, rec); }
@@ -241,7 +251,7 @@ export function drawSkillProjectile(g, p, time) {
 }
 
 // Corte do ataque básico corpo a corpo (efeito `slash` da simulação): meia-lua pintada que varre o arco.
-const SLASH_PAL = { '#ffe1d0': PL.amber, '#fff3b0': PL.holy };
+const SLASH_PAL = { '#ffe1d0': PL.amber, '#fff3b0': PL.holy, '#ffb199': PL.ember, '#ffc27a': PL.amber };
 export function drawBasicSlash(g, f) {
   const k = f.t / f.life, sc = (f.r * 0.98) / 96, sweep = (k - 0.5) * 0.7;
   if (!vfxKitReady()) return false;
@@ -281,6 +291,7 @@ export function drawSkillVfx(g, world, lite = false) {
       case 'rain': drawRain(g, f, el); break;
       case 'pierce': drawPierce(g, f, k, cx, cy); break;
       case 'sun': drawSun(g, f, k, el, cx, cy); break;
+      case 'zone': drawZone(g, f, el); break;
       case 'bubble': drawBubble(g, f, el, cx, cy); break;
       case 'beam': drawBeam(g, f, k, cx, cy); break;
       case 'crit': drawCrit(g, f, k, cx, cy); break;
@@ -456,7 +467,7 @@ function drawMeteor(g, f, el, world) {
   if (el - fall < 0.7) for (let n = rate(f, 22); n > 0; n--) { const a = rnd() * TAU, r = rnd() * R * 0.8; ember(f, tx + Math.cos(a) * r, ty + Math.sin(a) * r, 0, (rnd() - 0.5) * 20, (rnd() - 0.5) * 20, 50 + rnd() * 60, 9 + rnd() * 7, 0.8); } // brasas da queimadura
 }
 function drawRain(g, f, el) {
-  const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r, storm = f.skill === 'arrowstorm';
+  const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r, storm = f.skill === 'arrowstorm' || f.skill === 'wl_souls';
   const ring = clamp01(Math.min(el / 0.2, (f.life - el) / 0.4));
   put(g, SP.glow, f.m, 1, tx, ty, R * 2.4, R * 2.4, 0, 0.3 * ring);
   put(g, SP.rune0, f.m, 0, tx, ty, R * 2.08, R * 2.08, el * 0.3, 0.8 * ring);
@@ -493,7 +504,7 @@ function drawPierce(g, f, k, cx, cy) { // clarão do disparo + fita de luz até 
   if (!f.n) { f.n = 1; for (let i = cnt(9); i > 0; i--) { const t = rnd() * Math.min(f.range, 720) * 0.8, a = f.ang + (rnd() - 0.5) * 0.1; spark(f, x0 + Math.cos(a) * t, y0 + Math.sin(a) * t, 4, (rnd() - 0.5) * 40, (rnd() - 0.5) * 40, 20 + rnd() * 30, 6 + rnd() * 6, 0.3 + rnd() * 0.3); } }
 }
 function drawSun(g, f, k, el, cx, cy) {
-  const big = f.skill === 'intervention', R = f.r * (big ? 0.55 : 1), e = ease(k), o = 1 - k * k;
+  const big = f.skill === 'intervention' || f.skill === 'gd_celestial', R = f.r * (big ? 0.55 : 1), e = ease(k), o = 1 - k * k;
   if (big) { // coluna de luz que desce sobre o clérigo
     const w = 80 * (1 - k * 0.5);
     put(g, SP.glow, f.m, 1, cx, cy - 110, w * 1.7, 340, 0, o * 0.9);
@@ -507,6 +518,16 @@ function drawSun(g, f, k, el, cx, cy) {
   put(g, SP.star8, PL.holy, 0, cx, cy - 8, 52 * (1 - k * 0.4), 52 * (1 - k * 0.4), k * 2, o * 0.8);
   if (!f.n) { f.n = 1; if (f.spec === 'inquisitor') for (let i = cnt(12); i > 0; i--) { const a = rnd() * TAU; spark(f, cx, cy - 6, 8, Math.cos(a) * 240, Math.sin(a) * 190, 40, 9 + rnd() * 7, 0.5); } }
   if (el < 0.6) for (let n = rate(f, big ? 90 : 50); n > 0; n--) { const a = rnd() * TAU, r = rnd() * R * 0.85; bit(f, cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.5, 2, 0, 0, 50 + rnd() * 70, 16 + rnd() * 12, 0.8); }
+}
+// Anel de runas no chão que dura a vida da zona (Armadilha de Gelo, Santuário do Sol): lê só o estado do efeito.
+function drawZone(g, f, el) {
+  const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r, a = clamp01(Math.min(el / 0.3, (f.life - el) / 0.6)), pulse = 0.85 + 0.15 * Math.sin(el * 4);
+  if (a <= 0) return;
+  put(g, SP.glow, f.m, 1, tx, ty, R * 2.3, R * 2.3, 0, 0.32 * a * pulse);
+  put(g, SP.rune0, f.m, 0, tx, ty, R * 2.05, R * 2.05, el * 0.35, 0.75 * a);
+  put(g, SP.rune1, f.h, 0, tx, ty, R * 1.35, R * 1.35, -el * 0.5, 0.5 * a);
+  if (!LITE) put(g, SP.ring, f.m, 0, tx, ty, R * 2.9, R * 2.9, 0, 0.35 * a * pulse);
+  for (let n = rate(f, 16); n > 0; n--) { const ang = rnd() * TAU, r = rnd() * R * 0.85; bit(f, tx + Math.cos(ang) * r, ty + Math.sin(ang) * r * 0.55, 2, 0, 0, 40 + rnd() * 50, 12 + rnd() * 8, 0.9, a); }
 }
 function drawBubble(g, f, el, cx, cy) {
   const alpha = clamp01(Math.min(el / 0.15, (f.dur + 0.2 - el) / 0.6));

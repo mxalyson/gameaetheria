@@ -113,6 +113,10 @@ export class Renderer {
     if (z.scenery) drawGroundLife(g, world, t, vis);
 
     for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortal(g, p, t, cam.x + 10, cam.x + this.ww - 10);
+    const cpSaved = view.cpSaved; // Pedra de Retorno salva (char.checkpoint): anel dourado; as outras ficam em azul-pálido
+    for (const c of z.checkpoints ?? []) if (vis(c.x, c.y)) drawCheckpointRing(g, c, t, !!cpSaved && cpSaved.x === c.x && cpSaved.y === c.y);
+    if (view.route) drawRoute(g, view.route, t, view.autoOn);
+    if (view.guide && vis(view.guide.x, view.guide.y)) drawGuidePulse(g, view.guide, t);
     if (world.objective) drawObjective(g, world.objective, t);
     for (const ar of world.areas) drawArea(g, ar, t);
     for (const tg of world.telegraphs) drawTelegraph(g, tg, t);
@@ -165,6 +169,11 @@ export class Renderer {
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y) && (a === player || a.kind !== 'mob' || a.boss || !covered(a))) drawBars(g, a, a === player, this.labels);
     labelLifts(g, z.npcs, vis);
     for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id], view.guideNpc === n.id);
+    for (const c of z.checkpoints ?? []) if (vis(c.x, c.y)) {
+      const saved = !!cpSaved && cpSaved.x === c.x && cpSaved.y === c.y;
+      drawCheckpointGlyph(g, c, t, saved);
+      if (player && !player.dead && Math.hypot(c.x - player.x, c.y - player.y) < 80) drawPrompt(g, c.x, c.y + 30, saved ? 'Ponto já salvo aqui' : 'Toque para salvar o ponto');
+    }
     for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : 'Toque para abrir');
     for (const tx of world.texts) {
       const a = 1 - Math.max(0, (tx.t - tx.life * 0.6) / (tx.life * 0.4));
@@ -197,6 +206,7 @@ export class Renderer {
       vignette = this.vignettes[world.zoneId] = v;
     }
     g.drawImage(vignette, 0, 0, this.vw, this.vh);
+    if (view.guide) drawGuideArrow(g, view.guide, cam, this.zoom, this.vw, this.vh, t);
     if (view.lowHp) {
       g.fillStyle = `rgba(200,30,40,${0.12 + Math.sin(t * 5) * 0.06})`;
       g.fillRect(0, 0, this.vw, this.vh);
@@ -921,6 +931,56 @@ function drawBars(g, a, isPlayer, placed) {
 }
 
 // Baú pintado (assets/props/chest.webp): brilha quando está pronto para abrir; saqueado fica escurecido.
+// Guia de missão (core/autopath.js): rota tracejada leve no chão durante a auto-viagem, pulso no destino e seta na borda da tela quando ele está fora de vista.
+function drawRoute(g, pts, t, on) {
+  g.save();
+  g.lineCap = 'round'; g.lineWidth = 5; g.setLineDash([1, 14]); g.lineDashOffset = -t * 26;
+  g.strokeStyle = on ? 'rgba(255,236,150,0.85)' : 'rgba(200,210,230,0.55)';
+  g.shadowColor = 'rgba(255,200,80,0.7)'; g.shadowBlur = on ? 6 : 0;
+  g.beginPath(); g.moveTo(pts[0].x, pts[0].y + 10);
+  for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y + 10);
+  g.stroke();
+  g.restore();
+}
+function drawGuidePulse(g, goal, t) {
+  const k = (t * 0.9) % 1;
+  g.save(); g.globalCompositeOperation = 'lighter';
+  g.strokeStyle = `rgba(255,222,120,${0.75 * (1 - k)})`; g.lineWidth = 3;
+  g.beginPath(); g.ellipse(goal.x, goal.y + 8, 20 + k * 34, 8 + k * 14, 0, 0, Math.PI * 2); g.stroke();
+  g.restore();
+  const ay = goal.y - 74 + Math.sin(t * 4) * 5; // seta que quica sobre o destino
+  g.fillStyle = '#ffd34d'; g.strokeStyle = 'rgba(60,35,0,0.9)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(goal.x, ay + 12); g.lineTo(goal.x - 10, ay - 4); g.lineTo(goal.x + 10, ay - 4); g.closePath(); g.stroke(); g.fill();
+}
+function drawGuideArrow(g, goal, cam, zoom, vw, vh, t) {
+  const sx = (goal.x - cam.x) * zoom, sy = (goal.y - 40 - cam.y) * zoom, m = 26;
+  if (sx > m && sx < vw - m && sy > m + 40 && sy < vh - m) return; // à vista: basta o pulso do mundo
+  const cx = vw / 2, cy = vh / 2, dx = sx - cx, dy = sy - cy;
+  const k = Math.min((vw / 2 - 70) / Math.abs(dx || 1e-6), (vh / 2 - 62) / Math.abs(dy || 1e-6)); // borda recuada: longe do joystick, do mapa e dos botões
+  const ax = cx + dx * k, ay = cy + dy * k, ang = Math.atan2(dy, dx), pul = 1 + Math.sin(t * 5) * 0.08;
+  g.save(); g.translate(ax, ay); g.rotate(ang); g.scale(pul, pul);
+  g.fillStyle = '#ffd34d'; g.strokeStyle = 'rgba(60,35,0,0.92)'; g.lineWidth = 3; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(16, 0); g.lineTo(-9, -12); g.lineTo(-3, 0); g.lineTo(-9, 12); g.closePath(); g.stroke(); g.fill();
+  g.restore();
+}
+
+// Pedra de Retorno: anel rúnico no chão (a pedra em si é o cenário 'runestone') e um glifo flutuante com o nome.
+function drawCheckpointRing(g, c, t, saved) {
+  const k = (t * 0.8) % 1, col = saved ? '255,214,110' : '150,205,255';
+  g.save(); g.globalCompositeOperation = 'lighter';
+  g.strokeStyle = `rgba(${col},${saved ? 0.7 : 0.4})`; g.lineWidth = 3;
+  g.beginPath(); g.ellipse(c.x, c.y + 14, 40, 15, 0, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = `rgba(${col},${0.55 * (1 - k)})`; g.lineWidth = 2;
+  g.beginPath(); g.ellipse(c.x, c.y + 14, 40 * (0.5 + k * 0.6), 15 * (0.5 + k * 0.6), 0, 0, Math.PI * 2); g.stroke();
+  g.restore();
+}
+function drawCheckpointGlyph(g, c, t, saved) {
+  const y = c.y - 62 + Math.sin(t * 2.2) * 3;
+  g.save(); g.globalCompositeOperation = 'lighter';
+  g.fillStyle = saved ? 'rgba(255,214,110,0.9)' : 'rgba(150,205,255,0.8)';
+  g.beginPath(); g.moveTo(c.x, y - 9); g.lineTo(c.x + 6, y); g.lineTo(c.x, y + 9); g.lineTo(c.x - 6, y); g.closePath(); g.fill();
+  g.restore();
+}
 function drawChest(g, c, ready, t) { drawChestSprite(g, c, ready, t); } // baú pintado (render/prop-sprites.js); o desenho por código foi removido
 
 // Quadro atual da vista (câmera, zoom e áreas da interface) para prender etiquetas à área livre da tela
@@ -961,7 +1021,7 @@ function labelLifts(g, npcs, vis) {
   NPC_LIFT.clear();
   const list = (npcs ?? []).filter((n) => vis(n.x, n.y));
   g.font = '800 12px Cinzel, Nunito, serif';
-  const lifts = stackLabels(list.map((n) => ({ x: n.x, w: g.measureText(n.name).width + 6, y: n.y })));
+  const lifts = stackLabels(list.map((n) => { const top = mobSpritesEnabled() ? npcTop(n.id) : null; return { x: n.x, w: g.measureText(n.name).width + 6, y: top != null ? n.y + top - 6 : n.y - 44 }; })); // y = linha do nome (varia com a altura do sprite), não os pés
   list.forEach((n, i) => { if (lifts[i]) NPC_LIFT.set(n.id, lifts[i]); });
 }
 

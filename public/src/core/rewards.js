@@ -9,6 +9,7 @@ import { ensureJournal, recordEvent } from './journal.js';
 import { hashString } from './rng.js';
 import { ensureEcho } from './echo.js';
 import { CRYPT } from '../data/crypt.js';
+import { applyDeath, hasDeathPenalty } from './phoenix.js';
 
 // Aplica o resultado de uma partida (1×1, 2×2 ou 4×4) a UM personagem. `result`: 'win' | 'loss' | 'draw'.
 // Rating separado por modo; times maiores pagam um pouco mais (mesma regra do cliente). Devolve { doc, summary } sem alterar o original.
@@ -80,8 +81,10 @@ export function applyZoneBatch(doc, batch) {
   const c = structuredClone(doc);
   const before = { level: c.level, gold: c.gold };
   c.gold += batch.gold ?? 0;
-  for (let i = 0; i < (batch.deaths ?? 0); i++) c.gold -= Math.floor(c.gold * 0.1);
   const levels = addXp(c, batch.xp ?? 0);
+  // Quedas (só zonas de farm): cada uma gasta 1 Amuleto da Fênix, se houver; senão perde 10% do ouro e 10% do XP do nível (nunca desce de nível). Cripta e arenas: nada.
+  const dead = { saved: 0, gold: 0, xp: 0 };
+  if (hasDeathPenalty(batch.zoneId)) for (let i = 0; i < (batch.deaths ?? 0); i++) { const r = applyDeath(c); if (r.saved) dead.saved++; dead.gold += r.gold; dead.xp += r.xp; }
   let kept = 0, converted = 0;
   for (const it of batch.items ?? []) {
     if (c.inventory.length < INVENTORY_SIZE) { c.inventory.push(it); kept++; } else { c.gold += it.value; converted++; }
@@ -101,5 +104,5 @@ export function applyZoneBatch(doc, batch) {
   if (c.spirits.length) recordEvent(c, { type: 'spirit', count: c.spirits.length });
   const v = validate(c);
   if (!v.ok) throw new Error('documento inválido após recompensa de zona: ' + v.reason);
-  return { doc: v.char, summary: { mode: 'zone', zone: batch.zoneId, gold: v.char.gold - before.gold, xp: batch.xp ?? 0, levels, level: v.char.level, items: kept, converted, potions: batch.potions ?? 0, frags: batch.frags ?? 0, kills: (batch.kills ?? []).length, deaths: batch.deaths ?? 0, achievements: ach, quests } };
+  return { doc: v.char, summary: { mode: 'zone', zone: batch.zoneId, gold: v.char.gold - before.gold, xp: batch.xp ?? 0, levels, level: v.char.level, items: kept, converted, potions: batch.potions ?? 0, frags: batch.frags ?? 0, kills: (batch.kills ?? []).length, deaths: batch.deaths ?? 0, deathsSaved: dead.saved, lostGold: dead.gold, lostXp: dead.xp, phoenix: v.char.phoenix ?? 0, achievements: ach, quests } };
 }

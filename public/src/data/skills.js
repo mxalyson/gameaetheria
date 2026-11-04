@@ -1,4 +1,5 @@
 // Habilidades são dados; o simulador interpreta pelo campo `kind`.
+import { KIT_SKILLS } from './kits.js';
 export const SKILLS = {
   whirlwind: { name: 'Golpe Giratório', icon: '🌀', cd: 4, kind: 'aoe_self', radius: 110, mult: 2.0, color: '#ffb199',
     desc: 'Gira a lâmina, ferindo todos ao redor.' },
@@ -42,3 +43,6 @@ export const SKILLS = {
 // Nível em que cada slot de habilidade (s0, s1, s2) é aprendido; o ataque básico existe desde o nível 1. A especialização continua no nível 15 (data/specs.js).
 // O 4º slot (s3, Maestria) abre no nível 25 E depois da missão `maestria` do mestre da classe (core/unlocks.js).
 export const SKILL_UNLOCK = [1, 5, 10, 25];
+
+// Kits das especializações (data/kits.js): entram na mesma tabela, pois o simulador, a IA e a interface buscam a habilidade por id.
+Object.assign(SKILLS, KIT_SKILLS);

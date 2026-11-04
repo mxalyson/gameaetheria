@@ -8,6 +8,7 @@ import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, PVE_SE
 import { RARITY, AFFIXES, SHIELD_BLOCK } from '../public/src/data/items.js';
 import { xpToNext } from '../public/src/core/progression.js';
 import { PRICES } from '../public/src/shop.js';
+import { PHOENIX } from '../public/src/core/phoenix.js';
 import { SPECS, SPEC_LEVEL, SPEC_ALIASES } from '../public/src/data/specs.js';
 
 // itemSlack: folga sobre o máximo que o gerador (core/loot.js) consegue sortear; itemLevelAhead: quantos níveis acima do herói um drop pode vir (chefes/zonas mais fortes).
@@ -50,7 +51,7 @@ export function sanitizeImport(doc, fresh) {
   for (const k of Object.keys(doc.equipment)) if (!ok(doc.equipment[k])) delete doc.equipment[k];
   doc.inventory = doc.inventory.filter(ok);
   doc.bank = (doc.bank ?? []).filter(ok);
-  doc.scrolls = 0; doc.echo = { frags: 0, keys: 0, entry: 0 }; doc.pity = { epic: 0, legendary: 0, opal: 0 }; doc.visited = { ...fresh.visited };
+  doc.scrolls = 0; doc.phoenix = 0; doc.echo = { frags: 0, keys: 0, entry: 0 }; doc.pity = { epic: 0, legendary: 0, opal: 0 }; doc.visited = { ...fresh.visited };
   return doc;
 }
 const SAME_ITEM = ['slot', 'weaponType', 'rarity', 'level', 'reqLevel', 'value'];
@@ -83,6 +84,7 @@ export function pveProblem(old, neu) {
   for (const [id, p] of plusById(neu)) if (p > (plusOld.get(id) ?? 0)) return 'pve_plus';
   for (const k of PVE_STATS) if ((neu.stats[k] ?? 0) > (old.stats[k] ?? 0)) return 'pve_stat_' + k;
   if (((neu.stats.lore ?? 0) & ~(old.stats.lore ?? 0) & LORE_MASK) !== 0) return 'pve_lore';
+  if (((neu.stats.mentors ?? 0) & ~(old.stats.mentors ?? 0)) !== 0) return 'pve_mentors'; // conversa com mentor: só pela transação `mentor_talk`
   const hadSp = spiritIds(old), stage2 = new Set((old.spirits ?? []).filter((x) => x.stage === 2).map((x) => x.id));
   for (const sp of neu.spirits ?? []) { if (!hadSp.has(sp.id)) return 'pve_spirit'; if (sp.stage === 2 && !stage2.has(sp.id)) return 'pve_spirit_stage'; }
   for (const id of Object.keys(neu.quests.done)) if (old.quests.done[id] == null) return 'pve_quest';
@@ -192,6 +194,10 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   // scrolls/visited/pity são do servidor: scrolls só sobem se o ouro caiu o preço (compra na loja, que é do cliente); visited vem do banco; pity só desce
   const paid = Math.max(0, Math.floor((old.gold - neu.gold) / PRICES.scroll(old.level)));
   const scrolls = Math.max(0, Math.min(neu.scrolls ?? 0, opts.strictPve ? (old.scrolls ?? 0) : (old.scrolls ?? 0) + paid)); // estrito: pergaminho só pela transação buy_scroll
+  // Amuletos da Fênix: só sobem pela compra (ouro caiu o preço); no modo estrito, só a transação buy_phoenix. Pedra de Retorno: no estrito, só a transação checkpoint_set.
+  const paidP = Math.max(0, Math.floor((old.gold - neu.gold) / PHOENIX.price));
+  const phoenix = Math.max(0, Math.min(neu.phoenix ?? 0, opts.strictPve ? (old.phoenix ?? 0) : (old.phoenix ?? 0) + paidP));
+  const checkpoint = opts.strictPve ? old.checkpoint : neu.checkpoint;
   const pity = {}; for (const k of ['epic', 'legendary', 'opal']) pity[k] = Math.min(neu.pity?.[k] ?? 0, old.pity?.[k] ?? 0);
   // Contratos diários (core/journal.js): o dia nunca volta nem salta além de amanhã, e a entrega do dia não se desfaz (sem repetir recompensa).
   const nowDay = Math.floor(now / 86400000), od = old.daily, nd = neu.daily;
@@ -202,7 +208,8 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   const echo = { frags: Math.min(neu.echo?.frags ?? 0, old.echo?.frags ?? 0), keys: Math.min(neu.echo?.keys ?? 0, old.echo?.keys ?? 0), entry: Math.max(neu.echo?.entry ?? 0, old.echo?.entry ?? 0) };
   // Selos e contagem de trocas são do servidor: só a transação (respec_buy/respec) mexe; o cliente nunca ganha Selo
   const seals = Math.min(neu.seals ?? 0, old.seals ?? 0), specChanges = old.specChanges ?? 0;
-  const out = { ...neu, seals, specChanges, echo, ...(daily ? { daily } : {}), arena, stats, quests, chests, scrolls, visited: { ...(old.visited ?? {}) }, pity, achievements: { ...old.achievements } };
+  const out = { ...neu, seals, specChanges, echo, ...(daily ? { daily } : {}), arena, stats, quests, chests, scrolls, phoenix, visited: { ...(old.visited ?? {}) }, pity, achievements: { ...old.achievements } };
+  if (checkpoint) out.checkpoint = checkpoint; else delete out.checkpoint;
   checkAchievements(out, now); // as conquistas são recalculadas aqui: o cliente não "se concede" nenhuma
   out.title = out.title && out.achievements[out.title] != null ? out.title : null;
   return { ok: true, doc: out };

@@ -58,7 +58,7 @@ export function chooseSpec(char, spec) {
   if (char.level < SPEC_LEVEL) return { ok: false, reason: `Disponível a partir do nível ${SPEC_LEVEL}.` };
   if (!specInfo(char.classId, spec)) return { ok: false, reason: 'Especialização inválida.' };
   // a escolha exige a Prova do Mestre da sua classe (praça dos mestres na Vila); saves que já tinham spec a mantêm (savedoc), mas trocar também exige a prova
-  if (char.quests?.done?.prova_do_mestre == null) return { ok: false, reason: 'Conclua a Prova do Mestre da sua classe na Vila.' };
+  if (char.quests?.done?.prova_do_mestre == null) return { ok: false, reason: 'Conclua a Prova do Mestre da sua classe na Vila (inclui conversar com os dois mentores, no Porto de Marfim).' };
   if (char.spec === spec) return { ok: false, reason: 'Você já tem esta especialização.' };
   // sem escudo (Berserker): o escudo equipado volta para a mochila; mochila cheia bloqueia a troca (nada é gasto nem perdido)
   const dropShield = !!SPECS[char.classId][spec].noOffhand && !!char.equipment?.offhand;

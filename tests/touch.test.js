@@ -104,3 +104,12 @@ test('escala automática da interface: acompanha a viewport (piso 60%, teto 100%
   assert.equal(cp({ scale: 90, quality: 'auto', controls: 'auto' }, 'scale:auto').scale, 'auto');
   assert.equal(lp().scale, 'auto', 'padrão inicial');
 });
+
+test('segurar para explicar: só vale parado e depois de ~0,4 s', async () => {
+  const { isHold, HOLD_MS } = await import('../public/src/touch-logic.js');
+  assert.equal(HOLD_MS, 400);
+  assert.equal(isHold(100, 0), false, 'toque curto continua conjurando');
+  assert.equal(isHold(HOLD_MS, 0), true);
+  assert.equal(isHold(900, 5), true, 'tremor do dedo não cancela');
+  assert.equal(isHold(900, 40), false, 'arrastar é mirar na mão, não segurar');
+});

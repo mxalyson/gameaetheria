@@ -1,9 +1,12 @@
 // NPCs pintados (fotos 3D de frente, recortadas por tools/npc-from-sheet.py → assets/npcs/<id>.webp + .json). NPC não anda: uma vista só, com respiração leve.
 // Só com ?visual=original (ou falha ao carregar) vale o desenho antigo (renderer.js › NPC_LOOK); todo NPC do jogo tem arte pintada ou alias.
 import { mobSpritesEnabled, tint } from './mob-sprites.js';
+import { MENTOR_BY_ID } from '../data/mentors.js';
 
 // NPCs que têm arte (evita pedir arquivos que não existem)
-export const NPC_ART = new Set(['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith', 'master_warrior', 'master_mage', 'master_archer', 'master_cleric']);
+export const NPC_ART = new Set(['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith', 'master_warrior', 'master_mage', 'master_archer', 'master_cleric',
+  // mentores de especialização (Porto): quadro de frente do atlas Nv 25 de cada uma, recortado por tools/npc-from-heroes.py mentors
+  'mentor_paladin', 'mentor_berserker', 'mentor_arcane', 'mentor_warlock', 'mentor_sniper', 'mentor_gunslinger', 'mentor_guardian', 'mentor_inquisitor']);
 // NPCs sem arte própria (Porto de Marfim) usam a arte pintada do papel parecido, com tinta leve para se distinguirem. Arte nova: docs/roadmap/pendencias.md.
 export const NPC_ALIAS = {
   banker: { art: 'sage', tint: { hue: 38, sat: 1.1, bri: 1.05 } },     // mística de manto azul -> manto dourado (cofres)
@@ -20,14 +23,19 @@ function load(id) {
   let it = items.get(id);
   if (it) return it;
   it = { state: 'loading', img: null, meta: null }; items.set(id, it);
-  const al = NPC_ALIAS[id], art = al?.art ?? id;
+  const al = NPC_ALIAS[id];
+  // mentor sem arte própria cai no mestre de classe (herói base da classe)
+  const arts = [al?.art ?? id, ...(MENTOR_BY_ID[id] ? ['master_' + MENTOR_BY_ID[id].classId] : [])];
   (async () => {
-    try {
-      const meta = await fetch(`assets/npcs/${art}.json`).then((r) => r.json());
-      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/npcs/${art}.webp?v=${meta.v ?? 0}`; });
-      if (img.naturalWidth !== meta.w || img.naturalHeight !== meta.h) { it.state = 'none'; return; }
-      await img.decode?.(); it.meta = meta; it.img = al?.tint ? await tint(img, al.tint) : img; it.state = 'ready';
-    } catch { it.state = 'none'; }
+    for (const art of arts) {
+      try {
+        const meta = await fetch(`assets/npcs/${art}.json`).then((r) => r.json());
+        const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `assets/npcs/${art}.webp?v=${meta.v ?? 0}`; });
+        if (img.naturalWidth !== meta.w || img.naturalHeight !== meta.h) continue;
+        await img.decode?.(); it.meta = meta; it.img = al?.tint ? await tint(img, al.tint) : img; it.state = 'ready'; return;
+      } catch { /* tenta a próxima arte */ }
+    }
+    it.state = 'none';
   })();
   return it;
 }

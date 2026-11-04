@@ -62,7 +62,7 @@ test('categorias e estado indisponível: selo de categoria em cada habilidade, t
   const cats = await page.evaluate(() => [...document.querySelectorAll('#touch .tbtn.sk .cat')].map((c) => c.className.replace('cat cat-', '')));
   expect(cats.slice(0, 3)).toEqual(['cura', 'buff', 'controle']); // Luz Sagrada, Escudo Divino, Julgamento
   expect(await page.evaluate(() => [...document.querySelectorAll('#skillbar .slot .cat')].length)).toBeGreaterThanOrEqual(3);
-  expect(await page.evaluate(() => window.game.ui.tooltipHtml('skill:judgement'))).toContain('Controle');
+  expect(await page.evaluate(() => window.game.ui.tooltipHtml('skill:judgement'))).toContain('cat-controle');
   await page.evaluate(() => { window.game.char.level = 10; window.game.refreshStats(); window.game.player.stunT = 1; });
   await page.waitForTimeout(250);
   expect(await page.evaluate(() => [...document.querySelectorAll('#touch .tbtn.sk')].slice(0, 3).every((b) => b.classList.contains('blocked')))).toBe(true);

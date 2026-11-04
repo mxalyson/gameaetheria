@@ -12,10 +12,12 @@ import { MOBS, XP_MULT } from '../public/src/data/mobs.js';
 import { ZONES } from '../public/src/data/zones.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { POTION_HEAL, POTION_COOLDOWN } from './tx.js';
+import { respawnPoint, hasDeathPenalty } from '../public/src/core/phoenix.js';
 import { wire } from './wire.js';
 import { DeltaEncoder, actorTuple, mobTuple, mobStatic } from './snapshot.js';
 
 export const FLUSH_EVERY = 10;   // s entre gravações de recompensas
+export const RESPAWN_MIN = 1.5;  // s mínimos caído antes do botão de renascer valer (a animação de queda termina)
 export const RESPAWN_AFTER = 4;  // s morto até renascer na entrada da zona
 const SHARE_RADIUS = 900;        // quem está longe do abate não ganha nada dele
 const r1 = (n) => Math.round(n * 10) / 10;
@@ -140,10 +142,19 @@ export class ZoneRoom {
     const p = this.players.get(actor.id);
     if (!p || p.left) return;
     p.deadAt = this.clock; p.pend.deaths++;
+    // Zona de farm: a queda é cobrada AGORA (Amuleto da Fênix consome 1 e evita a perda); o resumo vai ao cliente em zone_reward. Arenas e Cripta: sem penalidade.
+    if (hasDeathPenalty(this.zoneId)) this.flush(p);
+  }
+  // Pedido do jogador para renascer já: só depois de RESPAWN_MIN s caído (a penalidade já foi cobrada na queda) e nunca na Cripta (lá vale o ciclo da masmorra).
+  respawnNow(p) {
+    if (!p || p.left || !p.actor.dead || p.deadAt == null || this.zoneId === 'crypt') return;
+    if (this.clock - p.deadAt >= RESPAWN_MIN) this.respawn(p);
   }
   respawn(p) {
     const a = p.actor;
-    a.dead = false; a.deadT = 0; a.hp = Math.round(a.maxHp * 0.5); a.stunT = 0; a.buffs = []; a.x = p.entry.x; a.y = p.entry.y; p.deadAt = null;
+    a.dead = false; a.deadT = 0; a.hp = Math.round(a.maxHp * 0.5); a.stunT = 0; a.buffs = [];
+    const rp = respawnPoint(p.session?.char, this.zoneId, p.entry); // última Pedra de Retorno desta zona; sem ela, a entrada
+    a.x = rp.x; a.y = rp.y; p.deadAt = null;
     this.events.push({ e: 'revive', actor: a.id });
   }
 

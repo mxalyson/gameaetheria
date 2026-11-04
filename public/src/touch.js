@@ -2,11 +2,11 @@
 // Mira automática no inimigo mais próximo; arrastar um botão de skill mira na mão. Usa Pointer Events (multi-toque).
 import { CLASSES } from './data/classes.js';
 import { SKILLS } from './data/skills.js';
-import { isSkillUnlocked, skillUnlockLevel, skillIdAt } from './core/unlocks.js';
+import { isSkillUnlocked, skillUnlockLevel, skillIdAt, kitIds } from './core/unlocks.js';
 import { skillOf, basicOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { asset } from './assets-version.js';
-import { stickVector, pickAim, aimModeFor, dragAim, interactTarget } from './touch-logic.js';
+import { stickVector, pickAim, aimModeFor, dragAim, interactTarget, isHold, HOLD_MS } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -47,6 +47,8 @@ export class TouchControls {
     this.stickId = null;
     $('stick')?.classList.add('hidden');
     $('aim-arrow')?.classList.add('hidden');
+    for (const st of this.btns.values()) clearTimeout(st.timer);
+    this.game?.ui?.hideSkillCard?.();
   }
 
   build() {
@@ -97,16 +99,25 @@ export class TouchControls {
       const b = e.target.closest('.tbtn');
       if (!b || b.classList.contains('hidden')) return;
       e.preventDefault();
-      if (b.classList.contains('locked')) return; // habilidade ainda não aprendida: o botão não responde
+      const locked = b.classList.contains('locked'); // habilidade ainda não aprendida: não conjura, mas segurar explica o que ela fará
       b.setPointerCapture(e.pointerId);
+      const st = { b, t: b.dataset.t, i: Number(b.dataset.i ?? 0), sx: e.clientX, sy: e.clientY, aim: null, locked, held: false, at: performance.now(), moved: 0, timer: 0 };
+      if (locked && st.t !== 'skill') return;
       b.classList.add('down');
-      this.btns.set(e.pointerId, { b, t: b.dataset.t, i: Number(b.dataset.i ?? 0), sx: e.clientX, sy: e.clientY, aim: null });
+      this.btns.set(e.pointerId, st);
+      if (st.t === 'skill') st.timer = setTimeout(() => { // segurar parado: abre o cartão e a soltura não conjura
+        if (this.btns.get(e.pointerId) !== st || !isHold(performance.now() - st.at, st.moved)) return;
+        st.held = true; arrow.classList.add('hidden');
+        this.game.ui?.showSkillCard(st.i);
+      }, HOLD_MS);
       if (b.dataset.t === 'attack') this.attack = true;
     });
     tb.addEventListener('pointermove', (e) => {
       const st = this.btns.get(e.pointerId);
       if (!st || st.t !== 'skill') return;
       const ui = this.scale;
+      st.moved = Math.hypot((e.clientX - st.sx) / ui, (e.clientY - st.sy) / ui);
+      if (st.held || st.locked) return;
       st.aim = dragAim((e.clientX - st.sx) / ui, (e.clientY - st.sy) / ui);
       if (st.aim) {
         const r = st.b.getBoundingClientRect();
@@ -119,10 +130,12 @@ export class TouchControls {
       const st = this.btns.get(e.pointerId);
       if (!st) return;
       this.btns.delete(e.pointerId);
+      clearTimeout(st.timer);
       st.b.classList.remove('down');
       arrow.classList.add('hidden');
+      if (st.held) this.game.ui?.hideSkillCard();
       if (st.t === 'attack') { this.attack = false; return; }
-      if (!fire) return;
+      if (!fire || st.held || st.locked) return; // segurou para ler (ou está bloqueada): soltar não conjura
       const g = this.game;
       if (st.t === 'skill') this.castQueue.push({ i: st.i, aim: st.aim });
       else if (st.t === 'potion') g.usePotion();
@@ -138,7 +151,8 @@ export class TouchControls {
   setup(char) {
     const cls = CLASSES[char.classId];
     $('t-atk-icon').innerHTML = attackImg(char.classId, cls.icon);
-    [...cls.skills, cls.mastery].forEach((s, i) => { // o 4º é a habilidade de Maestria
+    this.kitSig = char.classId + ':' + (char.level >= 15 ? char.spec ?? '' : '');
+    kitIds(char).forEach((s, i) => { // o 4º é a habilidade de Maestria; com especialização (nível 15+) vem do kit dela
       const b = this.root.querySelector(`.sk${i}`), c = skillCategory(skillOf(char.classId, null, s));
       b.querySelector('.icon').innerHTML = skillImg(s, SKILLS[s].icon);
       b.querySelector('.cat')?.remove(); b.insertAdjacentHTML('beforeend', `<i class="cat cat-${c}" title="${CATEGORIES[c]}"></i>`);
@@ -152,7 +166,7 @@ export class TouchControls {
     const q = this.castQueue.shift();
     let cast = null, aim;
     if (q) {
-      const skill = skillOf(player.classId, player.spec, skillIdAt(player.classId, q.i));
+      const skill = skillOf(player.classId, player.spec, skillIdAt(player.classId, q.i, player.spec));
       cast = q.i;
       aim = pickAim({ player, enemies, move: this.move, override: q.aim, mode: aimModeFor(skill), reach: skill.dist ?? 260 });
     } else aim = pickAim({ player, enemies, move: this.move });
@@ -165,6 +179,7 @@ export class TouchControls {
     this.root.classList.toggle('hidden', !show);
     if (!show) { if (this.attack || this.stickId !== null) this.reset(); return; }
     const p = game.player, cls = CLASSES[p.classId];
+    if (this.kitSig !== p.classId + ':' + (p.level >= 15 ? p.spec ?? '' : '')) this.setup({ classId: p.classId, level: p.level, spec: p.spec }); // escolheu/trocou a especialização: ícones do novo kit
     const cdOf = [p.cds.s0, p.cds.s1, p.cds.s2, p.cds.s3 ?? 0];
     const setCd = (el, cd, max, text) => {
       el.style.setProperty('--p', cd > 0 ? Math.min(1, cd / max).toFixed(3) : '0');
@@ -172,7 +187,7 @@ export class TouchControls {
       if (t) t.textContent = text && cd > 0 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
     };
     const blocked = p.stunT > 0 || p.dead; // sem a investida (dash): durava ~0,3 s e parecia erro (V19)
-    [...cls.skills, cls.mastery].forEach((s, i) => {
+    kitIds(p).forEach((s, i) => {
       const b = this.root.querySelector(`.sk${i}`), lk = !isSkillUnlocked(p, i), sk = skillOf(p.classId, p.spec, s);
       setCd(b, lk ? 0 : cdOf[i], sk.cd, true);
       b.classList.toggle('blocked', blocked && !lk && !sk.castStunned); // a Intervenção Divina rompe o atordoamento
@@ -186,13 +201,15 @@ export class TouchControls {
     pot.classList.toggle('empty', !game.char.potions || game.mode === 'pvp');
     // botão contextual: balão pintado para NPC, baú pintado para baú
     let tg = game.mode === 'explore' || game.inNetZone?.() ? interactTarget(p, game.world) : null;
-    if (tg && game.mode !== 'explore' && tg.kind !== 'chest') tg = null; // na instância online só o baú (o servidor abre)
+    if (tg && game.mode !== 'explore' && tg.kind !== 'chest' && tg.kind !== 'checkpoint') tg = null; // na instância online só o baú e a Pedra de Retorno (o servidor confere)
     const act = this.root.querySelector('.act');
     act.classList.toggle('hidden', !tg);
     if (tg && act.dataset.kind !== tg.kind) {
       act.dataset.kind = tg.kind;
       act.querySelector('.icon').innerHTML = tg.kind === 'chest'
         ? `<img class="art" src="${asset('assets/icons/item/res-chest.webp')}" alt="🧰" draggable="false" onerror="this.replaceWith(this.alt)">`
+        : tg.kind === 'checkpoint'
+          ? `<img class="art" src="${asset('assets/icons/item/res-essence.webp')}" alt="Pedra de Retorno" draggable="false" onerror="this.replaceWith(this.alt)">`
         : tg.kind === 'lore'
           ? `<img class="art" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false" onerror="this.replaceWith(this.alt)">`
           :`<img class="art" src="${asset('assets/icons/menu/menu-journal.webp')}" alt="Conversar" draggable="false">`; // pergaminho pintado (V6): sem emoji nem disco chapado
