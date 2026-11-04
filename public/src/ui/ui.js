@@ -174,7 +174,7 @@ export class UI {
         <div class="logo"><span>AETHERIA</span><small>Arena dos Ecos</small></div>
         <p class="tagline">Suba de nível, colete itens, desperte spirits e conquiste a arena.</p>
         <div class="title-actions">${cont}${importBtn}</div>
-        <p class="foot">Protótipo v0.1 · PvE + Arena PvP contra ecos (multiplayer em breve)</p>
+        <p class="foot">Protótipo v0.1 · PvE, arena PvP e, com conta online, multiplayer e chat</p>
       </div>`;
     this.screen.className = 'visible';
   }

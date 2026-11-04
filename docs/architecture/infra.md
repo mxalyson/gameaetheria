@@ -1,12 +1,17 @@
 # Infraestrutura do servidor (P10)
 Status: **implementado e testado localmente**; Docker **não testado** (ausente na máquina).
 
+## Publicação (porta única, 2026-11-04)
+Com `PORT` definido, `server/start.js` sobe **um** servidor HTTP que entrega o jogo (`public/`, arte com `?v=` em cache imutável), a API (`/api/*`), a operação (`/healthz`, `/readyz`, `/metrics`) e o WebSocket (`/ws`). O `index.html` sai com `<meta name="aetheria-api" content="same-origin">`, que liga o modo online no cliente sem `?api=`; `GET /api/config` devolve `gameUrl: '/ws'` e o cliente monta `wss://<site>/ws`. `PUBLIC_URL` (ex.: `https://aetheria.duckdns.org`) vira a origem permitida padrão. Guia: `docs/deploy/publicar-gratis.md` (Oracle Always Free + DuckDNS + Caddy, `deploy/instalar-vm.sh`, testado em Ubuntu 24.04 limpo com systemd simulado). **Docker construído e testado** nesta data (persistência no volume e SIGTERM limpo); o modo de duas portas abaixo continua para desenvolvimento.
+
 ## Processos e portas
 `npm run server` (`server/start.js`) sobe **um processo** com: API HTTP (padrão 5176), WebSocket do jogo (5175) e banco SQLite (`node:sqlite`, arquivo em `DB_PATH`). O frontend estático é independente (GitHub Pages ou CDN). Capacidade medida na P9: ≈ 150–250 jogadores por processo (nesta máquina); escalar = mais processos/máquinas (cada sala é independente; o banco compartilhado é o ponto a revisar então — SQLite é de **um** processo).
 
 ## Variáveis de ambiente (validadas na partida)
 | Variável | Padrão | Observação |
 |---|---|---|
+| `PORT` | — | **porta única** (publicação): jogo + API + WebSocket `/ws` no mesmo endereço; serviços de hospedagem costumam definir sozinhos |
+| `PUBLIC_URL` | — | endereço público `https://host` (sem caminho); vira a origem permitida padrão no modo de porta única |
 | `HOST` | 127.0.0.1 | `0.0.0.0` só atrás de proxy com TLS (gera aviso sem `GAME_URL` `wss://`) |
 | `API_PORT` / `GAME_PORT` | 5176 / 5175 | inteiros 1–65535, diferentes entre si |
 | `ALLOWED_ORIGINS` | http://localhost:5174 | `esquema://host[:porta]`, sem barra final; `http://` não local gera aviso |
@@ -34,8 +39,8 @@ Uma linha JSON por evento (`{t, level, msg, …campos}`) em stdout; o orquestrad
 ## Backup e restauração
 `npm run db:backup` (VACUUM INTO, seguro com o servidor ligado) → `data/backups/`. `npm run db:restore -- <arquivo> [destino]`: confere integridade e se é um banco do Aetheria, **recusa se o servidor está usando o banco** (arquivo `-wal` ativo), guarda cópia do banco atual (`….antes-da-restauracao-…`) e substitui. Teste: `tests/ops.test.js` (ida e volta, backup corrompido, banco em uso). Agendamento do backup (cron/tarefa) e cópia para fora da máquina: **pendente / responsabilidade de quem hospeda**.
 
-## Contêiner (não testado)
-`Dockerfile` (Node 24, usuário não-root, volume `/data`, `HEALTHCHECK` em `/healthz`), `.dockerignore`, `docker-compose.yml` (exemplo; exige TLS por proxy). **Nunca foi construído aqui**: rode `docker build` e corrija o que aparecer antes de confiar.
+## Contêiner (construído e testado em 2026-11-04)
+`Dockerfile` (Node 24, usuário não-root, porta única 8080, volume `/data`, `HEALTHCHECK` em `/healthz`; `NODE_IMAGE` troca a imagem base se o Docker Hub der 429), `.dockerignore`, `docker-compose.yml` (jogo + Caddy com HTTPS; `DOMINIO` no `.env`). Testado: build, site/API/registro dentro do contêiner, conta persiste após `docker restart`, desligamento limpo com SIGTERM. Não testado: o Caddy com certificado real.
 
 ## Não coberto
 TLS/WSS (proxy), vários processos com estado compartilhado (SQLite → PostgreSQL), CI/CD, alertas, limites de CPU/memória do contêiner, rotação de logs, teste de restauração em máquina limpa.

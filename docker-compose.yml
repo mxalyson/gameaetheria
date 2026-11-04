@@ -1,16 +1,22 @@
-# Exemplo (NÃO TESTADO: Docker ausente nesta máquina). Coloque um proxy com TLS (Caddy/nginx) na frente: ele publica https:// e wss:// e repassa
-# /api/* para a porta 5176 e o WebSocket para a 5175. Defina as variáveis num arquivo .env que NÃO vai ao Git.
+# Alternativa ao deploy/instalar-vm.sh para quem prefere Docker: jogo (porta única) + Caddy com HTTPS automático.
+# Uso: crie um arquivo .env (NÃO vai ao Git) com  DOMINIO=seu-nome.duckdns.org  e rode  docker compose up -d --build
+# A imagem do jogo foi construída e testada (docs/deploy/publicar-gratis.md); este arquivo junta os dois serviços.
 services:
   aetheria:
     build: .
     restart: unless-stopped
-    ports: ["127.0.0.1:5175:5175", "127.0.0.1:5176:5176"]
     environment:
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?defina a origem do site, ex.: https://jogo.exemplo.com}
-      GAME_URL: ${GAME_URL:?defina a URL pública wss://…}
+      PUBLIC_URL: "https://${DOMINIO:?defina DOMINIO no arquivo .env (exemplo aetheria.duckdns.org)}"
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
-      TRUST_PROXY: "1"
     volumes: ["aetheria-data:/data"]
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    command: caddy reverse-proxy --from ${DOMINIO} --to aetheria:8080
+    volumes: ["caddy-data:/data"]
+    depends_on: [aetheria]
 volumes:
   aetheria-data:
+  caddy-data:
