@@ -84,7 +84,7 @@ export function drawAuraMotes(g, a, t, q, feetY) {
   const tier = auraTier(a); if (!tier || a.dead) return;
   const e = get(a.spec, tier, q); if (!e.part) return;
   const st = e.st, n = q === 1 ? Math.max(1, st.n >> 1) : Math.ceil(st.n * 1.3), prev = g.globalAlpha, id = a.id ?? 0;
-  const s = st.big ? 17 : 14; // um pouco mais (+30% partículas, +15% tamanho) que a versão anterior
+  const s = st.big ? 12 : 10; // pequenas (dono): menores que antes (15/12); +30% de partículas
   for (let i = 0; i < n; i++) {
     const ph = (t * (0.25 + st.rise * 0.25) + h01(id, i)) % 1;       // vida da partícula 0..1
     const ang = h01(id, i + 31) * 6.283 + t * 0.6 * (i % 2 ? 1 : -1);
