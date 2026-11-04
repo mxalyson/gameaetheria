@@ -505,6 +505,7 @@ export class UI {
     if (id === 'options') this.open.clear();
     if (id === 'character') this.specMaster = anchor === 'master'; // aberto pelo Mestre de Classe: o Selo de Reespecialização está à venda
     if (id === 'map') this.mapSel = null; // o mapa sempre abre selecionando onde você está
+    if (!this.open.has(id)) this.game.audio?.play('open'); // som de livro abrindo (audio.js)
     this.open.add(id);
     if (id === 'shop') { this.shopAnchor = anchor ?? null; this.selMode = false; this.sel = new Set(); if (anchor === 'smith') this.open.delete('inventory'); else this.open.add('inventory'); } // Ferreiro só aprimora: sem mochila ao lado (tocar nela venderia) // título: Ferreiro Brok (anchor 'smith') ou Mercador do Porto ('harbor')
     if (id === 'bank') this.open.add('inventory'); // mochila ao lado: tocar nela deposita
@@ -513,11 +514,12 @@ export class UI {
   }
   close(id) {
     this.hideTooltip();
+    if (this.open.has(id)) this.game.audio?.play('close');
     this.open.delete(id);
     if (id === 'inventory') { this.open.delete('shop'); this.open.delete('bank'); }
     this.render();
   }
-  closePanels() { this.hideTooltip(); this.open.clear(); this.render(); }
+  closePanels() { this.hideTooltip(); if (this.open.size) this.game.audio?.play('close'); this.open.clear(); this.render(); }
   // Modo venda: loja da Vila ou do Porto aberta (o Ferreiro não compra nem vende itens)
   sellMode() { return this.isOpen('shop') && this.shopAnchor !== 'smith'; }
   // Seleção múltipla para vender vários itens de uma vez (botão Selecionar na mochila ao lado da loja). Equipados nunca estão na mochila, logo nunca entram.
@@ -1013,6 +1015,11 @@ export class UI {
       <p class="hint">Baixa e média reduzem névoa, partículas e resolução: ajudam em celulares fracos e economizam bateria.</p>
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Toque (padrão)'], ['keyboard', 'Teclado e mouse']])}</div>
       <p class="hint">À noite o ar escurece e as criaturas enxergam mais longe, mas dão um pouco mais de XP, ouro e itens. O ciclo de dia e noite é sempre ligado.</p>
+      ${['music', 'sfx'].map((k) => `<div class="opt-row"><b>${k === 'music' ? 'Música' : 'Efeitos sonoros'}</b>
+        <div class="seg"><button class="btn small" data-action="pref" data-arg="${k}:-10" ${pr[k] <= 0 ? 'disabled' : ''}>−</button>
+        <span class="opt-val">${pr[k] ? pr[k] + '%' : 'desligado'}</span>
+        <button class="btn small" data-action="pref" data-arg="${k}:+10" ${pr[k] >= 100 ? 'disabled' : ''}>+</button>
+        <button class="btn small ${pr[k] === 0 ? 'sel' : ''}" data-action="pref" data-arg="${k}:0">Mudo</button></div></div>`).join('')}
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
       </div><div class="col">

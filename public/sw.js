@@ -4,8 +4,8 @@
 // Arte (PNG/WebP, fontes, SVG): cache primeiro. Com ?v=<hash> (tools/bump-assets.mjs) o arquivo é imutável: nunca baixa de novo (antes cada uso disparava um
 // download em segundo plano, gastando dados móveis à toa). Sem ?v= atualiza em segundo plano, uma vez por arquivo enquanto este worker vive.
 // Nada de WebSocket, API, outras origens nem laboratórios (login/salvamento na nuvem passam direto). Subir VERSION invalida o cache antigo.
-const VERSION = 'aetheria-e41a135c';
-const HEAVY = /\.(png|ttf|woff2?|svg|jpe?g|webp)$/i;
+const VERSION = 'aetheria-5c8c9f3f';
+const HEAVY = /\.(png|ttf|woff2?|svg|jpe?g|webp|mp3|ogg)$/i;
 const CODE_TIMEOUT_MS = 3000;
 const refreshed = new Set(); // arte sem ?v= já atualizada nesta vida do worker
 
@@ -48,5 +48,6 @@ async function respond(e) {
 self.addEventListener('fetch', (e) => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin || isLab(url)) return;
+  if (req.headers?.has?.('range')) return; // pedido por partes (música no <audio>): o navegador fala direto com o servidor; o cache guarda só respostas inteiras
   e.respondWith(respond(e));
 });

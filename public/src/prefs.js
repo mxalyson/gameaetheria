@@ -7,7 +7,8 @@ export const SCALE_MAX = 150;
 export const SCALE_STEP = 10;
 export const QUALITIES = ['auto', 'high', 'medium', 'low'];
 export const CONTROLS = ['auto', 'touch', 'keyboard'];
-const DEFAULTS = { scale: 'auto', quality: 'auto', controls: 'auto' };
+const DEFAULTS = { scale: 'auto', quality: 'auto', controls: 'auto', music: 50, sfx: 80 }; // music/sfx: volume 0–100 (0 desliga; audio.js)
+const vol = (v, d) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(100, Math.round(Number(v) / 10) * 10)) : d);
 
 // Escala automática da interface (%): acompanha a viewport (referência 1250×575 pt, piso 60%, teto 100%).
 // Celular deitado (iPhone 874×402) cai para ~70% (84% ainda deixava painéis ocupando a tela toda); tela de 1250×575 ou mais fica em 100%. O tamanho manual (60–150%) continua nas Opções.
@@ -22,6 +23,8 @@ const clean = (p) => ({
   scale: p.scale === 'auto' ? 'auto' : Math.max(SCALE_MIN, Math.min(SCALE_MAX, Math.round(Number(p.scale) / SCALE_STEP) * SCALE_STEP || DEFAULTS.scale)),
   quality: QUALITIES.includes(p.quality) ? p.quality : DEFAULTS.quality,
   controls: CONTROLS.includes(p.controls) ? p.controls : DEFAULTS.controls,
+  music: vol(p.music, DEFAULTS.music),
+  sfx: vol(p.sfx, DEFAULTS.sfx),
 });
 
 export function loadPrefs() {
@@ -32,13 +35,14 @@ export function savePrefs(p) {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* armazenamento indisponível */ }
 }
 
-// arg: "scale:auto", "scale:+10", "scale:-10", "quality:low", "controls:touch"
+// arg: "scale:auto", "scale:+10", "scale:-10", "quality:low", "controls:touch", "music:-10", "sfx:0"
 export function changePref(prefs, arg, w, h) {
   const [key, val] = arg.split(':');
   const next = { ...prefs };
   if (key === 'scale' && val === 'auto') next.scale = 'auto';
   else if (key === 'scale') next.scale = resolveScale(prefs, w, h) + (val.startsWith('+') || val.startsWith('-') ? Number(val) : Number(val) - resolveScale(prefs, w, h));
   else if (key === 'quality' || key === 'controls') next[key] = val;
+  else if (key === 'music' || key === 'sfx') next[key] = val.startsWith('+') || val.startsWith('-') ? prefs[key] + Number(val) : Number(val); // "music:+10", "sfx:0"
   return clean(next);
 }
 

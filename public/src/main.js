@@ -22,6 +22,7 @@ import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.
 import { cleanName } from './core/savedoc.js';
 import { apiUrl, wsUrl, Online, CloudSave } from './online.js';
 import { ChatBox } from './ui/chat.js';
+import { AudioEngine, musicFor } from './audio.js';
 import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
 import { decodeLook } from './core/aura.js';
@@ -71,6 +72,7 @@ class Game {
     this.input = new Input(this.canvas);
     this.ui = new UI(this);
     this.prefs = loadPrefs();
+    this.audio = new AudioEngine({ musicVol: this.prefs.music / 100, sfxVol: this.prefs.sfx / 100 }); // só toca depois do 1º toque (regra dos navegadores)
     this.qgov = new QualityGovernor();
     this.touch = new TouchControls(this);
     this.portrait = matchMedia('(orientation: portrait) and (pointer: coarse)');
@@ -164,6 +166,7 @@ class Game {
         this.touch.update(this);
       }) || bad;
     }
+    if ((this.musicT = (this.musicT ?? 0) - dt) <= 0) { this.musicT = 0.5; this.guard('audio', () => this.updateMusic()); } // música por lugar (2 vezes por segundo basta)
     this.guard('rede', () => {
       this.cloud?.tick();
       if (this.net?.connected && (this.netPingT = (this.netPingT ?? 0) - dt) <= 0) { this.net.ping(); this.netPingT = 2; }
@@ -552,6 +555,15 @@ class Game {
   // exploração dentro de uma instância do servidor (P11)
   inNetZone() { return this.mode === 'net' && this.netInfo?.mode === 'zone'; }
   // equipamento/atributos/spirits mudam o personagem no cliente; na instância o servidor é o dono do personagem (transações de loja/equipar: P11.4)
+  // Vila nas cidades, exploração nos mapas, batalha com chefe vivo por perto ou em partida (arena, ondas, cooperativo, Cripta). audio.js › musicFor
+  updateMusic() {
+    if (this.mode === 'ended') return;
+    const w = this.mode === 'title' ? this.titleWorld : this.world, p = this.player;
+    const netMatch = this.mode === 'net' && this.netInfo?.mode && this.netInfo.mode !== 'zone';
+    const bossNear = !!(w && p && w.actors.some((a) => a.boss && !a.dead && Math.hypot(a.x - p.x, a.y - p.y) < 1100));
+    this.audio.setMusic(musicFor({ mode: netMatch ? 'pvp' : this.mode, zone: w?.zone, bossNear }));
+  }
+
   togglePanel(id) {
     if ((id === 'journal' || id === 'map') && this.mode !== 'explore' && !(id === 'map' && this.inNetZone())) return; // diário e mapa só no mundo normal (o mapa também abre na instância online: lá o nó da Vila é o retorno)
     if (id === 'party' && !this.online) return;
@@ -706,6 +718,7 @@ class Game {
 
   netEvent(e) {
     const w = this.world, a = e.actor != null ? this.netEntity(e.actor) : null;
+    this.audio.event({ ...e, type: e.e, actor: a, target: e.target != null ? this.netEntity(e.target) : null }, this.player); // mesmo som do jogo offline
     switch (e.e) {
       case 'hit': {
         const t = this.netEntity(e.target); if (!t) break;
@@ -991,6 +1004,7 @@ class Game {
     const q = resolveQuality(p, this.touch.coarse);
     this.renderer.setQuality(q, p.quality === 'auto' ? this.qgov.apply(q) : q); // resolução = q; o governador só limita os EFEITOS, e só no modo auto
     this.touch.setMode(p.controls);
+    this.audio?.setVolumes(p.music / 100, p.sfx / 100);
   }
 
   setPref(arg) {
@@ -1079,6 +1093,7 @@ class Game {
   handleEvents() {
     const events = this.world.events.splice(0);
     for (const ev of events) {
+      this.audio.event(ev, this.player); // som do evento (golpe, dano, magia, morte, chefe); só leitura
       if (ev.type === 'cast') { if (ev.actor === this.player) this.gameEvent({ type: 'skill', skillId: ev.skill }); spawnSkillVfx(this.world, ev); continue; } // efeito visual da habilidade (a simulação já decidiu tudo)
       if (ev.type === 'hit' || ev.type === 'heal') { spawnEventVfx(this.world, ev); continue; } // crítico, absorção e cura
       if (ev.type === 'phase' && ev.phase === 3) { this.ui.toast('Enfurecido!', `${ev.actor.name} entrou em fúria`, 'gold'); continue; }
@@ -1372,13 +1387,14 @@ class Game {
       this.serverTx({ op: 'chest', id }, (m) => {
         this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
         this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${m.gold}`, size: 15, color: '#ffd34d' });
-        this.ui.chestReward({ gold: m.gold, item: m.item });
+        this.ui.chestReward({ gold: m.gold, item: m.item }); this.audio.play('chest');
         this.chestsOpen = new Set(Object.keys(this.char.chests ?? {}).filter((k) => !chestReady(this.char, k)));
       });
       return;
     }
     const r = openChest(this.char, chest, this.world.zoneId, this.rng);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
+    this.audio.play('chest');
     this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
     this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${r.gold}`, size: 15, color: '#ffd34d' });
     this.ui.chestReward(r); // cartão por cima de tudo (fila); abrir o baú nunca abre a mochila
@@ -1425,6 +1441,7 @@ class Game {
       if (l.kind === 'gold') { // ouro vai direto para a mochila (sem drop no chão), com texto flutuante
         this.char.gold += l.amount;
         this.world.addText({ x: this.player.x, y: this.player.y - 34, t: 0, life: 0.8, text: `+${l.amount}`, size: 13, color: '#ffd34d' });
+        this.audio.play('coins');
         continue;
       }
       this.dropAt(m.x, m.y, l);
@@ -1457,6 +1474,7 @@ class Game {
 
   onLevelUp() {
     const p = this.player;
+    this.audio.play('levelup');
     this.refreshStats();
     p.hp = p.maxHp;
     this.world.addFx({ type: 'ring', x: p.x, y: p.y, r: 120, color: '#ffd34d', t: 0, life: 0.8, follow: p });
@@ -1500,6 +1518,7 @@ class Game {
         } else {
           c.inventory.push(d.item);
           const R = RARITY[d.item.rarity];
+          this.audio.play(R.index >= 3 ? 'levelup' : 'loot');
           this.ui.log(`Obtido: <b style="color:${R.color}">${d.item.name}</b> (${R.name})`, '#e8e6f0');
           if (R.index >= 3) this.ui.toast(d.item.name, `Item ${R.name}!`, 'gold');
         }

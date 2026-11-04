@@ -19,7 +19,7 @@ for (const [classe, skills] of Object.entries(CLASSES)) {
       const id = skills[i];
       const r = await page.evaluate(([idx]) => {
         const g = window.game, p = g.player;
-        p.cds.s0 = p.cds.s1 = p.cds.s2 = 0; p.dead = false; p.hp = p.maxHp;
+        p.cds.s0 = p.cds.s1 = p.cds.s2 = 0; p.dead = false; p.hp = p.maxHp; p.dash = null; // a Investida anterior pode ainda estar correndo (habilidade é recusada durante o avanço)
         g.world.svfx = []; const before = p.cds['s' + idx];
         const ok = g.world.castSkill(p, idx, p.x + 200, p.y + 20);
         return { ok, cdSet: p.cds['s' + idx] > 0, before };

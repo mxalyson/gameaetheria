@@ -17,6 +17,8 @@ export const TYPES = {
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
   '.svg': 'image/svg+xml',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
   '.ico': 'image/x-icon',
 };
 
@@ -34,7 +36,19 @@ export function createStatic(root, { headExtra = '', cache = 'none' } = {}) {
       if (headExtra && rel === 'index.html') data = Buffer.from(data.toString('utf8').replace('<head>', '<head>\n  ' + headExtra));
       const ver = url.searchParams.has('v');
       const cc = cache === 'none' ? 'no-store' : ver ? 'public, max-age=31536000, immutable' : 'no-cache';
-      res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Cache-Control': cc, 'X-Content-Type-Options': 'nosniff' });
+      const head = { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Cache-Control': cc, 'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' };
+      // pedido por partes (Range): o <audio> da música usa; o Safari não toca mídia de servidor que só responde 200
+      const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+      if (m && (m[1] || m[2])) {
+        const size = data.length;
+        let start = m[1] ? Number(m[1]) : size - Number(m[2]), end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+        if (!m[1]) start = Math.max(0, start);
+        if (start >= size || start > end) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }).end(); return; }
+        res.writeHead(206, { ...head, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 });
+        res.end(req.method === 'HEAD' ? undefined : data.subarray(start, end + 1));
+        return;
+      }
+      res.writeHead(200, { ...head, 'Content-Length': data.length });
       res.end(req.method === 'HEAD' ? undefined : data);
     } catch {
       res.writeHead(404).end('not found');
