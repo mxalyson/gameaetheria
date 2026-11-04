@@ -2,6 +2,7 @@ import { TESTE, buildTesteChar, installTesteUi } from './teste.js'; // modo ?tes
 import { enhance, findGear } from './core/enhance.js';
 import './no-zoom.js';
 import { heroSpritesEnabled, preloadHero, showHeroLoading } from './render/hero-sprites.js';
+import { whenNatureReady } from './render/nature-sprites.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { UI, esc } from './ui/ui.js';
@@ -127,8 +128,9 @@ class Game {
       const raw = (now - this.last) / 1000, dt = Math.min(0.05, raw);
       this.last = now;
       // qualidade automática: só em jogo (não no título) e com prefs.quality 'auto'; a escolha manual nunca é alterada
+      if (this.renderer.held) this.qgov.grace(); // atlases ainda carregando: a abertura pesada não conta como FPS do jogo
       const lowered = this.qgov.update(raw, this.prefs.quality === 'auto' && this.mode !== 'title' && !this.portrait.matches, resolveQuality(this.prefs, this.touch.coarse));
-      if (lowered) { this.applyPrefs(); this.ui.toast('Qualidade ajustada', '', ''); }
+      if (lowered) { this.applyPrefs(); if (this.qgov.shouldNotify()) this.ui.toast('Qualidade ajustada', 'Efeitos reduzidos para manter a fluidez', ''); } // só efeitos: resolução e arte HD ficam
       const ok = this.guard('quadro', () => this.frameBody(dt));
       this.frameFails = ok ? 0 : (this.frameFails ?? 0) + 1;
       if (this.frameFails === 20) this.ui.toast('Erro', 'Algo deu errado, recarregue a página.', '');
@@ -275,7 +277,7 @@ class Game {
     this.ui.hideScreen();
     this.ui.setupHud(char);
     this.touch.setup(char);
-    if (heroSpritesEnabled()) showHeroLoading(preloadHero(char)); // visual novo: espera o herói carregar
+    if (heroSpritesEnabled()) showHeroLoading(Promise.all([preloadHero(char), whenNatureReady()])); // visual novo: espera o herói e o cenário pintado (casas HD) carregarem
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
       setTimeout(() => this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Fale com a Guarda Ren (marca ❗) para receber sua primeira missão', 'gold'), 2600); // depois da tela "Preparando seu herói" (antes o toast expirava escondido)
@@ -317,6 +319,7 @@ class Game {
   }
 
   enterZone(zoneId, x, y, mode = 'explore') {
+    this.qgov.grace(); // trocar de zona (terreno e atlas novos) é pesado: o governador espera
     const prev = this.player;
     const ratio = prev && !prev.dead ? prev.hp / prev.maxHp : 1;
     this.skillLv = this.char.level;
@@ -953,7 +956,7 @@ class Game {
     this.uiScale = resolveScale(p) / 100; // 'auto' acompanha a viewport (prefs.js autoScale)
     document.documentElement.style.setProperty('--ui', String(this.uiScale));
     const q = resolveQuality(p, this.touch.coarse);
-    this.renderer.setQuality(p.quality === 'auto' ? this.qgov.apply(q) : q); // o governador só limita o modo auto
+    this.renderer.setQuality(q, p.quality === 'auto' ? this.qgov.apply(q) : q); // resolução = q; o governador só limita os EFEITOS, e só no modo auto
     this.touch.setMode(p.controls);
   }
 

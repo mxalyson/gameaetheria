@@ -6,6 +6,7 @@ const KEY = 'aetheria_cenario';
 let atlas = null, meta = null, loading = null, on = null;
 let hdAtlas = null, hdMeta = null; // atlas HD (hd.webp, nomes hd_*): árvores, casas e ponte com o dobro de pixels, só em aparelho de alta densidade
 let gAtlas = null, gMeta = null; // atlas de CHÃO (flores, trevos, pedrinhas, pedras de trilha): carimbado no cache do terreno, não a cada quadro
+let settled = false, giveUp = false; // settled: todos os atlases terminaram (ou falharam); giveUp: espera longa demais (rede ruim), deixa desenhar mesmo assim
 export const stats = { drawn: 0, sprites: 0 }; // diagnóstico/testes (window.natureStats)
 
 // Tier HD: tela de alta densidade (DPR >= 2,5, iPhone) com aparelho forte, ou ?hd=1 (força) / ?hd=0 (desliga). Nos demais valem os atlases normais (menos memória de GPU).
@@ -22,6 +23,15 @@ function applyHdVariants() {
     const hdv = cfg.v.filter((n) => hdMeta[hdKey(n)]);
     cfg.vh = new Set(hdv).size >= 2 && /Tree|Pine|cherry/.test(cfg.v[0]) ? cfg.v.filter((n) => hdMeta[hdKey(n)] || /^DeadTree/.test(n)) : null;
   }
+}
+
+// O cenário pintado está pronto (ou desligado/indisponível)? Até lá o renderer NÃO desenha o mundo: a Vila nunca aparece com as casas por código.
+export const natureReady = () => !natureEnabled() || settled || giveUp;
+// Promessa que resolve quando o cenário pintado terminou de carregar (tela de carregamento espera por ela); desiste após `ms`.
+export function whenNatureReady(ms = 12000) {
+  const p = loadNature();
+  if (!p) return Promise.resolve();
+  return Promise.race([p, new Promise((r) => setTimeout(() => { giveUp = true; r(); }, ms))]);
 }
 
 export function natureEnabled() {
@@ -69,7 +79,9 @@ export function loadNature() {
       await img.decode?.();
       gMeta = m.sprites; gAtlas = img;
     } catch { gAtlas = null; }
+    settled = true;
   })();
+  setTimeout(() => { giveUp = true; }, 15000); // rede ruim: não prende o jogo para sempre
   return loading;
 }
 

@@ -10,12 +10,12 @@ import { drawSkillVfx, drawSkillProjectile, drawBasicSlash, vfxShake, trackActor
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
 import { drawChestSprite } from './prop-sprites.js';
 import { GroundCache, quantScale } from './ground-tiles.js';
-import { loadGroundTextures, groundTexReady, fillGroundTexture } from './ground-textures.js';
+import { loadGroundTextures, groundTexReady, groundTexSettled, fillGroundTexture } from './ground-textures.js';
 import { drawSpiritSprite, preloadSpirits } from './spirit-sprites.js';
 import { drawNpcSprite, preloadNpcs, npcTop } from './npc-sprites.js';
 import { drawDayNight } from './sky.js';
 import { loadProps, setCryptState, gateSortY, drawCryptGate, drawCryptPillar, drawCryptSarcophagus, drawHarborBoat, drawHarborCrate, propShadow, propReady } from './props-art.js';
-import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite, drawNatureNamed } from './nature-sprites.js';
+import { loadNature, setNatureZone, drawNature, stampGround, groundReady, hasNatureSprite, drawNatureNamed, natureReady } from './nature-sprites.js';
 import { CLASSES } from '../data/classes.js';
 import { MOBS } from '../data/mobs.js';
 import { SPIRITS } from '../data/spirits.js';
@@ -86,12 +86,14 @@ export class Renderer {
     if (tbs.length) { this.hud[3] = [0, 0, 0, 0]; for (const r of tbs) this.hud.push([r.left - 3, r.top - 3, r.right + 3, r.bottom + 3]); } // no lugar da estimativa por escala
   }
 
-  // Qualidade gráfica: limita a resolução e corta efeitos de atmosfera mais caros (para celulares).
-  setQuality(level) {
-    this.quality = { low: 0, medium: 1, high: 2 }[level] ?? 2;
+  // Qualidade gráfica em dois eixos independentes: `level` = RESOLUÇÃO (teto de DPR, escolhido pelo aparelho/usuário) e `fx` = EFEITOS (partículas, atmosfera, sombras, aura;
+  // é o que o governador de FPS rebaixa). A resolução só muda se o teto mudar de fato: redimensionar o canvas descarta o terreno em cache.
+  setQuality(level, fx = level) {
+    const lv = { low: 0, medium: 1, high: 2 };
+    this.quality = lv[fx] ?? 2;
     auraQ = this.quality;
-    this.dprCap = [1, 2, 3][this.quality]; // alta usa a densidade real da tela (iPhone = 3×); antes o teto de 2 deixava o celular borrado
-    this.resize();
+    const cap = [1, 2, 3][lv[level] ?? 2]; // alta usa a densidade real da tela (iPhone = 3×); antes o teto de 2 deixava o celular borrado
+    if (cap !== this.dprCap) { this.dprCap = cap; this.resize(); }
   }
 
   camera(world, focus) {
@@ -106,6 +108,10 @@ export class Renderer {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.fillStyle = z.palette.outside;
     g.fillRect(0, 0, this.vw, this.vh);
+    // Arte pintada (cenário + texturas de chão) ainda carregando: não desenha o mundo. Antes as primeiras quadros mostravam as casas e árvores por código
+    // e o terreno sem textura, que "estouravam" para a arte HD quando os atlases chegavam. A tela de carregamento (#hero-loading) cobre esse intervalo.
+    this.held = !(natureReady() && groundTexSettled());
+    if (this.held) return;
     g.save();
     g.scale(this.zoom, this.zoom);
     const shk = vfxShake(world); // tremor discreto de golpes fortes (skill-vfx.js)

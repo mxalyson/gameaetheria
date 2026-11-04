@@ -23,10 +23,13 @@ export function loadGroundTextures() {
   if (!groundTexEnabled() || loading) return loading;
   loading = Promise.all([...NAMES, ...EXTRA].map((n) => new Promise((res) => {
     const i = new Image(); i.onload = () => { imgs.set(n, i); res(); }; i.onerror = () => res(); i.src = `assets/ground/${n}.webp?v=${ASSET_V}`;
-  }))).then(() => { ready = NAMES.every((n) => imgs.has(n)); });
+  }))).then(() => { ready = NAMES.every((n) => imgs.has(n)); done = true; });
+  setTimeout(() => { done = true; }, 15000);
   return loading;
 }
 export const groundTexReady = () => ready;
+let done = false; // terminou de carregar (ou desistiu): o terreno só é montado depois, sem refazer
+export const groundTexSettled = () => !groundTexEnabled() || done;
 export const groundExtra = (name) => imgs.get(name) ?? null;
 
 // cada tile cobre `scale` vezes o seu tamanho em pixels no mundo; sem emenda, então basta repetir
