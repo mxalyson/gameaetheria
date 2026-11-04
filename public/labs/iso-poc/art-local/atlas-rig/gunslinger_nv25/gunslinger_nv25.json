@@ -1,12 +1,12 @@
 {
   "name": "gunslinger_nv25",
   "frame": {
-    "w": 99.2,
-    "h": 120.8
+    "w": 97.6,
+    "h": 116.8
   },
   "pivot": {
-    "x": 49.6,
-    "y": 104.39
+    "x": 48.8,
+    "y": 101.19
   },
   "scale": 1.25,
   "views": 8,
@@ -20,8 +20,8 @@
       "release": null
     },
     "walk": {
-      "frames": 6,
-      "fps": 9,
+      "frames": 8,
+      "fps": 12,
       "loop": true,
       "release": null
     },
@@ -49,6 +49,5 @@
       "loop": false,
       "release": 1
     }
-  },
-  "sizeMul": 1
+  }
 }

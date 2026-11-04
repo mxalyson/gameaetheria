@@ -148,7 +148,7 @@ def q(name, *rots):  # rotações em eixos do MUNDO -> quaternion no espaço loc
 
 def reset():
     for b in pb:
-        b.rotation_quaternion = Quaternion((1, 0, 0, 0)); b.location = (0, 0, 0)
+        b.rotation_quaternion = Quaternion((1, 0, 0, 0)); b.location = (0, 0, 0); b.scale = (1, 1, 1)
 
 def pose(rot=None, hipz=0.0, hipy=0.0):
     reset()
@@ -164,73 +164,78 @@ AMP = spec.get('arm_amp', 1.0)           # < 1 em personagens de manga larga/ves
 LEG = spec.get('leg_swing', 1.0)         # 0.4 para personagens de manto/vestido (evita deformar a roupa)
 FPS = {'idle': 6, 'walk': 8, 'attack': 6, 'skill': 8, 'hit': 3, 'dash': 4}
 
-def idle(f, n):
-    p = 2 * math.pi * f / n
-    return dict(rot={'spine': [(AX, 0.03 * math.sin(p + 0.5))], 'head': [(AX, 0.03 * math.sin(p + 1.0))],
-                     'upper_arm.R': [(AY, -0.05 + 0.04 * math.sin(p))], 'upper_arm.L': [(AY, 0.05 - 0.04 * math.sin(p))]}, hipz=0.012 * math.sin(p))
+LEGACY = bool(spec.get('legacy', False))  # legacy: animações antigas (Bruxo e heróis-base); as novas (anim2) estão no bloco else
+if LEGACY:
+    def idle(f, n):
+        p = 2 * math.pi * f / n
+        return dict(rot={'spine': [(AX, 0.03 * math.sin(p + 0.5))], 'head': [(AX, 0.03 * math.sin(p + 1.0))],
+                         'upper_arm.R': [(AY, -0.05 + 0.04 * math.sin(p))], 'upper_arm.L': [(AY, 0.05 - 0.04 * math.sin(p))]}, hipz=0.012 * math.sin(p))
 
-def walk(f, n):
-    p = 2 * math.pi * f / n; s = math.sin(p); c = math.cos(p)
-    rot = {'hips': [(AX, 0.08), (AZ, 0.08 * s)], 'spine': [(AZ, -0.08 * s)],
-           'thigh.R': [(AX, -0.7 * LEG * s)], 'thigh.L': [(AX, 0.7 * LEG * s)],
-           'shin.R': [(AX, 0.8 * LEG * max(0, c))], 'shin.L': [(AX, 0.8 * LEG * max(0, -c))],
-           'upper_arm.R': [(AX, 0.5 * AMP * s)], 'upper_arm.L': [(AX, -0.5 * AMP * s)], 'head': [(AX, -0.05)]}
-    return dict(rot=rot, hipz=0.035 * abs(s))
+    def walk(f, n):
+        p = 2 * math.pi * f / n; s = math.sin(p); c = math.cos(p)
+        rot = {'hips': [(AX, 0.08), (AZ, 0.08 * s)], 'spine': [(AZ, -0.08 * s)],
+               'thigh.R': [(AX, -0.7 * LEG * s)], 'thigh.L': [(AX, 0.7 * LEG * s)],
+               'shin.R': [(AX, 0.8 * LEG * max(0, c))], 'shin.L': [(AX, 0.8 * LEG * max(0, -c))],
+               'upper_arm.R': [(AX, 0.5 * AMP * s)], 'upper_arm.L': [(AX, -0.5 * AMP * s)], 'head': [(AX, -0.05)]}
+        return dict(rot=rot, hipz=0.035 * abs(s))
 
-def swing(arr, f): return arr[f]
+    def swing(arr, f): return arr[f]
 
-def attack(f, n, big=False):
-    k = 1.25 if big else 1.0
-    W, O = 'upper_arm.' + WS, 'upper_arm.' + OS
-    if STYLE == 'slash':   # espada: levanta atrás e corta para frente
-        a = [0.3, 1.0, -0.3, -1.3, -0.9, -0.2]
-        fa = [-0.2, -0.9, -0.4, -0.2, -0.3, -0.2]
-        lean = [0.0, -0.1, 0.1, 0.3, 0.2, 0.05]; twist = [0, -0.25, 0.1, 0.4, 0.2, 0]
-        o = [-0.3, -0.5, -0.6, -0.6, -0.5, -0.3]
-    elif STYLE == 'cast':  # varinha: ergue e aponta
-        a = [-0.2, -0.9, -1.5, -1.95, -1.4, -0.5]
-        fa = [-0.2, -0.6, -0.5, -0.3, -0.3, -0.2]
-        lean = [0, -0.1, -0.05, 0.18, 0.1, 0.0]; twist = [0, -0.15, 0.0, 0.2, 0.1, 0]
-        o = [-0.4, -0.8, -1.1, -1.3, -1.0, -0.5]
-    elif STYLE == 'shoot':  # rifle: mira firme, coice no disparo
-        a = [-0.6, -1.1, -1.25, -0.45, -0.9, -0.8]
-        fa = [-0.5, -0.8, -0.8, -0.3, -0.6, -0.5]
-        lean = [0, 0.1, 0.12, -0.3, -0.1, 0]; twist = [0, 0.1, 0.1, -0.15, 0, 0]
-        o = [-0.6, -1.1, -1.25, -0.45, -0.9, -0.8]
-    else:                  # 'pray': cajado sobe e bate no chão
-        a = [-0.2, -0.9, -1.4, -1.0, -0.6, -0.2]
-        fa = [-0.2, -0.5, -0.7, -0.4, -0.3, -0.2]
-        lean = [0, -0.08, -0.12, 0.12, 0.05, 0]; twist = [0, 0, 0, 0, 0, 0]
-        o = [-0.2, -0.9, -1.3, -1.1, -0.6, -0.2]
-    WA = spec.get('w_amp', 1.0)  # < 1: arma grande/rígida no braço (arco, cajado) não pode varrer o corpo
-    rot = {W: [(AX, a[f] * k * WA)], 'fore_arm.' + WS: [(AX, fa[f])], O: [(AX, o[f] * AMP)],
-           'hips': [(AX, lean[f] * k), (AZ, twist[f] * k)], 'spine': [(AZ, twist[f] * 0.5)]}
-    return dict(rot=rot, hipz=0.01 * f / n if f < 4 else 0.0)
+    def attack(f, n, big=False):
+        k = 1.25 if big else 1.0
+        W, O = 'upper_arm.' + WS, 'upper_arm.' + OS
+        if STYLE == 'slash':   # espada: levanta atrás e corta para frente
+            a = [0.3, 1.0, -0.3, -1.3, -0.9, -0.2]
+            fa = [-0.2, -0.9, -0.4, -0.2, -0.3, -0.2]
+            lean = [0.0, -0.1, 0.1, 0.3, 0.2, 0.05]; twist = [0, -0.25, 0.1, 0.4, 0.2, 0]
+            o = [-0.3, -0.5, -0.6, -0.6, -0.5, -0.3]
+        elif STYLE == 'cast':  # varinha: ergue e aponta
+            a = [-0.2, -0.9, -1.5, -1.95, -1.4, -0.5]
+            fa = [-0.2, -0.6, -0.5, -0.3, -0.3, -0.2]
+            lean = [0, -0.1, -0.05, 0.18, 0.1, 0.0]; twist = [0, -0.15, 0.0, 0.2, 0.1, 0]
+            o = [-0.4, -0.8, -1.1, -1.3, -1.0, -0.5]
+        elif STYLE == 'shoot':  # rifle: mira firme, coice no disparo
+            a = [-0.6, -1.1, -1.25, -0.45, -0.9, -0.8]
+            fa = [-0.5, -0.8, -0.8, -0.3, -0.6, -0.5]
+            lean = [0, 0.1, 0.12, -0.3, -0.1, 0]; twist = [0, 0.1, 0.1, -0.15, 0, 0]
+            o = [-0.6, -1.1, -1.25, -0.45, -0.9, -0.8]
+        else:                  # 'pray': cajado sobe e bate no chão
+            a = [-0.2, -0.9, -1.4, -1.0, -0.6, -0.2]
+            fa = [-0.2, -0.5, -0.7, -0.4, -0.3, -0.2]
+            lean = [0, -0.08, -0.12, 0.12, 0.05, 0]; twist = [0, 0, 0, 0, 0, 0]
+            o = [-0.2, -0.9, -1.3, -1.1, -0.6, -0.2]
+        WA = spec.get('w_amp', 1.0)  # < 1: arma grande/rígida no braço (arco, cajado) não pode varrer o corpo
+        rot = {W: [(AX, a[f] * k * WA)], 'fore_arm.' + WS: [(AX, fa[f])], O: [(AX, o[f] * AMP)],
+               'hips': [(AX, lean[f] * k), (AZ, twist[f] * k)], 'spine': [(AZ, twist[f] * 0.5)]}
+        return dict(rot=rot, hipz=0.01 * f / n if f < 4 else 0.0)
 
-def skill(f, n):
-    up = [0, -0.04, 0.04, 0.12, 0.08, 0.0, 0.0, 0.0]
-    arms = [-0.2, -0.4, -0.9, -1.5, -1.3, -0.7, -0.3, -0.1]
-    lean = [0, -0.1, -0.2, 0.0, 0.3, 0.15, 0.05, 0]
-    crouch = [0, 0.5, 0.2, 0, 0.2, 0.3, 0.1, 0]
-    WA = spec.get('w_amp', 1.0)  # braço da arma grande sobe menos (arco/cajado não cobre o rosto)
-    rot = {'upper_arm.R': [(AX, arms[f] * (WA if WS == 'R' else 1.0))], 'upper_arm.L': [(AX, arms[f] * (WA if WS == 'L' else 1.0))], 'hips': [(AX, lean[f])],
-           'thigh.R': [(AX, -crouch[f])], 'thigh.L': [(AX, -crouch[f])], 'shin.R': [(AX, crouch[f] * 1.6)], 'shin.L': [(AX, crouch[f] * 1.6)],
-           'head': [(AX, -0.1 if f < 3 else 0.1)]}
-    return dict(rot=rot, hipz=up[f])
+    def skill(f, n):
+        up = [0, -0.04, 0.04, 0.12, 0.08, 0.0, 0.0, 0.0]
+        arms = [-0.2, -0.4, -0.9, -1.5, -1.3, -0.7, -0.3, -0.1]
+        lean = [0, -0.1, -0.2, 0.0, 0.3, 0.15, 0.05, 0]
+        crouch = [0, 0.5, 0.2, 0, 0.2, 0.3, 0.1, 0]
+        WA = spec.get('w_amp', 1.0)  # braço da arma grande sobe menos (arco/cajado não cobre o rosto)
+        rot = {'upper_arm.R': [(AX, arms[f] * (WA if WS == 'R' else 1.0))], 'upper_arm.L': [(AX, arms[f] * (WA if WS == 'L' else 1.0))], 'hips': [(AX, lean[f])],
+               'thigh.R': [(AX, -crouch[f])], 'thigh.L': [(AX, -crouch[f])], 'shin.R': [(AX, crouch[f] * 1.6)], 'shin.L': [(AX, crouch[f] * 1.6)],
+               'head': [(AX, -0.1 if f < 3 else 0.1)]}
+        return dict(rot=rot, hipz=up[f])
 
-def hit(f, n):
-    t = [0.6, 1.0, 0.3][f]
-    rot = {'hips': [(AX, -0.3 * t)], 'head': [(AX, -0.25 * t)], 'upper_arm.R': [(AX, 0.4 * t)], 'upper_arm.L': [(AX, 0.4 * t)]}
-    return dict(rot=rot, hipy=0.04 * t, hipz=-0.01 * t)
+    def hit(f, n):
+        t = [0.6, 1.0, 0.3][f]
+        rot = {'hips': [(AX, -0.3 * t)], 'head': [(AX, -0.25 * t)], 'upper_arm.R': [(AX, 0.4 * t)], 'upper_arm.L': [(AX, 0.4 * t)]}
+        return dict(rot=rot, hipy=0.04 * t, hipz=-0.01 * t)
 
-def dash(f, n):  # investida / rolamento: corpo baixo e inclinado, passada larga, braços para trás
-    lean = [0.2, 0.4, 0.45, 0.35][f]; stride = [-0.4, -1.0, 0.7, -0.9][f]; knee = [0.6, 1.0, 0.4, 0.9][f]; arms = [0.25, 0.55, 0.6, 0.45][f]  # braços pouco para trás: a capa/poncho acompanha os braços e rasga se eles vão longe
-    rot = {'hips': [(AX, lean), (AZ, [0.0, -0.1, 0.1, -0.05][f])], 'spine': [(AX, 0.1)], 'head': [(AX, -0.25)],
-           'thigh.R': [(AX, stride * LEG)], 'thigh.L': [(AX, -stride * 0.9 * LEG)], 'shin.R': [(AX, knee * LEG)], 'shin.L': [(AX, (1.2 - knee) * LEG)],
-           'upper_arm.R': [(AX, arms)], 'upper_arm.L': [(AX, arms)], 'fore_arm.R': [(AX, -0.3)], 'fore_arm.L': [(AX, -0.3)]}
-    return dict(rot=rot, hipz=[-0.03, 0.0, 0.02, 0.0][f])
+    def dash(f, n):  # investida / rolamento: corpo baixo e inclinado, passada larga, braços para trás
+        lean = [0.2, 0.4, 0.45, 0.35][f]; stride = [-0.4, -1.0, 0.7, -0.9][f]; knee = [0.6, 1.0, 0.4, 0.9][f]; arms = [0.25, 0.55, 0.6, 0.45][f]  # braços pouco para trás: a capa/poncho acompanha os braços e rasga se eles vão longe
+        rot = {'hips': [(AX, lean), (AZ, [0.0, -0.1, 0.1, -0.05][f])], 'spine': [(AX, 0.1)], 'head': [(AX, -0.25)],
+               'thigh.R': [(AX, stride * LEG)], 'thigh.L': [(AX, -stride * 0.9 * LEG)], 'shin.R': [(AX, knee * LEG)], 'shin.L': [(AX, (1.2 - knee) * LEG)],
+               'upper_arm.R': [(AX, arms)], 'upper_arm.L': [(AX, arms)], 'fore_arm.R': [(AX, -0.3)], 'fore_arm.L': [(AX, -0.3)]}
+        return dict(rot=rot, hipz=[-0.03, 0.0, 0.02, 0.0][f])
 
-CLIPS = {'idle': idle, 'walk': walk, 'attack': attack, 'skill': skill, 'hit': hit, 'dash': dash}
+else:
+    exec(compile(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "anim2.py"), encoding="utf8").read(), "anim2.py", "exec"))
+
+CLIPS = {'idle': idle, 'walk': walk, 'attack': attack, 'skill': skill, 'hit': hit, 'dash': dash} if LEGACY else CLIPS2
 arm.animation_data_create()
 for cname, fn in CLIPS.items():
     n = FPS[cname]
@@ -238,10 +243,12 @@ for cname, fn in CLIPS.items():
     arm.animation_data.action = act
     loop = cname in ('idle', 'walk')
     for f in range(n + (1 if loop else 0)):
-        pose(**fn(f % n, n))
+        if LEGACY: pose(**fn(f % n, n))
+        else: pose2(fn(f % n, n))
         for b in pb:
             b.keyframe_insert('rotation_quaternion', frame=f)
             b.keyframe_insert('location', frame=f)
+            if not LEGACY: b.keyframe_insert('scale', frame=f)
     if preview:  # imagens de conferência: um quadro de cada clipe
         pass
 bpy.ops.object.mode_set(mode='OBJECT')

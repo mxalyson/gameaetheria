@@ -9,10 +9,12 @@ test('cria personagem, entra na vila e se move sem erros de console', async ({ p
   await page.click('[data-action="new-char"]');
   await page.click('[data-action="create"]');
   await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
+  await page.waitForSelector('#hero-loading', { state: 'detached', timeout: 20000 }).catch(() => {}); // o herói pintado carrega primeiro; sem isso o 1º segundo pode ser de tela de carregamento
+  await page.waitForFunction(() => window.game?.mode === 'explore');
 
   const before = await page.evaluate(() => ({ x: window.game.player.x, y: window.game.player.y }));
   await page.keyboard.down('d');
-  await page.waitForTimeout(600);
+  await page.waitForFunction((x) => window.game.player.x > x + 40, before.x, { timeout: 5000 }); // andar até 40 px (não depende do relógio do teste)
   await page.keyboard.up('d');
   const after = await page.evaluate(() => ({ x: window.game.player.x, y: window.game.player.y }));
 

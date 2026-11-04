@@ -75,7 +75,7 @@ function pose(name, f, n) {
   return P;
 }
 // idle/walk usam menos quadros (src = quadros da animação original do Blender): mesma duração do ciclo, ~13% menos textura
-const CLIPS = { idle: { frames: 4, src: 6, fps: 5.33, loop: true }, walk: { frames: 6, src: 8, fps: 9, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false }, dash: { frames: 4, fps: 12, loop: false, release: 1 } };
+const CLIPS = { idle: { frames: 4, src: 6, fps: 5.33, loop: true }, walk: { frames: +(q.get('walkf') || 8), src: 8, fps: +(q.get('walkf') || 8) * 1.5, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false }, dash: { frames: 4, fps: 12, loop: false, release: 1 } };
 const yaws = [0, 45, 90, 135, 180, 225, 270, 315]; // 0 = de frente para a câmera; +90 = olhando para a direita da tela
 
 function shoot(P, deg, dst, dx, dy) {

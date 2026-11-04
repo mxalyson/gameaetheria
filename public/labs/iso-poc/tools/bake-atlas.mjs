@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const [model = 'paladino', size = '160', clip = '0'] = process.argv.slice(2);
 const root = fileURLToPath(new URL('../', import.meta.url));
 // RIG=1 usa o GLB com esqueleto (art-local/rigged/<id>.glb, feito por tools/blender/rig_animate.py) e grava em atlas-rig/
-const dest = path.join(root, 'art-local', process.env.RIG ? (process.env.MIRROR ? 'atlas-rig-m' : 'atlas-rig') : 'atlas', model);
+const dest = process.env.OUTDIR ? path.join(process.env.OUTDIR, model) : path.join(root, 'art-local', process.env.RIG ? (process.env.MIRROR ? 'atlas-rig-m' : 'atlas-rig') : 'atlas', model); // OUTDIR=pasta: grava lá (testes de animação sem sobrescrever o atlas)
 fs.mkdirSync(dest, { recursive: true });
 const browser = await chromium.launch({ args: process.env.SOFTGL ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--use-gl=angle', '--use-angle=d3d11', '--ignore-gpu-blocklist'] }); // GPU por padrão (software leva ~1,2 s/quadro)
 const page = await browser.newPage({ viewport: { width: 400, height: 300 } });

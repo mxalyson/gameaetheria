@@ -1,11 +1,11 @@
 {
   "name": "guardian_nv25",
   "frame": {
-    "w": 126.4,
-    "h": 122.4
+    "w": 128,
+    "h": 119.2
   },
   "pivot": {
-    "x": 63.2,
+    "x": 64,
     "y": 105.99
   },
   "scale": 1.25,
@@ -20,8 +20,8 @@
       "release": null
     },
     "walk": {
-      "frames": 6,
-      "fps": 9,
+      "frames": 8,
+      "fps": 12,
       "loop": true,
       "release": null
     },
@@ -49,6 +49,5 @@
       "loop": false,
       "release": 1
     }
-  },
-  "sizeMul": 1
+  }
 }

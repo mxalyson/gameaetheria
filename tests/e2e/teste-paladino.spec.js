@@ -16,7 +16,7 @@ test('?teste=paladino: Paladino Nv25 em sandbox, sem tocar no save real', async 
     const { heroLook } = await import('/src/render/hero-sprites.js');
     return { ...heroLook(window.game.player), cls: window.game.char.classId, lvl: window.game.char.level, shield: window.game.char.equipment.offhand?.rarity };
   });
-  expect(look).toMatchObject({ spec: 'paladin', tier: 2, atlasVariant: 'paladin_sun', cls: 'warrior', lvl: 25, shield: 'legendary' });
+  expect(look).toMatchObject({ spec: 'paladin', tier: 2, atlasVariant: 'paladin_nv25', cls: 'warrior', lvl: 25, shield: 'legendary' });
   await expect(page.locator('#teste-bar')).toContainText('MODO TESTE');
   // alterna para o Guerreiro base e para o Bosque sem recarregar
   await page.locator('#teste-base').click();

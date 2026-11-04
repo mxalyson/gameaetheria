@@ -1,12 +1,12 @@
 {
   "name": "sniper_nv25",
   "frame": {
-    "w": 116.8,
-    "h": 125.6
+    "w": 128,
+    "h": 126.4
   },
   "pivot": {
-    "x": 58.4,
-    "y": 105.99
+    "x": 64,
+    "y": 104.39
   },
   "scale": 1.25,
   "views": 8,
@@ -20,8 +20,8 @@
       "release": null
     },
     "walk": {
-      "frames": 6,
-      "fps": 9,
+      "frames": 8,
+      "fps": 12,
       "loop": true,
       "release": null
     },
@@ -49,6 +49,5 @@
       "loop": false,
       "release": 1
     }
-  },
-  "sizeMul": 1
+  }
 }

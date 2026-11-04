@@ -63,11 +63,12 @@ test('heroLook: atlas de variante só para Paladino com Maestria (Nv 25); demais
   assert.equal(heroLook(hero('mage', 25, 'warlock', true)).atlasVariant, 'warlock_nv25');
   assert.equal(heroLook(hero('cleric', 25, 'guardian', true)).atlasVariant, 'guardian_nv25');
   assert.equal(heroLook(hero('archer', 20, 'sniper', false)).atlasVariant, undefined, 'tier 1 usa o atlas base');
-  assert.equal(heroLook(hero('warrior', 25, 'paladin', true)).atlasVariant, 'paladin_sun');
+  assert.equal(heroLook(hero('warrior', 25, 'paladin', true)).atlasVariant, 'paladin_nv25');
   assert.equal(heroLook(hero('warrior', 20, 'paladin', false)).atlasVariant, undefined, 'tier 1 (só especialização) usa o atlas base');
-  assert.equal(heroLook({ classId: 'warrior', spec: 'paladin', mastery: true }).atlasVariant, 'paladin_sun', 'ator (jogo/rede) também');
+  assert.equal(heroLook({ classId: 'warrior', spec: 'paladin', mastery: true }).atlasVariant, 'paladin_nv25', 'ator (jogo/rede) também');
   assert.equal(heroLook(hero('warrior', 25, 'berserker', true)).atlasVariant, 'berserker_nv25');
-  assert.equal(heroLook(hero('mage', 25, 'arcane', true)).atlasVariant, undefined, 'Arcano ainda sem arte');
+  assert.equal(heroLook(hero('mage', 25, 'arcane', true)).atlasVariant, 'arcane_nv25');
+  assert.equal(heroLook(hero('cleric', 25, 'inquisitor', true)).atlasVariant, 'inquisitor_nv25');
 });
 
 test('snapshot: aura viaja no 8º elemento da tupla e só quando existe', () => {

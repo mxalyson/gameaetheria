@@ -20,8 +20,8 @@
       "release": null
     },
     "walk": {
-      "frames": 6,
-      "fps": 9,
+      "frames": 8,
+      "fps": 12,
       "loop": true,
       "release": null
     },
@@ -49,6 +49,5 @@
       "loop": false,
       "release": 1
     }
-  },
-  "sizeMul": 1
+  }
 }

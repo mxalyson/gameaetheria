@@ -7,7 +7,7 @@ const ROOT = 'public/labs/iso-poc/art-local/atlas-rig';
 const HEROES = { paladino: 'Guerreiro', aprendiz: 'Mago', franco: 'Arqueiro', sacerdote: 'Clérigo' };
 // Variantes de evolução (hero-sprites.js VARIANT_ATLASES): carregadas sob demanda no lugar do atlas da classe; o pior caso numa partida é a soma de todas.
 const VARIANTS = {
-  paladin_sun: 'Paladino Maestria', berserker_nv25: 'Berserker Maestria', sniper_nv25: 'Franco-atirador Maestria',
+  paladin_nv25: 'Paladino Maestria', arcane_nv25: 'Arcano Maestria', inquisitor_nv25: 'Inquisidor Maestria', berserker_nv25: 'Berserker Maestria', sniper_nv25: 'Franco-atirador Maestria',
   gunslinger_nv25: 'Pistoleiro Maestria', warlock_nv25: 'Bruxo Maestria', guardian_nv25: 'Guardiao Maestria',
 };
 const VARIANT_TEX_K = 0.8; // igual a hero-sprites.js: variantes ficam a 80% da escala em média/baixa
