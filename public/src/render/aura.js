@@ -107,7 +107,7 @@ export function drawAuraMotes(g, a, t, q, feetY) {
     const px = a.x + Math.cos(ang) * rad, py = feetY - ph * 62 * (0.6 + st.rise * 0.5) + Math.sin(ang) * rad * 0.4;
     g.globalAlpha = prev * st.alpha * Math.sin(ph * Math.PI);        // nasce e some suave
     const pp = paintedParts(e);
-    if (pp) { const sp = pp[(h01(id, i + 5) * pp.length) | 0], w = s * (st.kind === 'ember' || st.kind === 'spark' ? 1.7 : 1.5) * (st.spec === 'berserker' ? 0.7 : 1), // Berserker: brasas menores (fogo demais, dono) h = w * sp.h / sp.w; g.drawImage(sp.cv, px - w * 0.5, py - h * 0.5, w, h); }
+    if (pp) { const sp = pp[(h01(id, i + 5) * pp.length) | 0], w = s * (st.kind === 'ember' || st.kind === 'spark' ? 1.7 : 1.5) * (st.spec === 'berserker' ? 0.7 : 1), /* Berserker: brasas menores (fogo demais, dono) */ h = w * sp.h / sp.w; g.drawImage(sp.cv, px - w * 0.5, py - h * 0.5, w, h); }
     else g.drawImage(e.part, px - s * 0.5, py - s * 0.5, s, s);
   }
   g.globalAlpha = prev;
