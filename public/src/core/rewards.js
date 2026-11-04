@@ -16,7 +16,7 @@ import { applyDeath, hasDeathPenalty } from './phoenix.js';
 // XP de PvP (G3): vitória 6% / derrota 2% de um nível (×mul do modo), SEM teto por hora (decisão do dono); 0 se o MESMO adversário
 // aparece pela 3ª vez seguida em 30 min. Contadores em `stats` (minutos desde 1970 para caber no limite de 1e8 do savedoc).
 // `pvpHour`/`pvpHourN` ficaram sem uso (eram o teto por hora); as chaves seguem em STAT_KEYS_PROGRESS só por compatibilidade de saves.
-export const PVP_XP = { win: 0.06, loss: 0.02, foeMax: 2, foeWindowMin: 30 };
+export const PVP_XP = { win: 0, loss: 0, foeMax: 2, foeWindowMin: 30 }; // dono (2026-11-04): arena NÃO dá XP (rendia mais que o farm); só rating e ouro
 export function pvpXpFactor(stats, foeId, now) {
   const min = Math.floor(now / 60000);
   let f = 1;

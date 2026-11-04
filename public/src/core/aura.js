@@ -11,7 +11,7 @@ export const SPEC_ORDER = ['paladin', 'berserker', 'arcane', 'warlock', 'sniper'
 // (c do tier 2 sempre difere da c do tier 1 e as 8 cores principais continuam distintas entre si.)
 export const AURA_STYLES = {
   paladin:     { c: '#e0b84a', c2: '#bcd2ff', kind: 'spark',   ring: true,  n: 5, rise: 0.4, t2: { c: '#ffcf3a', c2: '#d6e6ff' } }, // ouro e azul-prata: escudo sagrado
-  berserker:   { c: '#d8322a', c2: '#ff9a50', kind: 'ember',   ring: false, n: 7, rise: 1.0, t2: { c: '#ff3b2e', c2: '#ffc070' } },
+  berserker:   { c: '#d8322a', c2: '#ff9a50', kind: 'ember',   ring: false, n: 5, rise: 1.0, t2: { c: '#ff3b2e', c2: '#ffc070' } },
   arcane:      { c: '#7f8bff', c2: '#e3dcff', kind: 'crystal', ring: true,  n: 5, rise: 0.6, t2: { c: '#8f9cff', c2: '#f2eeff' } }, // cristais violeta-azulados e anel arcano
   warlock:     { c: '#7fd44a', c2: '#d6ff9a', kind: 'ember',   ring: false, n: 7, rise: 0.8, t2: { c: '#8dff3f', c2: '#eaffb8' } }, // brasas verde-veneno subindo
   sniper:      { c: '#3fd3b0', c2: '#d4fff3', kind: 'spark',   ring: true,  n: 4, rise: 0.6, t2: { c: '#2dffd0', c2: '#e6fff9' } },

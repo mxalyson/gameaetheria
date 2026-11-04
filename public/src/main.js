@@ -884,7 +884,8 @@ class Game {
     const r = this.netRewardMsg;
     const lines = [];
     if (r.mode !== 'coop') lines.push(`Rating ${r.mode}: ${r.rating} (${r.ratingDelta >= 0 ? '+' : ''}${r.ratingDelta})`);
-    lines.push(`+${r.gold} ouro`, `+${r.xp} XP${r.levels ? ` · subiu ${r.levels} nível(is)!` : ''}`);
+    lines.push(`+${r.gold} ouro`);
+    if (r.xp) lines.push(`+${r.xp} XP${r.levels ? ` · subiu ${r.levels} nível(is)!` : ''}`);
     if (r.items) lines.push(`${r.items} item(ns) de recompensa no inventário`);
     if (r.converted) lines.push(`${r.converted} item(ns) viraram ouro (inventário cheio)`);
     const nr = this.netResult ?? {};
@@ -1406,7 +1407,7 @@ class Game {
     if (m.summoned) return; // esbirros de chefe não dão XP nem loot
     const M = MOBS[m.mobId];
     const rm = this.world.nightMods?.rewardMul ?? 1; // bônus noturno: +15% de XP, ouro e chance de item (só ao ar livre)
-    this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1) * rm));
+    if (this.mode === 'explore') this.grantXp(mobXp(m.level, this.char.level, M.xp * (m.boss ? XP_MULT.boss : m.elite ? XP_MULT.elite : 1) * rm));
     for (const l of rollMobLoot(this.rng, m, this.char.classId, (this.char.pity ??= { epic: 0, legendary: 0, opal: 0 }), rm)) {
       if (l.kind === 'gold') { // ouro vai direto para a mochila (sem drop no chão), com texto flutuante
         this.char.gold += l.amount;
@@ -1933,7 +1934,7 @@ class Game {
         lines.push(`Prêmio: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
       } else { c.gold += it.value; lines.push(`Prêmio convertido em ${it.value} ouro (inventário cheio)`); }
     }
-    this.grantXp(xpToNext(c.level) * (won ? 0.12 : 0.04) * mul);
+    // arena não dá XP (decisão do dono, 2026-11-04): só rating, ouro e prêmio
     this.ui.banner(null);
     this.ui.showResult({
       title: won ? 'Vitória!' : draw ? 'Empate' : 'Derrota',

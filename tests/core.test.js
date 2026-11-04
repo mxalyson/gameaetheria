@@ -557,22 +557,16 @@ test('G2/G13: loja só vende até raro + 1 épico de destaque, estoque estável 
   assert.equal(sellValue({ value: 101 }), 50); assert.equal(sellValue({ value: 1 }), 1);
 });
 
-test('G3: XP de PvP — vitória 6%, derrota 2%, sem teto por hora, 3º duelo seguido contra o mesmo adversário = 0', () => {
+test('G3: arena (PvP) NÃO dá XP (decisão do dono 2026-11-04): vitória e derrota pagam 0 XP, mas rating e ouro continuam', () => {
   const base = () => { const d = newCharacter('Duelista', 'warrior', makeRng(5)); d.level = 10; return validate(d).char; };
-  const T0 = 1.8e12, need = xpToNext(10);
-  const w = applyMatchResult(base(), { mode: '1v1', result: 'win', foeRating: 1000, now: T0 });
-  assert.equal(w.summary.xp, Math.round(need * PVP_XP.win));
-  const l = applyMatchResult(base(), { mode: '1v1', result: 'loss', foeRating: 1000, now: T0 });
-  assert.equal(l.summary.xp, Math.round(need * PVP_XP.loss));
-  assert.equal(applyMatchResult(base(), { mode: '4v4', result: 'win', foeRating: 1000, now: T0 }).summary.xp, Math.round(need * 0.06 * 1.6));
-  let d = base(); const xps = [];
-  for (let i = 0; i < 12; i++) { const r = applyMatchResult(d, { mode: '1v1', result: 'loss', foeRating: 1000, now: T0 + i * 60000, foeId: 'rival' + i }); d = r.doc; d.level = 10; d.xp = 0; xps.push(r.summary.xp); }
-  assert.ok(xps.slice(0, 12).every((x) => x === xps[0]), 'sem teto por hora: todas as partidas pagam igual: ' + xps);
-  d = base(); const rep = [];
-  for (let i = 0; i < 4; i++) { const r = applyMatchResult(d, { mode: '1v1', result: 'win', foeRating: 1000, now: T0 + i * 60000, foeId: 'mesmo' }); d = r.doc; d.level = 10; d.xp = 0; rep.push(r.summary.xp); }
-  assert.ok(rep[0] > 0 && rep[1] > 0 && rep[2] === 0 && rep[3] === 0, 'repetição: ' + rep);
-  const later = applyMatchResult(d, { mode: '1v1', result: 'win', foeRating: 1000, now: T0 + 40 * 60000, foeId: 'mesmo' });
-  assert.ok(later.summary.xp > 0, 'passada a janela de 30 min volta a pagar');
+  const T0 = 1.8e12;
+  for (const result of ['win', 'loss']) for (const mode of ['1v1', '4v4']) {
+    const r = applyMatchResult(base(), { mode, result, foeRating: 1000, now: T0 });
+    assert.equal(r.summary.xp, 0, `${mode} ${result}`);
+    assert.equal(r.doc.xp, base().xp);
+    assert.ok(r.summary.gold > 0);
+  }
+  assert.equal(PVP_XP.win, 0); assert.equal(PVP_XP.loss, 0);
 });
 
 test('G4: chefes recalibrados após os kits próprios (Guardião/Ancião vida; Carvalho, Colosso e Cavaleiro Rubro vida e ataque), missões em níveis mais altos', () => {

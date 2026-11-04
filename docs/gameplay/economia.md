@@ -74,3 +74,7 @@ APRIMORAMENTO (ferreiro): ouro por item vestido, +0 → +8, e quantos abates iss
 - **Arena:** o ouro por vitória (≈ 120 em nv 10) equivale a ≈ 4 abates da Planície; o rating é o prêmio principal.
 - **Não existe ainda:** mercado entre jogadores, leilão, comércio direto (decidido: **não** implementar antes de existir telemetria — é onde duplicação e inflação nascem).
 - **Risco conhecido:** o PvE de exploração (ouro/XP/loot) é calculado no cliente; os limites do servidor impedem saltos absurdos, mas **não** impedem alguém de "farmar mais rápido" dentro do teto. A correção estrutural é PvE de exploração no servidor.
+
+## Atualização 2026-11-04 (pedido do dono)
+- **Arena não dá XP.** `PVP_XP` = 0 (vitória e derrota): a arena paga rating, ouro e prêmio; a Arena das Ondas offline não paga XP por abate (só `mode === 'explore'`). As seções de XP de PvP acima ficam como histórico. O cooperativo (servidor) segue pagando XP (≤ 30% do nível) — não alterado.
+- **Curva do 20+ mais leve:** `xpToNext` igual até o nível 15; depois cresce 6% do valor do nível 15 por nível (nível 20: 44,5k → 33,4k; nível 29: ~90k → 46k). Mobs de nível 16+ pagam +3% de XP por nível acima do 15.
