@@ -1,13 +1,15 @@
-// Efeitos visuais das 12 habilidades (Canvas 2D). SÓ APRESENTAÇÃO: nascem dos eventos reais de combate (`cast` da simulação local ou confirmados pelo servidor)
+// Efeitos visuais das habilidades (Canvas 2D). SÓ APRESENTAÇÃO: nascem dos eventos reais de combate (`cast` da simulação local ou confirmados pelo servidor)
 // e dos projéteis já existentes; nunca decidem dano, alcance nem resultado. Tempo = world.time (a simulação local e o modo online avançam o mesmo relógio).
-// Sem alocação por quadro: os objetos de efeito são criados uma vez ao lançar; o desenho só lê e calcula.
+// Visual PINTADO: sprites do kit (render/vfx-kit.js, atlas gerado por tools/vfx-kit.py) em mistura aditiva ('lighter') e 'screen', mais partículas de um POOL fixo.
+// Sem alocação por quadro: efeitos e projéteis guardam estado em campos próprios; o desenho só lê, calcula e emite partículas no pool (arrays tipados).
 import { SKILLS } from '../data/skills.js';
+import { SP, PL, sprite, loadVfxKit, vfxKitReady, warm, warmStep } from './vfx-kit.js';
 
-const TAU = Math.PI * 2;
+const TAU = Math.PI * 2, HALF = Math.PI / 2;
 const MAX_FX = 22;
 const ease = (k) => 1 - (1 - k) * (1 - k);
 const clamp01 = (k) => (k < 0 ? 0 : k > 1 ? 1 : k);
-const circle = (g, x, y, r) => { g.beginPath(); g.arc(x, y, Math.max(0.1, r), 0, TAU); };
+const rnd = Math.random;
 
 // qual efeito cada habilidade usa (a chave é o id real em data/skills.js)
 const KIND = {
@@ -15,10 +17,111 @@ const KIND = {
   fireball: 'muzzle', frostnova: 'frost', blink: 'blink',
   rain: 'rain', pierce: 'pierce', roll: 'roll',
   holylight: 'sun', divineshield: 'bubble', judgement: 'beam',
-  // Maestria: reaproveitam efeitos existentes com outra cor/tamanho (colossus e meteor têm desenho próprio, montado sobre o rastro e o clarão)
+  // Maestria: colossus e meteor têm desenho próprio; arrowstorm/intervention reaproveitam chuva/sol com mais tamanho e outra cor
   colossus: 'colossus', meteor: 'meteor', arrowstorm: 'rain', intervention: 'sun',
 };
 const LIFE = { colossus: 6.6, meteor: 1.9, crit: 0.32, absorb: 0.4, heal: 0.85, whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.45 };
+
+// ---- estilo (cores e família de partículas) por habilidade e por especialização ----
+const FAM = { fire: 0, ice: 1, arcane: 2, toxic: 3, holy: 4, nature: 5 };
+const sty = (m, h, fam) => ({ m: PL[m], h: PL[h], fam: FAM[fam] });
+const BASE = {
+  whirlwind: sty('fire', 'amber', 'fire'), charge: sty('fire', 'amber', 'fire'), warcry: sty('fire', 'amber', 'fire'), colossus: sty('amber', 'gold', 'fire'),
+  fireball: sty('fire', 'amber', 'fire'), frostnova: sty('ice', 'holy', 'ice'), blink: sty('violet', 'ice', 'arcane'), meteor: sty('fire', 'amber', 'fire'),
+  rain: sty('leaf', 'gold', 'nature'), pierce: sty('leaf', 'gold', 'nature'), roll: sty('leaf', 'gold', 'nature'), arrowstorm: sty('ember', 'amber', 'fire'),
+  holylight: sty('gold', 'holy', 'holy'), divineshield: sty('gold', 'holy', 'holy'), judgement: sty('gold', 'holy', 'holy'), intervention: sty('gold', 'holy', 'holy'),
+  basic_mage: sty('violet', 'holy', 'arcane'), basic_archer: sty('leaf', 'gold', 'nature'), crit: sty('fire', 'amber', 'fire'), absorb: sty('gold', 'holy', 'holy'), heal: sty('leaf', 'holy', 'nature'),
+};
+// cada especialização pinta TODAS as suas habilidades na própria cor: Paladino dourado, Berserker brasa, Arcano prisma violeta, Bruxo verde tóxico,
+// Franco-atirador turquesa, Pistoleiro âmbar, Guardião branco-dourado, Inquisidor violeta-âmbar
+const SPEC = {
+  paladin: sty('gold', 'holy', 'holy'), berserker: sty('ember', 'fire', 'fire'), arcane: sty('violet', 'holy', 'arcane'), warlock: sty('toxic', 'leaf', 'toxic'),
+  sniper: sty('turq', 'holy', 'arcane'), gunslinger: sty('amber', 'fire', 'fire'), guardian: sty('holy', 'gold', 'holy'), inquisitor: sty('violamber', 'amber', 'holy'),
+};
+const styleOf = (skill, spec) => (spec && SPEC[spec]) || BASE[skill] || BASE.fireball;
+
+// ---- pool de partículas (arrays tipados; nada é alocado por quadro) ----
+const MAXP = 200;
+const f32 = () => new Float32Array(MAXP);
+const P = { n: 0, x: f32(), y: f32(), z: f32(), vx: f32(), vy: f32(), vz: f32(), rot: f32(), vr: f32(), s0: f32(), s1: f32(), age: f32(), life: f32(), a: f32(), drag: f32(), grav: f32(), spr: new Int16Array(MAXP), pal: new Int16Array(MAXP), bl: new Uint8Array(MAXP) };
+const PA = [P.x, P.y, P.z, P.vx, P.vy, P.vz, P.rot, P.vr, P.s0, P.s1, P.age, P.life, P.a, P.drag, P.grav, P.spr, P.pal, P.bl];
+let cap = MAXP, LITE = false, DT = 0, poolWorld = null, lastT = 0;
+// mistura: 0 = aditiva ('lighter'), 1 = 'screen' (brilho suave), 2 = normal (fumaça, pedra)
+const BLEND = ['lighter', 'screen', 'source-over'];
+let curBl = -1;
+const setBl = (g, b) => { if (b !== curBl) { g.globalCompositeOperation = BLEND[b]; curBl = b; } };
+
+function em(spr, pal, bl, x, y, z, vx, vy, vz, s0, s1, life, rot, vr, a, drag, grav) {
+  if (P.n >= cap) return;
+  const i = P.n++;
+  P.spr[i] = spr; P.pal[i] = pal; P.bl[i] = bl; P.x[i] = x; P.y[i] = y; P.z[i] = z; P.vx[i] = vx; P.vy[i] = vy; P.vz[i] = vz;
+  P.s0[i] = s0; P.s1[i] = s1; P.age[i] = 0; P.life[i] = life; P.rot[i] = rot; P.vr[i] = vr; P.a[i] = a; P.drag[i] = drag; P.grav[i] = grav;
+}
+function stepP(dt) {
+  for (let i = P.n - 1; i >= 0; i--) {
+    P.age[i] += dt;
+    if (P.age[i] >= P.life[i]) { const l = --P.n; if (i !== l) for (let j = 0; j < PA.length; j++) PA[j][i] = PA[j][l]; continue; }
+    const d = Math.max(0, 1 - P.drag[i] * dt);
+    P.vx[i] *= d; P.vy[i] *= d; P.vz[i] = P.vz[i] * d - P.grav[i] * dt;
+    P.x[i] += P.vx[i] * dt; P.y[i] += P.vy[i] * dt; P.z[i] += P.vz[i] * dt; P.rot[i] += P.vr[i] * dt;
+    if (P.z[i] < 0 && P.grav[i] > 0) { P.z[i] = 0; P.vz[i] *= -0.25; P.vx[i] *= 0.6; P.vy[i] *= 0.6; }
+  }
+}
+function drawP(g) {
+  for (let i = 0; i < P.n; i++) {
+    const k = P.age[i] / P.life[i], a = P.a[i] * Math.min(1, k * 10) * (1 - k * k), s = P.s0[i] + (P.s1[i] - P.s0[i]) * ease(k);
+    const sp = sprite(P.spr[i], P.pal[i]); if (!sp || a < 0.01 || s < 0.5) continue;
+    setBl(g, P.bl[i] === 0 && BODY[P.spr[i]] ? 2 : P.bl[i]); blit(g, sp, P.x[i], P.y[i] - P.z[i], s, s, P.rot[i], a);
+  }
+}
+
+// ---- desenho de sprite ----
+function blit(g, s, x, y, w, h, rot, alpha) {
+  const kx = w / s.w, ky = h / s.h; g.globalAlpha = alpha > 1 ? 1 : alpha;
+  if (rot) { g.translate(x, y); g.rotate(rot); g.drawImage(s.cv, -s.ax * kx, -s.ay * ky, w, h); g.rotate(-rot); g.translate(-x, -y); }
+  else g.drawImage(s.cv, x - s.ax * kx, y - s.ay * ky, w, h);
+}
+// sprites de CORPO (chamas, cristais, fitas, runas, cortes...) são pintados em mistura normal: a cor aparece em qualquer fundo (a aditiva estoura para branco no gramado claro);
+// só luz pura (glow, faíscas, estrelas, rajadas, raios) fica aditiva
+const BODY = new Uint8Array(64);
+for (const n of ['ring', 'shock', 'flame0', 'flame1', 'flame2', 'flame3', 'crystal0', 'crystal1', 'crystal2', 'flake', 'wisp0', 'wisp1', 'leaf0', 'leaf1', 'ribbon0', 'ribbon1', 'wind', 'bolt0', 'bolt1', 'bolt2', 'rune0', 'rune1', 'slash0', 'slash1', 'shard0', 'shard1', 'cross', 'rays']) BODY[SP[n]] = 1;
+function put(g, id, pal, bl, x, y, w, h, rot, a) {
+  if (a < 0.01 || w < 0.5) return;
+  const s = sprite(id, pal); if (!s) return;
+  setBl(g, bl === 0 && BODY[id] ? 2 : bl); blit(g, s, x, y, w, h, rot, a);
+}
+const rate = (f, perSec) => { f.acc += perSec * (LITE ? 0.5 : 1) * DT; const n = f.acc | 0; f.acc -= n; return n; };
+const cnt = (n) => (LITE ? Math.ceil(n / 2) : n);
+
+// pedaço elemental da família (fogo: chama; gelo: floco; arcano: estrela; tóxico: fiapo; sagrado: faísca; natureza: folha)
+function bit(f, x, y, z, vx, vy, vz, size, life, a = 1) {
+  switch (f.fam) {
+    case 0: em(SP.flame0 + ((rnd() * 4) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.35, life, 0, 0, a, 1.2, -70); break;
+    case 1: em(SP.flake, f.m, 1, x, y, z, vx, vy, vz, size * 0.7, size * 0.3, life, rnd() * TAU, (rnd() - 0.5) * 6, a, 1.4, 30); break;
+    case 2: em(rnd() < 0.4 ? SP.star8 : SP.spark, rnd() < 0.5 ? f.m : f.h, 0, x, y, z, vx, vy, vz, size * 0.8, size * 0.2, life, 0, 0, a, 1.5, 10); break;
+    case 3: em(SP.wisp0 + ((rnd() * 2) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.5, life, rnd() * TAU, (rnd() - 0.5) * 3, a * 0.9, 1.3, -30); break;
+    case 4: em(SP.spark, rnd() < 0.5 ? f.m : f.h, 0, x, y, z, vx, vy, vz, size * 0.8, size * 0.25, life, 0, 0, a, 1.2, -25); break;
+    default: em(SP.leaf0 + ((rnd() * 2) | 0), f.m, 1, x, y, z, vx, vy, vz, size * 0.55, size * 0.4, life, rnd() * TAU, (rnd() - 0.5) * 9, a, 1.0, 40); break;
+  }
+}
+const spark = (f, x, y, z, vx, vy, vz, size, life, a = 1) => em(SP.spark, f.h, 0, x, y, z, vx, vy, vz, size, size * 0.2, life, 0, 0, a, 1.6, 60);
+const ember = (f, x, y, z, vx, vy, vz, size, life, a = 1) => em(SP.ember0 + ((rnd() * 2) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.3, life, 0, 0, a, 0.8, 120);
+const smoke = (f, x, y, z, vx, vy, vz, size, life, a = 0.4) => em(SP.smoke0 + ((rnd() * 3) | 0), f.fam === 3 ? PL.toxic : f.fam === 0 ? PL.smoke : PL.dust, 2, x, y, z, vx, vy, vz, size * 0.5, size, life, rnd() * TAU, (rnd() - 0.5) * 1.2, a, 1.5, -25);
+const chunk = (x, y, vx, vy, vz, size, life) => em(SP.shard0 + ((rnd() * 2) | 0), PL.stone, 2, x, y, 4, vx, vy, vz, size, size * 0.85, life, rnd() * TAU, (rnd() - 0.5) * 14, 1, 0.2, 900);
+
+// tremor de câmera discreto (golpes fortes): o renderer soma isto ao deslocamento da câmera
+function shake(world, amp, dur) {
+  const s = (world.shake ??= { t0: -9, dur: 0, amp: 0 });
+  if (world.time - s.t0 < s.dur && s.amp * (1 - (world.time - s.t0) / s.dur) > amp) return;
+  s.t0 = world.time; s.dur = dur; s.amp = amp;
+}
+const SH = { x: 0, y: 0 };
+export function vfxShake(world) {
+  const s = world.shake, e = s ? world.time - s.t0 : 9;
+  if (!s || e < 0 || e >= s.dur) { SH.x = 0; SH.y = 0; return SH; }
+  const a = s.amp * (1 - e / s.dur) ** 2; SH.x = Math.sin(e * 73) * a; SH.y = Math.cos(e * 91) * a;
+  return SH;
+}
 
 // Acerto crítico, golpe absorvido por escudo e cura relevante (eventos reais `hit` e `heal`; o servidor manda os mesmos no online). Cura de regeneração (pequena e constante) não gera efeito.
 const healAt = new WeakMap();
@@ -32,9 +135,11 @@ export function spawnEventVfx(world, ev) {
     if (last === undefined || world.time - last >= 0.5) { healAt.set(a, world.time); kind = 'heal'; }
   }
   if (!kind) return null;
+  loadVfxKit();
   const list = (world.svfx ??= []);
   if (list.length >= MAX_FX) list.shift();
-  const f = { kind, skill: null, t0: world.time, life: LIFE[kind], actor: a, x: a.x, y: a.y, ang: 0, color: '', r: a.r ?? 14, tx: null, ty: null, ox: a.x, oy: a.y, seed: (a.id ?? 1) * 7919, pts: null, dur: 0, range: 0 };
+  const s = BASE[kind];
+  const f = { kind, skill: null, spec: null, t0: world.time, life: LIFE[kind], actor: a, x: a.x, y: a.y, ang: 0, color: '', r: a.r ?? 14, tx: null, ty: null, ox: a.x, oy: a.y, seed: (a.id ?? 1) * 7919, pts: null, dur: 0, range: 0, m: s.m, h: s.h, fam: s.fam, n: 0, acc: 0, mask: 0 };
   list.push(f);
   return f;
 }
@@ -46,93 +151,136 @@ export function spawnSkillVfx(world, ev) {
   const kind = KIND[ev.skill];
   const a = ev.actor;
   if (!kind || !a || !world) return null;
+  loadVfxKit();
   const s = SKILLS[ev.skill];
   const list = (world.svfx ??= []);
   if (list.length >= MAX_FX) list.shift();
-  const prev = lastPos.get(a);
+  const prev = lastPos.get(a), st = styleOf(ev.skill, a.spec);
   const f = {
-    kind, skill: ev.skill, t0: world.time, life: s.vfxLife ?? (kind === 'bubble' || kind === 'warcry' ? Math.max(LIFE[kind], (s.dur ?? 0) + 0.4) : LIFE[kind]),
+    kind, skill: ev.skill, spec: a.spec ?? null, t0: world.time, life: s.vfxLife ?? (kind === 'bubble' || kind === 'warcry' ? Math.max(LIFE[kind], (s.dur ?? 0) + 0.4) : LIFE[kind]),
     actor: a, x: a.x, y: a.y, ang: ev.ang ?? a.facing ?? 0, color: s.color, r: s.radius ?? 60,
     tx: ev.tx ?? null, ty: ev.ty ?? null, ox: prev ? prev.x : a.x, oy: prev ? prev.y : a.y,
     seed: ((world.time * 1000) | 0) ^ (a.id ?? 7), pts: kind === 'dashtrail' || kind === 'roll' || kind === 'colossus' ? [] : null, dur: s.dur ?? 0, range: s.range ?? 500,
+    m: st.m, h: st.h, fam: st.fam, n: 0, acc: 0, mask: 0,
   };
   list.push(f);
   return f;
 }
 
-// Projéteis das habilidades (reconhecidos pelas propriedades que a simulação já dá): devolve true se desenhou.
+// ---------------- projéteis ----------------
+const PT = new WeakMap(); // projétil -> último instante em que soltou partículas
+// Projéteis dos jogadores (habilidades e ataques básicos); devolve true se desenhou. Sem o kit carregado devolve false e o renderer usa o desenho simples.
 export function drawSkillProjectile(g, p, time) {
-  const prevOp = g.globalCompositeOperation; g.globalCompositeOperation = 'source-over';
-  const done = drawSkillProjectileOpaque(g, p, time);
-  g.globalCompositeOperation = prevOp;
-  return done;
-}
-function drawSkillProjectileOpaque(g, p, time) {
-  const speed = Math.hypot(p.vx, p.vy);
-  if (p.src?.kind === 'spirit') return false;
-  const cos = Math.cos(p.ang), sin = Math.sin(p.ang);
-  if (p.explode > 0) { // Bola de Fogo: cabeça incandescente + cauda de chamas tremulante
-    for (let i = 5; i >= 1; i--) {
-      const back = i * 9, fl = Math.sin(time * 38 + i * 1.7) * 2.5, r = p.radius * (1.9 - i * 0.2);
-      g.globalAlpha = 0.5 - i * 0.07; g.fillStyle = i > 3 ? '#c8321a' : '#ff7a3a';
-      circle(g, p.x - cos * back - sin * fl, p.y - sin * back + cos * fl, r); g.fill();
+  const src = p.src;
+  if (!src || src.kind === 'spirit' || src.kind === 'mob' || !src.classId) return false;
+  if (!vfxKitReady()) { loadVfxKit(); return false; }
+  const cls = src.classId, speed = Math.hypot(p.vx, p.vy);
+  let id;
+  if (p.explode > 0) id = 'fireball';
+  else if (p.pierce) id = cls === 'archer' ? 'pierce' : 'fireball';
+  else if (p.stun > 0 && p.radius >= 8) id = 'judgement';
+  else if (cls === 'archer') id = p.radius >= 6 ? 'pierce' : 'basic_archer';
+  else if (cls === 'mage') id = 'basic_mage';
+  else return false;
+  const st = id.startsWith('basic') ? (src.spec && SPEC[src.spec]) || BASE[id] : styleOf(id, src.spec);
+  let rec = PT.get(p); if (!rec) { rec = { t: time }; PT.set(p, rec); }
+  const emit = time - rec.t >= 0.028; if (emit) rec.t = time;
+  const prevOp = g.globalCompositeOperation; curBl = -1;
+  const x = p.x, y = p.y, cos = Math.cos(p.ang), sin = Math.sin(p.ang), r = p.radius;
+  const f = { m: st.m, h: st.h, fam: st.fam };
+  if (id === 'fireball' && p.explode > 0 && st.fam !== 3) { // Bola de Fogo: cabeça incandescente com cauda de chamas
+    const fl = ((time * 22) | 0) & 3, sz = r * 10;
+    put(g, SP.glow, st.m, 1, x, y, r * 8, r * 8, 0, 0.75);
+    put(g, SP.flame0 + fl, st.m, 0, x - cos * sz * 0.36, y - sin * sz * 0.36, sz, sz, p.ang - HALF, 1);
+    put(g, SP.flame0 + ((fl + 2) & 3), st.h, 0, x - cos * sz * 0.3, y - sin * sz * 0.3, sz * 0.62, sz * 0.62, p.ang - HALF, 0.9);
+    put(g, SP.glow, PL.holy, 0, x, y, r * 3.2, r * 3.2, 0, 1);
+    if (emit) {
+      bit(f, x - cos * 8 + (rnd() - 0.5) * 8, y - sin * 8 + (rnd() - 0.5) * 8, 4, -cos * 40, -sin * 40, 20 + rnd() * 30, 20 + rnd() * 14, 0.35, 0.85);
+      if (rnd() < 0.6) ember(f, x - cos * 12, y - sin * 12, 6, (rnd() - 0.5) * 70 - cos * 30, (rnd() - 0.5) * 70 - sin * 30, 20 + rnd() * 40, 8 + rnd() * 6, 0.5);
+      if (rnd() < 0.3) smoke(f, x - cos * 16, y - sin * 16, 8, 0, 0, 12, 16, 0.6, 0.3);
     }
-    g.globalAlpha = 1;
-    const grd = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 2.6);
-    grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.3, '#ffd27a'); grd.addColorStop(0.65, p.color); grd.addColorStop(1, p.color + '00');
-    g.fillStyle = grd; circle(g, p.x, p.y, p.radius * 2.6); g.fill();
-    return true;
+  } else if (st.fam === 3 && p.explode > 0) { // Praga Ardente (Bruxo): bola maldita verde com fiapos
+    put(g, SP.glow, st.m, 1, x, y, r * 8, r * 8, 0, 0.7);
+    put(g, SP.wisp0 + (((time * 6) | 0) & 1), st.m, 0, x, y, r * 5.4, r * 5.4, time * 5, 0.95);
+    put(g, SP.wisp1, st.h, 0, x, y, r * 4, r * 4, -time * 7, 0.8);
+    put(g, SP.glow, PL.holy, 0, x, y, r * 2.6, r * 2.6, 0, 0.95);
+    if (emit) { bit(f, x - cos * 6, y - sin * 6, 4, -cos * 30 + (rnd() - 0.5) * 40, -sin * 30 + (rnd() - 0.5) * 40, 14 + rnd() * 20, 20 + rnd() * 10, 0.5, 0.8); if (rnd() < 0.4) smoke(f, x, y, 6, 0, 0, 14, 18, 0.7, 0.3); }
+  } else if (id === 'fireball') { // Projétil Arcano (Arcano): estrela prismática com fita de luz e cacos
+    put(g, SP.glow, st.m, 1, x, y, r * 9, r * 9, 0, 0.7);
+    put(g, SP.ribbon0, st.m, 0, x - cos * 46, y - sin * 46, 100, r * 2.6, p.ang, 0.9);
+    put(g, SP.ribbon0, st.h, 0, x - cos * 32, y - sin * 32, 66, r * 1.1, p.ang, 1);
+    put(g, SP.star8, st.m, 0, x, y, r * 7.2, r * 7.2, time * 4, 1);
+    put(g, SP.glow, PL.holy, 0, x, y, r * 2.6, r * 2.6, 0, 1);
+    if (emit && rnd() < 0.7) bit(f, x - cos * 10 + (rnd() - 0.5) * 10, y - sin * 10 + (rnd() - 0.5) * 10, 4, -cos * 20 + (rnd() - 0.5) * 50, -sin * 20 + (rnd() - 0.5) * 50, 10, 14 + rnd() * 8, 0.45);
+  } else if (id === 'pierce') { // flecha/virote: fita de luz atrás e ponta brilhante
+    const long = speed > 900 ? 170 : speed > 700 ? 120 : 80, th = 34;
+    put(g, SP.ribbon0, st.m, 0, x - cos * long * 0.45, y - sin * long * 0.45, long, th, p.ang, 0.85);
+    put(g, SP.ribbon0, st.h, 0, x - cos * long * 0.3, y - sin * long * 0.3, long * 0.6, th * 0.4, p.ang, 1);
+    put(g, SP.glow, st.m, 1, x, y, 40, 40, 0, 0.7);
+    put(g, SP.spark, PL.holy, 0, x + cos * 4, y + sin * 4, 30, 30, p.ang, 1);
+    if (emit && rnd() < 0.15) spark(f, x - cos * 20, y - sin * 20, 4, (rnd() - 0.5) * 50, (rnd() - 0.5) * 50, 10, 6 + rnd() * 5, 0.35, 0.9);
+  } else if (id === 'judgement') { // Julgamento: estrela sagrada com raios girando
+    put(g, SP.glow, st.m, 1, x, y, r * 10, r * 10, 0, 0.8);
+    put(g, SP.rays, st.h, 0, x, y, r * 9, r * 9, time * 3, 0.75);
+    put(g, SP.star8, st.m, 0, x, y, r * 8, r * 8, -time * 5, 1);
+    put(g, SP.glow, PL.holy, 0, x, y, r * 3, r * 3, 0, 1);
+    if (emit) { spark(f, x - cos * 8 + (rnd() - 0.5) * 12, y - sin * 8 + (rnd() - 0.5) * 12, 6, -cos * 25, -sin * 25, 10 + rnd() * 20, 9 + rnd() * 7, 0.5); }
+  } else if (id === 'basic_archer') { // flecha comum: haste luminosa curta
+    put(g, SP.ribbon0, st.m, 0, x - cos * 16, y - sin * 16, 56, 14, p.ang, 0.9);
+    put(g, SP.ribbon0, st.h, 0, x - cos * 10, y - sin * 10, 30, 6, p.ang, 1);
+    put(g, SP.glow, PL.holy, 0, x, y, 12, 12, 0, 1);
+  } else { // basic_mage: orbe
+    put(g, SP.glow, st.m, 2, x, y, r * 6, r * 6, 0, 0.85);
+    put(g, SP.glow, st.m, 1, x, y, r * 9, r * 9, 0, 0.6);
+    put(g, SP.spark, st.h, 0, x, y, r * 7, r * 7, time * 3, 0.95);
+    put(g, SP.glow, PL.holy, 0, x, y, r * 2.4, r * 2.4, 0, 1);
+    if (emit && rnd() < 0.6) bit(f, x - cos * 6, y - sin * 6, 4, -cos * 20 + (rnd() - 0.5) * 30, -sin * 20 + (rnd() - 0.5) * 30, 8, 10 + rnd() * 6, 0.4, 0.8);
   }
-  if (p.pierce && speed > 600) { // Tiro Perfurante: flecha fina com rastro longo
-    g.strokeStyle = 'rgba(30,70,20,0.45)'; g.lineWidth = 6.5; g.lineCap = 'round'; g.beginPath(); g.moveTo(p.x - cos * 60, p.y - sin * 60); g.lineTo(p.x + cos * 6, p.y + sin * 6); g.stroke();
-    const grd = g.createLinearGradient(p.x - cos * 70, p.y - sin * 70, p.x, p.y);
-    grd.addColorStop(0, '#9be02e00'); grd.addColorStop(1, '#ffffff');
-    g.strokeStyle = grd; g.lineWidth = 3.4;
-    g.beginPath(); g.moveTo(p.x - cos * 70, p.y - sin * 70); g.lineTo(p.x + cos * 6, p.y + sin * 6); g.stroke();
-    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(p.x + cos * 12, p.y + sin * 12); g.lineTo(p.x - cos * 2 - sin * 4, p.y - sin * 2 + cos * 4); g.lineTo(p.x - cos * 2 + sin * 4, p.y - sin * 2 - cos * 4); g.closePath(); g.fill();
-    return true;
-  }
-  if (p.stun > 0 && !p.explode && !p.pierce && p.radius >= 8) { // Julgamento: núcleo branco-dourado com estrela de quatro pontas
-    const grd = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 3);
-    grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.3, '#ffe27a'); grd.addColorStop(0.7, '#ffb81f'); grd.addColorStop(1, '#d98f0000');
-    g.fillStyle = grd; circle(g, p.x, p.y, p.radius * 3); g.fill();
-    g.strokeStyle = '#a8760d'; g.lineWidth = 3.4; g.lineCap = 'round'; g.beginPath();
-    const L = p.radius * 2.8, rot = time * 6;
-    for (let i = 0; i < 2; i++) { const a = rot + i * Math.PI / 2; g.moveTo(p.x - Math.cos(a) * L, p.y - Math.sin(a) * L); g.lineTo(p.x + Math.cos(a) * L, p.y + Math.sin(a) * L); }
-    g.stroke();
-    return true;
-  }
-  return false;
+  g.globalCompositeOperation = prevOp; curBl = -1; g.globalAlpha = 1;
+  return true;
 }
 
-// Desenha e descarta os efeitos vencidos. `lite` (qualidade baixa) reduz detalhes.
+// Corte do ataque básico corpo a corpo (efeito `slash` da simulação): meia-lua pintada que varre o arco.
+const SLASH_PAL = { '#ffe1d0': PL.amber, '#fff3b0': PL.holy };
+export function drawBasicSlash(g, f) {
+  const k = f.t / f.life, sc = (f.r * 0.98) / 96, sweep = (k - 0.5) * 0.7;
+  if (!vfxKitReady()) return false;
+  const pal = SLASH_PAL[f.color] ?? PL.holy, prevOp = g.globalCompositeOperation; curBl = -1;
+  put(g, SP.slash0, pal, 0, f.x, f.y, 140 * sc, 210 * sc * Math.min(1.35, f.arc / 1.6), f.ang + sweep, 1 - k * k * 0.6);
+  put(g, SP.slash1, PL.holy, 0, f.x, f.y, 128 * sc * 0.96, 192 * sc * 0.9, f.ang + sweep * 1.3, (1 - k) * 0.8);
+  g.globalCompositeOperation = prevOp; curBl = -1; g.globalAlpha = 1;
+  return true;
+}
+
+// Desenha e descarta os efeitos vencidos. `lite` (qualidade baixa) reduz partículas e camadas.
 export function drawSkillVfx(g, world, lite = false) {
-  const list = world.svfx;
-  const now = world.time;
-  if (!list || !list.length) { return; }
-  g.save();
-  g.globalCompositeOperation = 'source-over';
-  for (let i = list.length - 1; i >= 0; i--) {
-    const f = list[i];
-    const el = now - f.t0;
+  const list = world.svfx, now = world.time;
+  if (world !== poolWorld) { P.n = 0; poolWorld = world; lastT = now; }
+  DT = Math.min(0.05, Math.max(0, now - lastT)); lastT = now;
+  LITE = lite; cap = lite ? 90 : MAXP;
+  if ((!list || !list.length) && P.n === 0) return;
+  if (!vfxKitReady()) { loadVfxKit(); if (list) for (let i = list.length - 1; i >= 0; i--) if (now - list[i].t0 >= list[i].life) list.splice(i, 1); return; }
+  if (DT > 0) { stepP(DT); warmStep(); }
+  g.save(); curBl = -1; g.lineCap = 'round';
+  if (list) for (let i = list.length - 1; i >= 0; i--) {
+    const f = list[i], el = now - f.t0;
     if (el >= f.life || el < -0.5) { list.splice(i, 1); continue; }
-    const k = clamp01(el / f.life);
-    const a = f.actor;
+    if (!f.w) { f.w = 1; warm(f.m); warm(f.h); }
+    const k = clamp01(el / f.life), a = f.actor;
     const cx = a && !a.dead ? a.x : f.x, cy = a && !a.dead ? a.y : f.y;
-    g.lineCap = 'round'; g.lineJoin = 'round';
     switch (f.kind) {
-      case 'whirl': drawWhirl(g, f, k, cx, cy, lite); break;
-      case 'dashtrail': drawTrail(g, f, el, cx, cy, '#ff5a1f', '#ffe08a', 16); break;
-      case 'roll': drawTrail(g, f, el, cx, cy, '#2e9d4f', '#eaffe9', 11); drawLeaves(g, f, el, cx, cy); break;
-      case 'warcry': drawWarcry(g, f, el, cx, cy, lite); break;
+      case 'whirl': drawWhirl(g, f, k, el, cx, cy); break;
+      case 'dashtrail': drawDash(g, f, el, cx, cy, 24, world); break;
+      case 'roll': drawRoll(g, f, el, cx, cy); break;
+      case 'warcry': drawWarcry(g, f, el, cx, cy); break;
       case 'muzzle': drawMuzzle(g, f, k); break;
-      case 'frost': drawFrost(g, f, k, cx, cy, lite); break;
-      case 'blink': drawBlink(g, f, k, cx, cy); break;
-      case 'colossus': drawColossus(g, f, el, cx, cy, lite); break;
-      case 'meteor': drawMeteor(g, f, el, lite); break;
-      case 'rain': drawRain(g, f, el, lite); break;
+      case 'frost': drawFrost(g, f, k, el, cx, cy); break;
+      case 'blink': drawBlink(g, f, k, el, cx, cy); break;
+      case 'colossus': drawColossus(g, f, el, cx, cy, world); break;
+      case 'meteor': drawMeteor(g, f, el, world); break;
+      case 'rain': drawRain(g, f, el); break;
       case 'pierce': drawPierce(g, f, k, cx, cy); break;
-      case 'sun': drawSun(g, f, k, cx, cy, lite); break;
+      case 'sun': drawSun(g, f, k, el, cx, cy); break;
       case 'bubble': drawBubble(g, f, el, cx, cy); break;
       case 'beam': drawBeam(g, f, k, cx, cy); break;
       case 'crit': drawCrit(g, f, k, cx, cy); break;
@@ -140,218 +288,273 @@ export function drawSkillVfx(g, world, lite = false) {
       case 'heal': drawHeal(g, f, k, cx, cy); break;
     }
   }
-  g.restore();
+  drawP(g);
+  g.restore(); curBl = -1;
   g.globalAlpha = 1;
 }
 
-// ---- um desenho por efeito ----
-function drawWhirl(g, f, k, cx, cy, lite) {
-  const R = f.r * (0.4 + 0.6 * ease(k)), a0 = k * TAU * 1.7;
-  g.globalAlpha = (1 - k) * 0.95;
-  for (let i = 0; i < 3; i++) {
-    const a = a0 + i * TAU / 3, rr = R * (0.8 + 0.1 * i);
-    g.strokeStyle = 'rgba(90,25,5,0.4)'; g.lineWidth = 14 * (1 - k) + 4; g.beginPath(); g.arc(cx, cy, rr, a, a + 1.6); g.stroke();
-    g.strokeStyle = i === 1 ? '#ff8a3d' : '#ff5a1f'; g.lineWidth = 10 * (1 - k) + 2;
-    g.beginPath(); g.arc(cx, cy, rr, a, a + 1.6); g.stroke();
-    g.strokeStyle = '#fff0b0'; g.lineWidth = 3.4 * (1 - k) + 0.6;
-    g.beginPath(); g.arc(cx, cy, rr, a + 0.25, a + 1.35); g.stroke();
-  }
-  g.strokeStyle = '#ff5a1f'; g.lineWidth = 3 * (1 - k) + 1; circle(g, cx, cy, R * 1.06); g.stroke();
-  if (!lite) { const grd = g.createRadialGradient(cx, cy, 0, cx, cy, R); grd.addColorStop(0, 'rgba(255,120,40,0)'); grd.addColorStop(1, 'rgba(255,90,20,0.34)'); g.fillStyle = grd; circle(g, cx, cy, R); g.fill(); }
+// ---- um desenho por efeito (todos só leem o estado do efeito e emitem partículas) ----
+function burstOnce(f, cx, cy, n, spd, up) { // leque de faíscas/pedaços elementais na primeira vez
+  if (f.n) return; f.n = 1;
+  for (let i = cnt(n); i > 0; i--) { const a = rnd() * TAU, v = spd * (0.4 + rnd() * 0.8); if (i % 2) spark(f, cx, cy, 8, Math.cos(a) * v, Math.sin(a) * v * 0.8, up * rnd(), 8 + rnd() * 8, 0.35 + rnd() * 0.3); else bit(f, cx, cy, 8, Math.cos(a) * v * 0.6, Math.sin(a) * v * 0.5, up * rnd() + 10, 16 + rnd() * 12, 0.45 + rnd() * 0.3); }
 }
-// rastro do avanço/rolamento: acompanha o ator e guarda os últimos pontos (alocação só no início do efeito)
-function drawTrail(g, f, el, cx, cy, c1, c2, w) {
+
+function drawWhirl(g, f, k, el, cx, cy) {
+  const R = f.r, e = ease(k), o = 1 - k, sc = R * 0.95 / 96;
+  put(g, SP.shock, f.m, 0, cx, cy, R * 2.5 * (0.45 + 0.55 * e), R * 2.5 * (0.45 + 0.55 * e), el * 2, o * 0.85);
+  for (let i = 0; i < 3; i++) put(g, i === 1 ? SP.slash1 : SP.slash0, i === 1 ? f.h : f.m, 0, cx, cy, 150 * sc, 225 * sc, k * TAU * 1.6 + i * TAU / 3, Math.min(1, o * 1.3));
+  burstOnce(f, cx, cy, 10, 220, 30);
+  if (el < 0.4) for (let n = rate(f, 110); n > 0; n--) {
+    const a = rnd() * TAU, r = R * (0.65 + rnd() * 0.35), tx = -Math.sin(a) * 160, ty = Math.cos(a) * 160;
+    if (n % 2) bit(f, cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.9, 6, tx, ty, 50, 20 + rnd() * 14, 0.45);
+    else spark(f, cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.9, 8, tx * 1.2 + Math.cos(a) * 80, ty * 1.2 + Math.sin(a) * 80, 40, 7 + rnd() * 6, 0.4);
+  }
+  if (f.m === PL.ember && el < 0.3 && !LITE) for (let n = rate(f, 30); n > 0; n--) smoke(f, cx + (rnd() - 0.5) * R, cy + (rnd() - 0.5) * R * 0.6, 4, 0, 0, 20, 22, 0.6, 0.3);
+}
+
+// rastro do avanço/rolamento: acompanha o ator e guarda os últimos pontos (alocação só no início do efeito); desenha UMA fita do ponto mais antigo ao mais novo
+function trail(f, el, cx, cy) {
   const pts = f.pts;
   if (el < 0.38) {
     const l = pts[pts.length - 2], d = l === undefined ? 0 : Math.hypot(cx - l, cy - pts[pts.length - 1]);
-    if (d > 140) pts.length = 0; // salto grande (teletransporte/troca de mapa/empurrão): recomeça o rastro em vez de riscar uma faixa diagonal até o ponto antigo (V18)
-    if (l === undefined || d > 3) pts.push(cx, cy); if (pts.length > 30) pts.splice(0, 2);
+    if (d > 140) pts.length = 0; // salto grande (teletransporte/troca de mapa/empurrão): recomeça o rastro em vez de riscar uma faixa até o ponto antigo (V18)
+    if (l === undefined || d > 3) pts.push(cx, cy);
+    if (pts.length > 30) pts.splice(0, 2);
   }
-  const fade = clamp01(1 - (el - 0.2) / 0.45);
-  const n = pts.length / 2;
-  if (n < 2) return;
-  for (let i = 1; i < n; i++) {
-    if (Math.hypot(pts[i * 2] - pts[(i - 1) * 2], pts[i * 2 + 1] - pts[(i - 1) * 2 + 1]) > 140) continue;
-    const u = i / n;
-    g.globalAlpha = fade * u * 0.9;
-    g.strokeStyle = 'rgba(40,20,10,0.32)'; g.lineWidth = w * u + 4;
-    g.beginPath(); g.moveTo(pts[(i - 1) * 2], pts[(i - 1) * 2 + 1]); g.lineTo(pts[i * 2], pts[i * 2 + 1]); g.stroke();
-    g.strokeStyle = c1; g.lineWidth = w * u + 1;
-    g.beginPath(); g.moveTo(pts[(i - 1) * 2], pts[(i - 1) * 2 + 1]); g.lineTo(pts[i * 2], pts[i * 2 + 1]); g.stroke();
-    g.strokeStyle = c2; g.lineWidth = (w * u + 1) * 0.35;
-    g.beginPath(); g.moveTo(pts[(i - 1) * 2], pts[(i - 1) * 2 + 1]); g.lineTo(pts[i * 2], pts[i * 2 + 1]); g.stroke();
+  return pts.length / 2;
+}
+function ribbon(g, f, el, cx, cy, w, pal, pal2, spr) {
+  const n = trail(f, el, cx, cy), pts = f.pts, fade = clamp01(1 - (el - 0.2) / 0.45);
+  if (n < 2) return fade;
+  const x0 = pts[0], y0 = pts[1], x1 = pts[pts.length - 2], y1 = pts[pts.length - 1], len = Math.hypot(x1 - x0, y1 - y0);
+  if (len < 4) return fade;
+  const ang = Math.atan2(y1 - y0, x1 - x0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  put(g, SP.glow, pal, 1, mx, my, len * 1.15 + w * 2, w * 3.6, ang, 0.5 * fade);
+  put(g, spr, pal, 0, mx, my, len * 1.25 + 30, w * 1.6, ang, 0.95 * fade);
+  put(g, spr, pal2, 0, mx, my, len * 1.1 + 20, w * 0.6, ang, fade);
+  return fade;
+}
+function drawDash(g, f, el, cx, cy, w, world) {
+  const fade = ribbon(g, f, el, cx, cy, w, f.m, f.h, SP.ribbon0);
+  if (f.n === 0) { f.n = 1; put(g, SP.shock, f.m, 0, f.x, f.y, 80, 80, 0, 0.8); }
+  if (el < 0.4) { put(g, SP.glow, f.m, 1, cx, cy, 70, 70, 0, 0.8 * fade); for (let n = rate(f, 80); n > 0; n--) bit(f, cx - Math.cos(f.ang) * 10 + (rnd() - 0.5) * 16, cy - Math.sin(f.ang) * 10 + (rnd() - 0.5) * 12, 6, -Math.cos(f.ang) * 60, -Math.sin(f.ang) * 60, 20 + rnd() * 30, 18 + rnd() * 12, 0.4); }
+  if (el > 0.3 && f.n === 1) { // chegada: clarão, onda e faíscas
+    f.n = 2; dashImpact(f, cx, cy, 1, world);
   }
-  if (el < 0.25) { g.globalAlpha = (1 - el / 0.25) * 0.7; g.strokeStyle = c2; g.lineWidth = 3; circle(g, f.x, f.y, 14 + el * 120); g.stroke(); }
+  if (f.n === 2 && el < 0.7) { const u = clamp01((el - 0.3) / 0.35); put(g, SP.burst, f.h, 0, cx, cy, 40 + 90 * ease(u), 40 + 90 * ease(u), 0, (1 - u) * 0.95); put(g, SP.shock, f.m, 0, cx, cy, 160 * ease(u), 160 * ease(u), 0, (1 - u) * 0.8); }
 }
-function drawLeaves(g, f, el, cx, cy) {
-  g.globalAlpha = clamp01(1 - el / 0.65) * 0.9; g.fillStyle = '#3fae4a';
-  for (let i = 0; i < 6; i++) { const a = el * 9 + i * TAU / 6, r = 18 + el * 26; g.save(); g.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.7); g.rotate(a * 2); g.beginPath(); g.ellipse(0, 0, 5, 2.2, 0, 0, TAU); g.fill(); g.restore(); }
+function dashImpact(f, cx, cy, big, world) {
+  for (let i = cnt(14 * big); i > 0; i--) { const a = rnd() * TAU, v = 150 + rnd() * 200 * big; spark(f, cx, cy, 8, Math.cos(a) * v, Math.sin(a) * v * 0.8, 40 + rnd() * 80, 8 + rnd() * 7, 0.35 + rnd() * 0.3); }
+  for (let i = cnt(6 * big); i > 0; i--) { const a = rnd() * TAU; bit(f, cx, cy, 6, Math.cos(a) * 90, Math.sin(a) * 70, 40 + rnd() * 60, 24 + rnd() * 16, 0.5); }
+  if (big > 1) shake(world, 4, 0.35);
 }
-function drawWarcry(g, f, el, cx, cy, lite) {
-  // ondas sonoras à frente (início) + aura de brasas que dura o tempo do buff
-  if (el < 0.6) for (let i = 0; i < 3; i++) {
+function drawRoll(g, f, el, cx, cy) {
+  const fade = ribbon(g, f, el, cx, cy, 16, f.m, f.h, SP.ribbon0);
+  if (f.n === 0) { f.n = 1; for (let i = cnt(5); i > 0; i--) smoke(f, f.x + (rnd() - 0.5) * 16, f.y + 6, 2, (rnd() - 0.5) * 50, (rnd() - 0.5) * 30, 10, 20 + rnd() * 10, 0.5, 0.35); put(g, SP.shock, f.m, 0, f.x, f.y, 60, 60, 0, 0.6); }
+  if (el < 0.5) { put(g, SP.glow, f.m, 1, cx, cy, 44, 44, 0, 0.5 * fade); for (let n = rate(f, 55); n > 0; n--) bit(f, cx + (rnd() - 0.5) * 14, cy + (rnd() - 0.5) * 10, 4 + rnd() * 6, (rnd() - 0.5) * 70, (rnd() - 0.5) * 50, 20 + rnd() * 30, 18 + rnd() * 8, 0.55); }
+  if (el < 0.4 && !LITE) put(g, SP.wind, f.h, 0, cx - Math.cos(f.ang) * 26, cy - Math.sin(f.ang) * 26, 70, 26, f.ang, (1 - el / 0.4) * 0.7);
+}
+function drawWarcry(g, f, el, cx, cy) {
+  if (el < 0.6) for (let i = 0; i < 3; i++) { // ondas de choque à frente
     const u = clamp01((el - i * 0.1) / 0.45); if (u <= 0) continue;
-    g.globalAlpha = (1 - u) * 0.85; g.strokeStyle = i === 1 ? '#ffb02e' : '#ff5a1f'; g.lineWidth = 5 * (1 - u) + 1;
-    const d = 20 + u * 90; g.beginPath(); g.arc(cx + Math.cos(f.ang) * d * 0.5, cy + Math.sin(f.ang) * d * 0.5, d, f.ang - 0.9, f.ang + 0.9); g.stroke();
+    const d = 20 + u * 90, sz = 60 + u * 170;
+    put(g, SP.shock, i === 1 ? f.h : f.m, 0, cx + Math.cos(f.ang) * d * 0.55, cy + Math.sin(f.ang) * d * 0.55 - 8, sz, sz, f.ang + i, (1 - u) * 0.85);
   }
-  if (el < 0.5) { g.globalAlpha = (1 - el / 0.5) * 0.8; g.strokeStyle = '#e8501c'; g.lineWidth = 4; circle(g, cx, cy, 26 + ease(el / 0.5) * 70); g.stroke(); }
+  if (!f.n) { f.n = 1; put(g, SP.burst, f.h, 0, cx, cy - 10, 100, 100, 0, 1); for (let i = cnt(14); i > 0; i--) { const a = rnd() * TAU; spark(f, cx, cy - 8, 10, Math.cos(a) * 200, Math.sin(a) * 160, 60 + rnd() * 60, 8 + rnd() * 6, 0.5); } }
   const aura = clamp01(Math.min(el / 0.25, (f.dur + 0.2 - el) / 0.6));
-  if (aura > 0) {
-    g.globalAlpha = aura * 0.75; g.strokeStyle = '#e8501c'; g.lineWidth = 2.5; g.setLineDash([7, 6]); g.lineDashOffset = -el * 40;
-    circle(g, cx, cy + 6, 30 + Math.sin(el * 7) * 2); g.stroke(); g.setLineDash([]);
-    if (!lite) for (let i = 0; i < 6; i++) { const u = (el * 0.9 + i / 6) % 1, ang = i * 2.1 + el; g.globalAlpha = aura * (1 - u) * 0.85; g.fillStyle = i % 2 ? '#ffb02e' : '#ff5a1f'; circle(g, cx + Math.cos(ang) * 22, cy + 6 - u * 42, 2.4 * (1 - u) + 0.6); g.fill(); }
+  if (aura > 0) { // anel de runas pintado no chão + brasas subindo durante o reforço
+    put(g, SP.glow, f.m, 1, cx, cy + 6, 100, 70, 0, 0.45 * aura);
+    put(g, SP.rune0, f.m, 0, cx, cy + 8, 92 + Math.sin(el * 5) * 3, 58 + Math.sin(el * 5) * 2, 0, 0.8 * aura);
+    put(g, SP.rune1, f.h, 0, cx, cy + 8, 64, 40, 0, 0.5 * aura);
+    for (let n = rate(f, 14); n > 0; n--) bit(f, cx + (rnd() - 0.5) * 40, cy + 6 + (rnd() - 0.5) * 12, 2, (rnd() - 0.5) * 16, 0, 40 + rnd() * 40, 12 + rnd() * 10, 0.9, aura);
   }
 }
-function drawMuzzle(g, f, k) { // clarão no cajado/mão ao lançar a Bola de Fogo
-  const x = f.x + Math.cos(f.ang) * 20, y = f.y + Math.sin(f.ang) * 20;
-  g.globalAlpha = 1 - k; const grd = g.createRadialGradient(x, y, 0, x, y, 30 * (0.6 + k)); grd.addColorStop(0, '#fff6d8'); grd.addColorStop(0.4, '#ff9a2e'); grd.addColorStop(1, '#ff5a1f00');
-  g.fillStyle = grd; circle(g, x, y, 30 * (0.6 + k)); g.fill();
+function drawMuzzle(g, f, k) { // clarão na mão ao lançar a Bola de Fogo / projétil
+  const x = f.x + Math.cos(f.ang) * 20, y = f.y + Math.sin(f.ang) * 20 - 6;
+  put(g, SP.glow, f.m, 1, x, y, 90 * (0.7 + k), 90 * (0.7 + k), 0, 1 - k);
+  put(g, f.fam === 2 ? SP.star8 : SP.burst, f.h, 0, x, y, 64 * (0.6 + k), 64 * (0.6 + k), k * 2, (1 - k) * 1.1);
+  if (!f.n) { f.n = 1; for (let i = cnt(6); i > 0; i--) { const a = f.ang + (rnd() - 0.5) * 1.2, v = 120 + rnd() * 160; spark(f, x, y, 6, Math.cos(a) * v, Math.sin(a) * v, 20 + rnd() * 30, 7 + rnd() * 6, 0.3 + rnd() * 0.2); } }
 }
-function drawFrost(g, f, k, cx, cy, lite) {
-  const R = f.r * ease(k), n = lite ? 6 : 10;
-  g.globalAlpha = (1 - k) * 0.5; const grd = g.createRadialGradient(cx, cy, 0, cx, cy, R); grd.addColorStop(0, 'rgba(170,230,255,0.75)'); grd.addColorStop(1, 'rgba(60,170,230,0)'); g.fillStyle = grd; circle(g, cx, cy, R); g.fill();
-  g.globalAlpha = (1 - k * k) * 0.95;
-  for (let i = 0; i < n; i++) {
-    const a = i * TAU / n + 0.2, len = R * (i % 2 ? 0.62 : 0.95), w = 7 + (i % 2) * 3;
-    g.beginPath(); g.moveTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len);
-    g.lineTo(cx + Math.cos(a + 1.5708) * w, cy + Math.sin(a + 1.5708) * w); g.lineTo(cx + Math.cos(a - 1.5708) * w, cy + Math.sin(a - 1.5708) * w); g.closePath();
-    g.fillStyle = i % 2 ? '#38a9e6' : '#bfefff'; g.fill(); g.strokeStyle = '#1d6fa5'; g.lineWidth = 1.6; g.stroke();
+function drawFrost(g, f, k, el, cx, cy) {
+  const R = f.r, e = ease(k), o = 1 - k;
+  put(g, SP.rune1, f.m, 0, cx, cy, R * 2.1 * ease(Math.min(1, k * 2.2)), R * 2.1 * ease(Math.min(1, k * 2.2)), el * 0.9, 0.9 * (1 - k * k));
+  if (!LITE) put(g, SP.shock, f.m, 0, cx, cy, R * 2.5 * e, R * 2.5 * e, 0, o * 0.8);
+  if (f.fam === 3) { // Névoa Pestilenta: nuvens e fiapos tóxicos
+    for (let i = 0; i < 8; i++) { const a = i * TAU / 8 + el, r = R * (0.2 + 0.6 * e); put(g, SP.smoke0 + (i % 3), PL.toxic, 1, cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.9, R * 0.9, R * 0.9, a, o * 0.7); }
+    for (let i = 0; i < 3; i++) put(g, SP.wisp0 + (i & 1), f.m, 0, cx + Math.cos(i * 2.1 + el * 2) * R * 0.45, cy + Math.sin(i * 2.1 + el * 2) * R * 0.4, R * 0.8, R * 0.8, el * 3 + i, o * 0.85);
+  } else { // cristais que brotam em raios
+    const N = LITE ? 5 : 7, gr = ease(Math.min(1, k * 2.4));
+    for (let i = 0; i < N; i++) { const a = i * TAU / N + 0.25, rr = R * (0.2 + 0.72 * e) * (i % 2 ? 0.7 : 1), sz = R * (i % 2 ? 0.42 : 0.62) * gr; put(g, SP.crystal0 + (i % 3), f.m, 1, cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, sz, sz, a + HALF, o * 1.2); }
   }
-  g.strokeStyle = '#1d6fa5'; g.lineWidth = 5 * (1 - k) + 2; circle(g, cx, cy, R); g.stroke(); g.strokeStyle = '#bfefff'; g.lineWidth = 2.4 * (1 - k) + 0.6; circle(g, cx, cy, R); g.stroke();
+  burstOnce(f, cx, cy, 18, 260, 60);
+  if (el < 0.4) for (let n = rate(f, 50); n > 0; n--) { const a = rnd() * TAU, r = R * (0.3 + rnd() * 0.6); bit(f, cx + Math.cos(a) * r, cy + Math.sin(a) * r, 4, Math.cos(a) * 40, Math.sin(a) * 30, 30 + rnd() * 40, 16 + rnd() * 10, 0.6); }
 }
-function drawBlink(g, f, k, cx, cy) {
-  const o = 1 - k;
-  g.globalAlpha = o * 0.95; g.strokeStyle = '#7a4dff'; g.lineWidth = 4 * o + 1; circle(g, f.ox, f.oy, 8 + 46 * (1 - ease(Math.min(1, k * 2)))); g.stroke(); // implosão na origem
-  const grd = g.createLinearGradient(f.ox, f.oy - 70, f.ox, f.oy + 6); grd.addColorStop(0, 'rgba(122,77,255,0)'); grd.addColorStop(1, 'rgba(122,77,255,0.8)');
-  g.globalAlpha = o * 0.8; g.fillStyle = grd; g.fillRect(f.ox - 7 * o, f.oy - 70, 14 * o, 76);
-  g.globalAlpha = o; g.strokeStyle = '#5b2fe0'; g.lineWidth = 5 * o; circle(g, cx, cy, 10 + 44 * ease(k)); g.stroke(); g.strokeStyle = '#e9e0ff'; g.lineWidth = 2 * o; circle(g, cx, cy, 10 + 44 * ease(k)); g.stroke(); // chegada
-  g.globalAlpha = o * 0.85; g.strokeStyle = '#4fb8ea'; g.lineWidth = 3; g.beginPath(); g.moveTo(f.ox, f.oy); g.lineTo(cx, cy); g.stroke(); // rastro entre os pontos
-  g.fillStyle = '#7a4dff';
-  for (let i = 0; i < 5; i++) { const a = i * 1.26 + k * 3, r = 10 + k * 34; circle(g, cx + Math.cos(a) * r, cy + Math.sin(a) * r, 2.2 * o + 0.4); g.fill(); }
-}
-// Fúria do Colosso: rastro dourado, onda de choque ao chegar e aura que dura o reforço
-function drawColossus(g, f, el, cx, cy, lite) {
-  drawTrail(g, f, el, cx, cy, '#ffa51f', '#fff2b0', 24);
-  if (el > 0.25 && el < 0.9) {
-    const u = (el - 0.25) / 0.65;
-    g.globalAlpha = (1 - u) * 0.9; g.strokeStyle = '#b9650a'; g.lineWidth = 9 * (1 - u) + 2; circle(g, cx, cy, 150 * ease(u)); g.stroke();
-    g.strokeStyle = '#ffe08a'; g.lineWidth = 3.5 * (1 - u) + 0.6; circle(g, cx, cy, 150 * ease(u)); g.stroke();
+function drawBlink(g, f, k, el, cx, cy) {
+  const o = 1 - k, u = ease(Math.min(1, k * 2));
+  // origem: implosão (runa que encolhe + estrela) | destino: florescer de luz
+  put(g, SP.rune1, f.m, 0, f.ox, f.oy + 4, 120 * (1 - u) + 20, 120 * (1 - u) + 20, -el * 4, o * 0.9);
+  put(g, SP.glow, f.m, 1, f.ox, f.oy - 8, 100 * o, 100 * o, 0, o);
+  put(g, SP.star8, f.h, 0, f.ox, f.oy - 10, 90 * (1 - u) + 10, 90 * (1 - u) + 10, el * 5, o);
+  put(g, SP.ribbon1, f.m, 0, (f.ox + cx) / 2, (f.oy + cy) / 2 - 6, Math.hypot(cx - f.ox, cy - f.oy) + 24, 14 * o + 3, Math.atan2(cy - f.oy, cx - f.ox), o * 0.8);
+  put(g, SP.glow, f.m, 1, cx, cy - 8, 150 * (0.5 + k), 150 * (0.5 + k), 0, o);
+  put(g, SP.burst, f.h, 0, cx, cy - 10, 50 + 90 * ease(k), 50 + 90 * ease(k), el * 2, o);
+  put(g, SP.shock, f.m, 0, cx, cy, 160 * ease(k), 160 * ease(k), 0, o * 0.8);
+  put(g, SP.star8, PL.holy, 0, cx, cy - 12, 60 * o + 10, 60 * o + 10, -el * 4, o);
+  if (!f.n) {
+    f.n = 1; const dx = cx - f.ox, dy = cy - f.oy;
+    for (let i = cnt(18); i > 0; i--) { const t = rnd(); spark(f, f.ox + dx * t, f.oy + dy * t - 6, 8 + rnd() * 10, (rnd() - 0.5) * 40, (rnd() - 0.5) * 40, 20 + rnd() * 30, 8 + rnd() * 8, 0.35 + rnd() * 0.4); }
+    for (let i = cnt(10); i > 0; i--) { const a = rnd() * TAU; bit(f, cx, cy - 6, 8, Math.cos(a) * 70, Math.sin(a) * 50, 40 + rnd() * 60, 16 + rnd() * 10, 0.6); }
   }
+}
+// Fúria do Colosso: rastro dourado, onda de choque com pedras ao chegar e aura que dura o reforço
+function drawColossus(g, f, el, cx, cy, world) {
+  drawDash(g, f, Math.min(el, 0.69), cx, cy, 34, world);
+  if (el > 0.3 && f.n < 3) { f.n = 3; // chegada: pedras, poeira, onda dupla, tremor
+    for (let i = cnt(9); i > 0; i--) { const a = rnd() * TAU, v = 90 + rnd() * 160; chunk(cx, cy, Math.cos(a) * v, Math.sin(a) * v * 0.7, 260 + rnd() * 220, 14 + rnd() * 12, 1.4); }
+    for (let i = cnt(8); i > 0; i--) { const a = rnd() * TAU; smoke(f, cx + Math.cos(a) * 30, cy + Math.sin(a) * 24, 4, Math.cos(a) * 80, Math.sin(a) * 60, 20, 40 + rnd() * 20, 0.9, 0.5); }
+    shake(world, 5, 0.45);
+  }
+  if (el > 0.28 && el < 1.1) { const u = (el - 0.28) / 0.82, e = ease(u); put(g, SP.shock, f.m, 0, cx, cy, 380 * e, 380 * e, 0, (1 - u) * 0.95); put(g, SP.shock, f.h, 0, cx, cy, 300 * e * 0.8, 300 * e * 0.8, 1, (1 - u) * 0.7); put(g, SP.burst, f.h, 0, cx, cy - 6, 70 + 120 * e, 70 + 120 * e, 0, (1 - u)); put(g, SP.glow, f.m, 1, cx, cy, 300 * e, 300 * e, 0, (1 - u) * 0.6); }
   const aura = clamp01(Math.min(el / 0.3, (f.dur + 0.3 - el) / 0.6));
-  if (aura > 0) {
-    g.globalAlpha = aura * 0.8; g.strokeStyle = '#ffb23d'; g.lineWidth = 3; g.setLineDash([8, 6]); g.lineDashOffset = -el * 50;
-    circle(g, cx, cy + 6, 34 + Math.sin(el * 7) * 2); g.stroke(); g.setLineDash([]);
-    if (!lite) for (let i = 0; i < 6; i++) { const u = (el * 0.9 + i / 6) % 1, ang = i * 2.1 + el; g.globalAlpha = aura * (1 - u) * 0.85; g.fillStyle = i % 2 ? '#fff2b0' : '#ffa51f'; circle(g, cx + Math.cos(ang) * 26, cy + 6 - u * 48, 2.6 * (1 - u) + 0.6); g.fill(); }
+  if (aura > 0 && el > 0.3) {
+    put(g, SP.glow, f.m, 1, cx, cy + 6, 120, 84, 0, 0.5 * aura);
+    put(g, SP.rune0, f.m, 0, cx, cy + 8, 108, 68, 0, 0.8 * aura);
+    put(g, SP.rune1, f.h, 0, cx, cy + 8, 74, 46, 0, 0.5 * aura);
+    for (let n = rate(f, 16); n > 0; n--) bit(f, cx + (rnd() - 0.5) * 46, cy + 6 + (rnd() - 0.5) * 12, 2, (rnd() - 0.5) * 14, 0, 40 + rnd() * 50, 14 + rnd() * 12, 0.9, aura);
   }
 }
-// Meteoro Arcano: aviso pulsante na área, rocha em chamas caindo (1 s) e explosão
-function drawMeteor(g, f, el, lite) {
+// Meteoro Arcano: telégrafo de runas na área, rocha em chamas caindo (1 s) e explosão
+function drawMeteor(g, f, el, world) {
   const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r, fall = 1.0;
   if (el < fall) {
-    const u = el / fall;
-    g.globalAlpha = 0.25 + 0.2 * Math.sin(el * 14); g.fillStyle = '#ff5a1f'; circle(g, tx, ty, R * ease(Math.min(1, u * 3))); g.fill();
-    g.globalAlpha = 0.9; g.strokeStyle = '#ffb23d'; g.lineWidth = 3; g.setLineDash([10, 7]); g.lineDashOffset = -el * 40; circle(g, tx, ty, R); g.stroke(); g.setLineDash([]);
-    const h = (1 - u) * (1 - u) * 560, mx = tx + h * 0.45, my = ty - h; // rocha vindo de cima, inclinada
-    for (let i = 5; i >= 1; i--) { g.globalAlpha = 0.5 - i * 0.07; g.fillStyle = i > 3 ? '#c8321a' : '#ff9a3a'; circle(g, mx + i * 11 * 0.45, my - i * 11, 20 - i * 2); g.fill(); }
-    g.globalAlpha = 1; g.fillStyle = '#3a2418'; circle(g, mx, my, 20); g.fill(); g.fillStyle = '#ffd27a'; circle(g, mx - 5, my - 5, 8); g.fill();
+    const u = el / fall, pulse = 0.7 + 0.3 * Math.sin(el * 12);
+    put(g, SP.glow, f.m, 2, tx, ty, R * 2.4 * ease(Math.min(1, u * 3)), R * 2.4 * ease(Math.min(1, u * 3)), 0, 0.3 + 0.2 * u);
+    put(g, SP.rune1, f.m, 0, tx, ty, R * 2.08, R * 2.08, el * 0.5, 0.85 * pulse);
+    put(g, SP.rune0, f.h, 0, tx, ty, R * 1.5 * (1.05 - u * 0.4), R * 1.5 * (1.05 - u * 0.4), -el * 0.8, 0.6 * pulse);
+    put(g, SP.ring, f.m, 0, tx, ty, R * 3.03 * (1 - u * 0.05), R * 3.03 * (1 - u * 0.05), 0, 0.6 * pulse);
+    const h = (1 - u) * (1 - u) * 560, mx = tx + h * 0.45, my = ty - h, tail = Math.atan2(-1, 0.45) + HALF;
+    put(g, SP.glow, f.m, 1, mx, my, 170, 170, 0, 0.9);
+    put(g, SP.flame0 + (((el * 24) | 0) & 3), f.m, 0, mx + 26, my - 58, 150, 150, tail, 1);
+    put(g, SP.flame0 + (((el * 24 + 2) | 0) & 3), f.h, 0, mx + 14, my - 32, 96, 96, tail, 0.95);
+    put(g, SP.glow, PL.holy, 0, mx, my, 56, 56, 0, 1);
+    for (let n = rate(f, 150); n > 0; n--) { if (n % 3) bit(f, mx + 12 + (rnd() - 0.5) * 24, my - 26 + (rnd() - 0.5) * 24, 0, 40, -80, 0, 30 + rnd() * 20, 0.45); else ember(f, mx + (rnd() - 0.5) * 20, my + (rnd() - 0.5) * 20, 0, (rnd() - 0.5) * 60, 30, 20, 10 + rnd() * 8, 0.6); }
     return;
   }
-  const u = clamp01((el - fall) / 0.9), o = 1 - u;
-  const grd = g.createRadialGradient(tx, ty, 0, tx, ty, R * (0.5 + 0.6 * ease(u)));
-  grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.35, '#ffb23d'); grd.addColorStop(1, 'rgba(255,90,30,0)');
-  g.globalAlpha = o; g.fillStyle = grd; circle(g, tx, ty, R * (0.5 + 0.6 * ease(u))); g.fill();
-  g.strokeStyle = '#8a2a08'; g.lineWidth = 8 * o + 1; circle(g, tx, ty, R * ease(u)); g.stroke(); g.strokeStyle = '#ffe08a'; g.lineWidth = 3 * o + 0.5; circle(g, tx, ty, R * ease(u)); g.stroke();
-  if (!lite) for (let i = 0; i < 10; i++) { const a = i * 0.63 + 0.3, r = R * ease(u) * (0.4 + (i % 3) * 0.3); g.fillStyle = i % 2 ? '#ffb23d' : '#ff5a1f'; circle(g, tx + Math.cos(a) * r, ty + Math.sin(a) * r - u * 30, 3 * o + 0.5); g.fill(); }
+  const u = clamp01((el - fall) / 0.9), o = 1 - u, e = ease(u);
+  if (f.n < 2) { f.n = 2; // impacto: pedras, chamas, fumaça, faíscas e tremor
+    for (let i = cnt(10); i > 0; i--) { const a = rnd() * TAU, v = 120 + rnd() * 260; chunk(tx, ty, Math.cos(a) * v, Math.sin(a) * v * 0.7, 300 + rnd() * 260, 14 + rnd() * 14, 1.5); }
+    for (let i = cnt(18); i > 0; i--) { const a = rnd() * TAU, v = 60 + rnd() * R * 1.2; bit(f, tx + Math.cos(a) * R * 0.2, ty + Math.sin(a) * R * 0.2, 6, Math.cos(a) * v, Math.sin(a) * v * 0.8, 90 + rnd() * 160, 34 + rnd() * 26, 0.6 + rnd() * 0.4); }
+    for (let i = cnt(12); i > 0; i--) { const a = rnd() * TAU, v = 40 + rnd() * R; smoke(f, tx + Math.cos(a) * R * 0.3, ty + Math.sin(a) * R * 0.3, 6, Math.cos(a) * v, Math.sin(a) * v * 0.8, 30 + rnd() * 40, 60 + rnd() * 40, 1.3, 0.55); }
+    for (let i = cnt(26); i > 0; i--) { const a = rnd() * TAU, v = 150 + rnd() * 380; spark(f, tx, ty, 8, Math.cos(a) * v, Math.sin(a) * v * 0.8, 80 + rnd() * 160, 8 + rnd() * 8, 0.5 + rnd() * 0.6); }
+    shake(world, 6, 0.5);
+  }
+  put(g, SP.glow, f.m, 1, tx, ty, R * 3 * (0.6 + 0.5 * e), R * 3 * (0.6 + 0.5 * e), 0, o * 0.9);
+  put(g, SP.burst, f.h, 0, tx, ty, R * 2.4 * (0.4 + 0.6 * e), R * 2.4 * (0.4 + 0.6 * e), 0, o * 1.1);
+  put(g, SP.shock, f.m, 0, tx, ty, R * 2.5 * e, R * 2.5 * e, 0, o);
+  put(g, SP.shock, f.h, 0, tx, ty, R * 2.5 * ease(Math.max(0, u - 0.12) / 0.88) * 0.7, R * 2.5 * ease(Math.max(0, u - 0.12) / 0.88) * 0.7, 2, o * 0.7);
+  if (el - fall < 0.9) put(g, SP.rune1, f.m, 0, tx, ty, R * 2.08, R * 2.08, el * 0.5, o * 0.5);
+  if (el - fall < 0.7) for (let n = rate(f, 22); n > 0; n--) { const a = rnd() * TAU, r = rnd() * R * 0.8; ember(f, tx + Math.cos(a) * r, ty + Math.sin(a) * r, 0, (rnd() - 0.5) * 20, (rnd() - 0.5) * 20, 50 + rnd() * 60, 9 + rnd() * 7, 0.8); } // brasas da queimadura
 }
-function drawRain(g, f, el, lite) {
-  const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r;
+function drawRain(g, f, el) {
+  const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r, storm = f.skill === 'arrowstorm';
   const ring = clamp01(Math.min(el / 0.2, (f.life - el) / 0.4));
-  g.globalAlpha = ring * 0.8; g.strokeStyle = f.skill === 'arrowstorm' ? '#d9541a' : '#2e7d32'; g.lineWidth = 2.5; g.setLineDash([9, 7]); g.lineDashOffset = -el * 36; circle(g, tx, ty, R); g.stroke(); g.setLineDash([]);
-  const storm = f.skill === 'arrowstorm', gap = storm ? 0.1 : 0.125;
-  const N = storm ? (lite ? 16 : 28) : lite ? 10 : 18; let s = f.seed >>> 0;
+  put(g, SP.glow, f.m, 1, tx, ty, R * 2.4, R * 2.4, 0, 0.3 * ring);
+  put(g, SP.rune0, f.m, 0, tx, ty, R * 2.08, R * 2.08, el * 0.3, 0.8 * ring);
+  put(g, SP.rune1, f.h, 0, tx, ty, R * 1.35, R * 1.35, -el * 0.4, 0.45 * ring);
+  const gap = storm ? 0.1 : 0.125, N = storm ? (LITE ? 16 : 28) : LITE ? 10 : 18; let s = f.seed >>> 0;
   for (let i = 0; i < N; i++) {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0; const ra = (s / 4294967296) * TAU;
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0; const rr = Math.sqrt(s / 4294967296) * R * 0.92;
     const lx = tx + Math.cos(ra) * rr, ly = ty + Math.sin(ra) * rr, local = el - (0.15 + i * gap);
     if (local < 0) continue;
-    if (local < 0.2) { // flecha caindo (inclinada)
-      const u = local / 0.2, h = 150 * (1 - u);
-      g.globalAlpha = 0.95; g.strokeStyle = '#4a3010'; g.lineWidth = 3.4; g.beginPath(); g.moveTo(lx + h * 0.35, ly - h - 26); g.lineTo(lx + h * 0.35 - 3, ly - h); g.stroke();
-      g.strokeStyle = storm ? '#ff9a3d' : '#fff3c4'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(lx + h * 0.35, ly - h - 26); g.lineTo(lx + h * 0.35 - 3, ly - h); g.stroke();
+    if (local < 0.2) { // flecha caindo (inclinada), fita luminosa
+      const u = local / 0.2, h = 150 * (1 - u), hx = lx + h * 0.35, hy = ly - h;
+      put(g, SP.ribbon0, f.m, 0, hx - 1.5, hy - 14, 52, storm ? 22 : 15, 1.69, 0.95);
+      put(g, SP.ribbon0, f.h, 0, hx - 1.5, hy - 10, 30, 7, 1.69, 1);
+      put(g, SP.glow, f.m, 1, hx, hy, storm ? 34 : 22, storm ? 34 : 22, 0, 0.8);
     } else if (local < 0.55) { // impacto
-      const u = (local - 0.2) / 0.35; g.globalAlpha = (1 - u) * 0.9; g.strokeStyle = storm ? '#e8501c' : '#2e7d32'; g.lineWidth = 2.6 * (1 - u) + 0.6; circle(g, lx, ly, 4 + u * 20); g.stroke();
-      g.fillStyle = storm ? '#ffd27a' : '#d7f5a0'; circle(g, lx, ly, 3 * (1 - u)); g.fill();
+      const u = (local - 0.2) / 0.35;
+      put(g, SP.burst, f.h, 0, lx, ly, 26 + u * 26, 26 + u * 26, 0, (1 - u) * 0.9);
+      put(g, SP.shock, f.m, 0, lx, ly, 18 + u * 56, 18 + u * 56, 0, (1 - u) * 0.8);
+      if (!(f.mask & (1 << i))) { f.mask |= 1 << i; for (let j = LITE ? 1 : 2; j > 0; j--) { const a = rnd() * TAU; if (storm) bit(f, lx, ly, 2, Math.cos(a) * 40, Math.sin(a) * 30, 40 + rnd() * 50, 20 + rnd() * 10, 0.5); else bit(f, lx, ly, 2, Math.cos(a) * 50, Math.sin(a) * 40, 60 + rnd() * 60, 16 + rnd() * 8, 0.8); } spark(f, lx, ly, 3, (rnd() - 0.5) * 120, (rnd() - 0.5) * 90, 80 + rnd() * 60, 7 + rnd() * 5, 0.4); }
     }
   }
 }
-function drawPierce(g, f, k, cx, cy) { // clarão do disparo + linha de luz até o fim do alcance
-  const L = Math.min(f.range, 720), cos = Math.cos(f.ang), sin = Math.sin(f.ang), x0 = cx + cos * 18, y0 = cy + sin * 18;
-  const grd = g.createLinearGradient(x0, y0, x0 + cos * L, y0 + sin * L); grd.addColorStop(0, 'rgba(120,200,30,0.95)'); grd.addColorStop(1, 'rgba(120,200,30,0)');
-  g.globalAlpha = (1 - k); g.strokeStyle = 'rgba(30,70,20,0.35)'; g.lineWidth = 11 * (1 - k) + 2; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + cos * L * 0.7, y0 + sin * L * 0.7); g.stroke(); g.strokeStyle = grd; g.lineWidth = 7 * (1 - k) + 1; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + cos * L, y0 + sin * L); g.stroke();
-  g.strokeStyle = '#ffffff'; g.lineWidth = 2 * (1 - k); g.stroke();
-  circle(g, x0, y0, 14 * (1 - k) + 3); g.fillStyle = '#c8ff3d'; g.fill();
-}
-function drawSun(g, f, k, cx, cy, lite) {
-  const R = f.r * (0.45 + 0.55 * ease(k)), o = 1 - k * k;
-  if (f.skill === 'intervention') { // coluna de luz sobre o clérigo
-    g.globalAlpha = o * 0.7; const col = g.createLinearGradient(cx, cy - 260, cx, cy + 10); col.addColorStop(0, 'rgba(255,242,168,0)'); col.addColorStop(1, 'rgba(255,230,120,0.9)');
-    g.fillStyle = col; g.fillRect(cx - 34 * (1 - k * 0.5), cy - 260, 68 * (1 - k * 0.5), 270);
+function drawPierce(g, f, k, cx, cy) { // clarão do disparo + fita de luz até o fim do alcance (Rajada do Pistoleiro: três em leque)
+  const o = 1 - k, n = f.spec === 'gunslinger' ? 3 : 1;
+  for (let b = 0; b < n; b++) {
+    const ang = f.ang + (n > 1 ? (b - 1) * 0.18 : 0), L = Math.min(f.range, n > 1 ? 480 : 720) * (0.25 + 0.75 * ease(Math.min(1, k * 2.2))), cos = Math.cos(ang), sin = Math.sin(ang), x0 = cx + cos * 18, y0 = cy + sin * 18 - 6;
+    put(g, SP.ribbon0, f.m, 0, x0 + cos * L * 0.5, y0 + sin * L * 0.5, L, (n > 1 ? 26 : 52) * o + 6, ang, o * 0.9);
+    put(g, SP.ribbon0, f.h, 0, x0 + cos * L * 0.5, y0 + sin * L * 0.5, L, (n > 1 ? 9 : 18) * o + 2, ang, o);
   }
-  g.globalAlpha = o * 0.6; const grd = g.createRadialGradient(cx, cy, 0, cx, cy, R); grd.addColorStop(0, 'rgba(255,240,170,0.95)'); grd.addColorStop(0.6, 'rgba(255,190,40,0.5)'); grd.addColorStop(1, 'rgba(255,190,40,0)');
-  g.fillStyle = grd; circle(g, cx, cy, R); g.fill();
-  const rays = lite ? 8 : 14; g.globalAlpha = o * 0.95;
-  for (let i = 0; i < rays; i++) { const a = i * TAU / rays + k * 1.1, len = R * (i % 2 ? 0.7 : 1.05), w = 0.1; g.beginPath(); g.moveTo(cx + Math.cos(a) * 14, cy + Math.sin(a) * 14); g.lineTo(cx + Math.cos(a - w) * len, cy + Math.sin(a - w) * len); g.lineTo(cx + Math.cos(a + w) * len, cy + Math.sin(a + w) * len); g.closePath(); g.fillStyle = '#ffb81f'; g.fill(); g.strokeStyle = '#b87a00'; g.lineWidth = 1.2; g.stroke(); }
-  g.strokeStyle = '#d98f00'; g.lineWidth = 5 * (1 - k) + 1.5; circle(g, cx, cy, R); g.stroke(); g.strokeStyle = '#fff6d6'; g.lineWidth = 2 * (1 - k) + 0.5; circle(g, cx, cy, R); g.stroke();
-  if (!lite) for (let i = 0; i < 9; i++) { const u = (k * 1.2 + i / 9) % 1, ang = i * 2.4; g.globalAlpha = (1 - u) * o; g.fillStyle = '#ffd24a'; circle(g, cx + Math.cos(ang) * R * 0.7 * (0.4 + (i % 3) * 0.25), cy - u * 56 + Math.sin(ang) * R * 0.2, 2.2 * (1 - u) + 0.5); g.fill(); }
+  const x0 = cx + Math.cos(f.ang) * 18, y0 = cy + Math.sin(f.ang) * 18 - 6;
+  put(g, SP.glow, f.m, 1, x0, y0, 90 * (0.6 + k), 90 * (0.6 + k), 0, o);
+  put(g, SP.star8, f.h, 0, x0, y0, 70 * (0.6 + k), 70 * (0.6 + k), k * 3, o);
+  if (!f.n) { f.n = 1; for (let i = cnt(9); i > 0; i--) { const t = rnd() * Math.min(f.range, 720) * 0.8, a = f.ang + (rnd() - 0.5) * 0.1; spark(f, x0 + Math.cos(a) * t, y0 + Math.sin(a) * t, 4, (rnd() - 0.5) * 40, (rnd() - 0.5) * 40, 20 + rnd() * 30, 6 + rnd() * 6, 0.3 + rnd() * 0.3); } }
+}
+function drawSun(g, f, k, el, cx, cy) {
+  const big = f.skill === 'intervention', R = f.r * (big ? 0.55 : 1), e = ease(k), o = 1 - k * k;
+  if (big) { // coluna de luz que desce sobre o clérigo
+    const w = 80 * (1 - k * 0.5);
+    put(g, SP.glow, f.m, 1, cx, cy - 110, w * 1.7, 340, 0, o * 0.9);
+    put(g, SP.glow, PL.holy, 0, cx, cy - 110, w * 0.55, 330, 0, o * 0.9);
+    put(g, SP.rune1, f.m, 0, cx, cy + 6, f.r * 1.3 * ease(Math.min(1, k * 2)), f.r * 1.3 * ease(Math.min(1, k * 2)), el * 0.6, o * 0.7);
+  }
+  put(g, SP.glow, f.m, 1, cx, cy, R * 2.8, R * 2.8, 0, o * 0.65);
+  put(g, SP.rays, f.h, 0, cx, cy - 6, R * 2.2 * (0.5 + 0.5 * e), R * 2.2 * (0.5 + 0.5 * e), k * 1.2, o * 0.95);
+  put(g, SP.rays, f.m, 0, cx, cy - 6, R * 1.5 * (0.5 + 0.5 * e), R * 1.5 * (0.5 + 0.5 * e), -k * 1.6, o * 0.8);
+  put(g, SP.ring, f.m, 0, cx, cy, R * 3.03 * e, R * 3.03 * e, 0, (1 - k) * 0.9);
+  put(g, SP.star8, PL.holy, 0, cx, cy - 8, 52 * (1 - k * 0.4), 52 * (1 - k * 0.4), k * 2, o * 0.8);
+  if (!f.n) { f.n = 1; if (f.spec === 'inquisitor') for (let i = cnt(12); i > 0; i--) { const a = rnd() * TAU; spark(f, cx, cy - 6, 8, Math.cos(a) * 240, Math.sin(a) * 190, 40, 9 + rnd() * 7, 0.5); } }
+  if (el < 0.6) for (let n = rate(f, big ? 90 : 50); n > 0; n--) { const a = rnd() * TAU, r = rnd() * R * 0.85; bit(f, cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.5, 2, 0, 0, 50 + rnd() * 70, 16 + rnd() * 12, 0.8); }
 }
 function drawBubble(g, f, el, cx, cy) {
   const alpha = clamp01(Math.min(el / 0.15, (f.dur + 0.2 - el) / 0.6));
   if (alpha > 0) {
-    const R = 34 + Math.sin(el * 5) * 1.5, grd = g.createRadialGradient(cx, cy - 4, R * 0.55, cx, cy - 4, R);
-    grd.addColorStop(0, 'rgba(255,225,120,0)'); grd.addColorStop(0.75, 'rgba(255,200,60,0.3)'); grd.addColorStop(1, 'rgba(255,190,40,0.7)');
-    g.globalAlpha = alpha; g.fillStyle = grd; circle(g, cx, cy - 4, R); g.fill();
-    g.strokeStyle = '#d98f00'; g.lineWidth = 2.6; g.globalAlpha = alpha * 0.95; circle(g, cx, cy - 4, R); g.stroke();
-    g.strokeStyle = '#ffffff'; g.lineWidth = 3; for (let i = 0; i < 2; i++) { const a = el * 1.6 + i * Math.PI; g.beginPath(); g.arc(cx, cy - 4, R - 3, a, a + 0.7); g.stroke(); }
+    const R = 36 + Math.sin(el * 5) * 1.5;
+    put(g, SP.glow, f.m, 1, cx, cy - 6, R * 2.6, R * 2.6, 0, 0.35 * alpha);
+    put(g, SP.bubble, f.m, 1, cx, cy - 6, R * 2.1, R * 2.1, 0, 0.9 * alpha);
+    put(g, SP.rune1, f.m, 0, cx, cy + 8, 100, 64, 0, 0.75 * alpha);
+    put(g, SP.rune0, f.h, 0, cx, cy + 8, 70, 44, 0, 0.5 * alpha);
+    for (let i = 0; i < 3; i++) { const a = el * 1.6 + i * TAU / 3; put(g, SP.spark, f.h, 0, cx + Math.cos(a) * R, cy - 6 + Math.sin(a) * R * 0.8, 20, 20, a, 0.9 * alpha); }
+    for (let n = rate(f, 5); n > 0; n--) bit(f, cx + (rnd() - 0.5) * 46, cy + 4, 2, 0, 0, 30 + rnd() * 20, 12 + rnd() * 8, 0.9, alpha);
   }
-  if (el < 0.45) { const u = el / 0.45; g.globalAlpha = (1 - u) * 0.95; g.strokeStyle = '#d98f00'; g.lineWidth = 5 * (1 - u) + 1; circle(g, cx, cy, 20 + ease(u) * 56); g.stroke(); }
+  if (el < 0.5) { const u = el / 0.5; put(g, SP.shock, f.m, 0, cx, cy, 70 + ease(u) * 200, 70 + ease(u) * 200, 0, (1 - u) * 0.9); put(g, SP.burst, f.h, 0, cx, cy - 8, 70 + 60 * u, 70 + 60 * u, 0, (1 - u)); }
 }
 function drawBeam(g, f, k, cx, cy) { // raio sagrado até o fim do alcance
-  const L = Math.min(f.range, 560), cos = Math.cos(f.ang), sin = Math.sin(f.ang), x0 = cx + cos * 16, y0 = cy + sin * 16, o = 1 - k;
-  g.globalAlpha = o * 0.5; g.strokeStyle = 'rgba(168,118,13,0.9)'; g.lineWidth = 30 * o + 5; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + cos * L, y0 + sin * L); g.stroke();
-  g.globalAlpha = o * 0.75; g.strokeStyle = 'rgba(255,196,60,0.95)'; g.lineWidth = 22 * o + 3; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + cos * L, y0 + sin * L); g.stroke();
-  g.globalAlpha = o; g.strokeStyle = '#ffe27a'; g.lineWidth = 9 * o + 1; g.stroke();
-  g.strokeStyle = '#ffffff'; g.lineWidth = 3 * o; g.stroke();
-  const ex = x0 + cos * L, ey = y0 + sin * L; g.strokeStyle = '#d98f00'; g.lineWidth = 4 * o + 0.5; circle(g, ex, ey, 10 + 36 * ease(k)); g.stroke();
-  g.globalAlpha = o * 0.95; g.fillStyle = '#ffd24a'; for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4; circle(g, ex + Math.cos(a) * (8 + k * 30), ey + Math.sin(a) * (8 + k * 30), 2.4 * o + 0.5); g.fill(); }
+  const L = Math.min(f.range, 560), cos = Math.cos(f.ang), sin = Math.sin(f.ang), x0 = cx + cos * 16, y0 = cy + sin * 16 - 6, o = 1 - k, e = ease(Math.min(1, k * 2.5));
+  const len = L * (0.35 + 0.65 * e), mx = x0 + cos * len / 2, my = y0 + sin * len / 2, ex = x0 + cos * L, ey = y0 + sin * L;
+  put(g, SP.glow, f.m, 1, mx, my, len, 80 * o + 12, f.ang, o * 0.7);
+  put(g, SP.ribbon0, f.m, 0, mx, my, len, 38 * o + 6, f.ang, o * 0.9);
+  put(g, SP.ribbon0, f.h, 0, mx, my, len, 15 * o + 2, f.ang, o);
+  put(g, SP.ribbon0, PL.holy, 0, mx, my, len, 5 * o, f.ang, o);
+  put(g, SP.star8, f.h, 0, x0, y0, 80 * o + 20, 80 * o + 20, k * 3, o);
+  put(g, SP.rays, f.m, 0, ex, ey, 140 * e, 140 * e, k * 2, o * 0.8); put(g, SP.glow, f.m, 1, ex, ey, 150 * e, 150 * e, 0, o); put(g, SP.shock, f.m, 0, ex, ey, 150 * e, 150 * e, 0, o * 0.8);
+  if (!f.n) { f.n = 1; for (let i = cnt(16); i > 0; i--) { const t = rnd() * L; spark(f, x0 + cos * t, y0 + sin * t, 6, (rnd() - 0.5) * 60, (rnd() - 0.5) * 60, 20 + rnd() * 50, 8 + rnd() * 7, 0.4 + rnd() * 0.4); } }
 }
 
-function drawCrit(g, f, k, cx, cy) { // estrela de oito pontas que estoura no alvo
-  const o = 1 - k, R = 12 + 30 * ease(k);
-  g.globalAlpha = o;
-  for (let i = 0; i < 8; i++) {
-    const a = i * Math.PI / 4 + 0.3, len = R * (i % 2 ? 0.6 : 1), w = 0.13;
-    g.beginPath(); g.moveTo(cx + Math.cos(a) * 5, cy + Math.sin(a) * 5); g.lineTo(cx + Math.cos(a - w) * len, cy + Math.sin(a - w) * len); g.lineTo(cx + Math.cos(a + w) * len, cy + Math.sin(a + w) * len); g.closePath();
-    g.fillStyle = i % 2 ? '#ff9a2e' : '#ffe27a'; g.fill(); g.strokeStyle = '#a8460d'; g.lineWidth = 1.2; g.stroke();
-  }
-  g.strokeStyle = '#ff6a2a'; g.lineWidth = 3 * o + 0.5; circle(g, cx, cy, R * 0.8); g.stroke();
+function drawCrit(g, f, k, cx, cy) { // estouro de estrela e faíscas no alvo
+  const o = 1 - k, e = ease(k);
+  put(g, SP.glow, f.m, 1, cx, cy - 6, 110, 110, 0, o * 0.8);
+  put(g, SP.burst, f.h, 0, cx, cy - 6, 40 + 70 * e, 40 + 70 * e, k * 1.5, o);
+  put(g, SP.star8, PL.holy, 0, cx, cy - 6, 70 * (1 - k * 0.3), 70 * (1 - k * 0.3), k * 2, o);
+  if (!f.n) { f.n = 1; for (let i = cnt(8); i > 0; i--) { const a = rnd() * TAU, v = 130 + rnd() * 160; spark(f, cx, cy - 6, 8, Math.cos(a) * v, Math.sin(a) * v * 0.8, 30 + rnd() * 50, 7 + rnd() * 6, 0.35 + rnd() * 0.25); } }
 }
-function drawAbsorb(g, f, k, cx, cy) { // escudo absorveu o golpe: hexágono dourado que cintila
-  const o = 1 - k, R = (f.r ?? 14) + 12 + 8 * ease(k);
-  g.globalAlpha = o; g.beginPath();
-  for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + k; const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R * 0.9; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
-  g.closePath(); g.fillStyle = 'rgba(255,200,60,0.28)'; g.fill();
-  g.strokeStyle = '#8a5d08'; g.lineWidth = 4 * o + 1; g.stroke(); g.strokeStyle = '#ffe27a'; g.lineWidth = 2 * o + 0.5; g.stroke();
+function drawAbsorb(g, f, k, cx, cy) { // escudo absorveu o golpe: clarão em bolha dourada
+  const o = 1 - k, R = (f.r ?? 14) + 14 + 8 * ease(k);
+  put(g, SP.bubble, f.m, 1, cx, cy - 4, R * 2.2, R * 2.2, 0, o);
+  put(g, SP.ring, f.h, 0, cx, cy - 4, R * 2.9 * (0.8 + 0.3 * ease(k)), R * 2.9 * (0.8 + 0.3 * ease(k)), 0, o * 0.8);
+  if (!f.n) { f.n = 1; for (let i = cnt(5); i > 0; i--) { const a = rnd() * TAU; spark(f, cx + Math.cos(a) * R, cy - 4 + Math.sin(a) * R * 0.8, 6, Math.cos(a) * 60, Math.sin(a) * 50, 30, 7 + rnd() * 5, 0.4); } }
 }
-function drawHeal(g, f, k, cx, cy) { // cruzes verdes subindo do alvo
+function drawHeal(g, f, k, cx, cy) { // cruzes verdes subindo do alvo, com aura e fagulhas
   const o = 1 - k * k;
+  put(g, SP.glow, f.m, 1, cx, cy, 90, 90, 0, o * 0.55);
+  put(g, SP.ring, f.m, 0, cx, cy + 4, (24 + 40 * ease(k)) * 3.03 * 0.5, (24 + 40 * ease(k)) * 3.03 * 0.5 * 0.7, 0, (1 - k) * 0.8);
   for (let i = 0; i < 4; i++) {
     const u = clamp01(k * 1.15 - i * 0.07); if (u <= 0) continue;
-    const x = cx + Math.sin(i * 2.1 + k * 3) * 14, y = cy - 6 - u * 40, s = 5.5 * (1 - u * 0.4);
-    g.globalAlpha = o * (1 - u * 0.4); g.lineCap = 'butt';
-    g.strokeStyle = '#1f7a3a'; g.lineWidth = 5.2; g.beginPath(); g.moveTo(x - s, y); g.lineTo(x + s, y); g.moveTo(x, y - s); g.lineTo(x, y + s); g.stroke();
-    g.strokeStyle = '#8dffb3'; g.lineWidth = 2.6; g.stroke();
+    put(g, SP.cross, f.m, 0, cx + Math.sin(i * 2.1 + k * 3) * 14, cy - 6 - u * 44, 15 * (1 - u * 0.4), 15 * (1 - u * 0.4), 0, o * (1 - u * 0.4));
   }
-  g.lineCap = 'round'; g.globalAlpha = o * 0.7; g.strokeStyle = '#2fb866'; g.lineWidth = 2.5 * (1 - k) + 0.5; circle(g, cx, cy + 4, 12 + 16 * ease(k)); g.stroke();
+  if (!f.n) { f.n = 1; for (let i = cnt(8); i > 0; i--) em(SP.spark, f.h, 0, cx + (rnd() - 0.5) * 24, cy + (rnd() - 0.5) * 10, 2, 0, 0, 40 + rnd() * 40, 9 + rnd() * 5, 2, 0.6 + rnd() * 0.4, 0, 0, 1, 0.5, -20); }
 }
 
 // o desenho chama isto uma vez por quadro: guarda a posição anterior dos atores que podem se teleportar

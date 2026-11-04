@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { spawnSkillVfx, drawSkillVfx, drawSkillProjectile, trackActors } from '../public/src/render/skill-vfx.js';
 import { SKILLS } from '../public/src/data/skills.js';
 import { CLASSES } from '../public/src/data/classes.js';
+import { useFakeKit as _fake } from '../public/src/render/vfx-kit.js';
+_fake(); // kit de mentira: sem ele (não carregado) os projéteis caem no desenho simples do renderer
 
 // Efeitos das habilidades (etapa 2): só apresentação. Cada habilidade REAL gera o seu efeito, nenhum desenho recebe número inválido e o que venceu é descartado.
 const KIND = { whirlwind: 'whirl', charge: 'dashtrail', warcry: 'warcry', fireball: 'muzzle', frostnova: 'frost', blink: 'blink', rain: 'rain', pierce: 'pierce', roll: 'roll', holylight: 'sun', divineshield: 'bubble', judgement: 'beam' };
@@ -49,11 +51,12 @@ test('o ciclo de vida inteiro de cada efeito (e dos 3 projéteis) só manda núm
     assert.equal(w.svfx.length, 0, `${id}: efeito vencido deve sair da lista`);
   }
   const g = fakeCtx(bad);
-  const base = { x: 100, y: 100, vx: 400, vy: 0, ang: 0, color: '#ff8a3d', radius: 11, src: { kind: 'player' } };
+  const base = { x: 100, y: 100, vx: 400, vy: 0, ang: 0, color: '#ff8a3d', radius: 11, src: { kind: 'player', classId: 'mage' } };
   assert.equal(drawSkillProjectile(g, { ...base, explode: 80, pierce: false, stun: 0 }, 1), true, 'bola de fogo');
-  assert.equal(drawSkillProjectile(g, { ...base, vx: 820, radius: 6, explode: 0, pierce: true, stun: 0 }, 1), true, 'tiro perfurante');
-  assert.equal(drawSkillProjectile(g, { ...base, vx: 560, radius: 9, explode: 0, pierce: false, stun: 1.5 }, 1), true, 'julgamento');
-  assert.equal(drawSkillProjectile(g, { ...base, radius: 6, explode: 0, pierce: false, stun: 0 }, 1), false, 'ataque básico segue no desenho antigo');
+  assert.equal(drawSkillProjectile(g, { ...base, src: { kind: 'player', classId: 'archer' }, vx: 820, radius: 6, explode: 0, pierce: true, stun: 0 }, 1), true, 'tiro perfurante');
+  assert.equal(drawSkillProjectile(g, { ...base, src: { kind: 'player', classId: 'cleric' }, vx: 560, radius: 9, explode: 0, pierce: false, stun: 1.5 }, 1), true, 'julgamento');
+  assert.equal(drawSkillProjectile(g, { ...base, radius: 6, explode: 0, pierce: false, stun: 0 }, 1), true, 'orbe básico do mago também é pintado');
+  assert.equal(drawSkillProjectile(g, { ...base, src: { kind: 'mob' } }, 1), false, 'projétil de mob segue no desenho antigo');
   assert.equal(drawSkillProjectile(g, { ...base, explode: 80, src: { kind: 'spirit' } }, 1), false, 'spirit não usa efeito de habilidade');
   assert.deepEqual(bad, [], 'nenhum desenho pode receber NaN/infinito');
 });
@@ -79,4 +82,37 @@ test('crítico, golpe absorvido e cura relevante geram efeito; hit comum e cura 
   for (let t = 0; t < 1; t += 1 / 30) { w.time += 1 / 30; drawSkillVfx(g, w, false); }
   assert.deepEqual(bad, []);
   assert.equal(spawnEventVfx(w, { type: 'hit', target: null, crit: true }), null);
+});
+
+const KIND_ALL = { ...KIND, colossus: 1, meteor: 1, arrowstorm: 1, intervention: 1 };
+// ---- kit de sprites (VFX pintados): com um kit de mentira, TODAS as habilidades em TODAS as especializações desenham só números válidos ----
+import { useFakeKit } from '../public/src/render/vfx-kit.js';
+import { SPECS } from '../public/src/data/specs.js';
+import { vfxShake, drawBasicSlash } from '../public/src/render/skill-vfx.js';
+
+test('kit de VFX: cada habilidade x especialização (e eventos crit/absorb/cura, projéteis, corte básico) só manda números válidos; pool não estoura; custo baixo', () => {
+  useFakeKit();
+  const bad = [], specs = [null, ...Object.values(SPECS).flatMap((o) => Object.keys(o))];
+  const g = fakeCtx(bad);
+  let t0 = performance.now(), frames = 0;
+  for (const lite of [false, true]) for (const spec of specs) for (const id of Object.keys(KIND_ALL)) {
+    const w = mkWorld(), a = { ...mkActor(id === 'blink' ? 'mage' : 'warrior'), spec }; w.actors.push(a);
+    trackActors(w); a.x += 120;
+    const f = spawnSkillVfx(w, { actor: a, skill: id, ang: 1.1, tx: 650, ty: 340 });
+    for (let t = 0; t <= f.life + 0.1; t += 1 / 30) { w.time = 5 + t; a.x += 2; drawSkillVfx(g, w, lite); frames++; }
+    assert.equal(w.svfx.length, 0, `${id}/${spec}`);
+  }
+  const w = mkWorld(), a = mkActor('warrior');
+  for (const ev of [{ type: 'hit', target: a, crit: true }, { type: 'hit', target: a, absorbed: 5 }, { type: 'heal', actor: a, amount: 50 }]) spawnEventVfx(w, ev);
+  for (let t = 0; t < 1; t += 1 / 30) { w.time = 5 + t; drawSkillVfx(g, w, false); }
+  const proj = { x: 100, y: 100, vx: 400, vy: 0, ang: 0, color: '#fff', explode: 0, pierce: false, stun: 0, radius: 6 };
+  for (const [cls, spec, extra] of [['mage', null, { explode: 80, radius: 11 }], ['mage', 'warlock', { explode: 60, radius: 11 }], ['mage', 'arcane', { pierce: true, radius: 9, vx: 760 }], ['mage', null, { radius: 7 }],
+    ['archer', 'sniper', { pierce: true, vx: 1000 }], ['archer', 'gunslinger', { radius: 6, vx: 800 }], ['archer', null, { radius: 4, vx: 700 }], ['cleric', 'inquisitor', { stun: 1.8, radius: 9 }]]) {
+    assert.equal(drawSkillProjectile(g, { ...proj, ...extra, src: { kind: 'player', classId: cls, spec } }, 1.3), true, `${cls}/${spec}`);
+  }
+  assert.equal(drawBasicSlash(g, { x: 1, y: 2, ang: 0.3, arc: 1.8, r: 74, t: 0.05, life: 0.2, color: '#ffe1d0' }), true);
+  assert.deepEqual(bad, [], 'nenhum desenho pode receber NaN/infinito');
+  const s = vfxShake({ time: 5, shake: { t0: 4.9, dur: 0.5, amp: 5 } });
+  assert.ok(Number.isFinite(s.x) && Math.abs(s.x) <= 5);
+  assert.ok(performance.now() - t0 < 4000, `${frames} quadros devem desenhar rápido (${(performance.now() - t0) | 0} ms)`);
 });

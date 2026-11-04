@@ -5,7 +5,7 @@ import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawAuraBack, drawAuraMotes } from './aura.js';
 
 let auraQ = 2; // qualidade para a aura de evolução (0 só halo, 1 meio, 2 cheio); atualizada em setQuality
-import { drawSkillVfx, drawSkillProjectile, trackActors } from './skill-vfx.js';
+import { drawSkillVfx, drawSkillProjectile, drawBasicSlash, vfxShake, trackActors } from './skill-vfx.js';
 import { drawMobSprite, mobSpritesEnabled, prepareMobs } from './mob-sprites.js';
 import { drawChestSprite } from './prop-sprites.js';
 import { GroundCache, quantScale } from './ground-tiles.js';
@@ -102,7 +102,8 @@ export class Renderer {
     g.fillRect(0, 0, this.vw, this.vh);
     g.save();
     g.scale(this.zoom, this.zoom);
-    g.translate(-Math.round(cam.x), -Math.round(cam.y));
+    const shk = vfxShake(world); // tremor discreto de golpes fortes (skill-vfx.js)
+    g.translate(-Math.round(cam.x) + shk.x, -Math.round(cam.y) + shk.y);
     setCryptState(view.crypt); if (z.dungeon || z.scenery?.boats) loadProps(z.dungeon ? CRYPT_PROPS : HARBOR_PROPS); // arte de objetos só da zona atual
     const rdy = (groundReady() ? 1 : 0) + (groundTexReady() ? 2 : 0) + (propReady('crypt_part2') ? 4 : 0); // o atlas de chão carrega depois do 1º quadro: refaz os blocos uma vez quando ele chega
     this.groundCache.draw(g, world, cam.x - 8, cam.y - 8, cam.x + this.ww + 8, cam.y + this.wh + 8, rdy);
@@ -776,6 +777,7 @@ function drawFx(g, f) {
   const k = f.t / f.life;
   g.globalAlpha = 1 - k;
   if (f.type === 'slash') {
+    if (drawBasicSlash(g, f)) { g.globalAlpha = 1; return; } // corte pintado (kit de VFX); sem o kit cai no arco simples
     g.strokeStyle = f.color; g.lineWidth = 6 * (1 - k) + 1; g.lineCap = 'round';
     g.beginPath(); g.arc(f.x, f.y, f.r * (0.75 + k * 0.2), f.ang - f.arc / 2, f.ang + f.arc / 2); g.stroke();
   } else if (f.type === 'ring') {
