@@ -21,7 +21,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "== 1/7 Pacotes básicos"
 apt-get update -y
-apt-get install -y curl git ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y curl git ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https iptables
 
 echo "== 2/7 Node.js 24"
 if ! command -v node >/dev/null || ! node -v | grep -q '^v24\.'; then
