@@ -61,9 +61,18 @@ for s in ('R', 'L'):
         ('shin.' + s, 'thigh.' + s, pt['kn_' + s], pt['an_' + s], spec['r'].get('leg', 45)),
         ('foot.' + s, 'shin.' + s, pt['an_' + s], pt['an_' + s] + Vector((0, -0.14, -0.02)), spec['r'].get('foot', 45)),
     ]
+CHAINS = {}  # nome do adereço -> lista de ossos da cadeia (capa em ossos com mola: "chain": N no spec)
 for wp in spec.get('weapons', []):  # armas/adereços presos a uma mão (ou a outro osso)
     dy = wp.get('dy', 0.0)  # profundidade própria do adereço (a vista frontal não separa frente/trás)
-    bones.append((wp['name'], wp['parent'], w(wp['a'], yb + wp.get('ay', dy)), w(wp['b'], yb + wp.get('by', dy)), wp['r']))  # ay/by: profundidade de cada ponta (ex.: espada que aponta para a frente)
+    A_ = w(wp['a'], yb + wp.get('ay', dy)); B_ = w(wp['b'], yb + wp.get('by', dy))  # ay/by: profundidade de cada ponta (ex.: espada que aponta para a frente)
+    K_ = int(wp.get('chain', 1))
+    if K_ <= 1:
+        bones.append((wp['name'], wp['parent'], A_, B_, wp['r']))
+    else:  # cadeia: segmentos iguais de a até b, cada um filho do anterior (o primeiro, do osso `parent`)
+        names = [wp['name']] + [f"{wp['name']}.{i}" for i in range(1, K_)]
+        for i, nm in enumerate(names):
+            bones.append((nm, wp['parent'] if i == 0 else names[i - 1], A_ + (B_ - A_) * (i / K_), A_ + (B_ - A_) * ((i + 1) / K_), wp['r']))
+        CHAINS[wp['name']] = names
 
 arm_data = bpy.data.armatures.new('Rig'); arm = bpy.data.objects.new('Rig', arm_data)
 sc.collection.objects.link(arm); bpy.context.view_layer.objects.active = arm
@@ -105,11 +114,36 @@ for _ in range(spec.get('smooth', 3)):
 Wt = Wu[inv]
 # adereços rígidos (espada, escudo, cajado...): vértices dentro da cápsula e mais perto dela que de qualquer osso do corpo ficam 100% no adereço
 yb_ = spec.get('depth', 0.0)
-wnames = {wp['name'] for wp in spec.get('weapons', [])}
+wnames = {wp['name'] for wp in spec.get('weapons', [])} | {nm for L_ in CHAINS.values() for nm in L_}
 body_idx = [i for i, b in enumerate(bones) if b[0] not in wnames]
 body_raw = RAW[:, body_idx].min(1)
+chain_idx = [i for i, b in enumerate(bones) if any(b[0] in L_ for L_ in CHAINS.values())]
+if chain_idx: Wt[:, chain_idx] = 0; Wt /= Wt.sum(1, keepdims=True)   # ossos de cadeia só mexem nos vértices da própria capa (não puxam o corpo)
+def _sstep(x): x = np.clip(x, 0, 1); return x * x * (3 - 2 * x)
 for i, (name, parent, hd, tl, r) in enumerate(bones):
+    if name in CHAINS:
+        wp = next(w_ for w_ in spec['weapons'] if w_['name'] == name)
+        names = CHAINS[name]; K_ = len(names); ids = [next(j for j, b in enumerate(bones) if b[0] == nm) for nm in names]
+        inside = RAW[:, i] < r / S
+        if 'ymax' in wp: inside &= co[:, 1] <= yb_ + wp['ymax']
+        if 'ymin' in wp: inside &= co[:, 1] >= yb_ + wp['ymin']
+        a_ = np.array(bones[ids[0]][2], dtype=np.float32); b_ = np.array(bones[ids[-1]][3], dtype=np.float32)
+        ab_ = b_ - a_; t_ = np.clip(((co - a_) @ ab_) / max(float(ab_ @ ab_), 1e-8), 0, 1) * K_   # posição ao longo da cadeia, em segmentos
+        top = wp.get('top_fix', 0.45)  # fração do 1º segmento presa ao corpo (ombro): a capa não se solta do pescoço
+        prev = Wt[inside].copy()
+        Wt[inside] = 0
+        k0 = np.minimum(np.floor(t_).astype(int), K_ - 1); fr = _sstep(t_ - k0)
+        for vi in np.nonzero(inside)[0]:
+            k = int(k0[vi]); f_ = float(fr[vi])
+            if k < K_ - 1: Wt[vi, ids[k]] += 1 - f_; Wt[vi, ids[k + 1]] += f_
+            else: Wt[vi, ids[k]] += 1.0
+            wtop = 1.0 - float(_sstep(t_[vi] / max(top, 1e-3)))   # junto ao ombro, o peso migra para o osso pai (spine)
+            if wtop > 0:
+                Wt[vi] *= (1 - wtop)
+                Wt[vi, [j for j, b in enumerate(bones) if b[0] == wp['parent']][0]] += wtop
+        continue
     if name in wnames:
+        if any(name in L_ for L_ in CHAINS.values()): continue
         wp = next(w_ for w_ in spec['weapons'] if w_['name'] == name)
         inside = RAW[:, i] < r / S
         if not wp.get('rigid'): inside &= RAW[:, i] < body_raw * 0.8   # rigid: tudo dentro da cápsula é 100% do adereço (sem 'mole')

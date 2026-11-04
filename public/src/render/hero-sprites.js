@@ -25,7 +25,7 @@ export function heroLook(o) {
   return { tier, spec, atlasVariant: spec ? (tier >= 1 ? VARIANT_ATLASES[`${o?.classId}:${spec}`] : undefined) : undefined };
 }
 
-export const VARIANT_TEX_K = 0.8;
+export const VARIANT_TEX_K = 0.75; // (era 0,8) a animação v3 tem +3 quadros por herói (walk 10, idle 5): menos resolução nas variantes mantém a memória igual
 export const stats = { drawn: 0, loaded: 0, texBytes: 0, texScale: 1 };
 
 // Escala das texturas (memória de GPU): cada herói tem ≈ 20–24 MiB decodificados em resolução cheia (4 classes ≈ 87 MiB).
@@ -111,6 +111,16 @@ export function viewFromFacing(face) {
 const ACTING = new Set(['attack', 'skill', 'dash', 'hit']);
 const states = new WeakMap();
 
+// Duração do clipe em "quadros" e quadro no instante tt (em quadros). `dur` (opcional, por quadro, em 1/fps) dá ritmo irregular: carrega devagar, golpe rápido, volta elástica.
+const clipLen = (c) => (c.len ??= c.dur ? c.dur.reduce((s, d) => s + d, 0) : c.frames);
+function frameAt(c, tt) {
+  if (!c.dur) return Math.floor(tt);
+  let acc = 0;
+  for (let i = 0; i < c.dur.length; i++) { acc += c.dur[i]; if (tt < acc) return i; }
+  return c.frames - 1;
+}
+const LEAN_K = 0.05; // inclinação do corpo (cisalhamento) no sentido do movimento, a 100% da velocidade de referência
+
 // Desenha o herói `a` com o atlas da sua classe. Retorna true (desenhou), 'wait' (ainda carregando: não desenhar nada,
 // para não "piscar" o desenho antigo) ou false (classe sem herói ou falha ao carregar: o chamador usa o visual antigo).
 export function drawHeroSprite(g, a, t) {
@@ -129,11 +139,11 @@ export function drawHeroSprite(g, a, t) {
   }
   const { meta, sheets } = at, clips = meta.clips;
   let st = states.get(a);
-  if (!st) { st = { clip: 'idle', el: 0, lastT: t, prevSwing: 0, prevHit: 0, px: a.x, py: a.y, moveFace: a.facing ?? Math.PI / 2 }; states.set(a, st); }
+  if (!st) { st = { clip: 'idle', el: 0, lastT: t, prevSwing: 0, prevHit: 0, px: a.x, py: a.y, moveFace: a.facing ?? Math.PI / 2, v: 0, lean: 0, leanV: 0 }; states.set(a, st); }
   const dt = Math.max(0, Math.min(0.1, t - st.lastT)); st.lastT = t;
 
   const restart = (name) => { if (clips[name]) { st.clip = name; st.el = 0; } };
-  const finished = () => { const c = clips[st.clip]; return !c.loop && st.el * c.fps >= c.frames; };
+  const finished = () => { const c = clips[st.clip]; return !c.loop && st.el * c.fps >= clipLen(c); };
   if (a.dead) {
     if (st.clip !== 'hit') restart('hit');
   } else {
@@ -144,12 +154,25 @@ export function drawHeroSprite(g, a, t) {
     else if (!acting) { const want = a.moving ? 'walk' : 'idle'; if (st.clip !== want) restart(want); }
   }
   st.prevSwing = a.swing; st.prevHit = a.hitFlash;
-  st.el += dt;
   const c = clips[st.clip];
-  const f = c.loop ? Math.floor(st.el * c.fps) % c.frames : Math.min(Math.floor(st.el * c.fps), c.frames - 1);
   const mdx = a.x - st.px, mdy = a.y - st.py; st.px = a.x; st.py = a.y;
   if (a.moving && Math.hypot(mdx, mdy) > 0.3) st.moveFace = Math.atan2(mdy, mdx);
-  const acting = ACTING.has(st.clip) && st.clip !== 'hit' && !(clips[st.clip].loop) && st.el * c.fps < c.frames;
+  // Atlas da animação v3 (clipe walk com `speed`, px/s de referência): o ritmo da passada acompanha a velocidade REAL (correr +30% = passos mais rápidos; lento = mais lento) e os pés deslizam menos.
+  const wspeed = clips.walk?.speed;
+  if (wspeed) {
+    const inst = dt > 0 ? Math.min(900, Math.hypot(mdx, mdy) / dt) : st.v;
+    st.v += (inst - st.v) * Math.min(1, dt * 10);
+  }
+  const rate = wspeed && st.clip === 'walk' ? Math.max(0.65, Math.min(1.6, st.v / wspeed)) : 1;
+  st.el += dt * rate;
+  const len = clipLen(c), tt = st.el * c.fps;
+  const f = c.loop ? frameAt(c, tt % len) : frameAt(c, Math.min(tt, len - 1e-6));
+  const acting = ACTING.has(st.clip) && st.clip !== 'hit' && !(clips[st.clip].loop) && tt < len;
+  if (wspeed) { // inclina o corpo no sentido do movimento, com mola (passa do ponto ao parar/virar): o personagem "pesa" em vez de deslizar em pé
+    const tgt = a.moving && !acting && !a.dead ? Math.min(st.v / wspeed, 1.6) * Math.cos(st.moveFace) * LEAN_K : 0;
+    const h = Math.min(dt, 1 / 30);
+    st.leanV += (400 * (tgt - st.lean) - 28 * st.leanV) * h; st.lean += st.leanV * h;
+  }
   const view = viewFromFacing(a.moving && !acting && !a.dead ? st.moveFace : (a.facing ?? Math.PI / 2));
 
   const sheet = sheets[st.clip], rows = meta.rows ?? meta.views, cw = sheet.width / c.frames, ch = sheet.height / rows;
@@ -157,6 +180,7 @@ export function drawHeroSprite(g, a, t) {
   const x = a.x, y = a.y + FEET_Y, k = SIZE * (meta.sizeMul ?? 1); // sizeMul: iguala a altura de atlas de variante à do herói base
   g.save();
   g.translate(x, y);
+  if (wspeed && !a.dead && (st.lean > 0.002 || st.lean < -0.002)) g.transform(1, 0, -st.lean, 1, 0, 0);
   if (a.dead) { // morto: tomba em torno dos pés, amassa e esmaece (sem textura nova)
     const P = deathPose(a.deadT ?? 0, view >= 1 && view <= 3 ? -1 : 1);
     g.rotate(P.rot); g.scale(1, P.squash); g.globalAlpha *= P.alpha;

@@ -762,7 +762,8 @@
     "dy": 0.2,
     "r": 260,
     "ymin": 0.1,
-    "rigid": true
+    "rigid": true,
+    "chain": 4
    }
   ]
  },
@@ -1286,9 +1287,11 @@
     "dy": 0.3,
     "r": 260,
     "ymin": 0.12,
-    "rigid": true
+    "rigid": true,
+    "chain": 4
    }
-  ]
+  ],
+  "cape_gain": 1.15
  },
  "inquisitor_nv25": {
   "style": "smash",
@@ -1525,7 +1528,8 @@
     "dy": 0.16,
     "r": 260,
     "ymin": 0.06,
-    "rigid": true
+    "rigid": true,
+    "chain": 4
    }
   ],
   "lean_k": 0.45,
@@ -1665,7 +1669,8 @@
     "dy": 0.16,
     "r": 300,
     "ymin": 0.07,
-    "rigid": true
+    "rigid": true,
+    "chain": 4
    }
   ]
  }

@@ -75,7 +75,9 @@ function pose(name, f, n) {
   return P;
 }
 // idle/walk usam menos quadros (src = quadros da animação original do Blender): mesma duração do ciclo, ~13% menos textura
-const CLIPS = { idle: { frames: 4, src: 6, fps: 5.33, loop: true }, walk: { frames: +(q.get('walkf') || 8), src: 8, fps: +(q.get('walkf') || 8) * 1.5, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false }, dash: { frames: 4, fps: 12, loop: false, release: 1 } };
+// v2 (?v2=1, heróis com animação v3): mais quadros, duração por quadro (dur, em unidades de 1/fps: ritmo irregular) e velocidade de referência do passo (speed, px/s: o jogo ajusta o ritmo da caminhada à velocidade real). TEM de bater com tools/blender/anim2.py (FPS/PLAY/DUR).
+const CLIPS_V2 = { idle: { frames: 5, src: 10, fps: 3, loop: true }, walk: { frames: 10, src: 10, fps: 16, loop: true, speed: 200 }, attack: { frames: 6, fps: 18, loop: false, release: 3, dur: [1.5, 1.6, 0.55, 0.6, 1.2, 1.5] }, skill: { frames: 8, fps: 16, loop: false, release: 4, dur: [1.2, 1.3, 1.5, 1.0, 0.6, 0.9, 1.3, 1.6] }, hit: { frames: 3, fps: 12, loop: false, dur: [0.6, 1.0, 1.8] }, dash: { frames: 4, fps: 12, loop: false, release: 1, dur: [0.9, 1.0, 1.0, 1.4] } };
+const CLIPS = q.get('v2') ? CLIPS_V2 : { idle: { frames: 4, src: 6, fps: 5.33, loop: true }, walk: { frames: +(q.get('walkf') || 8), src: 8, fps: +(q.get('walkf') || 8) * 1.5, loop: true }, attack: { frames: 6, fps: 16, loop: false, release: 3 }, skill: { frames: 8, fps: 14, loop: false, release: 4 }, hit: { frames: 3, fps: 12, loop: false }, dash: { frames: 4, fps: 12, loop: false, release: 1 } };
 const yaws = [0, 45, 90, 135, 180, 225, 270, 315]; // 0 = de frente para a câmera; +90 = olhando para a direita da tela
 
 function shoot(P, deg, dst, dx, dy) {
@@ -120,7 +122,7 @@ if (q.get('clips')) {
     const sh = document.createElement('canvas'); sh.width = bw * cd.frames; sh.height = bh * vy.length; const sg = sh.getContext('2d');
     for (let v = 0; v < vy.length; v++) for (let f = 0; f < cd.frames; f++) sg.drawImage(frames[name][v][f], x0, y0, bw, bh, f * bw, v * bh, bw, bh);
     out.sheets[name] = sh.toDataURL('image/png');
-    out.meta.clips[name] = { frames: cd.frames, fps: cd.fps, loop: !!cd.loop, release: cd.release ?? null };
+    out.meta.clips[name] = { frames: cd.frames, fps: cd.fps, loop: !!cd.loop, release: cd.release ?? null, ...(cd.dur ? { dur: cd.dur } : {}), ...(cd.speed ? { speed: cd.speed } : {}) };
   }
   out.info.crop = { x0, y0, bw, bh };
 } else {
