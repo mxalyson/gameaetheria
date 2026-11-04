@@ -2,6 +2,7 @@
 // Custo por herói com aura: 2 drawImage (halo + anel; 3 na Maestria, com o 2º anel) + poucas partículas (um drawImage cada) de sprites de luz pintados UMA vez por (spec, tier, qualidade).
 // Qualidade baixa: só o halo. Sem alocação no quadro: posições das partículas são função pura de (tempo, id, índice).
 import { auraStyle, auraTier } from '../core/aura.js';
+import { SP, PL, sprite, loadVfxKit, vfxKitReady } from './vfx-kit.js';
 
 const HALO = 96, RING = 96, PART = 24;       // lado (px) dos sprites pintados
 const cache = new Map();                      // `${spec}:${tier}:${q}` -> { halo, ring, part, st }
@@ -43,6 +44,16 @@ function paintPart(st) {
   else if (st.kind === 'ember') { const g = x.createRadialGradient(m, m, 0, m, m, 5 * k); g.addColorStop(0, st.c2); g.addColorStop(0.5, st.c); g.addColorStop(1, st.c + '00'); x.fillStyle = g; x.shadowBlur = 0; x.fillRect(0, 0, PART, PART); }
   else { const g = x.createRadialGradient(m, m, 0, m, m, 6 * k); g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, st.c2); g.addColorStop(1, st.c + '00'); x.fillStyle = g; x.shadowBlur = 0; x.fillRect(0, 0, PART, PART); }
   return c;
+}
+
+// Berserker: brasas e chamas PINTADAS (folha de VFX do dono), em quantidade e tamanho equilibrados; os demais heróis seguem com as partículas por código.
+const BSK_SP = [SP.ember0, SP.ember1, SP.ember2, SP.ember3, SP.flamelet0, SP.flamelet1, SP.flamelet2, SP.flamelet3];
+function paintedParts(e) {
+  if (e.st.spec !== 'berserker') return null;
+  if (e.pp) return e.pp;
+  if (!vfxKitReady()) { loadVfxKit(); return null; }
+  const out = BSK_SP.map((id) => sprite(id, PL.ember)).filter(Boolean);
+  return (e.pp = out.length ? out : null);
 }
 
 function get(spec, tier, q) {
@@ -91,7 +102,9 @@ export function drawAuraMotes(g, a, t, q, feetY) {
     const rad = 14 + h01(id, i + 7) * 16;
     const px = a.x + Math.cos(ang) * rad, py = feetY - ph * 62 * (0.6 + st.rise * 0.5) + Math.sin(ang) * rad * 0.4;
     g.globalAlpha = prev * st.alpha * Math.sin(ph * Math.PI);        // nasce e some suave
-    g.drawImage(e.part, px - s * 0.5, py - s * 0.5, s, s);
+    const pp = paintedParts(e);
+    if (pp) { const sp = pp[(h01(id, i + 5) * pp.length) | 0], w = s * 1.25, h = w * sp.h / sp.w; g.drawImage(sp.cv, px - w * 0.5, py - h * 0.5, w, h); }
+    else g.drawImage(e.part, px - s * 0.5, py - s * 0.5, s, s);
   }
   g.globalAlpha = prev;
 }

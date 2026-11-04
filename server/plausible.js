@@ -6,7 +6,7 @@ import { QUESTS } from '../public/src/data/quests.js';
 import { SERVER_STATS, STAT_KEYS_PROGRESS, FLAG_STATS } from '../public/src/data/achievements.js';
 import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, PVE_SERVER_TYPES, MAX_ACTIVE, isComplete, LORE_MASK } from '../public/src/core/journal.js';
 import { RARITY, AFFIXES, SHIELD_BLOCK } from '../public/src/data/items.js';
-import { xpToNext } from '../public/src/core/progression.js';
+import { xpToNext, mobXpRamp } from '../public/src/core/progression.js';
 import { PRICES } from '../public/src/shop.js';
 import { PHOENIX } from '../public/src/core/phoenix.js';
 import { SPECS, SPEC_LEVEL, SPEC_ALIASES } from '../public/src/data/specs.js';
@@ -153,7 +153,7 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   // Orçamento: 1,5 nível de folga (xpFreeLevels) (baús/ondas/recompensas que o servidor não separa) + XP máximo por abate × abates novos (chefe ×10) + XP máximo de missão × missões concluídas.
   const dKills = Math.max(0, neu.stats.kills - old.stats.kills), dBoss = Math.max(0, neu.stats.bossKills - old.stats.bossKills);
   const dQuests = Object.keys(neu.quests.done).filter((id) => old.quests.done[id] == null).length;
-  const perKill = (12 + 6 * (neu.level + 6)) * 1.5 * LIMITS.xpPerKillMul;
+  const perKill = (12 + 6 * (neu.level + 6)) * mobXpRamp(neu.level + 6) * 1.5 * LIMITS.xpPerKillMul;
   const xpBudget = Math.round(xpToNext(old.level) * LIMITS.xpFreeLevels) + (dKills + dBoss * 10) * perKill + dQuests * MAX_QUEST_XP;
   if (totalXp(neu) - totalXp(old) > xpBudget) return { ok: false, reason: 'xp_jump' };
 
