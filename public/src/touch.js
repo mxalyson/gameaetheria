@@ -157,10 +157,10 @@ export class TouchControls {
     tb.addEventListener('pointercancel', (e) => release(e, false));
     tb.addEventListener('lostpointercapture', (e) => release(e, false));
     // Rede de segurança: qualquer fim de toque, perda de foco ou aba oculta fecha o cartão de explicação (e o balão) se não restar botão de skill pressionado.
-    const noHold = () => { if (![...this.btns.values()].some((b) => b.held)) { this.game.ui?.hideSkillCard(); this.game.ui?.hideTooltip?.(); } };
+    const noHold = (e) => { if (![...this.btns.values()].some((b) => b.held)) { this.game.ui?.hideSkillCard(); if (!e || e.type === 'blur' || e.type === 'visibilitychange') this.game.ui?.hideTooltip?.(); } }; // o balão de item armado pelo 1º toque NÃO fecha ao soltar
     for (const ev of ['pointerup', 'pointercancel', 'touchend', 'touchcancel']) window.addEventListener(ev, noHold, true);
-    window.addEventListener('blur', () => { for (const [id, st] of [...this.btns]) release({ pointerId: id }, false); noHold(); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) { for (const [id] of [...this.btns]) release({ pointerId: id }, false); noHold(); } });
+    window.addEventListener('blur', () => { for (const [id] of [...this.btns]) release({ pointerId: id }, false); noHold({ type: 'blur' }); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { for (const [id] of [...this.btns]) release({ pointerId: id }, false); noHold({ type: 'visibilitychange' }); } });
     // Sem menu de contexto (toque longo) nem seleção sobre os controles.
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
   }
