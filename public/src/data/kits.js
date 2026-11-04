@@ -57,33 +57,33 @@ export const KIT_SKILLS = {
     desc: 'Mira por 0,6s e dispara um tiro devastador (2400% de dano) que atravessa tudo e atordoa por 0,5s.' },
 
   // ---- Pistoleiro (rajadas, granada, esquiva dupla)
-  gs_fan: { name: 'Rajada em Leque', icon: '💥', art: 'pierce', cd: 4.5, kind: 'projectile', volley: 5, spread: 0.16, speed: 800, range: 470, mult: 0.66, radius: 5, color: '#ffd27a',
+  gs_fan: { name: 'Rajada em Leque', icon: '💥',  cd: 4.5, kind: 'projectile', volley: 5, spread: 0.16, speed: 800, range: 470, mult: 0.66, radius: 5, color: '#ffd27a',
     desc: 'Dispara 5 virotes em leque (66% cada), forte de perto.' },
-  gs_grenade: { name: 'Granada Explosiva', icon: '💣', art: 'fireball', cd: 8, kind: 'meteor', range: 420, radius: 110, delay: 0.55, mult: 4.0, stun: 0.4, color: '#ffa63d', vfxLife: 1.0,
+  gs_grenade: { name: 'Granada Explosiva', icon: '💣',  cd: 8, kind: 'meteor', range: 420, radius: 110, delay: 0.55, mult: 4.0, stun: 0.4, color: '#ffa63d', vfxLife: 1.0,
     desc: 'Arremessa uma granada no cursor: explode em 0,55s, 400% de dano em área e atordoa 0,4s.' },
-  gs_roll2: { name: 'Rolamento Duplo', icon: '🌀', art: 'roll', cd: 4, kind: 'dash', dist: 230, speed: 1000, mult: 0, invuln: true, twice: { window: 2.2, gap: 0.3 }, color: '#ffe2b0',
+  gs_roll2: { name: 'Rolamento Duplo', icon: '🌀',  cd: 4, kind: 'dash', dist: 230, speed: 1000, mult: 0, invuln: true, twice: { window: 2.2, gap: 0.3 }, color: '#ffe2b0',
     desc: 'Duas esquivas seguidas (invulneráveis): a segunda sai em 0,3s; a recarga de 4s só começa depois.' },
-  gs_barrage: { name: 'Saraivada', icon: '🔫', art: 'rain', cd: 22, kind: 'projectile', volley: 5, spread: 0.12, waves: 5, waveEvery: 0.18, speed: 850, range: 520, mult: 4.4, radius: 5, color: '#ffb23d',
+  gs_barrage: { name: 'Saraivada', icon: '🔫',  cd: 22, kind: 'projectile', volley: 5, spread: 0.12, waves: 5, waveEvery: 0.18, speed: 850, range: 520, mult: 4.4, radius: 5, color: '#ffb23d',
     desc: 'Cinco rajadas de 5 virotes em sequência (440% cada) na direção do cursor.' },
 
   // ---- Guardião (cura em grupo, proteção)
-  gd_light: { name: 'Luz Curativa em Área', icon: '☀️', art: 'holylight', cd: 8, kind: 'aoe_self', radius: 280, mult: 1.8, heal: 0.14, allyHeal: 1.0, color: '#fff7c2',
+  gd_light: { name: 'Luz Curativa em Área', icon: '☀️',  cd: 8, kind: 'aoe_self', radius: 280, mult: 1.8, heal: 0.14, allyHeal: 1.0, color: '#fff7c2',
     desc: 'Onda de luz num raio de 280: cura 14% da vida de você e dos aliados e fere os inimigos (180%).' },
-  gd_ward: { name: 'Escudo Divino Reforçado', icon: '🛡️', art: 'divineshield', cd: 15, kind: 'buff', dur: 8, buff: { shieldPct: 0.25, dr: 0.14 }, groupShield: { range: 360, pct: 0.9 }, color: '#fff0b0',
+  gd_ward: { name: 'Escudo Divino Reforçado', icon: '🛡️',  cd: 15, kind: 'buff', dur: 8, buff: { shieldPct: 0.25, dr: 0.14 }, groupShield: { range: 360, pct: 0.9 }, color: '#fff0b0',
     desc: 'Escudo de 25% da vida e -14% de dano por 8s para você; TODOS os aliados num raio de 360 recebem 90% do escudo.' },
-  gd_word: { name: 'Palavra de Salvação', icon: '📖', art: 'judgement', cd: 22, kind: 'divine', radius: 320, heal: 0.3, allyHeal: 1.0, shieldPct: 0, mult: 2.0, stun: 0.8, dur: 0, color: '#fffbd0', vfxLife: 1.2,
+  gd_word: { name: 'Palavra de Salvação', icon: '📖',  cd: 22, kind: 'divine', radius: 320, heal: 0.3, allyHeal: 1.0, shieldPct: 0, mult: 2.0, stun: 0.8, dur: 0, color: '#fffbd0', vfxLife: 1.2,
     desc: 'Cura grande (30%) em você e nos aliados num raio de 320, remove atordoamento e lentidão e fere os inimigos (200%, atordoa 0,8s).' },
-  gd_celestial: { name: 'Intervenção Celestial', icon: '👼', art: 'intervention', cd: 45, kind: 'divine', radius: 340, heal: 0.22, allyHeal: 1.0, shieldPct: 0.15, dur: 5, buff: { dr: 0.25 }, mult: 1.5, color: '#fff2a8', vfxLife: 1.4, castStunned: true,
+  gd_celestial: { name: 'Intervenção Celestial', icon: '👼',  cd: 45, kind: 'divine', radius: 340, heal: 0.22, allyHeal: 1.0, shieldPct: 0.15, dur: 5, buff: { dr: 0.25 }, mult: 1.5, color: '#fff2a8', vfxLife: 1.4, castStunned: true,
     desc: 'Pode ser usada atordoado: remove controles, cura 22% e dá escudo de 15% (-25% de dano por 5s) a você e aliados; fere os inimigos.' },
 
   // ---- Inquisidor (fogo sagrado, marca, veredito)
-  inq_judge: { name: 'Julgamento Ardente', icon: '⚖️', art: 'judgement', cd: 3.4, kind: 'projectile', speed: 560, range: 620, mult: 5.5, radius: 10, burn: { dur: 4, every: 0.5, mult: 0.45 }, color: '#ffb36b',
+  inq_judge: { name: 'Julgamento Ardente', icon: '⚖️',  cd: 3.4, kind: 'projectile', speed: 560, range: 620, mult: 5.5, radius: 10, burn: { dur: 4, every: 0.5, mult: 0.45 }, color: '#ffb36b',
     desc: 'Raio sagrado em chamas: fere e queima o alvo por 4s.' },
-  inq_mark: { name: 'Marca da Pena', icon: '🪶', art: 'pierce', cd: 8, kind: 'projectile', speed: 720, range: 660, mult: 2.2, radius: 10, mark: { dur: 7, taken: 0.3 }, color: '#e8d0ff',
+  inq_mark: { name: 'Marca da Pena', icon: '🪶',  cd: 8, kind: 'projectile', speed: 720, range: 660, mult: 2.2, radius: 10, mark: { dur: 7, taken: 0.3 }, color: '#e8d0ff',
     desc: 'Marca o alvo por 7s: ele recebe +30% de dano de qualquer fonte (inclusive dos aliados).' },
-  inq_flame: { name: 'Chama Purificadora', icon: '🔥', art: 'fireball', cd: 5.5, kind: 'cone', range: 200, arc: 1.5, mult: 4.6, burn: { dur: 4, every: 0.5, mult: 0.4 }, color: '#ffc27a',
+  inq_flame: { name: 'Chama Purificadora', icon: '🔥',  cd: 5.5, kind: 'cone', range: 200, arc: 1.5, mult: 4.6, burn: { dur: 4, every: 0.5, mult: 0.4 }, color: '#ffc27a',
     desc: 'Leque de fogo sagrado à frente: 420% de dano e queimadura por 4s.' },
-  inq_verdict: { name: 'Livro do Veredito', icon: '📕', art: 'meteor', cd: 38, kind: 'meteor', range: 540, radius: 185, delay: 1.0, mult: 15.0, stun: 1.0, burn: { dur: 5, every: 0.5, mult: 0.5 }, mark: { dur: 8, taken: 0.25 }, color: '#ffb36b', vfxLife: 1.8,
+  inq_verdict: { name: 'Livro do Veredito', icon: '📕',  cd: 38, kind: 'meteor', range: 540, radius: 185, delay: 1.0, mult: 15.0, stun: 1.0, burn: { dur: 5, every: 0.5, mult: 0.5 }, mark: { dur: 8, taken: 0.25 }, color: '#ffb36b', vfxLife: 1.8,
     desc: 'Sentença numa área enorme após 1s: 1500% de dano, atordoa 1s, queima por 5s e marca (+25% de dano recebido por 8s).' },
 };
 
