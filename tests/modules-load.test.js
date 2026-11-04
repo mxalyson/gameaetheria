@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 // Todo módulo de public/src e server/ (menos os que dependem do DOM no topo ou sobem servidor) carrega em Node sem erro nem aviso.
 const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return statSync(p).isDirectory() ? walk(p) : p.endsWith('.js') ? [p] : []; });
-const SKIP = /[\\/](main|no-zoom|start|start-poc)\.js$/; // main.js e no-zoom.js usam document; start*.js abrem portas
+const SKIP = /[\\/](main|no-zoom|start|start-poc|online-pc)\.js$/; // main.js e no-zoom.js usam document; start*.js e online-pc.js abrem portas
 
 test('módulos carregam em Node sem exceção e sem avisos de processo', async () => {
   const warns = []; const on = (w) => warns.push(w.message); process.on('warning', on);

@@ -57,12 +57,18 @@ Na VM com Docker instalado: crie `.env` com `DOMINIO=aetheria-lumen.duckdns.org`
 
 ---
 
-## Opção B — testar hoje com amigos a partir do seu PC (sem cadastro; **não testado aqui**)
+## Opção B0 — o seu PC como servidor, na rede de casa (mais simples; **testado aqui**)
+Na pasta do jogo, no seu PC: `npm install` (só na 1ª vez) e depois `npm run online`. Ele mostra dois endereços:
+- `http://localhost:8080` — para jogar no próprio PC;
+- `http://192.168.x.x:8080` — para celulares e outros PCs **no mesmo Wi-Fi** (o Windows pode perguntar se libera o Node no firewall: marque "Redes privadas").
+Contas, até 3 personagens, multiplayer e chat funcionam (testado com login, entrada no mundo e conexão de partidas por `http` na rede local). Sem cadeado (HTTPS) dentro de casa: aceitável na sua rede, **não** exponha assim na internet. O jogo não instala como app (PWA) sem HTTPS, mas roda no navegador. O banco fica em `data/aetheria.db`; o PC precisa ficar ligado com o terminal aberto.
+
+## Opção B — amigos fora de casa a partir do seu PC (túnel grátis com HTTPS; o túnel em si **não testado aqui**)
 1. Instale o `cloudflared` (https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
 2. Num terminal: `cloudflared tunnel --url http://localhost:8080` → ele mostra um endereço `https://algo-aleatorio.trycloudflare.com`.
 3. Em outro terminal, na pasta do jogo (PowerShell):
    ```bash
-   $env:PORT="8080"; $env:TRUST_PROXY="1"; $env:PUBLIC_URL="https://algo-aleatorio.trycloudflare.com"; npm run server
+   $env:PUBLIC_URL="https://algo-aleatorio.trycloudflare.com"; npm run online
    ```
 4. Mande o endereço `https://…trycloudflare.com` para os amigos. Funciona enquanto os dois terminais estiverem abertos; o banco fica em `data/aetheria.db` no seu PC. O endereço muda a cada vez que o túnel reinicia (então repita o passo 3 com o novo `PUBLIC_URL`).
 

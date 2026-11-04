@@ -104,7 +104,9 @@ export class AudioEngine {
     const def = SFX[id]; if (!def || !this.ctx) return;
     for (const f of def.files) {
       if (this.buf.has(f) || this.loading.has(f)) continue;
-      this.loading.set(f, fetch(asset(SFX_DIR + f + '.mp3')).then((r) => r.arrayBuffer()).then((a) => new Promise((res, rej) => this.ctx.decodeAudioData(a, res, rej)))
+      // sem rede o service worker devolve 503 'offline': não decodifica (a promessa do decodeAudioData rejeitada virava erro solto na página)
+      this.loading.set(f, fetch(asset(SFX_DIR + f + '.mp3')).then((r) => { if (!r.ok) throw new Error('sem áudio'); return r.arrayBuffer(); })
+        .then((a) => this.ctx.decodeAudioData(a))
         .then((b) => { this.buf.set(f, b); }).catch(() => { /* sem o arquivo: fica em silêncio */ }).finally(() => this.loading.delete(f)));
     }
   }
