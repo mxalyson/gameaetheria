@@ -11,6 +11,7 @@ import { SLOTS, SHIELD_CLASSES } from '../public/src/data/items.js';
 import { decodeClient, encode, REJECT, RateLimiter, TICK_DT, SNAPSHOT_EVERY, TICK_HZ, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { PVP_MIN_LEVEL } from '../public/src/core/power.js';
 import { Hub } from './hub.js';
+import { clientIp } from './ops.js';
 
 const LEVEL = 10; // convidados (sem banco): personagem padrão nível 10 gerado pelo servidor
 
@@ -42,7 +43,11 @@ export function createGameServer({
   const badHello = new Map();
   const noteBadHello = (ip) => {
     const now = Date.now(), e = badHello.get(ip);
-    if (!e || now > e.until) { badHello.set(ip, { n: 1, until: now + 60000 }); return 1; }
+    if (!e || now > e.until) {
+      // janelas vencidas saem do mapa (antes cada IP novo ficava para sempre: memória crescia devagar com o tempo)
+      if (badHello.size >= 1000) for (const [k, v] of badHello) if (now > v.until) badHello.delete(k);
+      badHello.set(ip, { n: 1, until: now + 60000 }); return 1;
+    }
     return ++e.n;
   };
   const helloBlocked = (ip) => { const e = badHello.get(ip); return !!e && Date.now() <= e.until && e.n > 10; };
@@ -122,7 +127,7 @@ export function createGameServer({
   }
 
   wss.on('connection', (ws, req) => {
-    const ip = (trustProxy && String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
+    const ip = (trustProxy && clientIp(req.headers['x-forwarded-for'])) || req.socket.remoteAddress || '?';
     if (wss.clients.size > maxConnections || (perIp.get(ip) ?? 0) >= maxPerIp) { stats.refused++; ws.close(1013, 'busy'); return; } // 1013 = tente mais tarde
     perIp.set(ip, (perIp.get(ip) ?? 0) + 1);
     stats.connections++;

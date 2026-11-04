@@ -125,3 +125,13 @@ export function skillLayout(vw, vh, ui = 1, { right = 0, bottom = 0 } = {}) {
   }
   return { scale, w: TB_SIZE.w, h: TB_SIZE.h, items };
 }
+
+// Toque/tecla de habilidade que chega num quadro sem tick fixo (telas de 90/120 Hz rodam o tick de 1/60 s a cada 1,5–2 quadros):
+// guarda o pedido COM a mira do momento do toque e o reaplica até um tick consumi-lo; sem isso o pedido sumia (~50% dos toques a 120 Hz).
+// hold: { cast, aimX, aimY } | null. Devolve o novo hold; a intenção recebe cast/mira guardados quando não traz um pedido novo.
+export function carryCast(hold, intent) {
+  if (!intent) return null;
+  if (intent.cast != null) return { cast: intent.cast, aimX: intent.aimX, aimY: intent.aimY };
+  if (hold) { intent.cast = hold.cast; intent.aimX = hold.aimX; intent.aimY = hold.aimY; }
+  return hold;
+}

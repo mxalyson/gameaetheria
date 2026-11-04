@@ -306,3 +306,13 @@ test('B2: save importado de arquivo perde pergaminhos, mapas, azar e itens forja
   assert.deepEqual(out.inventory.map((i) => i.id), ['okx']);
   void PLAUS;
 });
+
+import { clientIp } from '../server/ops.js';
+// Atrás do proxy, só o ÚLTIMO X-Forwarded-For é confiável (o primeiro é escrito pelo cliente e burlava o limite de login).
+test('clientIp: usa o último valor do X-Forwarded-For', () => {
+  assert.equal(clientIp('1.1.1.1, 2.2.2.2, 203.0.113.9'), '203.0.113.9');
+  assert.equal(clientIp(' 198.51.100.4 '), '198.51.100.4');
+  assert.equal(clientIp(''), '');
+  assert.equal(clientIp(undefined), '');
+  assert.equal(clientIp('forjado, '), 'forjado'); // vazio no fim é ignorado
+});

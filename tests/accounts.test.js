@@ -172,8 +172,35 @@ test('Google via API: cria conta, repete login na mesma conta, vincula e-mail ex
   assert.equal(again.body.isNew, false); assert.equal(again.body.account.id, first.body.account.id);
   await register(s, 'ana@exemplo.com');
   const link = await s.call('POST', '/api/google', { idToken: jwt(goodClaims({ sub: 'g-999', email: 'ana@exemplo.com' })) });
-  assert.equal(link.body.isNew, false); assert.equal(link.body.account.hasPassword, true); assert.equal(link.body.account.google, true);
+  // vincula, mas a senha de quem cadastrou o e-mail (sem provar a posse) deixa de valer: ver o teste seguinte
+  assert.equal(link.body.isNew, false); assert.equal(link.body.account.hasPassword, false); assert.equal(link.body.account.google, true);
   assert.equal((await s.call('POST', '/api/google', { idToken: jwt(goodClaims({ aud: 'x' })) })).status, 401);
+  await s.close();
+});
+
+test('Google: vincular e-mail cadastrado por senha derruba senha, códigos de recuperação e sessões de quem o cadastrou (sem tomada de conta)', async () => {
+  const s = await setup({ google: true });
+  const intruso = await register(s, 'vitima@exemplo.com'); // alguém cadastra o e-mail de outra pessoa (o cadastro não confirma o e-mail)
+  assert.equal((await s.call('GET', '/api/me', undefined, intruso.token)).status, 200);
+  const dono = await s.call('POST', '/api/google', { idToken: jwt(goodClaims({ sub: 'g-vitima', email: 'vitima@exemplo.com' })) });
+  assert.equal(dono.status, 200); assert.equal(dono.body.account.hasPassword, false);
+  assert.equal((await s.call('GET', '/api/me', undefined, intruso.token)).status, 401, 'sessão antiga encerrada');
+  assert.equal((await s.call('POST', '/api/login', { email: 'vitima@exemplo.com', password: PW })).status, 401, 'senha antiga não entra mais');
+  const rec = await s.call('POST', '/api/recover', { email: 'vitima@exemplo.com', code: intruso.recoveryCodes[0], newPassword: 'outra-senha-boa-9' });
+  assert.equal(rec.status, 400, 'códigos de recuperação antigos não valem');
+  assert.equal((await s.call('GET', '/api/me', undefined, dono.body.token)).status, 200, 'o dono verificado segue logado');
+  await s.close();
+});
+
+test('login: "conta desativada" só aparece com a senha certa (senha errada recebe a mesma resposta de e-mail inexistente)', async () => {
+  const s = await setup();
+  const r = await register(s, 'off@exemplo.com');
+  s.db.raw.prepare('update accounts set disabled = 1 where id = ?').run(r.account.id);
+  const wrong = await s.call('POST', '/api/login', { email: 'off@exemplo.com', password: 'senha-errada-77' });
+  const none = await s.call('POST', '/api/login', { email: 'ninguem@exemplo.com', password: 'senha-errada-77' });
+  assert.equal(wrong.status, 401); assert.equal(wrong.body.error, none.body.error);
+  const right = await s.call('POST', '/api/login', { email: 'off@exemplo.com', password: PW });
+  assert.equal(right.status, 403); assert.equal(right.body.error, 'disabled');
   await s.close();
 });
 

@@ -132,9 +132,13 @@ test('transações do servidor no jogo real: comprar poção na Vila, abrir baú
   // poção: o servidor cura e debita
   const antes = db.character(who.id).doc.potions; // o baú pode ter dado uma poção: compara com o valor de antes
   me.actor.hp = Math.round(me.actor.maxHp * 0.3);
+  // a vida baixa só existe no servidor: espera o snapshot chegar ao cliente (com a vida cheia no cliente, usePotion só avisa "vida cheia")
+  await page.waitForFunction(() => window.game.player.hp < window.game.player.maxHp * 0.5, null, { timeout: 5000 });
+  await page.waitForTimeout(150); // folga do intervalo mínimo entre transações (TX_MIN_GAP) depois do baú
+  const hp0 = me.actor.hp; // um monstro pode ter batido durante a espera: mede a cura a partir da vida do momento
   await page.evaluate(() => window.game.usePotion());
   await expect.poll(() => db.character(who.id).doc.potions, { timeout: 8000 }).toBe(antes - 1);
-  expect(me.actor.hp).toBeGreaterThan(me.actor.maxHp * 0.6);
+  expect(me.actor.hp).toBeGreaterThan(hp0 + me.actor.maxHp * 0.2); // cura de 35% (folga para golpes no meio)
   await page.waitForFunction((n) => window.game.char.potions === n, antes - 1, { timeout: 8000 });
   expect(errors).toEqual([]);
   await ctx.close();

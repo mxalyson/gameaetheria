@@ -145,3 +145,19 @@ test('correr: joystick na borda (>90% do raio) por 0,25 s ativa; soltar ou volta
   assert.equal(stepRun(st2, 0.95, 0.2), false);
   assert.equal(RUN_HOLD_S, 0.25);
 });
+
+import { carryCast } from '../public/src/touch-logic.js';
+// Telas de 90/120 Hz: quadros sem tick fixo não podem engolir o toque de habilidade.
+test('carryCast: o pedido de habilidade (com a mira do toque) espera o próximo tick em vez de sumir', () => {
+  let hold = carryCast(null, { cast: 2, aimX: 10, aimY: 20, mx: 1 }); // quadro do toque, sem tick
+  assert.deepEqual(hold, { cast: 2, aimX: 10, aimY: 20 });
+  const next = { cast: null, aimX: 99, aimY: 99, mx: 0 }; // quadro seguinte: o toque já saiu da fila
+  hold = carryCast(hold, next);
+  assert.equal(next.cast, 2); assert.equal(next.aimX, 10); assert.equal(next.aimY, 20); assert.equal(next.mx, 0, 'movimento atual não muda');
+  // depois que um tick roda, main.js zera o hold: sem pedido guardado, nada é reaplicado
+  const later = { cast: null, aimX: 1, aimY: 1 };
+  assert.equal(carryCast(null, later), null); assert.equal(later.cast, null);
+  // pedido novo substitui o guardado
+  assert.equal(carryCast({ cast: 0, aimX: 0, aimY: 0 }, { cast: 1, aimX: 5, aimY: 6 }).cast, 1);
+  assert.equal(carryCast({ cast: 0 }, undefined), null, 'herói sem intenção (morto) descarta');
+});

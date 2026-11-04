@@ -1275,3 +1275,23 @@ test('correr: +30% em zona de farm fora de combate; sem efeito em arena, em comb
   assert.ok(atk.d <= walk.d + 1e-6 && !atk.running, 'atacando: cai o correr');
   assert.ok(dist('town', { run: true }, (w, p) => { p.lastCombat = w.time - 3.1; }).running, 'passados 3 s volta a correr');
 });
+
+import { ZONES as ZONES_WALL } from '../public/src/data/zones.js';
+// Muros e sarcófagos da Cripta são retângulos com `block`: antes o teste de projéteis só via círculos e a flecha atravessava o muro.
+test('projétil para no muro da Cripta (retângulo com block) e passa pela porta', () => {
+  const wl = ZONES_WALL.crypt.walls[0];
+  const shoot = (y) => {
+    const w = new World('crypt', { seed: 3, visuals: false });
+    w.actors = []; // só os dois atores do teste
+    const hero = w.add(makeHeroActor(newCharacter('Arq', 'archer', makeRng(1)), wl.x - 120, y));
+    const mob = w.add(makeMobActor(Object.keys(MOBS)[0], 1, wl.x + wl.w + 120, y, { hostile: false }));
+    const hp0 = mob.hp;
+    w.basicAttack(hero, mob.x, mob.y);
+    for (let i = 0; i < 90; i++) w.updateProjectiles(1 / 60);
+    return { hit: mob.hp < hp0, left: w.projectiles.length };
+  };
+  const wall = shoot(wl.gap[0] / 2); // meio do muro norte
+  assert.equal(wall.hit, false, 'o muro bloqueia a flecha');
+  assert.equal(wall.left, 0, 'a flecha morre no muro');
+  assert.equal(shoot((wl.gap[0] + wl.gap[1]) / 2).hit, true, 'pela porta a flecha passa e acerta');
+});
