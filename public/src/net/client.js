@@ -63,6 +63,8 @@ export class NetClient {
       case 'tx_result': this.h.txResult?.(m); break; // resposta de uma transação do servidor (loja, baú, poção…; server/tx.js)
       case 'zone_exit': this.match = null; this.h.zoneExit?.(m); break;
       case 'notice': this.notes.push(m); this.h.notice?.(m); break;
+      case 'chat': this.h.chat?.(m); break; // chat online (canal global ou do grupo; ui/chat.js)
+      case 'chat_history': this.h.chatHistory?.(m.list); break;
       case 'reject': this.h.reject?.(m); break;
       case 'pong': this.rtt = Math.round(performance.now() - m.ts); break;
     }

@@ -20,7 +20,8 @@ import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from './core/power.js';
 import { chooseSpec, buySeal, specInfo, activeSpec, needsSeal, sealsOf, SEAL_PRICE } from './core/specs.js';
 import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.js';
 import { cleanName } from './core/savedoc.js';
-import { apiUrl, Online, CloudSave } from './online.js';
+import { apiUrl, wsUrl, Online, CloudSave } from './online.js';
+import { ChatBox } from './ui/chat.js';
 import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
 import { decodeLook } from './core/aura.js';
@@ -231,6 +232,7 @@ class Game {
       case 'buy-seal': this.buySealAsk(); break;
       case 'sort-inv': this.sortInventory(); break;
       case 'pref': this.setPref(arg); break;
+      case 'chat': this.chatBox?.toggle(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'fullscreen': this.toggleFullscreen(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'buy-potion': this.buyPotion(Number(arg)); break;
       case 'buy-scroll': this.buyScroll(Number(arg)); break;
@@ -391,7 +393,7 @@ class Game {
     try {
       const cfg = await this.online.loadConfig();
       this.googleClientId = cfg.googleClientId ?? null;
-      this.maxCharacters = cfg.maxCharacters ?? 4;
+      this.maxCharacters = cfg.maxCharacters ?? 3;
       if (this.online.hasSession) { await this.showChars(); return; }
       this.showAuth('login');
     } catch (e) {
@@ -440,7 +442,7 @@ class Game {
     try {
       const me = await this.online.me();
       this.account = me.account;
-      this.ui.showCharacters(me.characters, { email: me.account.email ?? 'conta Google', maxCharacters: this.maxCharacters ?? 4, hasLocalSave: !!loadChar(), msg });
+      this.ui.showCharacters(me.characters, { email: me.account.email ?? 'conta Google', maxCharacters: this.maxCharacters ?? 3, hasLocalSave: !!loadChar(), msg });
     } catch (e) { this.showAuth('login', e.status === 401 ? '' : e.message); }
   }
 
@@ -500,17 +502,22 @@ class Game {
   // ---------------- multiplayer no jogo real (servidor autoritativo) ----------------
   async connectNet() {
     this.disconnectNet();
-    const url = this.online?.config?.gameUrl;
+    // chat online: uma caixa só (fora dos painéis), criada na 1ª conexão; o canal Grupo acompanha o grupo do servidor
+    this.chatBox ??= new ChatBox({ send: (ch, text) => { if (!this.net?.joined) return false; this.net.send({ t: 'chat', ch, text }); return true; }, me: () => this.net?.name ?? null });
+    const url = wsUrl(this.online?.config?.gameUrl, this.online?.base || location.href); // '/ws' (porta única) vira ws(s)://<site>/ws
     if (!url || !this.online.token || this.charId == null) return;
     const refresh = () => { if (this.ui.isOpen('party') || this.ui.isOpen('arena')) this.ui.render(); };
     const net = this.net = new NetClient({
       url, session: this.online.token, characterId: this.charId,
       handlers: {
-        party: refresh,
+        party: (p) => { this.chatBox?.setParty(!!p); refresh(); },
         queue: () => { refresh(); },
         invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (botão 👥)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
-        reject: (m) => { this.zoneBusy = false; this.teleportPending = false; this.portalCd = 4; /* recusa (ex.: sala cheia): espera antes de tentar o portal de novo, sem laço de pedidos */ if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(CRYPT_REJECT[m.code] ? 'Cripta dos Ecos' : TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', m.reason ?? CRYPT_REJECT[m.code] ?? TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
+        chat: (m) => this.chatBox?.add(m),
+        chatHistory: (list) => this.chatBox?.history(list),
+        reject: (m) => { if (this.chatBox?.rejected(m.code)) return; // recusa do chat (ritmo, sem grupo): aviso na própria caixa
+ this.zoneBusy = false; this.teleportPending = false; this.portalCd = 4; /* recusa (ex.: sala cheia): espera antes de tentar o portal de novo, sem laço de pedidos */ if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(CRYPT_REJECT[m.code] ? 'Cripta dos Ecos' : TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', m.reason ?? CRYPT_REJECT[m.code] ?? TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
@@ -533,7 +540,7 @@ class Game {
     try { await net.connect(); refresh(); }
     catch (e) { this.ui.log(e.message === 'already_online' ? 'Este personagem já está conectado em outro lugar.' : 'Servidor de partidas indisponível: o PvP online e o cooperativo ficam desligados.', '#ffb4a8'); this.net = null; }
   }
-  disconnectNet() { this.net?.close(); this.net = null; this.netBanner = false; }
+  disconnectNet() { this.net?.close(); this.net = null; this.netBanner = false; this.chatBox?.clear(); this.chatBox?.setParty(false); }
 
   async netQueue(mode) {
     if (!this.net?.joined) return this.ui.toast('Servidor de partidas', 'Ainda conectando…', '');

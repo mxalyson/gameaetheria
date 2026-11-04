@@ -223,7 +223,7 @@ export class UI {
     this.screen.className = 'visible';
   }
 
-  showCharacters(list, { email = '', maxCharacters = 4, hasLocalSave = false, msg = '' } = {}) {
+  showCharacters(list, { email = '', maxCharacters = 3, hasLocalSave = false, msg = '' } = {}) {
     $('hud').classList.add('hidden');
     this.closePanels();
     const cards = list.map((c) => `

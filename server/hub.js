@@ -27,6 +27,9 @@ export const TELEPORT_COMBAT_SEC = 8;    // mesmo critério do cliente offline: 
 const TELEPORT_ENTRY = { x: FARM_ENTRY, y: FARM_MID }; // ponto oeste, igual ao de quem entra por portal (B22)
 export const TX_MIN_GAP = 0.1;           // s entre transações da mesma sessão (cada uma é uma gravação no banco)
 export const PORTAL_REACH = 80;          // px: distância máxima do ator ao portal para atravessá-lo (o servidor usa a posição do ator, nunca a do cliente)
+// Chat (2026-11-04): por sessão, 1 mensagem a cada `gap` s, no máximo `burst` a cada `window` s e sem repetir o mesmo texto em `repeatSec` s.
+// O histórico do canal global (últimas `history`) vai para quem entra; nada de chat é gravado no banco (só em memória, some ao reiniciar).
+export const CHAT = { gap: 1.2, burst: 5, window: 10, repeatSec: 15, history: 30 };
 const RATING_WIN = [50, 400], POWER_WIN = [0.15, 0.5], WIDEN_SEC = 40; // a janela abre linearmente com a espera
 
 export class Hub {
@@ -42,7 +45,8 @@ export class Hub {
     this.queue = [];             // entradas { id, mode, members:[sessão], since, rating, power }
     this.rooms = new Map();
     this.zoneRooms = new Map();  // chave (grupo ou jogador + zona) -> sala de exploração
-    this.stats = { staleInputs: 0, matches: 0, botFills: 0, roomErrors: 0 };
+    this.stats = { staleInputs: 0, matches: 0, botFills: 0, roomErrors: 0, chat: 0 };
+    this.chatLog = [];           // últimas mensagens do canal global
     this.toSession = { stats: this.stats, to: (s, m) => this.out.send(s, m), raw: (s, text) => this.out.raw(s, text) };
   }
 
@@ -117,8 +121,28 @@ export class Hub {
       case 'crypt_enter': return this.cryptEnter(s, no);
       case 'zone_teleport': return this.zoneTeleport(s, m.zone, no);
       case 'tx': return this.transaction(s, m, no);
+      case 'chat': return this.chat(s, m, no);
     }
   }
+
+  // ---------- chat ----------
+  // m.text já chega limpo (core/protocol.js › cleanChat). O nome é o da sessão (do servidor), nunca um campo do cliente.
+  chat(s, m, no) {
+    const now = this.clock, c = (s.chat ??= { last: -Infinity, times: [], text: '', textAt: -Infinity });
+    c.times = c.times.filter((t) => now - t < CHAT.window);
+    const same = m.text.toLowerCase() === c.text && now - c.textAt < CHAT.repeatSec;
+    if (now - c.last < CHAT.gap || c.times.length >= CHAT.burst || same) return no(REJECT.CHAT_WAIT);
+    const party = m.ch === 'party' ? this.parties.get(s.partyId) : null;
+    if (m.ch === 'party' && !party) return no(REJECT.NOT_IN_PARTY);
+    c.last = now; c.times.push(now); c.text = m.text.toLowerCase(); c.textAt = now;
+    this.stats.chat++;
+    const msg = { t: 'chat', ch: m.ch, from: s.name, cls: s.char.classId, lv: s.char.level, text: m.text, at: Date.now() };
+    if (party) { for (const x of party.members) if (x.ws) this.out.send(x, msg); return; }
+    this.chatLog.push(msg);
+    if (this.chatLog.length > CHAT.history) this.chatLog.shift();
+    for (const x of this.sessions.values()) if (x.ws) this.out.send(x, msg);
+  }
+  sendChatHistory(s) { if (this.chatLog.length) this.out.send(s, { t: 'chat_history', list: this.chatLog }); }
 
   // ---------- grupos ----------
   newParty(leader) {

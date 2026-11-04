@@ -7,10 +7,23 @@ const KEY_API = 'aetheria_api', KEY_SESSION = 'aetheria_session';
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* sem armazenamento */ } };
 
+// Servidor publicado em porta única (server/start.js) marca o index.html com <meta name="aetheria-api" content="same-origin">:
+// o próprio site é a API, sem ?api= na URL. No GitHub Pages (sem a marca) segue offline.
+export const sameOriginApi = (doc = globalThis.document, loc = globalThis.location) =>
+  doc?.querySelector?.('meta[name="aetheria-api"]')?.content === 'same-origin' ? loc.origin : null;
+
 export function apiUrl() {
   const q = new URLSearchParams(location.search).get('api');
   if (q !== null) lsSet(KEY_API, q || null); // ?api= (vazio) desliga o modo online neste aparelho
-  return (q ?? lsGet(KEY_API) ?? API_DEFAULT).replace(/\/+$/, '');
+  return (q ?? sameOriginApi() ?? lsGet(KEY_API) ?? API_DEFAULT).replace(/\/+$/, '');
+}
+
+// URL do WebSocket do jogo: absoluta (ws://…, wss://…) como veio da API, ou relativa ('/ws', porta única) montada sobre o endereço da API.
+export function wsUrl(gameUrl, base) {
+  if (!gameUrl || /^wss?:\/\//.test(gameUrl)) return gameUrl;
+  const u = new URL(gameUrl, base);
+  u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+  return u.href;
 }
 
 export class ApiError extends Error { constructor(status, code, message) { super(message); this.status = status; this.code = code; } }

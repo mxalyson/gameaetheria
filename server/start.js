@@ -12,6 +12,10 @@ import { openDb } from './db.js';
 import { createApi } from './api.js';
 import { createGameServer } from './game-server.js';
 import { readConfig, makeLogger, createOps, gracefulShutdown } from './ops.js';
+import { createStatic } from './static.js';
+import { fileURLToPath } from 'node:url';
+
+const PUBLIC = fileURLToPath(new URL('../public', import.meta.url));
 
 let cfg;
 try { cfg = readConfig(process.env); } catch (e) { console.error('Configuração inválida:', e.message); process.exit(2); }
@@ -23,11 +27,21 @@ const db = openDb(cfg.dbPath);
 const gameUrl = cfg.gameUrl || `ws://${cfg.host}:${cfg.gamePort}`; // URL que o NAVEGADOR usa para o WebSocket (em produção: wss://…)
 const strictPve = process.env.STRICT_PVE !== '0'; // P11.3: PADRÃO LIGADO — recusa ganhos de PvE vindos do cliente (ver server/plausible.js); STRICT_PVE=0 desliga
 const api = createApi(db, { googleClientId: cfg.googleClientId, origins: cfg.origins, trustProxy: cfg.trustProxy, gameUrl, strictPve });
-const game = createGameServer({ port: cfg.gamePort, host: cfg.host, db, allowedOrigins: cfg.origins, trustProxy: cfg.trustProxy, maxPerIp: cfg.maxPerIp });
-const ops = createOps({ db, game, metricsToken: cfg.metricsToken });
-const http = api.server((req, res) => { if (!ops.handler(req, res)) res.writeHead(404).end(); });
-http.listen(cfg.apiPort, cfg.host, () => log.info('API iniciada', { host: cfg.host, porta: cfg.apiPort, origens: cfg.origins, metricas: !!cfg.metricsToken }));
-game.ready.then(() => log.info('servidor de jogo iniciado', { host: cfg.host, porta: game.port, banco: cfg.dbPath, google: !!cfg.googleClientId }));
+let game, ops, http;
+if (cfg.single) {
+  // Porta única (publicação): jogo (public/) + API + operação + WebSocket em /ws, num só endereço. O <meta> liga o modo online no cliente (src/online.js).
+  const serveStatic = createStatic(PUBLIC, { headExtra: '<meta name="aetheria-api" content="same-origin">', cache: 'prod' });
+  http = api.server((req, res) => { if (!ops.handler(req, res)) serveStatic(req, res); });
+  game = createGameServer({ server: http, path: '/ws', db, allowedOrigins: cfg.origins, trustProxy: cfg.trustProxy, maxPerIp: cfg.maxPerIp });
+  ops = createOps({ db, game, metricsToken: cfg.metricsToken });
+  http.listen(cfg.port, cfg.host, () => log.info('Aetheria publicado (porta única)', { host: cfg.host, porta: cfg.port, endereco: cfg.publicUrl, origens: cfg.origins, banco: cfg.dbPath }));
+} else {
+  game = createGameServer({ port: cfg.gamePort, host: cfg.host, db, allowedOrigins: cfg.origins, trustProxy: cfg.trustProxy, maxPerIp: cfg.maxPerIp });
+  ops = createOps({ db, game, metricsToken: cfg.metricsToken });
+  http = api.server((req, res) => { if (!ops.handler(req, res)) res.writeHead(404).end(); });
+  http.listen(cfg.apiPort, cfg.host, () => log.info('API iniciada', { host: cfg.host, porta: cfg.apiPort, origens: cfg.origins, metricas: !!cfg.metricsToken }));
+  game.ready.then(() => log.info('servidor de jogo iniciado', { host: cfg.host, porta: game.port, banco: cfg.dbPath, google: !!cfg.googleClientId }));
+}
 setInterval(() => db.purgeSessions(), 3600_000).unref();
 
 let closing = false;

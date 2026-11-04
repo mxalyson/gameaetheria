@@ -22,6 +22,7 @@ export const REJECT = {
   BAD_ZONE: 'bad_zone', AUTH_REQUIRED: 'auth_required', BAD_SESSION: 'bad_session', BAD_CHARACTER: 'bad_character', ALREADY_ONLINE: 'already_online',
   NOT_VISITED: 'not_visited', NO_SCROLL: 'no_scroll', IN_COMBAT: 'in_combat', TELEPORT_WAIT: 'teleport_wait', NOT_AT_PORTAL: 'not_at_portal', // teletransporte online
   CRYPT_LEVEL: 'crypt_level', CRYPT_LOCKED: 'crypt_locked', CRYPT_WAIT: 'crypt_wait', CRYPT_OVER: 'crypt_over', // Cripta dos Ecos: nível · falta chegar às Ruínas · espera (sem Chave de Eco) · a instância já terminou
+  CHAT_WAIT: 'chat_wait', // chat: mensagens rápidas demais ou repetidas
   TX_WAIT: 'tx_wait', NOT_HERE: 'not_here', // transações do servidor (P11.4): pedidos rápidos demais · serviço indisponível neste lugar (ex.: loja dentro da instância)
 };
 
@@ -51,6 +52,16 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 export function safeName(v) {
   const s = String(v ?? '').normalize('NFC').replace(/[^\p{L}\p{N} _'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, MAX_NAME);
   return s || 'Herói';
+}
+
+// Chat (2026-11-04): canal global (todos os conectados) ou do grupo. Texto limpo AQUI (servidor e cliente usam a mesma regra):
+// sem caracteres de controle nem invisíveis (\p{Cc}/\p{Cf}: zero-width, inversão de direção), espaços colapsados, até CHAT_MAX caracteres.
+// O cliente mostra o texto com textContent (nunca innerHTML), então "<b>" chega como texto e não vira HTML.
+export const CHAT_MAX = 140;
+export const CHAT_CHANNELS = ['global', 'party'];
+export function cleanChat(v) {
+  if (typeof v !== 'string') return '';
+  return [...v.normalize('NFC').replace(/[\p{Cc}\p{Cf}]/gu, ' ').replace(/\s+/g, ' ').trim()].slice(0, CHAT_MAX).join('');
 }
 
 // Valida UMA mensagem do cliente já decodificada. Devolve { ok, msg } (msg normalizada, com lista branca de campos) ou { ok:false, code }.
@@ -117,6 +128,11 @@ export function parseClientMessage(data) {
       return { ok: true, msg: { t: data.t, name: safeName(data.name) } };
     case 'party_accept': case 'party_decline':
       return Number.isInteger(data.partyId) && data.partyId > 0 ? { ok: true, msg: { t: data.t, partyId: data.partyId } } : { ok: false, code: REJECT.BAD_MESSAGE };
+    case 'chat': {
+      const ch = data.ch ?? 'global', text = cleanChat(data.text);
+      if (!CHAT_CHANNELS.includes(ch) || !text) return { ok: false, code: REJECT.BAD_MESSAGE };
+      return { ok: true, msg: { t: 'chat', ch, text } };
+    }
     case 'ping':
       return finite(data.ts) ? { ok: true, msg: { t: 'ping', ts: data.ts } } : { ok: false, code: REJECT.BAD_MESSAGE };
     default:

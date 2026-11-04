@@ -205,7 +205,7 @@ test('login: "conta desativada" só aparece com a senha certa (senha errada rece
 });
 
 // ---------- personagens ----------
-test('personagem criado pelo servidor: oficial, nome limpo, único; limite de 4 por conta; isolamento entre contas', async () => {
+test('personagem criado pelo servidor: oficial, nome limpo, único; limite de 3 por conta; isolamento entre contas', async () => {
   const s = await setup();
   const a = await register(s, 'a@exemplo.com'), b = await register(s, 'b@exemplo.com');
   const c = await s.call('POST', '/api/characters', { name: '<b>Zé</b>', classId: 'mage' }, a.token);
@@ -214,9 +214,9 @@ test('personagem criado pelo servidor: oficial, nome limpo, único; limite de 4 
   assert.equal(c.body.character.spirits.length, 1);
   assert.equal((await s.call('POST', '/api/characters', { name: 'bzéb', classId: 'mage' }, b.token)).body.error, 'name_taken', 'nome único sem diferenciar maiúsculas');
   assert.equal((await s.call('POST', '/api/characters', { name: 'X', classId: 'dragon' }, a.token)).status, 400);
-  for (const n of ['Dois', 'Tres', 'Quatro']) assert.equal((await s.call('POST', '/api/characters', { name: n, classId: 'archer' }, a.token)).status, 201);
-  assert.equal((await s.call('POST', '/api/characters', { name: 'Cinco', classId: 'archer' }, a.token)).body.error, 'slots_full');
-  assert.equal((await s.call('GET', '/api/me', undefined, a.token)).body.characters.length, 4);
+  for (const n of ['Dois', 'Tres']) assert.equal((await s.call('POST', '/api/characters', { name: n, classId: 'archer' }, a.token)).status, 201);
+  assert.equal((await s.call('POST', '/api/characters', { name: 'Quatro', classId: 'archer' }, a.token)).body.error, 'slots_full', 'o 4º personagem é recusado');
+  assert.equal((await s.call('GET', '/api/me', undefined, a.token)).body.characters.length, 3);
   assert.equal((await s.call('GET', `/api/characters/${c.body.id}`, undefined, b.token)).status, 404, 'a outra conta não enxerga');
   assert.equal((await s.call('PUT', `/api/characters/${c.body.id}`, { doc: c.body.character, rev: 0 }, b.token)).status, 404);
   assert.equal((await s.call('DELETE', `/api/characters/${c.body.id}`, undefined, b.token)).status, 404);
