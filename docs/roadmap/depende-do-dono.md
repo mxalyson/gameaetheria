@@ -1,124 +1,109 @@
 # O que depende do dono (prompts e passos prontos)
-2026-11-03 · Tudo aqui eu não consigo fazer sozinho (arte nova, contas, aparelho real). Cada item diz o que me entregar e onde o jogo vai ler. Regras de estilo comuns: pintura digital de fantasia luminosa "pintada à mão" (mesmo mundo dos heróis em miniatura, Summoners War + anime), luz do alto-esquerda, fundo liso, sem texto. Origem/licença do que entrar vai para `docs/CREDITOS.md`.
+2026-11-04 · Lista viva: só o que NÃO existe ainda no repositório (conferido em `public/assets`, `public/labs/iso-poc/art-local/atlas-rig` e `git log`). Texto anterior completo: `depende-do-dono-historico.md`.
+Regras de estilo comuns: pintura digital de fantasia luminosa "pintada à mão" (mesmo mundo dos heróis em miniatura, Summoners War + anime), luz do alto-esquerda, fundo liso, sem texto. Origem/licença do que entrar vai para `docs/CREDITOS.md`. Formatos que funcionaram: **ícones em folha de 4 com moldura dourada** (eu recorto); **GLB do Meshy isolado, pose A** (eu asso em sprite com `tools/mob-bake.mjs` ou atlas de herói); **folhas de efeitos branco-sobre-preto** (escala de cinza, fundo preto liso).
 
-## A. Arte (gerar e me enviar o arquivo)
+## Pendente de arte (ordem de prioridade)
 
-### A1. Porto de Marfim: peças 3D (Meshy, GLB; eu asso em sprite com `tools/mob-bake.mjs`)
-Prompt-base para todas: *"stylized hand-painted fantasy harbor prop, chibi miniature diorama style, warm ivory sand and weathered pale wood, soft saturated colors, clean shapes, game asset, single object, plain background"*
-1. **Píer de madeira** (reto, ~4 tábuas de largura, postes de corda): `harbor_pier`
-2. **Barco a remo** e **veleiro pequeno** (2 peças): `harbor_boat_1`, `harbor_boat_2`
-3. **Barris e caixas empilhados** (2 peças): `harbor_crates`, `harbor_barrels`
-4. **Farol baixo de pedra clara com lanterna** (alto, estreito): `harbor_lighthouse`
-5. **Cordame/rede de pesca pendurada** (opcional): `harbor_net`
-Entrega: os GLBs na conversa. Eu integro em `render/nature-sprites.js` (SET.harbor).
+### A1. NPCs do Porto com arte própria (hoje alias recolorido)
+- **Onde o jogo lê:** `render/npc-sprites.js` (`NPC_ALIAS`: banker→sage, hunter→guard, dealer→merchant, duelist→arena, captain→guard, com `tint`). Com arte, entro em `NPC_ART`, gero `assets/npcs/<id>.webp` + `.json` e o alias some.
+- **Arquivos esperados:** `banker`, `hunter`, `dealer`, `duelist`, `captain` (um GLB Meshy cada; eu recorto de frente).
+- **Formato:** GLB Meshy isolado, pose A, chibi, fundo liso.
+- **Prompt-base:** *"chibi fantasy NPC, anime style, big head, hand-painted, full body, standing neutral pose, plain background"* +
+  - **Banqueiro Octávio** (`banker`): homem baixo e rechonchudo, colete azul-marinho com botões dourados, monóculo, chaveiro enorme na cintura, chapéu alto de seda.
+  - **Mestra de Caça Vesna** (`hunter`): mulher alta de capa verde-musgo com capuz, arco curto nas costas, aljava, cicatriz no queixo.
+  - **Mercador Bartolomeu** (`dealer`): homem sorridente de colete laranja, bolsas e mochila cheia de mercadorias, chapéu de pena.
+  - **Duelista Kael** (`duelist`): espadachim magro de casaco vermelho, florete, bigode fino, luva branca.
+  - **Capitã Maré** (`captain`): mulher de casaco azul-petróleo com dragonas douradas, chapéu de capitão, âncora no cinto.
 
-### A2. NPCs do Porto (Meshy, personagem chibi de pé, pose neutra, A-pose)
-Prompt-base: *"chibi fantasy NPC, anime style, big head, hand-painted, full body, standing neutral pose, plain background"* + descrição:
-- **Banqueiro Octávio:** homem baixo e rechonchudo, colete azul-marinho com botões dourados, monóculo, chaveiro enorme na cintura, chapéu alto de seda.
-- **Mestra de Caça Vesna:** mulher alta de capa verde-musgo com capuz, arco curto nas costas, aljava, cicatriz no queixo.
-- **Mercador Bartolomeu:** homem sorridente de colete laranja, bolsas e mochila cheia de mercadorias, chapéu de pena.
-- **Duelista Kael:** espadachim magro de casaco vermelho, florete, bigode fino, luva branca.
-- **Capitã Maré:** mulher de casaco azul-petróleo com dragonas douradas, chapéu de capitão, âncora no cinto.
-Hoje usam sprites recoloridos da Yun/Ren/Lia/Doran; com estes GLBs eu gero `assets/npcs/<id>.webp` e o alias some.
+### A2. Místico (5º herói) + 2 especializações + ícones
+- **Estado:** só a promessa em texto (epílogo `ecos_unidos` e Capitã). Não há classe, NPC, atlas nem ícones. Especializações propostas: `docs/gameplay/sistemas.md` › Místico (Tecelão de Ecos e Ceifador de Ecos).
+- **Entrega:** (a) herói base GLB Meshy, pose A; (b) duas variantes Nv25 (uma por especialização), mesma silhueta; (c) ícones de habilidade 512×512 em folha de 4 com moldura dourada (kit base + 3 por especialização + Maestria; eu listo os ids quando o kit existir); (d) ícone do ataque básico (aro como os `atk-*`); (e) retrato de busto 512×512.
+- **Prompts:** herói: *"chibi fantasy mystic hero, anime style, flowing violet and teal robes, floating glowing sigils, staff with a hanging lantern, hand-painted, full body, standing neutral pose, A-pose"*. Tecelão de Ecos: *"... refined elite version, weaver of echoes, translucent teal threads and spectral companions orbiting, violet-gold robe"*. Ceifador de Ecos: *"... refined elite version, reaper of echoes, dark violet cloak, scythe-like lantern staff, pale teal glow"*.
+- Depois eu faço atlas, kit e ligo no `heroLook`.
 
-### A3. Retrato do Cavaleiro Rubro (chefe das Cinzas) — Meshy ou imagem
-*"armored red knight boss, burning ember armor, glowing cracks, horned helm, menacing, chibi stylized fantasy, hand-painted, bust portrait, plain dark background"* → `assets/portraits/boss-rubro.webp` (busto 512×512).
+### A3. Soberano dos Ecos com arte final e mais clara
+- **Estado:** `assets/mobs/echolord_p1` e `echolord_p2` existem (alta resolução, 4 quadros), mas o modelo é escuro; hoje o jogo levanta o brilho em `render/mob-sprites.js` (`LIFT`/`RIM`). Precisa modelo novo, claro, para ler bem sobre o piso escuro da Cripta.
+- **Entrega:** dois GLB Meshy (pose A): fase 1 (golpe pesado no chão) e fase 2 (braços erguidos, invocando). Eu reasso em `echolord_p1/p2` com `tools/mob-bake.mjs`.
+- **Prompt:** *"chibi fantasy boss, spectral king of echoes, tall armored lich knight with a cracked crystal crown, light pearl-white and teal armor with bright glowing violet runes, floating crystal shards orbiting him, hovering ghostly cape, menacing, hand-painted, stylized miniature, bright even lighting, plain light background, full body"*.
 
-### A4. Ícones das 4 habilidades de Maestria (512×512 PNG, moldura dourada, fundo transparente)
-Hoje são recolores dourados dos ícones antigos. Prompt: *"fantasy game skill icon, hand-painted, ornate gold frame, centered, glowing, dark transparent background"* +
-- **Fúria do Colosso** (Guerreiro): punho de pedra cristalina batendo no chão, ondas de choque âmbar. → `assets/icons/skills/colossus.webp`
-- **Meteoro Arcano** (Mago): meteoro roxo-alaranjado caindo com cauda de runas. → `meteor.webp`
-- **Tempestade de Flechas Ardentes** (Arqueiro): chuva de flechas em chamas num céu de brasas. → `arrowstorm.webp`
-- **Intervenção Divina** (Clérigo): mãos erguidas, coluna de luz dourada, asas translúcidas. → `intervention.webp`
+### A4. Ícone do nó da Cripta (128 px)
+- **Arquivo:** `public/assets/icons/ui/zone-crypt.webp` (128×128, fundo transparente). **Onde lê:** `ui/ui.js` (`ZONE_ART` + `zoneIcon('crypt')`; hoje cai no emoji 🕯️ porque `crypt` não está em `ZONE_ART`; eu acrescento ao ligar).
+- **Prompt:** *"fantasy game map node icon, stone crypt portal with glowing turquoise runes, hand-painted, ornate gold frame, centered, transparent background"* (mesmo desenho dos `zone-*`).
 
-### A4b. Ícones dos 32 kits de especialização (512×512, fundo transparente) — NOVO
-Cada especialização (nível 15+) tem 3 habilidades + 1 de Maestria próprias (`public/src/data/kits.js`). Hoje cada uma **empresta o ícone existente mais parecido** (campo `art`) e a barra põe uma **moldura na cor da especialização**. Ao receber a arte, grave `assets/icons/skills/<id>.webp` e apague o campo `art` da habilidade em `data/kits.js` (`tests/kits.test.js` confere que existe um ícone). Prompt-base: *"fantasy game skill icon, hand-painted, ornate frame in <cor da especialização>, centered, glowing, dark transparent background"* +
-- **Paladino** (dourado): `pal_hammer` martelo de luz girando · `pal_aura` escudo com aura radiante · `pal_rush` escudo avançando com lasca de luz · `pal_sanctuary` sol sobre círculo de runas
-- **Berserker** (brasa): `bsk_leap` machado de duas mãos caindo do alto, chão rachado · `bsk_frenzy` gota de sangue com olhos vermelhos · `bsk_cleave` arco de machadada com gotas · `bsk_fury` rosto de fera em brasa
-- **Arcano** (violeta): `arc_prism` feixe de luz atravessando prisma · `arc_barrier` escudo hexagonal arcano · `arc_phase` silhueta dupla com portal de runa · `arc_comet` cometa roxo com cauda de estrelas
-- **Bruxo** (verde tóxico): `wl_curse` caveira com fumaça verde · `wl_drain` mão sugando fios de vida · `wl_pact` dois espectros e pacto escrito · `wl_souls` chuva de almas
-- **Franco-atirador** (turquesa): `sn_aim` mira de luneta com ponto brilhante · `sn_trap` armadilha de cristal de gelo · `sn_retreat` botas com rastro de vento e seta para trás · `sn_lethal` bala perfurante com ondas de choque
-- **Pistoleiro** (âmbar): `gs_fan` cinco virotes em leque · `gs_grenade` granada com pavio · `gs_roll2` duas setas de rolamento encadeadas · `gs_barrage` chuva de virotes em linhas
-- **Sentinela** (id guardian; branco-dourado): `gd_light` flor de luz curando · `gd_ward` vários escudos de luz ligados · `gd_word` livro aberto emitindo luz · `gd_celestial` anjo de asas abertas, coluna de luz
-- **Inquisidor** (violeta-âmbar): `inq_judge` raio sagrado em chamas · `inq_mark` pena com selo brilhante · `inq_flame` leque de fogo sagrado · `inq_verdict` livro grande em chamas
+### A5. Ícones de zona em 128 px
+- **Arquivos:** refazer `assets/icons/ui/zone-town|forest|plains|ruins|glacier|ember|harbor.webp` (hoje 64×64, macios em tela 3×; `ember` e `harbor` são recortes tingidos). Mesmo desenho, 128×128. **Formato:** folha de 4 + folha de 3, moldura dourada, fundo transparente.
 
-### A5. Ícone do ataque básico das 4 classes (512×512, mesma moldura dos ícones de skill)
-Espada curva (Guerreiro), orbe/cajado arcano (Mago), arco com flecha de luz (Arqueiro), maça sagrada com halo (Clérigo). → `assets/icons/skills/basic-<classe>.webp`
+### A6. Baú aberto, cadeado e troféu
+- `assets/props/chest-open.webp` (mesmo estilo e tamanho do `chest.webp`, 160×143 ou maior; tampa levantada, vazio, brilho dourado leve). **Prompt:** *"same hand-painted fantasy treasure chest, lid open, empty, faint golden glow, transparent background, same angle as the closed one"*.
+- `assets/icons/ui/lock.webp` e `trophy.webp` (128×128, ícone dourado, fundo transparente). Hoje: cadeado usa `res-key.webp` e troféu usa `menu-journal.webp` (`ui/ui.js`, `LOCK`/`TROPHY`), com emoji de reserva.
 
-### A6. Peças do cenário e UI
-- **Baú aberto** (mesmo estilo do `assets/props/chest.webp`, tampa levantada, vazio, brilho dourado leve): `props/chest-open.webp`
-- **Adornos do Cume Gélido** (3 peças: pilar de gelo rachado, estátua coberta de neve, tocha de gelo azul): GLB Meshy.
-- **Cadeado e troféu pintados** (ícones 128×128 ícone dourado): `assets/icons/ui/lock.webp`, `trophy.webp`
-- **Ícones de zona em 128 px** (hoje 64 px, macios em tela 3×): redo de `assets/icons/ui/zone-*.webp`, mesmo desenho.
-- **Mestres de classe em maior resolução:** se quiser, reenvie os GLBs/renders dos 4 heróis em 1024 px de altura (hoje 125 px no atlas).
-- **Ícones de itens e spirits restantes**: usar `docs/art-direction/prompts-icones-itens.md`.
-- **4 folhas que só apareceram na conversa** (tooltip/faixa/diálogo, 7 molduras de raridade, 4 ataques básicos, 7 ícones de menu): reenviar como arquivo.
+### A7. Placa/arte da Pedra de Retorno
+- Hoje a Pedra é `m_boulder` do kit de natureza (`nature-sprites.js`, `SET.*.runestone`) e a lore está só em falas e toast. **Entrega:** ícone 128×128 `assets/icons/ui/runestone.webp` + peça de cenário (GLB Meshy, pose A) `runestone`: pedra rúnica com brilho turquesa suave e um espaço para placa de texto. **Prompt:** *"stylized hand-painted fantasy waystone, standing runestone with glowing turquoise runes and a small wooden plaque, chibi miniature diorama style, game asset, single object, plain background"*.
 
-### A6b. Escudos (item do Guerreiro e do Clérigo; slot offhand)
-Icones de 128×128 (ou 256), fundo transparente, estilo dos demais itens (mesma moldura de raridade). 5 arquivos, um por raridade, em `assets/icons/item/shield-common.webp`, `shield-uncommon.webp`, `shield-rare.webp`, `shield-epic.webp`, `shield-legendary.webp`. Enquanto não existem, a UI usa o ícone de armadura com um selo de escudo.
-- Prompt base: *"hand-painted fantasy RPG item icon, a heater shield seen from the front, slight 3/4 angle, anime style, soft rim light, transparent background, centered, no text"*
-- Comum: madeira com aro de ferro cinza · Incomum: ferro polido, aro verde · Rara: aço azulado com runa · Épica: aço roxo com gema · Lendária: ouro e laranja com brasão solar radiante.
-- Para o Clérigo, se quiser variante: mesmo escudo com símbolo sagrado (sol) no centro (arquivos `shield-<raridade>-cleric.webp`; ainda não usados pelo código, avise para ligar).
+### A8. Retratos dos mentores e dos NPCs do Porto
+- Hoje os 8 mentores reaproveitam o quadro do herói Nv25 (`npc-from-heroes.py`) e os NPCs do Porto usam o rosto dos alias. **Arquivos:** `assets/portraits/npc-<id>.webp` (512×512, busto, fundo transparente) para `banker, hunter, dealer, duelist, captain` e `mentor-<id>.webp` para `paladin, berserker, arcane, warlock, sniper, gunslinger, guardian, inquisitor`. **Formato:** folha de 4, mesmo estilo dos `npc-*.webp` existentes.
+- **Prompt-base:** *"bust portrait of a chibi anime fantasy NPC, {descrição}, painted game portrait like Summoners War, head and shoulders, transparent background"* (descrições do A1 e dos mentores em `data/mentors.js`).
 
-### A7. Místico (5º herói)
-Conceito: místico errante que tece "ecos" (invocações/controle). Especializações propostas (só desenho): `docs/gameplay/sistemas.md` › Místico (Tecelão de Ecos e Ceifador de Ecos); no Nv25 cada uma pede uma variante de herói, como as 8 da A8. Prompt: *"chibi fantasy mystic hero, anime style, flowing violet and teal robes, floating glowing sigils, staff with a hanging lantern, hand-painted, full body, standing neutral pose"* → GLB Meshy; depois eu faço atlas, kit de habilidades e ícones.
+### A9. Adornos do Cume Gélido (3 peças)
+- **Estado:** o Cume usa o kit de natureza (`SET.glacier`, pinheiros e cristais). Não há pilar, estátua nem tocha de gelo. **Entrega:** 3 GLB Meshy isolados, pose A: `glacier_pillar` (pilar de gelo rachado), `glacier_statue` (estátua coberta de neve), `glacier_torch` (tocha de gelo azul). Eu integro em `nature-sprites.js`. **Prompt-base:** *"stylized hand-painted fantasy ice prop, chibi miniature diorama style, soft saturated colors, game asset, single object, plain background"* + descrição.
 
-## B. Decisões suas
-- Aprovar pilares/assinatura visual (`docs/art-direction/identidade-visual-v1.md`).
-- Dizer se ainda quer comparar efeitos do laboratório isométrico (você disse que era resolução; se o iPhone está nítido, posso fechar).
-- Decidir o envio de B2–B5 e do Místico (prioridade).
+### A10. Peças restantes do Porto de Marfim (opcional)
+- Já há barcos, caixas e barris; faltam `harbor_pier` (píer reto de madeira, ~4 tábuas de largura), `harbor_lighthouse` (farol baixo de pedra clara com lanterna) e `harbor_net` (rede de pesca pendurada). **Formato:** GLB Meshy isolado, pose A; integro em `SET.harbor`. **Prompt-base:** *"stylized hand-painted fantasy harbor prop, chibi miniature diorama style, warm ivory sand and weathered pale wood, soft saturated colors, clean shapes, game asset, single object, plain background"*.
 
-## C. Contas, aparelho e servidor
+### A11. Montarias (lobo, cavalo, gryphon), só depois da decisão D1
+- **Estado:** só desenho (`docs/roadmap/montaria.md`); nenhum arquivo. **Formato:** por montaria, atlas **8 direções × 7 quadros** (6 de galope/voo + 1 parado), fundo transparente, **sem cavaleiro**, âncora nos cascos/patas, estilo miniatura dos heróis. Mais: ícone de **sela vazia** 256×256 e **Apito de Montaria** (item épico).
+- **Prompts:** (1) Lobo: *"chibi anime fantasy gray wolf mount, saddle with leather straps and small blue cloth, big expressive eyes, fluffy tail, painted miniature style like Summoners War, isometric 3/4 view, transparent background, galloping pose, no rider"*. (2) Cavalo: *"chibi anime fantasy white horse mount with golden saddle and flowing mane, big glossy eyes, painted miniature style, isometric 3/4 view, transparent background, trotting pose, no rider"*. (3) Gryphon: *"chibi anime fantasy gryphon mount, eagle head and lion body, golden-brown feathers, saddle, wings half-open for gliding, painted miniature style, isometric 3/4 view, transparent background, no rider"* (asas em 3 posições).
+
+### A12. Cena/ilustração do epílogo
+- **Estado:** não existe; o epílogo (`ecos_unidos`) é só texto. **Entrega:** 1 ilustração 1280×720 (WebP) `assets/ui/epilogue.webp`, que eu mostro no diálogo/tela final. **Prompt:** *"painted fantasy key art, four chibi heroes (warrior, mage, archer, cleric) standing together on a snowy ridge at dawn, glowing teal echoes drifting upward like fireflies, a distant figure in a violet cape watching from the harbor below, hand-painted, Summoners War + anime, wide cinematic composition, no text"*.
+
+### A13. Efeitos de VFX que ainda são procedurais (opcional)
+- Folhas 1–3 entregues (49 sprites). Faltam folhas para: vento (`wind`), folhas (`leaf0..1`), pedras (`shard0..1`), cruz, bolha, fitas (`ribbon0..1`), brasas (`ember0..1`), brilho (`glow`), anel (`ring`); mais raios (ideais 5–6, com vertical/bifurcado), cristais de gelo soltos, fumaça tóxica verde, cortes em meia-lua (mais variações), arco de energia/projétil e círculos de runa extras (2 hoje).
+- **Formato:** folha branco-sobre-preto em escala de cinza (`docs/art-direction/fontes-vfx/vfx-folha-N.jpg`; eu rodo `python tools/vfx-sheet.py` e `node tools/bump-assets.mjs`). **Prompts:** *"sprite sheet, N frames of {efeito}, painterly anime game VFX, soft glowing white-hot core fading to dark edges, grayscale only, black background, no text"*; para vento: *"curved wind streaks"*; para brasas: *"floating embers with glow"*; para folhas: *"drifting leaves"*; para pedras: *"angular rock shards"*.
+
+### A14. Retratos PINTADOS das especializações (opcional)
+- **Estado:** `assets/portraits/spec-<id>.webp` existem como **renders 3D** (`node tools/spec-portraits.mjs`; ainda não commitados), para os 8 ids. Só vale pedir arte se quiser pintura no lugar. **Entrega:** PNG 512×512, fundo transparente, `spec-<id>.png` (paladin, berserker, arcane, warlock, sniper, gunslinger, guardian, inquisitor), busto, mesma moldura e luz dos `class-*.webp`; eu converto para webp e rodo `node tools/bump-assets.mjs`.
+- **Prompts (busto, anime chibi pintado, fundo transparente):** Paladino: *"blond hair, golden winged helmet with white plume, radiant white and gold plate armor with sun emblem, calm determined look"*. Berserker: *"crimson horned full helm with glowing orange eyes, red armor with lava-like cracks and spikes, fierce"*. Arcano: *"short dark purple hair, violet eyes, high-collar purple and gold robe with runic trim, serene"*. Bruxo: *"dark green hood with glowing green runes, pale face with glowing green eyes, small horn, eerie, brighten the face for dark UI"*. Franco-atirador: *"teal hood pulled back, orange hair, teal eyes, teal leather cloak with white trim, focused"*. Pistoleiro: *"messy brown hair under a brown feathered hat, confident smirk, leather jacket with straps and quiver"*. Sentinela: *"long pale blonde hair, golden tiara, white and gold robe, large white feathered wings behind the shoulders, gentle but firm"*. Inquisidor: *"voluminous orange hair in a bun, teal eyes, purple and red ornate coat with gold crossed straps, stern"*. Todos: *"bust portrait of a chibi anime {classe}, ..., painted game portrait like Summoners War, head and shoulders, transparent background"*.
+
+### A15. Itens e spirits restantes, folhas perdidas (opcional)
+- Ícones de itens e spirits que faltam: `docs/art-direction/prompts-icones-itens.md` (Ópalo sem arte opalescente própria; variante de escudo do Clérigo `shield-<raridade>-cleric.webp`, ainda não usada pelo código: avise para ligar).
+- 4 folhas que só apareceram na conversa (tooltip/faixa/diálogo, 7 molduras de raridade, 4 ataques básicos, 7 ícones de menu): reenviar como arquivo (hoje os arquivos de `assets/ui` e `icons/menu` já existem; só reenvie se quiser a fonte original).
+- Mestres de classe em maior resolução (renders de 1024 px de altura; hoje 125 px no atlas).
+- Criaturas da Cripta próprias (opcional): *"chibi spectral sentinel, teal glowing armor shell, hollow helm"*, *"chibi runic gargoyle, blue stone with glowing runes"*, *"chibi echo wraith, teal translucent robe, floating lantern"* (hoje recoloridos; `data/mobs.js` `art`/`tint`).
+
+### A16. Ícone do Drenar Vida do Bruxo (opcional)
+- `assets/icons/skills/wl_drain.webp` existe e ficou com fios vermelhos **por escolha do dono**. Só substitua se quiser versão verde tóxica: ícone 512×512 moldura dourada, *"a hand draining glowing toxic-green life threads"*.
+
+## Já entregue e integrado
+
+| Item | Arquivo(s) | Commit / data |
+|---|---|---|
+| Retrato do Cavaleiro Rubro (antiga A3) | `assets/portraits/boss-rubro.webp` (lido em `render/mob-sprites.js`, `PAINTED_PORTRAIT`) | c8418f9, 2026-11-03 |
+| Ícones de Maestria (A4) | `assets/icons/skills/colossus|meteor|arrowstorm|intervention.webp` | bf1ea8f, 2026-11-03 |
+| Ícones dos 32 kits (A4b) | `assets/icons/skills/pal_*, bsk_*, arc_*, wl_*, sn_*, gs_*, gd_*, inq_*` (Paladino em alta resolução) | 871d96f, cdf7a49, 7f7e8da, 2026-11-04 |
+| Ataque básico das 4 classes (A5) | `assets/icons/attack/atk-archer|cleric|mage|warrior.webp` (arte do dono dentro do aro) | cdf7a49, b9ec81c, 2026-11-04 |
+| Escudos por raridade (A6b) | `assets/icons/item/shield-{common..legendary}.webp` | c8418f9, 2026-11-03 |
+| Peças da Cripta (portões, pilares, sarcófagos, piso) | `assets/props/crypt_part0..5` | 2b56938, 2026-11-03 |
+| Barcos, caixas e barris do Porto | `assets/props/harbor_boat0..1`, `harbor_crate0..4` | 2b56938, 2026-11-03 |
+| Soberano dos Ecos (versão escura, alta resolução) | `assets/mobs/echolord_p1/p2` | 2b56938, 24e966b, 2026-11-03 |
+| Itens Eco (armas, armaduras, Fragmento, Chave) | `assets/icons/item/eco-*`, `res-eco-fragment`, `res-eco-key` | 7aeb394, 2026-11-03 |
+| VFX folhas 1–3 (49 sprites) | `assets/vfx/vfx.webp` + `vfx.json` | 5032ab2, 2026-11-03 |
+| Heróis Nv25 das 8 especializações | `public/labs/iso-poc/art-local/atlas-rig/*_nv25` (Paladino é `paladin_nv25` do `chibi_heroes.glb`), ligados em `render/hero-sprites.js` | 6f19544, 4fe33f5, 2026-11-03 |
+| Mentores das 8 especializações (NPCs pintados, quadro do herói Nv25) | `assets/npcs/mentor_*.webp` | 31afd18, 2026-11-03 |
+| Mestres de classe, Vila (NPCs pintados) | `assets/npcs/master_*`, `merchant`, `arena`, `sage`, `guard`, `herbalist`, `smith` | anteriores (2026-11-01) |
+| Retratos das especializações (renders 3D; A11 antiga virou A14, opcional) | `assets/portraits/spec-*.webp` | ainda sem commit (working tree) |
+
+## Decisões suas
+- **D1. Aprovar o desenho da montaria** (`docs/roadmap/montaria.md`): +50% velocidade fora de combate, desmonta ao atacar/dano, nunca em PvP/Ondas/Cripta, missão no Nv 12 (lobo), demais por item/conquista. Sem aprovação não peço arte (A11) nem implemento.
+- **D2. Rebalanceamentos pendentes:** balanço do início mantido (lobos Nv 4 são perigo, decidido 2026-11-02); balanceamento por jogador da Cripta (duração 8–14 min) ainda em aberto (`pendencias.md` item 15); duelos classe×classe: rodar `npm run balance` depois dos kits novos e dizer se aceita fora de 45–55%.
+- **D3. Perguntas abertas de `auditoria-historia-2.md` §5** (as decisões da §4 já foram aprovadas e implementadas): (a) dizer onde fica a Praça dos Mestres de Estilo na Prova do Mestre; (b) aviso ao primeiro tombo sem Amuleto/Pedra (existe só `phoenix` na zona de farm); (c) dizer ao jogador que a Cripta exige o servidor (só a Yun offline avisa); (d) explicar por que o gelo é "reflexo do Carvalho" antes do Nv 27; (e) `CLAUDE.md` e `docs/gameplay/sistemas.md` ainda citam WASD/tecla G (decisão 0016): autorizar a correção.
+- **D4. Pilares/assinatura visual** (`docs/art-direction/identidade-visual-v1.md`), estilo do cenário Quaternius/Meshy, licença das imagens de IA e origem das folhas de ícones (registrar em `docs/CREDITOS.md`).
+- **D5. Prioridade:** Místico (A2) antes ou depois de NPCs do Porto (A1)?
+
+## Contas, aparelho e servidor
 1. **Servidor público com HTTPS/WSS e domínio** (hoje o GitHub Pages fica offline sem servidor). Opções: VPS pequena + Caddy (HTTPS automático) rodando `npm run server`. Eu preparo Dockerfile/compose quando você escolher o provedor.
 2. **Google Client ID** (Google Cloud → OAuth cliente Web, origens do domínio) → variável `GOOGLE_CLIENT_ID`. Nunca me mande o segredo por chat.
 3. **Google Play:** conta de desenvolvedor, chaves de assinatura guardadas fora do Git, um aparelho Android com depuração USB. Depois: TWA/Capacitor (`docs/roadmap/android.md`).
-4. **Medição em aparelho real:** rodar `docs/roadmap/teste-android.md` e me trazer FPS/RAM; no iPhone, abrir com `?fps=1` se existir, ou me descrever travadas. Testar também um celular médio/fraco e sessão longa (aquecimento).
+4. **Medição em aparelho real:** rodar `docs/roadmap/teste-android.md` e me trazer FPS/RAM; no iPhone, abrir com `?fps=1` se existir, ou descrever travadas. Testar também um celular médio/fraco e sessão longa (aquecimento). Validar em celular o que só foi testado em node (avisos automáticos da Cripta/especialização/Amuleto, HUD de toque sem sobreposição, Cripta no navegador).
 5. **Rede real:** testar com 2 aparelhos em redes diferentes (perda/latência/TLS).
 6. **Teste de invasão e anti-abuso de contas** (CAPTCHA): só por terceiros / quando houver servidor público.
-
-## A8. "Design completo Nv25" por especialização (8 variantes de herói)
-A aura de evolução já existe (procedural). O visual final do Nv25 (Maestria) precisa de arte sua: um herói por especialização, mesma silhueta/proporção chibi da classe, mais elaborado (armadura/robe refinado, detalhes dourados/prata, sem exagero). Gere no Meshy a partir do herói base da classe e me traga o GLB; eu faço atlas e ligo no gancho `heroLook` (`docs/art-direction/aura-evolucao.md`).
-Prompts (base: *"chibi fantasy {classe} hero, anime style, hand-painted, full body, neutral standing pose, refined elite version"*):
-1. Paladino (antigo Bastião): *"... paladin, heavy gold-and-steel plate, tower shield with engraved crest, short cape, calm radiant look"*
-2. Berserker (antigo Carrasco): *"... berserker warrior, dark crimson armor with ember-lit cracks, huge two-handed axe held in both hands, NO shield, horned helm"*
-3. Arcano (antigo Piromante): *"... arcane mage, deep violet and blue robes with silver runes, floating prism crystal, staff with a faceted arcane gem"*
-4. Bruxo (antigo Criomante): *"... warlock mage, dark green and black robes, toxic green glow, skull-topped staff, hanging vials and tattered hem"*
-5. Franco-atirador (antigo Atirador): *"... sniper archer, teal leather coat with silver fittings, long precision bow with scope-like rune, hooded cape"*
-6. Pistoleiro (antigo Caçador): *"... gunslinger archer, amber and brown gear with brass fittings, compact repeating-crossbow-style bow, bandolier of bolts, short coat"* (a classe segue usando arco; "besta de repetição" é só sabor, sem arma nova)
-7. Sentinela (id guardian): *"... guardian cleric, white and gold vestments, winged shoulder guards, radiant shield-staff, halo ornament"*
-8. Inquisidor: *"... inquisitor cleric, violet and amber ornate robes, floating rune book, judgement mace with glowing sigils"*
-
-## A8. Cripta dos Ecos (masmorra, decisão 0017): arte do chefe novo e peças (PROVISÓRIO até chegar)
-Hoje o **Soberano dos Ecos** usa o sprite do Guardião das Ruínas recolorido (azul-turquesa) e as criaturas da masmorra (Sombra, Sentinela, Gárgula Rúnica) são espectro/cavaleiro/gárgula recoloridos. Quando houver arte própria, eu troco `art`/`tint` em `data/mobs.js` e gero `assets/mobs/echolord.*` com `tools/mob-bake.mjs`.
-- **Soberano dos Ecos (chefe, Meshy GLB, chibi/miniatura):** *"chibi fantasy boss, spectral king of echoes, tall armored lich knight with a cracked crystal crown, teal and violet glowing runes, floating shards orbiting him, hovering ghostly cape, menacing, hand-painted, stylized miniature, plain background, full body, neutral pose"* → `echolord`. Precisa de pose de ataque pesado (golpe no chão) e pose de invocar (braços erguidos).
-- **Criaturas (opcional, 3 peças):** *"chibi spectral sentinel, teal glowing armor shell, hollow helm"* · *"chibi runic gargoyle, blue stone with glowing runes"* · *"chibi echo wraith, teal translucent robe, floating lantern"*.
-- **Itens Eco (ícones 512×512, moldura de raridade épica):** arma por classe (espada, cajado, arco, martelo) e armadura por classe, todas em tom turquesa/violeta com rachaduras luminosas; mais o **Fragmento de Eco** (estilhaço de cristal turquesa pulsando) e a **Chave de Eco** (chave de cristal). Hoje usam o ícone do tipo.
-- **Ícone do nó no mapa:** `assets/icons/ui/zone-crypt.webp` (128 px, cripta/portal de pedra com brilho turquesa, mesmo desenho dos outros `zone-*`). Hoje é um emoji.
-- **Cenário da masmorra (opcional):** textura de chão de laje escura com runas, e peças: sarcófago, coluna rachada, portão de pedra (aberto/fechado). Hoje o corredor usa colunas e braseiros das Ruínas.
-
-## A9. Efeitos de habilidade pintados (VFX): folhas de sprites de IA para trocar os procedurais (OPCIONAL, melhora o nível "pintado")
-Hoje os efeitos usam um kit gerado por código (`tools/vfx-kit.py` -> `public/assets/vfx/vfx.webp` + `vfx.json`, 38 sprites; carregador `render/vfx-kit.js`). Dá efeitos luminosos e orgânicos, mas arte feita por IA/pintada à mão ficaria melhor em fogo, gelo e raio. **Formato que o carregador aceita (substitui sem mexer em código):**
-- Um atlas `vfx.webp` (RGBA, largura 1024, altura livre, até 3 MiB decodificado ≈ 1024×768) e um `vfx.json` `{ "size": [W,H], "sprites": { "nome": [x, y, w, h, âncoraX, âncoraY] } }` com os **mesmos 38 nomes**: `glow ring shock flame0..3 ember0..1 spark star8 burst rays crystal0..2 flake bolt0..2 ribbon0..1 wind leaf0..1 smoke0..2 wisp0..1 shard0..1 cross bubble rune0..1 slash0..1`.
-- **Cada sprite em ESCALA DE CINZA (intensidade) + alfa**: a cor sai de uma rampa por paleta (borda escura -> cor -> clara -> branco no núcleo), então um fogo vale para laranja, brasa vermelha ou verde tóxico. Núcleo quase branco, bordas mais escuras, fundo TRANSPARENTE (PNG com alfa antes de virar WebP).
-- Tamanhos/orientação: `flame0..3` 112×112 (4 quadros do mesmo fogo, ponta para CIMA, base embaixo); `shock` 192 (anel de onda de choque, borda a 80% do raio); `rune0/1` 192 (círculo de runas, anel externo a 96%); `ring` 112; `rays` 192 (raios de luz saindo do centro); `slash0/1` 128×192 (meia-lua apontando para a DIREITA, âncora no centro do arco à esquerda: x=24, y=96); `bolt0..2` 256×64 (raio horizontal da esquerda para a direita); `ribbon0/1` 256×32 (fita horizontal, cauda transparente à esquerda e cabeça brilhante à direita); `crystal0..2` 112 (ponta para cima); demais 64–128 quadrados centrados.
-- Pasta de trabalho: coloque os PNGs em `art-local/vfx/` com o nome do sprite; peça ao Claude "montar o atlas de VFX" (um script empacota e roda `node tools/bump-assets.mjs`).
-
-**Prompts (gere cada folha em fundo preto liso, depois recorte; peça "grayscale, no color"):**
-1. **Fogo (4 quadros):** *"sprite sheet, 4 frames of a single stylized fantasy flame lick, painterly anime game VFX, soft glowing white-hot core fading to dark edges, tapered tip pointing up, flickering variation between frames, grayscale only, black background, no text"*
-2. **Gelo:** *"3 faceted ice crystal shards pointing up, painterly anime game VFX, glossy facets, bright white edges, grayscale only, black background"* + *"detailed snowflake, 6 arms, glowing, grayscale, black background"*
-3. **Raio:** *"3 horizontal lightning arcs left to right with small branches, white-hot core and soft glow, anime game VFX, grayscale, black background"*
-4. **Luz sagrada:** *"radial divine light rays burst from center, 14 tapered rays of varied length, soft halo, painterly, grayscale, black background"* + *"4-point and 8-point sparkle stars with soft glow, grayscale"*
-5. **Veneno/sombra:** *"2 curling wisps of toxic smoke with small bubbles, painterly anime game VFX, grayscale, black background"* + *"3 soft smoke puffs, billowing, grayscale"*
-6. **Impacto:** *"shockwave ring seen from above, irregular streaky edge, bright thin outer rim, dust streaks inside, grayscale, black background"* + *"explosion flash burst with radial rays, white-hot center, grayscale"* + *"2 crescent sword slash arcs, tapered tips, bright outer edge, motion streaks, grayscale"*
-7. **Runas:** *"magic circle top view, concentric rings with runic glyphs between rings and a star inside, thin glowing lines, grayscale, black background"* (2 variações: hexagrama e pentagrama)
-
-**Status (2026-11-03): folhas 1, 2 e 3 RECEBIDAS e integradas** (`docs/art-direction/fontes-vfx/vfx-folha-{1,2,3}.jpg`; `python tools/vfx-sheet.py` gera `vfx.webp`/`vfx.json` a partir delas + procedurais; depois `node tools/bump-assets.mjs`). Prioridade 3 > 2 > 1 por sprite: folha 3 = gelo (cristais, floco, **spikes**), luz (rays, burst, **burst2**, star8, spark, **twinkle0..3**), fumaça/fiapos, impacto (shock, **shock2**, slash0/1), runas e chamas pequenas (**flamelet0..3**); folha 2 = raio (bolt0..2 em 512 px, ramos finos) e fogo grande (flame0..3). Os nomes em negrito são novos (ainda sem uso nas skills: espinhos para armadilha/Nova de gelo, flamelets para fagulhas de fogo, twinkles para cintilas). Atlas 1024x928 (3,6 MiB decodificado, 49 sprites).
-**Ainda procedural / o que falta pedir:** vento (`wind`), folhas (`leaf0..1`), pedras (`shard0..1`), cruz, bolha, fitas (`ribbon0..1`), brasas (`ember0..1`), brilho (`glow`), anel (`ring`); raio com mais variações (hoje 3; ideais 5-6, incluindo vertical/bifurcado), gelo com mais cristais soltos, fumaça tóxica verde própria, cortes em meia-lua com mais variações, arco de energia/projétil, círculos de runa extras (2 hoje).
-
-## A10. Montarias (lobo, cavalo, gryphon): arte (só quando o dono aprovar `docs/roadmap/montaria.md`)
-Formato: para cada montaria, um atlas **8 direções × 7 quadros** (6 de galope/voo + 1 parado), fundo transparente, **sem cavaleiro** (o herói é desenhado em camada por cima); âncora nos cascos/patas; mesmo estilo miniatura anime/Summoners War dos heróis (decisão 0006).
-**Prompts (Meshy/IA, estilo chibi, proporção 1,2 de altura para largura, vista isométrica 3/4):**
-1. **Lobo:** *"chibi anime fantasy gray wolf mount, saddle with leather straps and small blue cloth, big expressive eyes, fluffy tail, painted miniature style like Summoners War, isometric 3/4 view, transparent background, galloping pose, no rider"* (gerar 8 direções + ciclo de 6 quadros).
-2. **Cavalo:** *"chibi anime fantasy white horse mount with golden saddle and flowing mane, big glossy eyes, painted miniature style, isometric 3/4 view, transparent background, trotting pose, no rider"*.
-3. **Gryphon:** *"chibi anime fantasy gryphon mount, eagle head and lion body, golden-brown feathers, saddle, wings half-open for gliding, painted miniature style, isometric 3/4 view, transparent background, no rider"* (asas em 3 posições para o ciclo).
-Pedir também uma **sela vazia vista de cima** (ícone de item 256×256) e o **Apito de Montaria** (ícone de item, raridade épica).

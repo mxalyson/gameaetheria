@@ -66,14 +66,19 @@ const zoneIcon = (id) => (ZONE_ART.has(id) ? `<img class="zone-ic" src="${asset(
 const spiritImg = (type, cls = '', stage = 1) => `<img class="sp-img ${cls}" src="${asset(spiritUrl(type, stage))}" alt="" draggable="false" onerror="this.outerHTML='<i class=&quot;orb ${cls}&quot;></i>'">`;
 // Retratos pintados (busto): classes no cartão do herói, no painel do personagem e na criação; NPCs no oval do diálogo. Sem a imagem, volta ao emblema/emoji.
 const classPortrait = (classId, emoji, cls = 'por') => `<img class="${cls}" src="${asset(`assets/portraits/class-${classId}.webp`)}" alt="" draggable="false" onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
+// Busto do herói: com especialização (Nv15+) usa spec-<id>.webp (render 3D do herói Nv25, tools/spec-portraits.mjs); sem o arquivo, cai no busto da classe e depois no emoji.
+const heroPortrait = (classId, emoji, spec, cls = 'por') => !spec ? classPortrait(classId, emoji, cls)
+  : `<img class="${cls}" src="${asset(`assets/portraits/spec-${spec}.webp`)}" alt="" draggable="false" onerror="this.onerror=function(){this.replaceWith(document.createTextNode('${emoji}'))};this.src='${asset(`assets/portraits/class-${classId}.webp`)}'">`;
+// Busto pequeno da especialização nos cartões (no lugar do ícone); sem o arquivo volta ao ícone.
+const specFace = (spec, icon) => `<img class="spec-por" src="${asset(`assets/portraits/spec-${spec}.webp`)}" alt="${icon}" width="40" height="40" draggable="false" onerror="this.replaceWith(this.alt)">`;
 const npcPortrait = (id) => `<img class="por" src="${asset(`assets/portraits/npc-${id === 'merchant' ? 'merchant' : id}.webp`)}" alt="" draggable="false">`;
 // Emblema no oval do diálogo (provisório até haver retrato pintado de cada NPC): moeda, espada, spirit, escudo, cruz.
 const NPC_EMBLEM = { shop: `<img src="${asset('assets/icons/item/res-gold-coin.webp')}" alt="">`, arena: null, sage: null, guard: null, herbalist: null };
 // NPCs do Porto e mestres de classe usam o retrato do NPC/classe de que a arte foi derivada (mesmos apelidos de render/npc-sprites.js), com a cor ajustada.
 const NPC_FACE = { banker: ['sage', 70], hunter: ['guard', 80], dealer: ['merchant', 0], duelist: ['arena', 0], captain: ['guard', 150] };
 const npcEmblem = (id) => {
-  const m = /^master_(warrior|mage|archer|cleric)$/.exec(id) ?? (MENTOR_BY_ID[id] && [0, MENTOR_BY_ID[id].classId]), face = NPC_FACE[id]; // mentor: retrato da classe dele
-  const html = m ? classPortrait(m[1], '⚔')
+  const m = /^master_(warrior|mage|archer|cleric)$/.exec(id), mt = MENTOR_BY_ID[id], face = NPC_FACE[id]; // mentor: busto da especialização dele (cai no da classe)
+  const html = mt ? heroPortrait(mt.classId, '⚔', mt.spec) : m ? classPortrait(m[1], '⚔')
     : ['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith'].includes(id) ? npcPortrait(id)
     : face ? npcPortrait(face[0]).replace('<img ', face[1] ? `<img style="filter:hue-rotate(${face[1]}deg)" ` : '<img ')
     : id === 'shop' ? NPC_EMBLEM.shop : attackImg('warrior', '⚔');
@@ -290,14 +295,14 @@ export class UI {
   setupHud(char) {
     $('hud').classList.remove('hidden');
     const cls = CLASSES[char.classId];
-    $('hud-portrait').innerHTML = classPortrait(char.classId, cls.icon); // busto pintado da classe
     $('hud-portrait').style.setProperty('--cc', cls.color);
-    this.buildSkillbar(char);
+    this.buildSkillbar(char); // também põe o busto (classe, ou especialização a partir do Nv15)
   }
 
   // Barra de habilidades: as 4 vêm do kit da especialização (nível 15+) ou do kit base da classe; a moldura leva a cor da especialização.
   buildSkillbar(char) {
     const cls = CLASSES[char.classId], kit = kitIds(char), spec = activeSpec(char), sc = spec ? specInfo(char.classId, spec)?.color : null;
+    $('hud-portrait').innerHTML = heroPortrait(char.classId, cls.icon, spec); // busto pintado: da especialização se houver, senão da classe
     this.kitSig = char.classId + ':' + (spec ?? '');
     const slots = [
       { key: 'LMB', id: 'basic', icon: attackImg(char.classId, '🖱️'), art: true, tip: 'skill:basic' },
@@ -592,7 +597,7 @@ export class UI {
     ].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('');
     return this.frame('character', 'Personagem', `<div class="cols"><div class="col">
       <div class="char-head" style="--cc:${cls.color}">
-        <div class="avatar art">${classPortrait(char.classId, cls.icon)}</div>
+        <div class="avatar art">${heroPortrait(char.classId, cls.icon, activeSpec(char))}</div>
         <div><div class="nm">${esc(char.name)}</div><div class="sub">${cls.name} · Nível ${char.level}</div>
         <div class="sub" style="color:${tier.color}">Arena: ${tier.name} (${char.arena.rating})</div></div>
       </div>
@@ -617,7 +622,7 @@ export class UI {
       const note = '<p class="hint">Para trocar de especialização, fale com o Mestre da sua classe ou com um mentor no Porto.</p>';
       if (!info) return `<h3 id="master-section">Especialização <span class="pts">nenhuma</span></h3>${note}`;
       return `<h3 id="master-section">Especialização <span class="pts">${info.name}</span></h3>
-        <div class="shop-item sel"><div class="cell r-epic"><span class="ic">${info.icon}</span></div><div><div class="nm">${info.name} ✔</div><div class="sub">${info.desc}</div></div></div>
+        <div class="shop-item sel"><div class="cell r-epic"><span class="ic">${specFace(char.spec, info.icon)}</span></div><div><div class="nm">${info.name} ✔</div><div class="sub">${info.desc}</div></div></div>
         ${this.skillCards(char.spec)}${note}`;
     }
     const buy = this.specMaster
@@ -625,7 +630,7 @@ export class UI {
           <button class="btn small" data-action="buy-seal" ${char.gold < SEAL_PRICE ? 'disabled' : ''}>${COIN} ${SEAL_PRICE.toLocaleString('pt-BR')}</button></div>`
       : '<p class="hint">O Mestre de Classe, na Vila, vende o Selo de Reespecialização.</p>';
     const cards = Object.entries(list).map(([id, sp]) => `
-      <div class="shop-item ${char.spec === id ? 'sel' : ''}"><div class="cell r-epic"><span class="ic">${sp.icon}</span></div>
+      <div class="shop-item ${char.spec === id ? 'sel' : ''}"><div class="cell r-epic"><span class="ic">${specFace(id, sp.icon)}</span></div>
         <div><div class="nm">${sp.name}${char.spec === id ? ' ✔' : ''}</div><div class="sub">${sp.desc}</div></div>
         ${char.spec === id ? '' : `<button class="btn small" data-action="spec" data-arg="${id}" ${has && !seals ? 'disabled' : ''}>${has ? 'Trocar · 1 Selo' : 'Escolher'}</button>`}</div>
       ${this.skillCards(id)}`).join('');
@@ -854,7 +859,7 @@ export class UI {
     else if (char.level < SPEC_LEVEL) act = `<p class="hint">${LOCK} Libera no nível ${SPEC_LEVEL} (você está no ${char.level}).</p>`;
     else if (char.quests?.done?.prova_do_mestre == null) act = `<p class="hint">${LOCK} Falta a Prova do Mestre, com o Mestre da sua classe na Vila (inclui conversar com os dois mentores da sua classe).</p>`;
     else { const has = !!specInfo(char.classId, char.spec); act = `<button class="btn primary wide" data-action="spec" data-arg="${m.spec}" ${has && !sealsOf(char) ? 'disabled' : ''}>${has ? 'Trocar · 1 Selo' : 'Escolher esta especialização'}</button>`; }
-    return { body: `<h3>${info.icon} ${esc(info.name)} <span class="pts">${esc(CLASSES[m.classId].name)}</span></h3><p class="hint">${esc(info.desc)}</p>${this.skillCards(m.spec, m.classId)}`, act };
+    return { body: `<h3>${specFace(m.spec, info.icon)} ${esc(info.name)} <span class="pts">${esc(CLASSES[m.classId].name)}</span></h3><p class="hint">${esc(info.desc)}</p>${this.skillCards(m.spec, m.classId)}`, act };
   }
 
   questLines(char, id) {

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-br"><head><meta charset="utf-8"><title>Retrato de busto 3D (laboratório)</title>
+<script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js"}}</script>
+</head><body style="margin:0;background:#333">
+<script type="module">
+// Fotografa o BUSTO (cabeça e ombros) de um GLB esqueletado (art-local/rigged/<id>.glb) para os retratos spec-<id>.webp.
+// Chamado por tools/spec-portraits.mjs. ?model=paladin_nv25&top=0.0&span=0.62&el=12&yaw=0&bri=1.2&sat=1.1&size=512&fx=0
+// top = fração da altura (a partir do TOPO do modelo) onde o quadro começa (negativa sobe); span = fração da altura que o quadro cobre;
+// fx = deslocamento horizontal do centro em frações da altura. Luz do alto-esquerda como no jogo.
+import * as THREE from 'three';
+import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from './vendor/three/examples/jsm/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search);
+const model = q.get('model'), size = +(q.get('size') || 512), aa = 2;
+const top = +(q.get('top') || 0), span = +(q.get('span') || 0.6), EL = THREE.MathUtils.degToRad(+(q.get('el') || 12));
+const yaw = THREE.MathUtils.degToRad(+(q.get('yaw') || 0)), fx = +(q.get('fx') || 0), bri = +(q.get('bri') || 1), sat = +(q.get('sat') || 1), env = +(q.get('env') || 0.55);
+const out = (window.portrait = { ready: false });
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(size * aa, size * aa);
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = env;
+const key = new THREE.DirectionalLight(0xfff1dc, 2.4); key.position.set(-3, 5, 4); scene.add(key);
+const rim = new THREE.DirectionalLight(0xbcd4ff, 0.9); rim.position.set(3, 2, -4); scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8fa8, 0.7));
+const gltf = await new GLTFLoader().loadAsync(`./art-local/rigged/${model}.glb`);
+const obj = gltf.scene;
+if (gltf.animations.length) { // quadro 0 do idle: pose natural (o esqueleto sai em T/A sem isso)
+  const mx = new THREE.AnimationMixer(obj), a = gltf.animations.find((c) => c.name === 'idle') ?? gltf.animations[0];
+  mx.clipAction(a).play(); mx.setTime(0); obj.updateMatrixWorld(true);
+}
+const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+obj.position.set(-c.x, -box.min.y, -c.z);
+const pivot = new THREE.Group(); pivot.add(obj); pivot.rotation.y = yaw; scene.add(pivot);
+const H = sz.y * span, cy = sz.y * (1 - top) - H / 2;
+const cam = new THREE.OrthographicCamera(-H / 2, H / 2, H / 2, -H / 2, 0.1, 50);
+const dist = 10, tx = fx * sz.y;
+cam.position.set(tx, cy + Math.sin(EL) * dist, Math.cos(EL) * dist); cam.lookAt(tx, cy, 0);
+renderer.render(scene, cam);
+const work = document.createElement('canvas'); work.width = work.height = size; const wg = work.getContext('2d'); wg.imageSmoothingQuality = 'high';
+if (bri !== 1 || sat !== 1) wg.filter = `brightness(${bri}) saturate(${sat})`;
+wg.drawImage(renderer.domElement, 0, 0, size, size);
+out.png = work.toDataURL('image/png'); out.webp = work.toDataURL('image/webp', 0.92); out.info = { size: sz.toArray() };
+out.ready = true;
+</script></body></html>
