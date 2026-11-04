@@ -9,9 +9,8 @@ export const POINTS_PER_LEVEL = 5;
 export const SAVE_VERSION = 3;
 
 // Curva mais lenta (antes 60·n^1,55: nível 20 em ~20 min de farm). Agora ≈ 6× o XP total até o 20 (algumas horas), nível 30 como meta longa.
-// Curva de XP por nível (barra): 150·n^1,9 (nível 20: 44,5k; 25: 68k; 29: 90k). O dono quer a barra com esses valores; o farm do 20+ é que paga mais por abate (mobXpRamp).
+// Curva de XP por nível (barra): 150·n^1,9 (nível 20: 44,5k; 25: 68k; 29: 90k).
 export const xpToNext = (level) => Math.round(150 * level ** 1.9);
-const XP_KNEE = 15;
 
 // Retorna quantos níveis foram ganhos.
 export function addXp(char, amount) {
@@ -28,14 +27,11 @@ export function addXp(char, amount) {
   return gained;
 }
 
-// Mobs de nível 16+ pagam +28% de XP por nível acima do 15 (nível 20: ×2,4; 25: ×3,8; 29: ×4,9): com a barra original o farm do 20+ pedia ~350 abates por nível, agora ~100-140 (dono: ganhar XP só farmando é complicado).
-export const mobXpRamp = (mobLevel) => 1 + 0.28 * Math.max(0, mobLevel - XP_KNEE);
-
 // Mobs muito abaixo do seu nível dão pouco XP; acima dão bônus (limitado).
 export function mobXp(mobLevel, playerLevel, mul = 1) {
   const diff = mobLevel - playerLevel;
   const factor = diff < -5 ? 0.1 : diff < -2 ? 0.5 : 1 + Math.min(0.5, Math.max(0, diff) * 0.1);
-  return (12 + mobLevel * 6) * mobXpRamp(mobLevel) * mul * factor; // mobs de nível 16+ pagam um pouco mais (faixa 20+ era lenta)
+  return (12 + mobLevel * 6) * mul * factor;
 }
 
 export function newCharacter(name, classId, rng) {

@@ -77,4 +77,4 @@ APRIMORAMENTO (ferreiro): ouro por item vestido, +0 → +8, e quantos abates iss
 
 ## Atualização 2026-11-04 (pedido do dono)
 - **Arena não dá XP.** `PVP_XP` = 0 (vitória e derrota): a arena paga rating, ouro e prêmio; a Arena das Ondas offline não paga XP por abate (só `mode === 'explore'`). As seções de XP de PvP acima ficam como histórico. O cooperativo (servidor) segue pagando XP (≤ 30% do nível) — não alterado.
-- **Barra de XP mantida** (150·n^1,9: nível 20 = 44,5k; 29 = 90k, pedido do dono). Para o farm do 20+ não ser penoso, o XP por abate sobe com o nível do mob: `mobXpRamp` = 1 + 0,28 por nível acima do 15 (nível 20 ×2,4; 25 ×3,8; 29 ×4,9). Abates por nível: nível 20 ≈ 140, 25 ≈ 110, 29 ≈ 100 (antes ~350). `server/plausible.js` usa o mesmo fator no orçamento de XP por abate.
+- **XP do farm como era:** barra 150·n^1,9 (nível 29 = 90k) e XP por abate sem rampa por nível (testei uma rampa +28%/nível acima do 15 e o dono achou fácil demais; revertida). O 20+ ganha ritmo pelas missões da cadeia "Maré de Ecos" (Porto).

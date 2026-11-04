@@ -46,13 +46,17 @@ function paintPart(st) {
   return c;
 }
 
-// Berserker: brasas e chamas PINTADAS (folha de VFX do dono), em quantidade e tamanho equilibrados; os demais heróis seguem com as partículas por código.
-const BSK_SP = [SP.ember0, SP.ember1, SP.ember2, SP.ember3, SP.flamelet0, SP.flamelet1, SP.flamelet2, SP.flamelet3];
+// Partículas PINTADAS (atlas de VFX do dono, tingidas pela paleta do spec) no lugar da fallback por código, assim que o kit carrega.
+const PART_PAL = { paladin: PL.holy, berserker: PL.ember, arcane: PL.violet, warlock: PL.toxic, sniper: PL.turq, gunslinger: PL.amber, guardian: PL.holy, inquisitor: PL.violet };
+const PART_SP = {
+  spark: [SP.spark, SP.twinkle0, SP.twinkle1, SP.twinkle2, SP.twinkle3, SP.star8], ember: [SP.ember0, SP.ember1, SP.ember2, SP.ember3, SP.flamelet0, SP.flamelet1, SP.flamelet2, SP.flamelet3],
+  crystal: [SP.crystal0, SP.crystal1, SP.crystal2], leaf: [SP.leaf0, SP.leaf1, SP.leaf2, SP.leaf3], rune: [SP.star8, SP.twinkle0, SP.twinkle2, SP.spark],
+};
 function paintedParts(e) {
-  if (e.st.spec !== 'berserker') return null;
   if (e.pp) return e.pp;
   if (!vfxKitReady()) { loadVfxKit(); return null; }
-  const out = BSK_SP.map((id) => sprite(id, PL.ember)).filter(Boolean);
+  const ids = PART_SP[e.st.kind] ?? PART_SP.spark, pal = PART_PAL[e.st.spec] ?? PL.holy;
+  const out = ids.map((id) => sprite(id, pal)).filter(Boolean);
   return (e.pp = out.length ? out : null);
 }
 
@@ -94,8 +98,8 @@ export function drawAuraMotes(g, a, t, q, feetY) {
   if (q < 1) return;
   const tier = auraTier(a); if (!tier || a.dead) return;
   const e = get(a.spec, tier, q); if (!e.part) return;
-  const st = e.st, n = q === 1 ? Math.max(1, st.n >> 1) : Math.ceil(st.n * 1.3), prev = g.globalAlpha, id = a.id ?? 0;
-  const s = st.big ? 12 : 10; // pequenas (dono): menores que antes (15/12); +30% de partículas
+  const st = e.st, n = q === 1 ? Math.max(1, st.n >> 1) : st.n, prev = g.globalAlpha, id = a.id ?? 0;
+  const s = st.big ? 15 : 12;
   for (let i = 0; i < n; i++) {
     const ph = (t * (0.25 + st.rise * 0.25) + h01(id, i)) % 1;       // vida da partícula 0..1
     const ang = h01(id, i + 31) * 6.283 + t * 0.6 * (i % 2 ? 1 : -1);
@@ -103,7 +107,7 @@ export function drawAuraMotes(g, a, t, q, feetY) {
     const px = a.x + Math.cos(ang) * rad, py = feetY - ph * 62 * (0.6 + st.rise * 0.5) + Math.sin(ang) * rad * 0.4;
     g.globalAlpha = prev * st.alpha * Math.sin(ph * Math.PI);        // nasce e some suave
     const pp = paintedParts(e);
-    if (pp) { const sp = pp[(h01(id, i + 5) * pp.length) | 0], w = s * 1.25, h = w * sp.h / sp.w; g.drawImage(sp.cv, px - w * 0.5, py - h * 0.5, w, h); }
+    if (pp) { const sp = pp[(h01(id, i + 5) * pp.length) | 0], w = s * (st.kind === 'ember' || st.kind === 'spark' ? 1.7 : 1.5) * (st.spec === 'berserker' ? 0.7 : 1), // Berserker: brasas menores (fogo demais, dono) h = w * sp.h / sp.w; g.drawImage(sp.cv, px - w * 0.5, py - h * 0.5, w, h); }
     else g.drawImage(e.part, px - s * 0.5, py - s * 0.5, s, s);
   }
   g.globalAlpha = prev;
