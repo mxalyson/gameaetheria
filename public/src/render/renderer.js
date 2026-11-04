@@ -180,7 +180,7 @@ export class Renderer {
     const hud = this.hud, zm = this.zoom;
     PROMPTS.length = 0; SAFE.cx = cam.x; SAFE.cy = cam.y; SAFE.zm = zm; SAFE.vw = this.vw; SAFE.vh = this.vh; SAFE.hud = hud;
     const covered = (a) => { const sx = (a.x - cam.x) * zm, sy = (a.y - cam.y) * zm - 40 * zm; for (const [x0, y0, x1, y1] of hud) if (sx > x0 && sx < x1 && sy > y0 && sy < y1) return true; return false; };
-    _lblCtx.player = player; _lblCtx.actors = world.actors;
+    _lblCtx.player = player; _lblCtx.actors = world.actors; _lblCtx.barMob = view?.barMob ?? null;
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y) && (a === player || a.kind !== 'mob' || a.boss || !covered(a))) drawBars(g, a, a === player, this.labels);
     for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortalLabel(g, p, cam.x + 10, cam.x + this.ww - 10);
     labelLifts(g, z.npcs, vis, view.questMarks, view.guideNpc);
@@ -929,7 +929,7 @@ function drawRunDust(g, actors, t) {
   }
   g.globalAlpha = 1;
 }
-const _lblCtx = { player: null, actors: null }; // contexto do quadro para as etiquetas de nome (herói próprio e vizinhos)
+const _lblCtx = { player: null, actors: null, barMob: null }; // contexto do quadro para as etiquetas de nome (herói próprio e vizinhos)
 const LABEL_STEPS = [14, 28, 42, -14, -28]; // degraus (mundo) tentados para a etiqueta de nome: sobe, depois desce
 function drawBars(g, a, isPlayer, placed) {
   if (a.kind === 'spirit') return;
@@ -960,7 +960,7 @@ function drawBars(g, a, isPlayer, placed) {
   g.lineWidth = small ? 2 : 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
   let label = null;
   if (a.kind === 'rival') label = a.name;
-  else if (a.kind === 'mob') label = `Nv ${a.level}${a.boss || a.elite ? ' · ' + a.name : ''}`;
+  else if (a.kind === 'mob') label = `Nv ${a.level}${(a.boss || a.elite) && a !== _lblCtx.barMob ? ' · ' + a.name : ''}`; // o nome já está na barra do topo: não duplica
   if (label) {
     // etiquetas coladas se afastam para cima (V21): até 3 degraus de 12 px; a posição fica registrada no quadro
     // A colisão é testada na posição FINAL (já presa à tela e fora do menu): dois elites perto do menu caíam no mesmo ponto e as etiquetas se sobrepunham.

@@ -284,3 +284,15 @@ export function pathLength(path, pos) {
   for (let i = 1; i < path.length; i++) d += hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
   return d;
 }
+
+// Regra de pausa da auto-viagem (pura). Ser atacado/estar em combate NÃO pausa: o herói segue andando e atravessa os mobs.
+// Pausa só por: toque/ataque manual, travado 3 vezes, vida baixa (< 30%, a menos que o jogador já tenha mandado continuar).
+// Atordoado não pausa: o herói só não anda enquanto dura (`stunned` → 'stun' = espera sem aviso e retoma sozinha).
+export const AUTO_LOW_HP = 0.3;
+export function autoPauseReason({ manual = false, hpFrac = 1, stunned = false, blocked = false, ignoreLow = false } = {}) {
+  if (manual) return 'manual';
+  if (blocked) return 'blocked';
+  if (!ignoreLow && hpFrac < AUTO_LOW_HP) return 'lowhp';
+  if (stunned) return 'stun';
+  return null;
+}

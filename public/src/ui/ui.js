@@ -346,7 +346,7 @@ export class UI {
       const btn = !gd.goal ? '' : !au ? mb('auto-go', 'go', 'Ir até lá')
         : au.paused ? mb('auto-resume', 'play', 'Continuar') + mb('auto-stop', 'x', 'Cancelar', ' stop')
         : mb('auto-stop', 'stop', 'Parar', ' stop');
-      const state = au?.paused ? `<em class="warn">Auto-viagem pausada${au.paused === 'combat' ? ': combate' : au.paused === 'blocked' ? ': caminho bloqueado' : ''}</em>` : au ? '<em class="go">Auto-viagem…</em>' : where ? `<em>${where}</em>` : '';
+      const state = au?.paused ? `<em class="warn">Auto-viagem pausada${au.paused === 'lowhp' ? ': vida baixa' : au.paused === 'blocked' ? ': caminho bloqueado' : ''}</em>` : au ? '<em class="go">Auto-viagem…</em>' : where ? `<em>${where}</em>` : '';
       html = `<button class="qt-ic" data-action="toggle" data-arg="map" title="${esc(gd.tk.name)}" aria-label="Mapa"><img src="${asset('assets/icons/menu/menu-map.webp')}" alt="" draggable="false"></button><div class="qt-txt" data-action="toggle" data-arg="journal" title="${esc(gd.tk.name)}"><b>${esc(gd.tk.name)}</b><span>${esc(gd.tk.text)}</span>${state}</div>${btn}`;
     }
     if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; el.classList.toggle('hidden', !html); }
@@ -404,14 +404,17 @@ export class UI {
     // Barra de chefe / rival.
     const boss = game.mode === 'pvp' ? game.rival : this.barTarget(world, player);
     if (boss && !boss.dead) {
-      this.set('boss-bar', 'class', game.mode === 'pvp' || game.mode === 'waves' || game.mode === 'net' ? 'compact' : ''); // partidas: barra fina sem nome (o nome já aparece sobre o inimigo)
-      this.set('boss-name', 'text', `${boss.name} · Nv ${boss.level}`);
+      const f = boss.hp / boss.maxHp;
+      // barra sempre fina (não cobre o campo): partidas sem nome (já aparece sobre o inimigo), PvE com nome pequeno; a cor muda por fase (≤50% / ≤25%)
+      this.set('boss-bar', 'class', (game.mode === 'pvp' || game.mode === 'waves' || game.mode === 'net' ? 'compact' : 'slim') + (f <= 0.25 ? ' ph3' : f <= 0.5 ? ' ph2' : ''));
+      this.set('boss-name', 'html', `<span>${boss.name}</span><i>Nv ${boss.level}</i>`);
       this.set('boss-fill', 'width', `${(100 * boss.hp) / boss.maxHp}%`);
       // retrato: vista frontal do sprite pintado do monstro (o rival do PvP e criaturas sem arte ficam sem retrato)
       const pt = boss.mobId ? mobPortrait(boss.mobId) : null;
       this.set('boss-portrait', 'display', pt ? 'block' : 'none');
       if (pt) this.set('boss-portrait', 'background-image', `url(${pt.url})`); // recorte do rosto/torso já tingido (ver mobPortrait)
     } else this.set('boss-bar', 'class', 'hidden');
+    this.barMob = boss && !boss.dead && !['pvp', 'waves', 'net'].includes(game.mode) ? boss : null; // o renderer omite o nome sobre o mob que já aparece na barra
     // o aviso de zona desce abaixo da barra do chefe em vez de ficar por cima do nome (V11)
     const bossOn = !!(boss && !boss.dead);
     if (this.bossOn !== bossOn) { this.bossOn = bossOn; document.body.classList.toggle('boss-on', bossOn); }

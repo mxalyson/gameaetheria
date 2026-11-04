@@ -8,7 +8,7 @@ import { Input } from './input.js';
 import { UI, esc } from './ui/ui.js';
 import { World, makeHeroActor, makeMobActor, makeSpiritActor } from './game/sim.js';
 import { waterWaypoint } from './game/ai.js';
-import { questTarget, guideGoal, pickTracked, trackerText, buildNavGrid, findPath, followPath, lineFree } from './core/autopath.js';
+import { questTarget, guideGoal, pickTracked, trackerText, buildNavGrid, findPath, followPath, lineFree, autoPauseReason } from './core/autopath.js';
 import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore, hasMastery } from './core/stats.js';
 import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit } from './core/progression.js';
@@ -157,7 +157,7 @@ class Game {
         const p = this.player;
         if ((this.mode === 'explore' || this.inNetZone()) && this.char && ((this.marksT = (this.marksT ?? 0) - dt) <= 0)) { this.marksT = 0.4; this.refreshGuide(); if (this.mode === 'explore') this.questMarks = this.computeMarks(); this.chestsOpen = new Set((this.world.zone.chests ?? []).filter((c) => !chestReady(this.char, c.id)).map((c) => c.id)); }
         const exploring = this.mode === 'explore', chestView = exploring || this.inNetZone();
-        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: chestView ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: chestView ? this.chestsOpen : null, cpSaved: this.char?.checkpoint?.zone === this.world.zoneId ? this.char.checkpoint : null, guide: this.guide?.goal ?? null, route: this.auto && this.auto.path?.length ? [{ x: p.x, y: p.y }, ...this.auto.path] : null, autoOn: !!this.auto && !this.auto.paused, crypt: this.netCrypt, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
+        this.renderer.draw(this.world, this.cam, { player: p, nearNpc: this.nearNpc?.id, nearChest: chestView ? this.nearChest : null, questMarks: exploring ? this.questMarks : null, guideNpc: exploring && this.char && !Object.keys(this.char.quests?.active ?? {}).length && !Object.keys(this.char.quests?.done ?? {}).length ? 'guard' : null, chestsOpen: chestView ? this.chestsOpen : null, cpSaved: this.char?.checkpoint?.zone === this.world.zoneId ? this.char.checkpoint : null, guide: this.guide?.goal ?? null, route: this.auto && this.auto.path?.length ? [{ x: p.x, y: p.y }, ...this.auto.path] : null, autoOn: !!this.auto && !this.auto.paused, crypt: this.netCrypt, barMob: this.ui.barMob ?? null, lowHp: !p.dead && p.hp < p.maxHp * 0.25, keys: this.keyHints });
         if ((this.mmT -= dt) <= 0) { this.renderer.drawMinimap(this.minimap, this.world, p); this.mmT = 0.15; }
         this.ui.updateHud(this);
         this.touch.update(this);
@@ -1229,22 +1229,25 @@ class Game {
   autoPause(reason) {
     if (!this.auto || this.auto.paused) return;
     this.auto.paused = reason; this.auto.path = null;
-    this.ui.toast('Auto-viagem pausada', reason === 'combat' ? 'Combate! Toque em Continuar quando acabar.' : reason === 'blocked' ? 'Caminho bloqueado. Ande um pouco e tente de novo.' : 'Toque em Continuar para seguir.', '');
+    this.ui.toast('Auto-viagem pausada', reason === 'lowhp' ? 'Vida baixa. Toque em Continuar quando estiver pronto.' : reason === 'blocked' ? 'Caminho bloqueado. Ande um pouco e tente de novo.' : 'Toque em Continuar para seguir.', '');
   }
   autoResume() {
     const a = this.auto;
     if (!a) return;
-    a.paused = null; a.path = null; a.fails = 0; a.hp = this.player.hp; a.probe = { x: this.player.x, y: this.player.y, t: 0 };
+    a.paused = null; a.path = null; a.fails = 0; a.ignoreLow = true; a.hp = this.player.hp; a.probe = { x: this.player.x, y: this.player.y, t: 0 };
   }
-  // Chamada uma vez por quadro com a intenção do jogador (mutada): pausa se o jogador tocou, atacou ou apanhou; senão anda pelo caminho.
+  // Chamada uma vez por quadro com a intenção do jogador (mutada): pausa se o jogador tocou/atacou ou a vida está baixa; senão anda pelo caminho.
   autoDrive(intent, dt) {
     const a = this.auto, p = this.player, w = this.world;
     if (!a || !intent || !this.guideReady()) return;
     const manual = Math.hypot(intent.mx, intent.my) > 0.05 || intent.attack || intent.cast != null;
-    const hit = p.hp < a.hp - 0.5; a.hp = p.hp;
+    const hpFrac = p.hp / (p.maxHp || 1);
+    if (hpFrac >= 0.3) a.ignoreLow = false; // recuperou: a regra de vida baixa volta a valer
     if (a.paused) return;
-    if (manual) return this.autoPause('manual');
-    if (hit || w.time - p.lastCombat < 0.8 || p.stunT > 0) return this.autoPause('combat');
+    // ser atacado/em combate não pausa (o herói atravessa os mobs); só toque/ataque manual, vida baixa e travamento
+    const why = autoPauseReason({ manual, hpFrac, ignoreLow: a.ignoreLow, stunned: p.stunT > 0 });
+    if (why === 'manual' || why === 'lowhp') return this.autoPause(why);
+    if (why === 'stun') { intent.mx = 0; intent.my = 0; intent.attack = false; intent.cast = null; return; } // atordoado: espera e retoma sozinha
     const goal = a.target && guideGoal(a.target, w.zoneId);
     if (!goal) return this.autoStop(true);
     const d = Math.hypot(goal.x - p.x, goal.y - p.y);
@@ -1270,7 +1273,7 @@ class Game {
     // travado? (sem andar 6 px em 1,3 s): recalcula; 3 vezes seguidas pausa
     a.probe.t += dt;
     if (a.probe.t >= 1.3) {
-      if (Math.hypot(p.x - a.probe.x, p.y - a.probe.y) < 6) { a.path = null; if (++a.fails >= 3) this.autoPause('blocked'); } else a.fails = 0;
+      if (Math.hypot(p.x - a.probe.x, p.y - a.probe.y) < 6) { a.path = null; if (++a.fails >= 3) this.autoPause(autoPauseReason({ blocked: true })); } else a.fails = 0;
       a.probe = { x: p.x, y: p.y, t: 0 };
     }
   }

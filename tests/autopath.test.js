@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { questTarget, trackerText, pickTracked, zoneRoute, guideGoal, buildNavGrid, findPath, followPath, lineFree, farmZoneForLevel, npcZone, mobArea, ARRIVE } from '../public/src/core/autopath.js';
+import { questTarget, trackerText, pickTracked, zoneRoute, guideGoal, buildNavGrid, findPath, followPath, lineFree, autoPauseReason, farmZoneForLevel, npcZone, mobArea, ARRIVE } from '../public/src/core/autopath.js';
 import { newOfficialCharacter } from '../server/api.js';
 import { acceptQuest, recordEvent, ensureJournal } from '../public/src/core/journal.js';
 import { buildLayout } from '../public/src/game/layout.js';
@@ -117,4 +117,16 @@ test('followPath: consome pontos alcançados e devolve null no fim', () => {
   assert.deepEqual(followPath(path, { x: 5, y: 0 }, 22), { mx: 1, my: 0, left: 1 }, 'o ponto a 5 px já foi alcançado');
   assert.equal(followPath(path, { x: 95, y: 0 }, 22), null);
   assert.equal(followPath([], { x: 0, y: 0 }), null);
+});
+
+test('pausa da auto-viagem: ser atacado/em combate não pausa; só toque manual, vida baixa e travamento', () => {
+  assert.equal(autoPauseReason({}), null, 'sem nada: segue');
+  assert.equal(autoPauseReason({ hpFrac: 0.8 }), null, 'apanhando mas com vida: segue (atravessa os mobs)');
+  assert.equal(autoPauseReason({ manual: true }), 'manual');
+  assert.equal(autoPauseReason({ hpFrac: 0.29 }), 'lowhp');
+  assert.equal(autoPauseReason({ hpFrac: 0.3 }), null, 'limite: 30% ainda segue');
+  assert.equal(autoPauseReason({ hpFrac: 0.1, ignoreLow: true }), null, 'jogador tocou em Continuar: ignora a vida baixa');
+  assert.equal(autoPauseReason({ blocked: true }), 'blocked');
+  assert.equal(autoPauseReason({ stunned: true }), 'stun', 'atordoado: espera (sem pausar nem avisar)');
+  assert.equal(autoPauseReason({ manual: true, hpFrac: 0.1, stunned: true }), 'manual', 'manual tem prioridade');
 });

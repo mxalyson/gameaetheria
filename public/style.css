@@ -938,3 +938,16 @@ body.touch #boss-bar.compact, #boss-bar.compact { top: 74px; width: min(150px, 2
 /* busto pequeno da especialização (cartões do painel/mentor) */
 .cell .ic img.spec-por { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 h3 > img.spec-por { width: 28px; height: 28px; vertical-align: middle; margin-right: 2px; }
+
+/* ---- Barra de chefe/elite SEMPRE fina (PvE): sem asas, retrato nem moldura; nome pequeno com "Nv" em gema; colada sob o menu ---- */
+body #boss-bar.slim, body.touch #boss-bar.slim { top: 58px; left: 50%; transform: translateX(-50%); width: min(250px, calc(36vw / var(--ui, 1))); opacity: .85; pointer-events: none; }
+#boss-bar.slim #boss-portrait { display: none !important; } /* ui.js põe display inline */
+#boss-bar.slim #boss-name { background: none; padding: 0; margin: 0 auto 2px; width: auto; max-width: 100%; display: flex; justify-content: center; align-items: center; gap: 4px; font-size: 10px; line-height: 12px; font-weight: 800; color: #ffe2d8; text-shadow: 0 1px 2px #000, 0 0 3px #000; white-space: nowrap; }
+#boss-bar.slim #boss-name span { overflow: hidden; text-overflow: ellipsis; }
+#boss-bar.slim #boss-name i { font-style: normal; flex: none; font-size: 8px; line-height: 10px; padding: 0 4px; border-radius: 6px; background: linear-gradient(180deg, #e9c25a, #a97a22); color: #2a1a05; text-shadow: none; border: 1px solid #5a3d0e; }
+#boss-bar.slim .bar { position: relative; height: 7px; border: 1px solid rgba(0,0,0,.7); border-radius: 4px; background: rgba(30,10,12,.7); box-shadow: none; overflow: hidden; }
+#boss-bar.slim .bar::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.55); } /* marca de 50% */
+#boss-bar.slim .fill { border-radius: 3px; }
+#boss-bar.slim.ph2 .fill { background: linear-gradient(180deg, #ffc066, #e07a1f); }
+#boss-bar.slim.ph3 .fill { background: linear-gradient(180deg, #ffe27a, #ff3b2a); animation: pulse 1s infinite; }
+#boss-bar.slim, #boss-bar.compact { transition: none; }
