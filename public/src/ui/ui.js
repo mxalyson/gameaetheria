@@ -335,11 +335,14 @@ export class UI {
     if (show) {
       const m = Math.round((gd.dist ?? 0) / 40 / 5) * 5; // 40 px = 1 m; arredondado de 5 em 5 para o texto não tremer
       const where = !gd.goal ? '' : gd.goal.portal ? `Rumo a ${esc(ZONES[gd.goal.nextZone].name)}${gd.goal.hops > 1 ? ` (${gd.goal.hops} mapas)` : ''}` : `${gd.target.label ? esc(gd.target.label) + ' · ' : ''}${m} m`;
-      const btn = !gd.goal ? '' : !au ? '<button class="qt-btn" data-action="auto-go">Ir até lá</button>'
-        : au.paused ? '<button class="qt-btn" data-action="auto-resume">Continuar</button><button class="qt-btn stop" data-action="auto-stop" aria-label="Cancelar">✕</button>'
-        : '<button class="qt-btn stop" data-action="auto-stop">Parar</button>';
+      // botões: medalhões redondos com ícone (seta = ir, triângulo = continuar, quadrado = parar, X = cancelar); o nome fica em title/aria-label
+      const IC = { go: '<svg viewBox="0 0 24 24"><path d="M5 12h11M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>', play: '<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>', stop: '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>', x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/></svg>' };
+      const mb = (act, ic, label, cls = '') => `<button class="qt-btn${cls}" data-action="${act}" title="${label}" aria-label="${label}">${IC[ic]}</button>`;
+      const btn = !gd.goal ? '' : !au ? mb('auto-go', 'go', 'Ir até lá')
+        : au.paused ? mb('auto-resume', 'play', 'Continuar') + mb('auto-stop', 'x', 'Cancelar', ' stop')
+        : mb('auto-stop', 'stop', 'Parar', ' stop');
       const state = au?.paused ? `<em class="warn">Auto-viagem pausada${au.paused === 'combat' ? ': combate' : au.paused === 'blocked' ? ': caminho bloqueado' : ''}</em>` : au ? '<em class="go">Auto-viagem…</em>' : where ? `<em>${where}</em>` : '';
-      html = `<div class="qt-txt" data-action="toggle" data-arg="journal"><b>${esc(gd.tk.name)}</b><span>${esc(gd.tk.text)}</span>${state}</div>${btn}`;
+      html = `<button class="qt-ic" data-action="toggle" data-arg="map" title="${esc(gd.tk.name)}" aria-label="Mapa"><img src="${asset('assets/icons/menu/menu-map.webp')}" alt="" draggable="false"></button><div class="qt-txt" data-action="toggle" data-arg="journal" title="${esc(gd.tk.name)}"><b>${esc(gd.tk.name)}</b><span>${esc(gd.tk.text)}</span>${state}</div>${btn}`;
     }
     if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; el.classList.toggle('hidden', !html); }
   }

@@ -575,8 +575,8 @@ test('G3: XP de PvP — vitória 6%, derrota 2%, sem teto por hora, 3º duelo se
   assert.ok(later.summary.xp > 0, 'passada a janela de 30 min volta a pagar');
 });
 
-test('G4: Guardião e Ancião com vida menor, missões em níveis mais altos; Cavaleiro Rubro intocado', () => {
-  assert.equal(MOBS.guardian.hp, 9); assert.equal(MOBS.frostlord.hp, 8.5); assert.equal(MOBS.infernoknight.hp, 16);
+test('G4: Guardião e Ancião (vida recalibrada após os kits próprios), missões em níveis mais altos; Cavaleiro Rubro intocado', () => {
+  assert.equal(MOBS.guardian.hp, 20); assert.equal(MOBS.frostlord.hp, 21); assert.equal(MOBS.infernoknight.hp, 16);
   assert.equal(QUESTS.guardiao_das_ruinas.level, 22); assert.equal(QUESTS.anciao_gelido.level, 27);
 });
 

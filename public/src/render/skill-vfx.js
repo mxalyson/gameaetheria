@@ -21,15 +21,15 @@ const KIND = {
   colossus: 'colossus', meteor: 'meteor', arrowstorm: 'rain', intervention: 'sun',
   // Kits das especializações (data/kits.js): reaproveitam os efeitos acima (a cor sai da especialização); 'zone' é o anel de runas no chão (armadilha, santuário)
   pal_hammer: 'muzzle', pal_aura: 'warcry', pal_rush: 'dashtrail', pal_sanctuary: 'zone',
-  bsk_leap: 'dashtrail', bsk_frenzy: 'warcry', bsk_cleave: 'muzzle', bsk_fury: 'warcry',
+  bsk_leap: 'dashtrail', bsk_frenzy: 'warcry', bsk_cleave: 'cone', bsk_fury: 'warcry',
   arc_prism: 'beam', arc_barrier: 'bubble', arc_phase: 'blink', arc_comet: 'meteor',
   wl_curse: 'muzzle', wl_drain: 'frost', wl_pact: 'frost', wl_souls: 'rain',
-  sn_aim: 'muzzle', sn_trap: 'zone', sn_retreat: 'roll', sn_lethal: 'muzzle',
-  gs_fan: 'pierce', gs_grenade: 'muzzle', gs_roll2: 'roll', gs_barrage: 'pierce',
+  sn_aim: 'snipe', sn_trap: 'zone', sn_retreat: 'roll', sn_lethal: 'snipe',
+  gs_fan: 'pierce', gs_grenade: 'blast', gs_roll2: 'roll', gs_barrage: 'pierce',
   gd_light: 'sun', gd_ward: 'bubble', gd_word: 'sun', gd_celestial: 'sun',
-  inq_judge: 'beam', inq_mark: 'muzzle', inq_flame: 'muzzle', inq_verdict: 'meteor',
+  inq_judge: 'beam', inq_mark: 'muzzle', inq_flame: 'cone', inq_verdict: 'meteor',
 };
-const LIFE = { zone: 6.4, colossus: 6.6, meteor: 1.9, crit: 0.32, absorb: 0.4, heal: 0.85, whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.45 };
+const LIFE = { zone: 6.4, colossus: 6.6, meteor: 1.9, crit: 0.32, absorb: 0.4, heal: 0.85, whirl: 0.55, dashtrail: 0.65, warcry: 1.2, muzzle: 0.3, frost: 0.7, blink: 0.6, rain: 2.6, pierce: 0.32, roll: 0.7, sun: 0.85, bubble: 6.4, beam: 0.6, snipe: 1.2, blast: 1.5, cone: 0.6 };
 
 // ---- estilo (cores e família de partículas) por habilidade e por especialização ----
 const FAM = { fire: 0, ice: 1, arcane: 2, toxic: 3, holy: 4, nature: 5 };
@@ -93,7 +93,7 @@ function blit(g, s, x, y, w, h, rot, alpha) {
 // sprites de CORPO (chamas, cristais, fitas, runas, cortes...) são pintados em mistura normal: a cor aparece em qualquer fundo (a aditiva estoura para branco no gramado claro);
 // só luz pura (glow, faíscas, estrelas, rajadas, raios) fica aditiva
 const BODY = new Uint8Array(64);
-for (const n of ['ring', 'shock', 'flame0', 'flame1', 'flame2', 'flame3', 'crystal0', 'crystal1', 'crystal2', 'flake', 'wisp0', 'wisp1', 'leaf0', 'leaf1', 'ribbon0', 'ribbon1', 'wind', 'bolt0', 'bolt1', 'bolt2', 'rune0', 'rune1', 'slash0', 'slash1', 'shard0', 'shard1', 'cross', 'rays']) BODY[SP[n]] = 1;
+for (const n of ['ring', 'shock', 'flame0', 'flame1', 'flame2', 'flame3', 'crystal0', 'crystal1', 'crystal2', 'flake', 'wisp0', 'wisp1', 'leaf0', 'leaf1', 'ribbon0', 'ribbon1', 'wind', 'spikes', 'flamelet0', 'flamelet1', 'flamelet2', 'flamelet3', 'rune0', 'rune1', 'slash0', 'slash1', 'shard0', 'shard1', 'cross', 'rays']) BODY[SP[n]] = 1;
 function put(g, id, pal, bl, x, y, w, h, rot, a) {
   if (a < 0.01 || w < 0.5) return;
   const s = sprite(id, pal); if (!s) return;
@@ -105,7 +105,7 @@ const cnt = (n) => (LITE ? Math.ceil(n / 2) : n);
 // pedaço elemental da família (fogo: chama; gelo: floco; arcano: estrela; tóxico: fiapo; sagrado: faísca; natureza: folha)
 function bit(f, x, y, z, vx, vy, vz, size, life, a = 1) {
   switch (f.fam) {
-    case 0: em(SP.flame0 + ((rnd() * 4) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.35, life, 0, 0, a, 1.2, -70); break;
+    case 0: em((rnd() < 0.4 ? SP.flamelet0 : SP.flame0) + ((rnd() * 4) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.35, life, 0, 0, a, 1.2, -70); break;
     case 1: em(SP.flake, f.m, 1, x, y, z, vx, vy, vz, size * 0.7, size * 0.3, life, rnd() * TAU, (rnd() - 0.5) * 6, a, 1.4, 30); break;
     case 2: em(rnd() < 0.4 ? SP.star8 : SP.spark, rnd() < 0.5 ? f.m : f.h, 0, x, y, z, vx, vy, vz, size * 0.8, size * 0.2, life, 0, 0, a, 1.5, 10); break;
     case 3: em(SP.wisp0 + ((rnd() * 2) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.5, life, rnd() * TAU, (rnd() - 0.5) * 3, a * 0.9, 1.3, -30); break;
@@ -113,8 +113,9 @@ function bit(f, x, y, z, vx, vy, vz, size, life, a = 1) {
     default: em(SP.leaf0 + ((rnd() * 2) | 0), f.m, 1, x, y, z, vx, vy, vz, size * 0.55, size * 0.4, life, rnd() * TAU, (rnd() - 0.5) * 9, a, 1.0, 40); break;
   }
 }
-const spark = (f, x, y, z, vx, vy, vz, size, life, a = 1) => em(SP.spark, f.h, 0, x, y, z, vx, vy, vz, size, size * 0.2, life, 0, 0, a, 1.6, 60);
-const ember = (f, x, y, z, vx, vy, vz, size, life, a = 1) => em(SP.ember0 + ((rnd() * 2) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.3, life, 0, 0, a, 0.8, 120);
+// fagulha: metade faísca, metade cintila em cruz (twinkle, maior porque o brilho do sprite é fino)
+const spark = (f, x, y, z, vx, vy, vz, size, life, a = 1) => (rnd() < 0.45 ? em(SP.twinkle0 + ((rnd() * 4) | 0), f.h, 0, x, y, z, vx, vy, vz, size * 1.7, size * 0.4, life, rnd() * 1.5, (rnd() - 0.5) * 3, a, 1.6, 60) : em(SP.spark, f.h, 0, x, y, z, vx, vy, vz, size, size * 0.2, life, 0, 0, a, 1.6, 60));
+const ember = (f, x, y, z, vx, vy, vz, size, life, a = 1) => em(rnd() < 0.4 ? SP.flamelet0 + ((rnd() * 4) | 0) : SP.ember0 + ((rnd() * 2) | 0), f.m, 0, x, y, z, vx, vy, vz, size, size * 0.3, life, 0, 0, a, 0.8, 120);
 const smoke = (f, x, y, z, vx, vy, vz, size, life, a = 0.4) => em(SP.smoke0 + ((rnd() * 3) | 0), f.fam === 3 ? PL.toxic : f.fam === 0 ? PL.smoke : PL.dust, 2, x, y, z, vx, vy, vz, size * 0.5, size, life, rnd() * TAU, (rnd() - 0.5) * 1.2, a, 1.5, -25);
 const chunk = (x, y, vx, vy, vz, size, life) => em(SP.shard0 + ((rnd() * 2) | 0), PL.stone, 2, x, y, 4, vx, vy, vz, size, size * 0.85, life, rnd() * TAU, (rnd() - 0.5) * 14, 1, 0.2, 900);
 
@@ -170,8 +171,10 @@ export function spawnSkillVfx(world, ev) {
     actor: a, x: a.x, y: a.y, ang: ev.ang ?? a.facing ?? 0, color: s.color, r: s.radius ?? s.vfxR ?? 60,
     tx: ev.tx ?? null, ty: ev.ty ?? null, ox: prev ? prev.x : a.x, oy: prev ? prev.y : a.y,
     seed: ((world.time * 1000) | 0) ^ (a.id ?? 7), pts: kind === 'dashtrail' || kind === 'roll' || kind === 'colossus' ? [] : null, dur: s.dur ?? 0, range: s.range ?? 500,
-    m: st.m, h: st.h, fam: st.fam, n: 0, acc: 0, mask: 0,
+    m: st.m, h: st.h, fam: st.fam, n: 0, acc: 0, mask: 0, wu: s.windup ?? 0, dl: s.delay ?? 0.55, arc: s.arc ?? 1.6,
   };
+  if (kind === 'snipe') f.life = Math.max(f.life, f.wu + 0.5); // mira (windup) + disparo
+  else if (kind === 'blast') f.life = Math.max(f.life, f.dl + 0.8);
   list.push(f);
   return f;
 }
@@ -236,14 +239,16 @@ export function drawSkillProjectile(g, p, time) {
     put(g, SP.glow, PL.holy, 0, x, y, r * 3, r * 3, 0, 1);
     if (emit) { spark(f, x - cos * 8 + (rnd() - 0.5) * 12, y - sin * 8 + (rnd() - 0.5) * 12, 6, -cos * 25, -sin * 25, 10 + rnd() * 20, 9 + rnd() * 7, 0.5); }
   } else if (id === 'basic_archer') { // flecha comum: haste luminosa curta
-    put(g, SP.ribbon0, st.m, 0, x - cos * 16, y - sin * 16, 56, 14, p.ang, 0.9);
-    put(g, SP.ribbon0, st.h, 0, x - cos * 10, y - sin * 10, 30, 6, p.ang, 1);
-    put(g, SP.glow, PL.holy, 0, x, y, 12, 12, 0, 1);
-  } else { // basic_mage: orbe
-    put(g, SP.glow, st.m, 2, x, y, r * 6, r * 6, 0, 0.85);
-    put(g, SP.glow, st.m, 1, x, y, r * 9, r * 9, 0, 0.6);
-    put(g, SP.spark, st.h, 0, x, y, r * 7, r * 7, time * 3, 0.95);
-    put(g, SP.glow, PL.holy, 0, x, y, r * 2.4, r * 2.4, 0, 1);
+    put(g, SP.glow, st.m, 2, x - cos * 16, y - sin * 16, 100, 34, p.ang, 0.7);
+    put(g, SP.ribbon0, st.m, 2, x - cos * 24, y - sin * 24, 104, 26, p.ang, 1);
+    put(g, SP.ribbon0, st.h, 0, x - cos * 14, y - sin * 14, 56, 9, p.ang, 1);
+    put(g, SP.twinkle0, PL.holy, 0, x + cos * 4, y + sin * 4, 26, 26, p.ang, 1);
+  } else { // basic_mage: orbe de cor cheia (mistura normal: a aditiva viraria uma bola branca no gramado) com anel de runa girando e cintilas
+    put(g, SP.glow, st.m, 1, x, y, r * 11, r * 11, 0, 0.7);
+    put(g, SP.glow, st.m, 2, x, y, r * 7.5, r * 7.5, 0, 0.95);
+    put(g, SP.shock2, st.m, 2, x, y, r * 8, r * 8, time * 4, 0.9);
+    put(g, SP.twinkle0, st.h, 0, x, y, r * 9, r * 9, time * 3, 0.95);
+    put(g, SP.glow, PL.holy, 0, x, y, r * 2.6, r * 2.6, 0, 1);
     if (emit && rnd() < 0.6) bit(f, x - cos * 6, y - sin * 6, 4, -cos * 20 + (rnd() - 0.5) * 30, -sin * 20 + (rnd() - 0.5) * 30, 8, 10 + rnd() * 6, 0.4, 0.8);
   }
   g.globalCompositeOperation = prevOp; curBl = -1; g.globalAlpha = 1;
@@ -294,6 +299,9 @@ export function drawSkillVfx(g, world, lite = false) {
       case 'zone': drawZone(g, f, el); break;
       case 'bubble': drawBubble(g, f, el, cx, cy); break;
       case 'beam': drawBeam(g, f, k, cx, cy); break;
+      case 'snipe': drawSnipe(g, f, el, cx, cy); break;
+      case 'cone': drawCone(g, f, k, el, cx, cy); break;
+      case 'blast': drawBlast(g, f, el, world); break;
       case 'crit': drawCrit(g, f, k, cx, cy); break;
       case 'absorb': drawAbsorb(g, f, k, cx, cy); break;
       case 'heal': drawHeal(g, f, k, cx, cy); break;
@@ -395,6 +403,7 @@ function drawFrost(g, f, k, el, cx, cy) {
     for (let i = 0; i < 3; i++) put(g, SP.wisp0 + (i & 1), f.m, 0, cx + Math.cos(i * 2.1 + el * 2) * R * 0.45, cy + Math.sin(i * 2.1 + el * 2) * R * 0.4, R * 0.8, R * 0.8, el * 3 + i, o * 0.85);
   } else { // cristais que brotam em raios
     const N = LITE ? 5 : 7, gr = ease(Math.min(1, k * 2.4));
+    for (let i = 0, M = LITE ? 4 : 6; i < M; i++) { const a = i * TAU / M + 0.6, rr = R * (0.3 + 0.55 * e), sz = R * 0.62 * gr; put(g, SP.spikes, f.m, 0, cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.9 - sz * 0.2, sz, sz, 0, o * 1.15); } // aglomerados de espinhos de gelo brotando
     for (let i = 0; i < N; i++) { const a = i * TAU / N + 0.25, rr = R * (0.2 + 0.72 * e) * (i % 2 ? 0.7 : 1), sz = R * (i % 2 ? 0.42 : 0.62) * gr; put(g, SP.crystal0 + (i % 3), f.m, 1, cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, sz, sz, a + HALF, o * 1.2); }
   }
   burstOnce(f, cx, cy, 18, 260, 60);
@@ -479,14 +488,18 @@ function drawRain(g, f, el) {
     const lx = tx + Math.cos(ra) * rr, ly = ty + Math.sin(ra) * rr, local = el - (0.15 + i * gap);
     if (local < 0) continue;
     if (local < 0.2) { // flecha caindo (inclinada), fita luminosa
-      const u = local / 0.2, h = 150 * (1 - u), hx = lx + h * 0.35, hy = ly - h;
-      put(g, SP.ribbon0, f.m, 0, hx - 1.5, hy - 14, 52, storm ? 22 : 15, 1.69, 0.95);
-      put(g, SP.ribbon0, f.h, 0, hx - 1.5, hy - 10, 30, 7, 1.69, 1);
-      put(g, SP.glow, f.m, 1, hx, hy, storm ? 34 : 22, storm ? 34 : 22, 0, 0.8);
+      const u = local / 0.2, h = 190 * (1 - u), hx = lx + h * 0.18, hy = ly - h; // queda mais curta e menos inclinada: a flecha nasce dentro da janela
+      if (f.fam === 3) { // Chuva de Almas: alma verde com brilho
+        put(g, SP.wisp0 + (i & 1), f.m, 0, hx, hy - 10, 46, 46, 0, 0.95); put(g, SP.glow, f.h, 0, hx, hy - 6, 40, 40, 0, 0.9);
+      } else {
+        put(g, SP.ribbon0, f.m, 0, hx - 1.5, hy - 14, storm ? 96 : 76, storm ? 28 : 20, 1.75, 0.95);
+        put(g, SP.ribbon0, f.h, 0, hx - 1.5, hy - 10, storm ? 56 : 44, 8, 1.75, 1);
+        put(g, SP.glow, f.m, 0, hx, hy, storm ? 40 : 28, storm ? 40 : 28, 0, 0.8);
+      }
     } else if (local < 0.55) { // impacto
       const u = (local - 0.2) / 0.35;
-      put(g, SP.burst, f.h, 0, lx, ly, 26 + u * 26, 26 + u * 26, 0, (1 - u) * 0.9);
-      put(g, SP.shock, f.m, 0, lx, ly, 18 + u * 56, 18 + u * 56, 0, (1 - u) * 0.8);
+      put(g, SP.burst2, f.h, 0, lx, ly, 34 + u * 30, 34 + u * 30, 0, (1 - u) * 0.95);
+      put(g, SP.shock2, f.m, 0, lx, ly, 22 + u * 62, 22 + u * 62, 0, (1 - u) * 0.85);
       if (!(f.mask & (1 << i))) { f.mask |= 1 << i; for (let j = LITE ? 1 : 2; j > 0; j--) { const a = rnd() * TAU; if (storm) bit(f, lx, ly, 2, Math.cos(a) * 40, Math.sin(a) * 30, 40 + rnd() * 50, 20 + rnd() * 10, 0.5); else bit(f, lx, ly, 2, Math.cos(a) * 50, Math.sin(a) * 40, 60 + rnd() * 60, 16 + rnd() * 8, 0.8); } spark(f, lx, ly, 3, (rnd() - 0.5) * 120, (rnd() - 0.5) * 90, 80 + rnd() * 60, 7 + rnd() * 5, 0.4); }
     }
   }
@@ -512,8 +525,9 @@ function drawSun(g, f, k, el, cx, cy) {
     put(g, SP.rune1, f.m, 0, cx, cy + 6, f.r * 1.3 * ease(Math.min(1, k * 2)), f.r * 1.3 * ease(Math.min(1, k * 2)), el * 0.6, o * 0.7);
   }
   put(g, SP.glow, f.m, 1, cx, cy, R * 2.8, R * 2.8, 0, o * 0.65);
-  put(g, SP.rays, f.h, 0, cx, cy - 6, R * 2.2 * (0.5 + 0.5 * e), R * 2.2 * (0.5 + 0.5 * e), k * 1.2, o * 0.95);
-  put(g, SP.rays, f.m, 0, cx, cy - 6, R * 1.5 * (0.5 + 0.5 * e), R * 1.5 * (0.5 + 0.5 * e), -k * 1.6, o * 0.8);
+  put(g, SP.rays, f.h, 0, cx, cy - 6, R * 1.55 * (0.5 + 0.5 * e), R * 1.55 * (0.5 + 0.5 * e), k * 1.2, o * 0.6);
+  put(g, SP.rays, f.m, 0, cx, cy - 6, R * 1.05 * (0.5 + 0.5 * e), R * 1.05 * (0.5 + 0.5 * e), -k * 1.6, o * 0.5);
+  put(g, SP.shock2, f.h, 0, cx, cy, R * 2.0 * e, R * 2.0 * e, k * 2, (1 - k) * 0.7);
   put(g, SP.ring, f.m, 0, cx, cy, R * 3.03 * e, R * 3.03 * e, 0, (1 - k) * 0.9);
   put(g, SP.star8, PL.holy, 0, cx, cy - 8, 52 * (1 - k * 0.4), 52 * (1 - k * 0.4), k * 2, o * 0.8);
   if (!f.n) { f.n = 1; if (f.spec === 'inquisitor') for (let i = cnt(12); i > 0; i--) { const a = rnd() * TAU; spark(f, cx, cy - 6, 8, Math.cos(a) * 240, Math.sin(a) * 190, 40, 9 + rnd() * 7, 0.5); } }
@@ -527,6 +541,11 @@ function drawZone(g, f, el) {
   put(g, SP.rune0, f.m, 0, tx, ty, R * 2.05, R * 2.05, el * 0.35, 0.75 * a);
   put(g, SP.rune1, f.h, 0, tx, ty, R * 1.35, R * 1.35, -el * 0.5, 0.5 * a);
   if (!LITE) put(g, SP.ring, f.m, 0, tx, ty, R * 2.9, R * 2.9, 0, 0.35 * a * pulse);
+  if (f.skill === 'sn_trap') { // Armadilha de Gelo: espinhos de gelo em volta, crescendo na instalação
+    const gr = ease(Math.min(1, el * 3.5)), M = LITE ? 6 : 9;
+    for (let i = 0; i < M; i++) { const ang = i * TAU / M + 0.3, rr = R * 0.82, sz = R * (i % 2 ? 0.42 : 0.55) * gr; put(g, SP.spikes, f.m, 0, tx + Math.cos(ang) * rr, ty + Math.sin(ang) * rr * 0.7 - sz * 0.15, sz, sz, 0, 0.95 * a); }
+    put(g, SP.spikes, f.h, 0, tx, ty - R * 0.05, R * 0.6 * gr, R * 0.6 * gr, 0, 0.9 * a);
+  }
   for (let n = rate(f, 16); n > 0; n--) { const ang = rnd() * TAU, r = rnd() * R * 0.85; bit(f, tx + Math.cos(ang) * r, ty + Math.sin(ang) * r * 0.55, 2, 0, 0, 40 + rnd() * 50, 12 + rnd() * 8, 0.9, a); }
 }
 function drawBubble(g, f, el, cx, cy) {
@@ -542,22 +561,93 @@ function drawBubble(g, f, el, cx, cy) {
   }
   if (el < 0.5) { const u = el / 0.5; put(g, SP.shock, f.m, 0, cx, cy, 70 + ease(u) * 200, 70 + ease(u) * 200, 0, (1 - u) * 0.9); put(g, SP.burst, f.h, 0, cx, cy - 8, 70 + 60 * u, 70 + 60 * u, 0, (1 - u)); }
 }
-function drawBeam(g, f, k, cx, cy) { // raio sagrado até o fim do alcance
-  const L = Math.min(f.range, 560), cos = Math.cos(f.ang), sin = Math.sin(f.ang), x0 = cx + cos * 16, y0 = cy + sin * 16 - 6, o = 1 - k, e = ease(Math.min(1, k * 2.5));
+// raio de energia: nucleo grosso + 2 camadas de brilho aditivo + relampago pintado (bolt) piscando por cima; o bolt e fino por natureza (a luz ocupa ~1/3 da altura do sprite), entao a altura e escalada 3x
+const bolt = (g, pal, bl, x, y, len, th, ang, a, t) => put(g, SP.bolt0 + (((t * 30) | 0) % 3), pal, bl, x, y, len, th, ang, a); // bl 2 = cor cheia (aparece no gramado), 0 = luz aditiva (nucleo branco)
+function drawBeam(g, f, k, cx, cy) {
+  const L = Math.min(f.range, 560), cos = Math.cos(f.ang), sin = Math.sin(f.ang), x0 = cx + cos * 16, y0 = cy + sin * 16 - 6, o = 1 - k, e = ease(Math.min(1, k * 2.5)), t = k * f.life;
   const len = L * (0.35 + 0.65 * e), mx = x0 + cos * len / 2, my = y0 + sin * len / 2, ex = x0 + cos * L, ey = y0 + sin * L;
-  put(g, SP.glow, f.m, 1, mx, my, len, 80 * o + 12, f.ang, o * 0.7);
-  put(g, SP.ribbon0, f.m, 0, mx, my, len, 38 * o + 6, f.ang, o * 0.9);
-  put(g, SP.ribbon0, f.h, 0, mx, my, len, 15 * o + 2, f.ang, o);
-  put(g, SP.ribbon0, PL.holy, 0, mx, my, len, 5 * o, f.ang, o);
-  put(g, SP.star8, f.h, 0, x0, y0, 80 * o + 20, 80 * o + 20, k * 3, o);
-  put(g, SP.rays, f.m, 0, ex, ey, 140 * e, 140 * e, k * 2, o * 0.8); put(g, SP.glow, f.m, 1, ex, ey, 150 * e, 150 * e, 0, o); put(g, SP.shock, f.m, 0, ex, ey, 150 * e, 150 * e, 0, o * 0.8);
-  if (!f.n) { f.n = 1; for (let i = cnt(16); i > 0; i--) { const t = rnd() * L; spark(f, x0 + cos * t, y0 + sin * t, 6, (rnd() - 0.5) * 60, (rnd() - 0.5) * 60, 20 + rnd() * 50, 8 + rnd() * 7, 0.4 + rnd() * 0.4); } }
+  put(g, SP.glow, f.m, 1, mx, my, len * 1.1, 170 * o + 26, f.ang, o * 0.5); // brilho largo ('screen': mantem a cor no gramado)
+  put(g, SP.glow, f.h, 0, mx, my, len, 70 * o + 12, f.ang, o * 0.5); // brilho medio (aditivo)
+  put(g, SP.ribbon0, f.m, 0, mx, my, len, 76 * o + 12, f.ang, o * 0.9);
+  put(g, SP.ribbon0, f.h, 0, mx, my, len, 30 * o + 4, f.ang, o);
+  put(g, SP.ribbon0, PL.holy, 0, mx, my, len, 10 * o + 1.5, f.ang, o);
+  bolt(g, f.m, 2, mx, my, len * 1.04, 170 * o + 34, f.ang, o, t);
+  bolt(g, PL.holy, 0, mx, my, len, 80 * o + 16, f.ang, o * 0.85, t + 0.02);
+  put(g, SP.star8, f.h, 0, x0, y0, 90 * o + 24, 90 * o + 24, k * 3, o);
+  put(g, SP.rays, f.m, 0, ex, ey, 140 * e, 140 * e, k * 2, o * 0.8); put(g, SP.glow, f.m, 1, ex, ey, 150 * e, 150 * e, 0, o); put(g, SP.shock2, f.m, 0, ex, ey, 150 * e, 150 * e, 0, o * 0.8);
+  if (!f.n) { f.n = 1; for (let i = cnt(16); i > 0; i--) { const t2 = rnd() * L; spark(f, x0 + cos * t2, y0 + sin * t2, 6, (rnd() - 0.5) * 60, (rnd() - 0.5) * 60, 20 + rnd() * 50, 8 + rnd() * 7, 0.4 + rnd() * 0.4); } }
+}
+
+// Mira e disparo do Franco-atirador: fio de laser que engrossa durante a mira (windup) e, na hora do tiro, um feixe enorme com relampago
+function drawSnipe(g, f, el, cx, cy) {
+  const wu = f.wu, cos = Math.cos(f.ang), sin = Math.sin(f.ang), x0 = cx + cos * 16, y0 = cy + sin * 16 - 6, big = f.skill === 'sn_lethal' ? 1.5 : 1, L = Math.min(f.range, 900);
+  if (el < wu) {
+    const u = el / wu, len = L * 0.92, mx = x0 + cos * len / 2, my = y0 + sin * len / 2, pulse = 0.65 + 0.35 * Math.sin(el * 36), ex = x0 + cos * len, ey = y0 + sin * len;
+    put(g, SP.glow, f.m, 1, mx, my, len, 40 + 40 * u, f.ang, (0.4 + 0.5 * u) * pulse);
+    put(g, SP.ribbon0, f.m, 2, mx, my, len, 16 + 18 * u, f.ang, 0.7 + 0.3 * u);
+    put(g, SP.ribbon0, PL.holy, 0, mx, my, len, 5 + 6 * u, f.ang, 0.5 + 0.5 * pulse);
+    put(g, SP.glow, f.h, 2, mx, my, len, 9 + 5 * u, f.ang, 0.85); // fio uniforme (o ribbon afina na cauda)
+    put(g, SP.glow, f.m, 0, x0, y0, 30 + 80 * u * big, 30 + 80 * u * big, 0, 0.5 + 0.5 * u); // carga na ponta da arma
+    put(g, SP.twinkle0, f.h, 0, x0, y0, 40 + 70 * u * big, 40 + 70 * u * big, el * 4, 0.9);
+    put(g, SP.shock2, f.m, 0, ex, ey, 70 * (1.5 - 0.6 * u), 70 * (1.5 - 0.6 * u), el * 2, 0.35 + 0.5 * u); // reticulo no fim do fio
+    return;
+  }
+  const u = clamp01((el - wu) / 0.4), o = 1 - u, th = (130 * big) * o + 14, len = L * (0.5 + 0.5 * ease(Math.min(1, u * 3))), mx = x0 + cos * len / 2, my = y0 + sin * len / 2, t = el;
+  put(g, SP.glow, f.m, 1, mx, my, len * 1.05, th * 1.7, f.ang, o * 0.5);
+  put(g, SP.glow, f.h, 0, mx, my, len, th * 0.7, f.ang, o * 0.5);
+  put(g, SP.ribbon0, f.m, 0, mx, my, len, th * 0.7, f.ang, o * 0.95);
+  put(g, SP.ribbon0, f.h, 0, mx, my, len, th * 0.28, f.ang, o);
+  put(g, SP.ribbon0, PL.holy, 0, mx, my, len, th * 0.1 + 1.5, f.ang, o);
+  bolt(g, f.m, 2, mx, my, len * 1.04, th * 1.6 + 26, f.ang, o, t);
+  bolt(g, PL.holy, 0, mx, my, len, th * 0.8 + 12, f.ang, o * 0.85, t + 0.02);
+  put(g, SP.burst2, f.h, 0, x0, y0, (60 + 90 * ease(u)) * big, (60 + 90 * ease(u)) * big, 0, o);
+  put(g, SP.shock2, f.m, 0, x0, y0, 170 * ease(u) * big, 170 * ease(u) * big, 0, o * 0.8);
+  if (!f.n) { f.n = 1; for (let i = cnt(14 * big); i > 0; i--) { const t2 = rnd() * L * 0.8; spark(f, x0 + cos * t2, y0 + sin * t2, 5, (rnd() - 0.5) * 70, (rnd() - 0.5) * 70, 20 + rnd() * 40, 8 + rnd() * 7, 0.35 + rnd() * 0.35); } }
+}
+
+// Leque de chamas do golpe em cone (Machadada em Arco, Chama Purificadora): chamas pintadas em arco que avancam ate o alcance, com lascas de fogo
+function drawCone(g, f, k, el, cx, cy) {
+  const R = f.range, e = ease(Math.min(1, k * 2.2)), o = 1 - k * k, N = LITE ? 6 : 11, cos = Math.cos(f.ang), sin = Math.sin(f.ang);
+  put(g, SP.glow, f.m, 0, cx + cos * R * 0.5, cy + sin * R * 0.5, R * 1.5, R * 1.5, 0, o * 0.5);
+  for (let i = 0; i < N; i++) {
+    const a = f.ang + (i / (N - 1) - 0.5) * f.arc, r = R * (0.25 + 0.7 * e) * (i % 2 ? 0.7 : 1), sz = R * (i % 2 ? 0.46 : 0.58) * (1 - k * 0.4), x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+    put(g, SP.flame0 + ((i + ((el * 20) | 0)) & 3), i % 2 ? f.h : f.m, 0, x, y - sz * 0.25, sz, sz, 0, Math.min(1, o * 1.3));
+  }
+  if (!f.n) { f.n = 1; for (let i = cnt(12); i > 0; i--) { const a = f.ang + (rnd() - 0.5) * f.arc, r = R * (0.3 + rnd() * 0.7); spark(f, cx + Math.cos(a) * r, cy + Math.sin(a) * r, 6, Math.cos(a) * 120, Math.sin(a) * 120, 30 + rnd() * 50, 8 + rnd() * 7, 0.4 + rnd() * 0.3); } }
+  if (el < 0.35) for (let n = rate(f, 70); n > 0; n--) { const a = f.ang + (rnd() - 0.5) * f.arc, r = R * (0.3 + rnd() * 0.7); ember(f, cx + Math.cos(a) * r, cy + Math.sin(a) * r, 4, Math.cos(a) * 50, Math.sin(a) * 40, 50 + rnd() * 50, 12 + rnd() * 8, 0.6); }
+}
+
+// Granada: bomba em arco ate o alvo e explosao (burst2 + shock2) com estilhacos, fumaca e tremor discreto
+function drawBlast(g, f, el, world) {
+  const tx = f.tx ?? f.x, ty = f.ty ?? f.y, R = f.r, dl = f.dl;
+  if (el < dl) {
+    const u = el / dl, x = f.x + (tx - f.x) * u, y = f.y + (ty - f.y) * u - Math.sin(Math.PI * u) * 110;
+    put(g, SP.glow, f.m, 0, x, y, 50, 50, 0, 0.8);
+    put(g, SP.flamelet0 + (((el * 20) | 0) & 3), f.m, 0, x, y - 6, 34, 34, 0, 1);
+    put(g, SP.twinkle0, f.h, 0, x, y, 36, 36, el * 14, 1);
+    for (let n = rate(f, 70); n > 0; n--) ember(f, x + (rnd() - 0.5) * 8, y + (rnd() - 0.5) * 8, 4, (rnd() - 0.5) * 30, (rnd() - 0.5) * 30, 10, 8 + rnd() * 6, 0.35);
+    return;
+  }
+  const u = clamp01((el - dl) / 0.55), o = 1 - u, e = ease(u);
+  if (f.n < 2) {
+    f.n = 2;
+    for (let i = cnt(6); i > 0; i--) { const a = rnd() * TAU, v = 90 + rnd() * 180; chunk(tx, ty, Math.cos(a) * v, Math.sin(a) * v * 0.7, 220 + rnd() * 200, 10 + rnd() * 8, 1.0); }
+    for (let i = cnt(8); i > 0; i--) { const a = rnd() * TAU, v = 40 + rnd() * R; smoke(f, tx + Math.cos(a) * R * 0.2, ty + Math.sin(a) * R * 0.2, 6, Math.cos(a) * v, Math.sin(a) * v * 0.8, 30 + rnd() * 30, 40 + rnd() * 30, 0.9, 0.5); }
+    for (let i = cnt(16); i > 0; i--) { const a = rnd() * TAU, v = 120 + rnd() * 300; spark(f, tx, ty, 8, Math.cos(a) * v, Math.sin(a) * v * 0.8, 60 + rnd() * 140, 8 + rnd() * 8, 0.4 + rnd() * 0.4); }
+    for (let i = cnt(8); i > 0; i--) { const a = rnd() * TAU, v = 40 + rnd() * R * 0.8; bit(f, tx + Math.cos(a) * R * 0.2, ty + Math.sin(a) * R * 0.2, 6, Math.cos(a) * v, Math.sin(a) * v * 0.8, 70 + rnd() * 110, 28 + rnd() * 20, 0.5 + rnd() * 0.3); }
+    shake(world, 3, 0.3);
+  }
+  put(g, SP.glow, f.m, 1, tx, ty, R * 2.8 * (0.6 + 0.5 * e), R * 2.8 * (0.6 + 0.5 * e), 0, o * 0.9);
+  put(g, SP.burst2, f.h, 0, tx, ty, R * 1.7 * (0.4 + 0.6 * e), R * 1.7 * (0.4 + 0.6 * e), 0, o * 1.1);
+  put(g, SP.shock2, f.m, 0, tx, ty, R * 2.2 * e, R * 2.2 * e, 0, o);
+  put(g, SP.shock, f.h, 0, tx, ty, R * 2.3 * ease(Math.max(0, u - 0.12) / 0.88), R * 2.3 * ease(Math.max(0, u - 0.12) / 0.88), 2, o * 0.6);
 }
 
 function drawCrit(g, f, k, cx, cy) { // estouro de estrela e faíscas no alvo
   const o = 1 - k, e = ease(k);
   put(g, SP.glow, f.m, 1, cx, cy - 6, 110, 110, 0, o * 0.8);
-  put(g, SP.burst, f.h, 0, cx, cy - 6, 40 + 70 * e, 40 + 70 * e, k * 1.5, o);
+  put(g, SP.burst2, f.h, 0, cx, cy - 6, 50 + 80 * e, 50 + 80 * e, k * 1.5, o);
+  put(g, SP.shock2, f.m, 0, cx, cy - 4, 30 + 90 * e, 30 + 90 * e, 0, o * 0.8);
   put(g, SP.star8, PL.holy, 0, cx, cy - 6, 70 * (1 - k * 0.3), 70 * (1 - k * 0.3), k * 2, o);
   if (!f.n) { f.n = 1; for (let i = cnt(8); i > 0; i--) { const a = rnd() * TAU, v = 130 + rnd() * 160; spark(f, cx, cy - 6, 8, Math.cos(a) * v, Math.sin(a) * v * 0.8, 30 + rnd() * 50, 7 + rnd() * 6, 0.35 + rnd() * 0.25); } }
 }

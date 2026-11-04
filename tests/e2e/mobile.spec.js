@@ -48,9 +48,19 @@ test('celular: interface de toque aparece e tudo cabe na tela, sem sobreposiçã
     expect(b.x + b.w, b.id).toBeLessThanOrEqual(844); expect(b.y + b.h, b.id).toBeLessThanOrEqual(390);
   }
   const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlap(boxes[i], boxes[j]), `${boxes[i].id} x ${boxes[j].id}`).toBe(false);
+  // botões de toque são arredondados e em arco: vale a distância entre centros (>= soma dos raios); o resto, retângulos
+  const btn = (b) => b.s.startsWith('.tbtn'), mid = (b) => [b.x + b.w / 2, b.y + b.h / 2];
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const A = boxes[i], B = boxes[j], hit = btn(A) && btn(B) ? Math.hypot(mid(A)[0] - mid(B)[0], mid(A)[1] - mid(B)[1]) < (A.w + B.w) / 2 : overlap(A, B);
+    expect(hit, `${A.id} x ${B.id}`).toBe(false);
+  }
   // Alvos de toque: botões de ação com pelo menos 40 px (a escala automática de 70% no celular deixa ~42 px; Apple recomenda 44).
   for (const b of boxes.filter((b) => b.s.startsWith('.tbtn'))) expect(Math.min(b.w, b.h), b.id).toBeGreaterThanOrEqual(40);
+  // habilidades em ARCO regular em volta do ataque: mesma distância do centro do ataque e ângulos crescentes (esquerda -> em cima)
+  const cs = Object.fromEntries(boxes.filter((b) => /(atk|sk\d)/.test(b.id)).map((b) => [b.id.match(/atk|sk\d/)[0], { x: b.x + b.w / 2, y: b.y + b.h / 2 }]));
+  const dist = (k) => Math.hypot(cs[k].x - cs.atk.x, cs[k].y - cs.atk.y), left = (k) => Math.atan2(cs.atk.y - cs[k].y, cs.atk.x - cs[k].x); // 0 = esquerda, cresce para cima
+  for (const k of ['sk1', 'sk2', 'sk3']) expect(Math.abs(dist(k) - dist('sk0')), k).toBeLessThan(6);
+  expect(left('sk0') < left('sk1') && left('sk1') < left('sk2') && left('sk2') < left('sk3')).toBe(true);
   await page.screenshot({ path: 'test-results/mobile-hud.png' });
   expect(errors).toEqual([]);
 });

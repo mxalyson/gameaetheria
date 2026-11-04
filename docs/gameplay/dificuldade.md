@@ -253,3 +253,37 @@ As 8 especializações trocaram os ajustes de números por **3 habilidades + 1 M
 - Cuidado ao mexer em `mods.stats` de uma spec: `tests/core.test.js` (pareamento por poder, ±20%) mede o poder do rival com spec; o Inquisidor com +12% de vida e +8% de defesa estourou para 22,7%.
 
 **Chefes** (`node tools/boss-check.mjs --n 4 --only boss`, comparado com o código anterior rodado igual): sem piora de dificuldade para o jogador — os chefes ficaram um pouco **mais fáceis** em níveis 15–26 por causa dos kits (ex.: Guardião das Ruínas, herói normal Nv19: 13% → 38% de vitória; Ancião Gélido normal Nv25: 38% → 69%; Colosso Nv15 normal: igual, 100%). O Cavaleiro Rubro ficou igual (good Nv30 94% → 94%; best Nv25 75% → 81%). Se quiser recuperar a dificuldade intermediária, o botão é a vida dos chefes em `data/mobs.js`, não os kits (os kits foram calibrados para o duelo, onde o dano ao herói é reduzido por `PVP_DAMAGE`). `waves-check`: não existe ferramenta com esse nome no repositório; o solo das Ondas não foi remedido.
+
+## Recalibragem após os kits próprios (2026-11-04)
+Duelos: `npm run balance -- --level 20 --n 60` e `--level 30 --n 60 --mastery` (a especialização alterna pela semente: as specs de índice 0 só enfrentam specs de índice 0 e as de índice 1 só as de índice 1, então mexer em uma spec desloca as outras do mesmo grupo; ruído ~±4 pontos).
+
+    Spec (vitória%)         Nv20 antes   Nv20 depois   Nv30+Maestria antes   Nv30+Maestria depois
+    Inquisidor                   35           50              49                    54
+    Pistoleiro                   53           50              42                    46
+    Berserker                    47           49              62                    53
+    Bruxo                        55           51              46                    49
+    Guardião                     56           47              61                    59
+    Paladino                     56           58              48                    51
+    Arcano                       49           52              51                    51
+    Franco-atirador              47           48              56                    50
+
+Mudanças só em `data/kits.js` e `mods` de `data/specs.js` (sem vida/defesa, para não estourar o teste de pareamento por poder): Inquisidor (Julgamento recarga 4→3,4 s e dano 480→550%; Chama recarga 6,5→5,5 s e 420→460%; Veredito 1200→1500%; `powerMul` 1,14→1,16 e roubo de vida 0,10→0,12); Pistoleiro (Rajada 62→66%, Saraivada 240→440%); Berserker (Machadada 270→300%, Salto 260→280%, Ira de Brasa -25%/+25% vel. → +12%/+15%, roubo 6→4%); Bruxo (Chuva de Almas 280→420%); Arcano (Cometa 1800→1600%); Franco-atirador (Tiro Letal 2800→2400%); Guardião (Luz Curativa 15→14%, Palavra de Salvação 32→30% de cura; Escudo Reforçado -18→-14% de dano; Intervenção Celestial cura 30→22%, escudo 20→15%, -30→-25%). Observação: sem `--mastery` no Nv30 o Berserker cai a ~30% (a Ira de Brasa é a maior parte do ganho dele).
+
+### Chefes intermediários (vitória%, `node tools/boss-check.mjs --n 4 --only boss`, 16 execuções por célula)
+Ajuste em `data/mobs.js`: Guardião vida ×9→×20, ataque ×1,7→×2,0; Ancião Gélido vida ×8,5→×21, ataque ×1,9→×2,3 (os números "antigos" abaixo são os da tabela de 2026-11-02, medidos com os kits da classe).
+
+    Guardião das Ruínas      antigo    com kits (antes)   agora
+    normal Nv19                 0          38             13
+    normal Nv25                50            100                 44
+    normal Nv30                94            100                100
+    good   Nv19                88            100                 94
+    good   Nv15                 6             63                 19
+
+    Ancião Gélido            antigo    com kits (antes)   agora
+    normal Nv25                 6             56                 19
+    normal Nv26                13             81                 13
+    normal Nv30                44            100                 44
+    good   Nv19                19             81                 13
+    best   Nv19                88            100                 88
+
+Também ficaram mais fáceis com os kits e NÃO foram tocados: Carvalho (normal Nv7 94%, era 69%), Colosso (normal Nv13 19%, era 13%; good Nv10 88%, era 50%) e o Cavaleiro Rubro (good Nv30 100%, era 56%; best Nv25 88%, era 13%; normal Nv30 6%). Início do jogo intacto (Carvalho/lobos). `tests/core.test.js` G4 e o digest de `ruins` em `tests/zone-determinism.test.js` foram atualizados (só `ruins` mudou; forest e plains iguais).

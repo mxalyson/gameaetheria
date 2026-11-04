@@ -58,7 +58,7 @@ export const SPECS = {
     },
     inquisitor: {
       name: 'Inquisidor', icon: '⚖️', color: '#ffb36b', desc: 'Dano sagrado: julgamento que queima, marca que amplia o dano, chama purificadora e o Livro do Veredito.',
-      mods: { stats: { powerMul: 1.14, lifesteal: 0.1 } },
+      mods: { stats: { powerMul: 1.16, lifesteal: 0.12 } },
     },
   },
 };

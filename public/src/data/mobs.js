@@ -13,7 +13,7 @@ export const MOBS = {
   wraith: { name: 'Espectro', shape: 'wraith', color: '#b6a6d8', hp: 0.85, atk: 1.1, speed: 120, kind: 'ranged', range: 280, projSpeed: 330, projColor: '#d7c6ff', cd: 1.5, size: 15, aggro: 320, xp: 1.15 },
   knight: { name: 'Cavaleiro Caído', shape: 'knight', color: '#8c93a8', hp: 1.4, atk: 1.25, speed: 105, range: 40, cd: 1.1, size: 18, aggro: 280, xp: 1.3, def: 1.3 },
   gargoyle: { name: 'Gárgula', shape: 'golem', color: '#8a8f9e', hp: 1.3, atk: 1.15, speed: 125, range: 38, cd: 1.0, size: 18, aggro: 300, xp: 1.25 },
-  guardian: { name: 'Guardião das Ruínas', shape: 'knight', color: '#6f6890', hp: 9, atk: 1.7, speed: 85, range: 70, cd: 1.3, size: 44, aggro: 450, xp: 1, boss: true, def: 1.4 },
+  guardian: { name: 'Guardião das Ruínas', shape: 'knight', color: '#6f6890', hp: 20, atk: 2.0, speed: 85, range: 70, cd: 1.3, size: 44, aggro: 450, xp: 1, boss: true, def: 1.4 },
 };
 
 
@@ -22,7 +22,7 @@ export const MOBS_EXTRA = {
   frostslime: { name: 'Geleia Gélida', art: 'slime', tint: { hue: 70, sat: 1.1, bri: 1.2 }, shape: 'slime', color: '#9fd8ff', temper: 0.3, hp: 1.0, atk: 0.8, speed: 90, range: 30, cd: 1.1, size: 15, aggro: 220, xp: 0.9 },
   frostwolf: { name: 'Lobo da Geada', art: 'wolf', tint: { mul: [0.82, 1.0, 1.3], bri: 1.3 }, shape: 'wolf', color: '#cfe6ff', hp: 1.1, atk: 1.1, speed: 160, range: 34, cd: 0.85, size: 17, aggro: 300, xp: 1.1 },
   icewisp: { name: 'Fogo-fátuo Glacial', art: 'wisp', tint: { sat: 0.35, bri: 1.25, mul: [0.95, 1.0, 1.1] }, shape: 'wisp', color: '#e8f6ff', hp: 0.8, atk: 1.05, speed: 115, kind: 'ranged', range: 300, projSpeed: 340, projColor: '#e0f4ff', cd: 1.5, size: 13, aggro: 320, xp: 1.2 },
-  frostlord: { name: 'Ancião Gélido', art: 'treant', tint: { hue: 150, sat: 0.55, bri: 1.35, mul: [0.9, 1.0, 1.25] }, shape: 'treant', color: '#8fc7ff', hp: 8.5, atk: 1.9, speed: 70, range: 60, cd: 1.3, size: 44, aggro: 440, xp: 1, boss: true },
+  frostlord: { name: 'Ancião Gélido', art: 'treant', tint: { hue: 150, sat: 0.55, bri: 1.35, mul: [0.9, 1.0, 1.25] }, shape: 'treant', color: '#8fc7ff', hp: 21, atk: 2.3, speed: 70, range: 60, cd: 1.3, size: 44, aggro: 440, xp: 1, boss: true },
   magmaslime: { name: 'Geleia de Magma', art: 'slime', tint: { hue: -115, sat: 1.4, bri: 1.1 }, shape: 'slime', color: '#ff8a4a', temper: 0.6, hp: 1.1, atk: 0.9, speed: 95, range: 30, cd: 1.0, size: 16, aggro: 240, xp: 1.0 },
   emberwolf: { name: 'Lobo de Brasa', art: 'wolf', tint: { mul: [1.5, 0.85, 0.55], bri: 1.05 }, shape: 'wolf', color: '#ff7a4a', hp: 1.2, atk: 1.25, speed: 170, range: 34, cd: 0.8, size: 17, aggro: 320, xp: 1.2 },
   cinderwraith: { name: 'Espectro de Cinzas', art: 'wraith', tint: { hue: 140, sat: 1.4, bri: 1.05 }, shape: 'wraith', color: '#ffb066', hp: 1.0, atk: 1.3, speed: 125, kind: 'ranged', range: 290, projSpeed: 340, projColor: '#ffb066', cd: 1.35, size: 15, aggro: 330, xp: 1.25 },

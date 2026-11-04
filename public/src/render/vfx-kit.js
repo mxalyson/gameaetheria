@@ -70,7 +70,7 @@ function make(id, pal) {
 }
 
 // Pré-aquecimento: pinta os sprites mais usados de uma paleta UM por quadro (evita engasgo no primeiro uso de cada paleta)
-const CORE = ['glow', 'burst', 'shock', 'rune0', 'rune1', 'star8', 'spark', 'flame0', 'flame1', 'flame2', 'flame3', 'ribbon0', 'ring', 'slash0'].map((n) => SP[n]);
+const CORE = ['glow', 'burst', 'shock', 'rune0', 'rune1', 'star8', 'spark', 'flame0', 'flame1', 'flame2', 'flame3', 'ribbon0', 'ring', 'slash0', 'bolt0', 'bolt1', 'bolt2', 'burst2', 'shock2', 'spikes', 'twinkle0', 'flamelet0'].map((n) => SP[n]);
 const wq = [], warmed = new Set();
 export function warm(pal) {
   if (!st.ready || st.fake || warmed.has(pal)) return;

@@ -31,3 +31,25 @@ export function stackLabels(boxes, step = 14, maxLevels = 3, gap = 4) {
   }
   return lift;
 }
+
+// Dispõe várias caixas (rótulos) sem sobreposição entre si, dentro da tela e fora das áreas da interface.
+// boxes = [{ x (centro), y (topo), w, h }] em px de tela; devolve [{ x, y }] na mesma ordem. Cada caixa tenta a posição pedida e depois sobe/desce em degraus de `step`
+// (primeiro para cima), sempre re-prendida à área livre: assim o aperto no rodapé não faz a de baixo voltar para cima da vizinha.
+export function placeBoxes(boxes, vw, vh, hud, step = 6, maxTries = 40, gap = 2) {
+  const out = boxes.map((b) => ({ x: b.x, y: b.y })), placed = [], tmp = { x: 0, y: 0 };
+  const order = boxes.map((_, i) => i).sort((a, b) => boxes[b].y - boxes[a].y || boxes[a].x - boxes[b].x); // de baixo para cima: o rodapé fixa primeiro
+  const hits = (x, y, b) => placed.some((p) => Math.abs(p.x - x) < (p.w + b.w) / 2 + gap && y < p.y + p.h + gap && p.y < y + b.h + gap);
+  for (const i of order) {
+    const b = boxes[i];
+    let best = null;
+    for (let k = 0; k <= maxTries && !best; k++) {
+      for (const dir of k === 0 ? [0] : [-1, 1]) {
+        safeBoxScreen(b.x, b.y + dir * k * step, b.w, b.h, vw, vh, hud, tmp);
+        if (!hits(tmp.x, tmp.y, b)) { best = { x: tmp.x, y: tmp.y }; break; }
+      }
+    }
+    if (!best) { safeBoxScreen(b.x, b.y, b.w, b.h, vw, vh, hud, tmp); best = { x: tmp.x, y: tmp.y }; }
+    out[i] = best; placed.push({ x: best.x, y: best.y, w: b.w, h: b.h });
+  }
+  return out;
+}

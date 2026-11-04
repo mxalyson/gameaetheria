@@ -1,6 +1,7 @@
 // Tudo é desenhado proceduralmente (sem imagens), num estilo pastel limpo.
 // Trocar por sprites no futuro = trocar apenas as funções draw* deste arquivo.
-import { safeBoxScreen, stackLabels } from './safe-box.js';
+import { safeBoxScreen, placeBoxes } from './safe-box.js';
+import { asset } from '../assets-version.js';
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawAuraBack, drawAuraMotes } from './aura.js';
 
@@ -78,6 +79,11 @@ export class Renderer {
     this.hud.length = 4;
     this.hud.push([mb.left - 4, 0, mb.right + 4, mb.bottom + 6]);
     this.menuOk = true;
+    // rastreador de missão e botões de toque reais (medidos no DOM): nomes e avisos do mundo nunca ficam sob eles
+    const vis = (el) => { const r = el?.getBoundingClientRect(); return r && r.width > 0 && r.height > 0 ? r : null; };
+    const qt = vis(document.getElementById('qtrack')); if (qt) this.hud.push([qt.left - 4, qt.top - 3, qt.right + 4, qt.bottom + 3]);
+    const tbs = [...document.querySelectorAll('#tbtns .tbtn:not(.hidden)')].map(vis).filter(Boolean);
+    if (tbs.length) { this.hud[3] = [0, 0, 0, 0]; for (const r of tbs) this.hud.push([r.left - 3, r.top - 3, r.right + 3, r.bottom + 3]); } // no lugar da estimativa por escala
   }
 
   // Qualidade gráfica: limita a resolução e corta efeitos de atmosfera mais caros (para celulares).
@@ -167,12 +173,13 @@ export class Renderer {
     PROMPTS.length = 0; SAFE.cx = cam.x; SAFE.cy = cam.y; SAFE.zm = zm; SAFE.vw = this.vw; SAFE.vh = this.vh; SAFE.hud = hud;
     const covered = (a) => { const sx = (a.x - cam.x) * zm, sy = (a.y - cam.y) * zm - 40 * zm; for (const [x0, y0, x1, y1] of hud) if (sx > x0 && sx < x1 && sy > y0 && sy < y1) return true; return false; };
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y) && (a === player || a.kind !== 'mob' || a.boss || !covered(a))) drawBars(g, a, a === player, this.labels);
-    labelLifts(g, z.npcs, vis);
-    for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, view.nearNpc === n.id, t, view.questMarks?.[n.id], view.guideNpc === n.id);
+    labelLifts(g, z.npcs, vis, view.questMarks, view.guideNpc);
+    for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, t, view.questMarks?.[n.id], view.guideNpc === n.id);
+    for (const n of z.npcs ?? []) if (vis(n.x, n.y) && view.nearNpc === n.id) drawPrompt(g, n.x, n.y + 22, 'Toque para conversar'); // depois de TODOS os nomes: o aviso desvia deles (sem tecla no texto, decisão 0016); presa à área livre
     for (const c of z.checkpoints ?? []) if (vis(c.x, c.y)) {
       const saved = !!cpSaved && cpSaved.x === c.x && cpSaved.y === c.y;
       drawCheckpointGlyph(g, c, t, saved);
-      if (player && !player.dead && Math.hypot(c.x - player.x, c.y - player.y) < 80) drawPrompt(g, c.x, c.y + 30, saved ? 'Ponto já salvo aqui' : 'Toque para salvar o ponto');
+      if (player && !player.dead && Math.hypot(c.x - player.x, c.y - player.y) < 80) drawPrompt(g, c.x, c.y + 30, saved ? 'Ponto já salvo aqui' : 'Toque para salvar o ponto', saveIcon());
     }
     for (const c of z.chests ?? []) if (vis(c.x, c.y) && view.nearChest === c.id) drawPrompt(g, c.x, c.y + 26, view.chestsOpen?.has(c.id) ? 'Vazio por enquanto' : 'Toque para abrir');
     for (const tx of world.texts) {
@@ -995,12 +1002,16 @@ function safeBox(x, y, w, h) {
 }
 
 const PROMPTS = [], PROMPT_OFF = [0, -24, 24, -48, 48]; // rótulos "Toque para…" já postos neste quadro (zerado em draw)
-function drawPrompt(g, x, y, txt) {
+const LABEL_BOXES = []; // caixas dos nomes de NPC já dispostas neste quadro (mundo: x0, x1, y0, y1); os avisos desviam delas
+let SAVE_IC = null; // ícone pintado do "salvar ponto" (assets/icons/ui/save-point.webp), carregado sob demanda
+function saveIcon() { if (!SAVE_IC && typeof Image !== 'undefined') { SAVE_IC = new Image(); SAVE_IC.src = asset('assets/icons/ui/save-point.webp'); } return SAVE_IC?.complete && SAVE_IC.naturalWidth ? SAVE_IC : null; }
+function drawPrompt(g, x, y, txt, icon = null) {
   g.font = '800 13px Cinzel, Nunito, serif'; g.textAlign = 'center';
-  const w = g.measureText(txt).width + 16;
-  // nunca sob botões de toque nem fora da tela; dois rótulos (NPC e baú juntos) não se sobrepõem: tenta ao lado em degraus de 24 px
+  const iw = icon ? 22 : 0, w = g.measureText(txt).width + 16 + iw;
+  // nunca sob botões de toque nem fora da tela; dois rótulos (NPC e baú juntos) não se sobrepõem, nem cobrem o nome de um NPC: tenta ao lado em degraus de 24 px
   const x0 = x, y0 = y;
-  const busy = () => PROMPTS.some((q) => Math.abs(q.x - x) < (q.w + w) / 2 && Math.abs(q.y - y) < 24);
+  const busy = () => PROMPTS.some((q) => Math.abs(q.x - x) < (q.w + w) / 2 && Math.abs(q.y - y) < 24)
+    || LABEL_BOXES.some((b) => x + w / 2 > b.x0 && x - w / 2 < b.x1 && y + 22 > b.y0 && y < b.y1);
   let n = 0;
   for (; n < 5; n++) {
     const p = safeBox(x0, y0 + PROMPT_OFF[n], w, 22); x = p.x; y = p.y;
@@ -1013,27 +1024,39 @@ function drawPrompt(g, x, y, txt) {
   }
   PROMPTS.push({ x, y, w });
   g.fillStyle = 'rgba(24,16,8,0.82)'; g.beginPath(); g.roundRect(x - w / 2, y, w, 22, 11); g.fill();
-  g.fillStyle = '#ffffff'; g.fillText(txt, x, y + 16);
+  g.fillStyle = '#ffffff'; g.fillText(txt, x + iw / 2, y + 16);
+  if (icon) g.drawImage(icon, x - w / 2 + 3, y - 3, 24, 24);
 }
 
-const NPC_LIFT = new Map(); // id -> elevação (px) do nome para não sobrepor o vizinho
-function labelLifts(g, npcs, vis) {
-  NPC_LIFT.clear();
-  const list = (npcs ?? []).filter((n) => vis(n.x, n.y));
+const NPC_PLACE = new Map(); // id -> { dx, dy }: deslocamento (mundo) do nome+marca para não sobrepor vizinhos, menu, rastreador nem botões de toque
+// Altura da caixa do nome: nome (16) + marca de missão (26) + seta do guia (22)
+const tagH = (mark, guide) => 16 + (mark && mark !== 'none' ? 26 : 0) + (guide && mark === 'offer' ? 22 : 0);
+function labelLifts(g, npcs, vis, marks, guideId) {
+  NPC_PLACE.clear(); LABEL_BOXES.length = 0;
+  const list = (npcs ?? []).filter((n) => vis(n.x, n.y)), s = SAFE;
+  if (!list.length) return;
   g.font = '800 12px Cinzel, Nunito, serif';
-  const lifts = stackLabels(list.map((n) => { const top = mobSpritesEnabled() ? npcTop(n.id) : null; return { x: n.x, w: g.measureText(n.name).width + 6, y: top != null ? n.y + top - 6 : n.y - 44 }; })); // y = linha do nome (varia com a altura do sprite), não os pés
-  list.forEach((n, i) => { if (lifts[i]) NPC_LIFT.set(n.id, lifts[i]); });
+  const base = list.map((n) => {
+    const top = mobSpritesEnabled() ? npcTop(n.id) : null, ny = top != null ? n.y + top - 6 : n.y - 44; // linha do nome (varia com a altura do sprite), não os pés
+    const h = tagH(marks?.[n.id], guideId === n.id), w = Math.max(g.measureText(n.name).width + 6, 24), bt = ny - 12 - (h - 16);
+    return { n, w, h, bt };
+  });
+  // posição de cada caixa em px de tela, disposta de uma vez (sem sobreposição entre si, com a interface e dentro da tela, usando as alturas reais)
+  const pos = placeBoxes(base.map((b) => ({ x: (b.n.x - s.cx) * s.zm, y: (b.bt - s.cy) * s.zm, w: b.w * s.zm, h: b.h * s.zm })), s.vw, s.vh, s.hud);
+  base.forEach((b, i) => {
+    const wx = s.cx + pos[i].x / s.zm, wy = s.cy + pos[i].y / s.zm;
+    NPC_PLACE.set(b.n.id, { dx: wx - b.n.x, dy: wy - b.bt });
+    LABEL_BOXES.push({ x0: wx - b.w / 2, x1: wx + b.w / 2, y0: wy, y1: wy + b.h });
+  });
 }
 
-function drawNpcTag(g, n, near, t, mark, guide) {
+function drawNpcTag(g, n, t, mark, guide) {
   g.font = '800 12px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   g.lineWidth = 3; g.strokeStyle = 'rgba(20,20,35,0.7)';
-  const top = mobSpritesEnabled() ? npcTop(n.id) : null, ny = (top != null ? n.y + top - 6 : n.y - 44) - (NPC_LIFT.get(n.id) ?? 0); // pintado: o nome fica logo acima da cabeça
-  // nome + marca presos à área livre (fora do menu do alto e dos botões de toque): desloca o conjunto inteiro
-  const hasMark = mark && mark !== 'none', boxH = 16 + (hasMark ? 26 : 0) + (guide && mark === 'offer' ? 22 : 0);
-  const sb = safeBox(n.x, ny - 12 - (boxH - 16), Math.max(g.measureText(n.name).width + 6, 24), boxH);
-  const dx = sb.x - n.x, dy = sb.y - (ny - 12 - (boxH - 16));
+  const top = mobSpritesEnabled() ? npcTop(n.id) : null, ny = top != null ? n.y + top - 6 : n.y - 44; // pintado: o nome fica logo acima da cabeça
+  // nome + marca presos à área livre (fora do menu do alto, do rastreador e dos botões de toque): labelLifts já calculou o deslocamento do conjunto inteiro
+  const pl = NPC_PLACE.get(n.id), dx = pl?.dx ?? 0, dy = pl?.dy ?? 0;
   if (guide && mark === 'offer') { // pulso no chão do guia: fica no lugar, não se desloca
     const k = (t * 1.2) % 1;
     g.strokeStyle = `rgba(255,211,77,${0.8 * (1 - k)})`; g.lineWidth = 3;
@@ -1058,5 +1081,4 @@ function drawNpcTag(g, n, near, t, mark, guide) {
     g.beginPath(); g.moveTo(n.x, ay + 9); g.lineTo(n.x - 8, ay - 3); g.lineTo(n.x + 8, ay - 3); g.closePath(); g.stroke(); g.fill();
   }
   g.restore();
-  if (near) drawPrompt(g, n.x, n.y + 22, 'Toque para conversar'); // sem tecla no texto (decisão 0016, V5); presa à área livre
 }

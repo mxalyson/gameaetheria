@@ -85,3 +85,21 @@ test('mentores de especialização: 8 NPCs no Porto com arte do atlas Nv 25, for
     for (const o of h.npcs.filter((o) => o.role !== 'mentor')) assert.ok(Math.hypot(n.x - o.x, n.y - o.y) >= 150, `${n.id} perto de ${o.id}`);
   }
 });
+
+test('placeBoxes: rótulos colados não se sobrepõem, ficam na tela e fora da interface (inclusive no rodapé)', async () => {
+  const { placeBoxes } = await import('../public/src/render/safe-box.js');
+  const vw = 800, vh = 400, hud = [[0, 0, 200, 80]];
+  // quatro nomes juntos no rodapé (antes o aperto no limite da tela os fazia voltar para cima uns dos outros)
+  const boxes = [60, 130, 200, 270].map((x, i) => ({ x, y: vh - 30 + i, w: 100, h: 16 }));
+  const out = placeBoxes(boxes, vw, vh, hud);
+  out.forEach((p, i) => {
+    assert.ok(p.y >= 4 && p.y + boxes[i].h <= vh - 4, 'dentro da tela');
+    for (let j = i + 1; j < out.length; j++) {
+      const sepX = Math.abs(out[j].x - p.x) >= (boxes[i].w + boxes[j].w) / 2, sepY = out[j].y >= p.y + boxes[i].h || p.y >= out[j].y + boxes[j].h;
+      assert.ok(sepX || sepY, `caixas ${i} e ${j} não se sobrepõem`);
+    }
+  });
+  const sob = placeBoxes([{ x: 100, y: 20, w: 90, h: 16 }], vw, vh, hud)[0];
+  assert.ok(sob.y >= 80 || sob.x - 45 >= 200, 'fora da faixa do cartão');
+  assert.deepEqual(placeBoxes([], vw, vh, hud), []);
+});

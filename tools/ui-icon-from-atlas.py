@@ -11,6 +11,7 @@ OUT = os.path.join(ROOT, 'public/assets/icons/ui')
 # saída -> (sprite do atlas, lado em px, preenchimento da caixa 0..1)
 ICONS = {
   'home': ('house_thatch', 96, 0.86),
+  'save-point': ('crystal_2', 96, 0.9), # Pedra de Retorno: botão de interagir (touch.js)
   'zone-town': ('house_thatch', 64, 0.9),
   'zone-forest': ('cherry_1', 64, 0.9),
   'zone-plains': ('crystal_4', 64, 0.9),

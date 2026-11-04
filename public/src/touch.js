@@ -199,7 +199,7 @@ export class TouchControls {
     setCd(pot, game.potionCd, 8, false);
     pot.querySelector('.count').textContent = String(game.char.potions);
     pot.classList.toggle('empty', !game.char.potions || game.mode === 'pvp');
-    // botão contextual: balão pintado para NPC, baú pintado para baú
+    // botão contextual: balão pintado para NPC, baú para baú, cristal sobre pedra (save-point) para a Pedra de Retorno
     let tg = game.mode === 'explore' || game.inNetZone?.() ? interactTarget(p, game.world) : null;
     if (tg && game.mode !== 'explore' && tg.kind !== 'chest' && tg.kind !== 'checkpoint') tg = null; // na instância online só o baú e a Pedra de Retorno (o servidor confere)
     const act = this.root.querySelector('.act');
@@ -209,7 +209,7 @@ export class TouchControls {
       act.querySelector('.icon').innerHTML = tg.kind === 'chest'
         ? `<img class="art" src="${asset('assets/icons/item/res-chest.webp')}" alt="🧰" draggable="false" onerror="this.replaceWith(this.alt)">`
         : tg.kind === 'checkpoint'
-          ? `<img class="art" src="${asset('assets/icons/item/res-essence.webp')}" alt="Pedra de Retorno" draggable="false" onerror="this.replaceWith(this.alt)">`
+          ? `<img class="art" src="${asset('assets/icons/ui/save-point.webp')}" alt="Salvar ponto" draggable="false" onerror="this.replaceWith(this.alt)">`
         : tg.kind === 'lore'
           ? `<img class="art" src="${asset('assets/icons/item/res-scroll.webp')}" alt="📜" draggable="false" onerror="this.replaceWith(this.alt)">`
           :`<img class="art" src="${asset('assets/icons/menu/menu-journal.webp')}" alt="Conversar" draggable="false">`; // pergaminho pintado (V6): sem emoji nem disco chapado
