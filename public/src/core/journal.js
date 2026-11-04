@@ -190,7 +190,7 @@ export function setTitle(doc, achievementId) {
 export const titleText = (doc) => (doc.title && ACH[doc.title]?.title) || '';
 
 // ---------- dicas de onboarding (cada uma aparece 1× por personagem: máscara de bits em stats.tips) ----------
-export const TIP_BITS = { forest: 0, chest: 1, level: 2, skill: 3, spirit: 4, boss: 5, ritual: 6 };
+export const TIP_BITS = { forest: 0, chest: 1, level: 2, skill: 3, spirit: 4, boss: 5, ritual: 6, crypt: 7, spec: 8, phoenix: 9 }; // crypt/spec/phoenix: avisos automáticos (main.js autoTip), nunca durante combate
 export const tipSeen = (doc, key) => ((doc.stats?.tips ?? 0) & (1 << TIP_BITS[key])) !== 0;
 export function takeTip(doc, key) { // true se for a primeira vez (e marca como vista)
   if (!(key in TIP_BITS) || tipSeen(doc, key)) return false;

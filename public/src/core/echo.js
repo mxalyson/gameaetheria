@@ -12,11 +12,18 @@ export const echoKeys = (doc) => doc.echo?.keys ?? 0;
 // Segundos até a próxima entrada GRÁTIS (0 = já pode).
 export const cryptWaitSec = (doc, now = Date.now()) => Math.max(0, Math.ceil(((doc.echo?.entry ?? 0) + CRYPT.cooldownSec * 1000 - now) / 1000));
 
+// Migração: quem já abriu a Cripta antes da regra do Guardião (limpou, fez a missão ou já entrou) segue com acesso, sem exigir nível 22 nem a missão.
+export const cryptLegacy = (doc) => (doc.stats?.cryptClears ?? 0) > 0 || doc.quests?.done?.cripta_dos_ecos != null || (doc.echo?.entry ?? 0) > 0;
+// Nível/missão que abrem a Cripta (sem checar espera): usado pelo mapa e pelo aviso único.
+export const cryptUnlocked = (doc) => !!doc.visited?.[CRYPT.needVisited] && (cryptLegacy(doc) || ((doc.level ?? 1) >= CRYPT.minLevel && doc.quests?.done?.[CRYPT.needQuest] != null));
+
 // Pode entrar agora? { ok, via: 'free' | 'key', code, reason, waitSec }. `code` são os mesmos de core/protocol.js REJECT (crypt_level | crypt_locked | crypt_wait).
 export function cryptEntryCheck(doc, now = Date.now()) {
   const waitSec = cryptWaitSec(doc, now);
-  if ((doc.level ?? 1) < CRYPT.minLevel) return { ok: false, code: 'crypt_level', reason: `Nível ${CRYPT.minLevel} para entrar na Cripta dos Ecos.`, waitSec };
+  const legacy = cryptLegacy(doc);
+  if (!legacy && (doc.level ?? 1) < CRYPT.minLevel) return { ok: false, code: 'crypt_level', reason: `Nível ${CRYPT.minLevel} para entrar na Cripta dos Ecos.`, waitSec };
   if (!doc.visited?.[CRYPT.needVisited]) return { ok: false, code: 'crypt_locked', reason: 'Chegue às Ruínas Sombrias a pé para encontrar a entrada.', waitSec };
+  if (!legacy && doc.quests?.done?.[CRYPT.needQuest] == null) return { ok: false, code: 'crypt_locked', reason: 'Derrote o Guardião das Ruínas (missão O Guardião Esquecido) para abrir a Cripta.', waitSec };
   if (waitSec <= 0) return { ok: true, via: 'free', waitSec };
   if (echoKeys(doc) > 0) return { ok: true, via: 'key', waitSec };
   const m = Math.ceil(waitSec / 60);
@@ -47,7 +54,7 @@ export const ownsEcho = (doc, slot) => gearList(doc).some((it) => it.eco && it.s
 export function craftEcho(doc, recipeId, rng) {
   const R = Object.hasOwn(ECHO_RECIPES, recipeId) ? ECHO_RECIPES[recipeId] : null;
   if (!R) return { ok: false, reason: 'Receita desconhecida.' };
-  if (doc.level < CRYPT.minLevel) return { ok: false, reason: `O Ferreiro só forja Eco para o nível ${CRYPT.minLevel}+.` };
+  if (doc.level < CRYPT.minLevel && !cryptLegacy(doc)) return { ok: false, reason: `O Ferreiro só forja Eco para o nível ${CRYPT.minLevel}+.` };
   if (ownsEcho(doc, R.slot)) return { ok: false, reason: 'Você já possui essa peça do Eco.' };
   if (echoFrags(doc) < R.frags) return { ok: false, reason: `Faltam fragmentos: ${R.frags} necessários (você tem ${echoFrags(doc)}).` };
   if (doc.gold < R.gold) return { ok: false, reason: 'Ouro insuficiente.' };

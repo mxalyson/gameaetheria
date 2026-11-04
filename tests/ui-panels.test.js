@@ -59,9 +59,11 @@ test('mapa: Cripta dos Ecos trava por nível/Ruínas/servidor, mostra a espera e
   const ui = mk({ txOnline: true });
   const c = ui.game.char;
   Object.assign(c, { level: 10, echo: { frags: 7, keys: 1, entry: 0 } });
-  assert.match(ui.mapCard('crypt', 'town'), /Nível 20 para entrar/);
+  assert.match(ui.mapCard('crypt', 'town'), /Nível 22 para entrar/);
   c.level = 25; assert.match(ui.mapCard('crypt', 'town'), /Ruínas Sombrias a pé/);
   c.visited.ruins = true;
+  assert.match(ui.mapCard('crypt', 'town'), /Derrote o Guardião/);
+  c.quests = { active: {}, done: { guardiao_das_ruinas: 1 } };
   assert.match(ui.mapCard('crypt', 'town'), /data-action="crypt-enter"[^>]*>Entrar na Cripta dos Ecos — grátis/);
   assert.match(ui.mapCard('crypt', 'town'), /7 fragmentos · <img[^>]*> 1 Chave/);
   c.echo.entry = Date.now() - 60_000; // entrou há 1 min: espera, mas há Chave

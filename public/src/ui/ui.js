@@ -22,7 +22,7 @@ import { ACHIEVEMENTS } from '../data/achievements.js';
 import { DIALOGS, TIPS } from '../data/dialogs.js';
 import { ZONES, WORLD_ROUTE, WORLD_NODES, teleportCost } from '../data/zones.js';
 import { CRYPT, ECHO_RECIPES, ECHO_NAMES } from '../data/crypt.js';
-import { cryptEntryCheck, ownsEcho } from '../core/echo.js';
+import { cryptEntryCheck, cryptUnlocked, cryptLegacy, ownsEcho } from '../core/echo.js';
 import { offeredBy, readyFor, activeFor, serviceFor, questGiverId, spiritEvoStatus, dailyBoard, dailyState, dailyProgressOf, dailyComplete, dayUTC, titleText, achievementProgress, ensureJournal, greetFor, LORE_ZONES, loreSeen, loreCount, tipSeen, mentorSeen } from '../core/journal.js';
 import { MENTOR_BY_ID, mentorsOfClass, MENTOR_SQUARE } from '../data/mentors.js';
 import { SCALE_MIN, SCALE_MAX, resolveScale } from '../prefs.js';
@@ -755,7 +755,7 @@ export class UI {
     const { char } = this.game, frags = char.echo?.frags ?? 0;
     const rows = Object.values(ECHO_RECIPES).map((R) => {
       const name = R.slot === 'weapon' ? ECHO_NAMES.weapon[CLASSES[char.classId].weapon] : ECHO_NAMES.armor[char.classId], own = ownsEcho(char, R.slot);
-      const can = !own && char.level >= CRYPT.minLevel && frags >= R.frags && char.gold >= R.gold;
+      const can = !own && (char.level >= CRYPT.minLevel || cryptLegacy(char)) && frags >= R.frags && char.gold >= R.gold;
       return `<div class="shop-item"><div class="cell r-epic"><span class="ic">${R.slot === 'weapon' ? ecoImg(`eco-${CLASSES[char.classId].weapon}`, '⚔️') : ecoImg(`eco-armor-${char.classId}`, '🛡️')}</span></div>
         <div><div class="nm" style="color:${RARITY.epic.color}">${esc(name)}</div><div class="sub">${R.slot === 'weapon' ? 'Arma' : 'Armadura'} da sua classe · ${R.frags} Fragmentos de Eco + ${R.gold} ouro</div></div>
         ${own ? '<span class="tag">Já forjado</span>' : `<button class="btn small" data-action="craft-echo" data-arg="${R.id}" ${can ? '' : 'disabled'}>${COIN} ${R.gold}</button>`}</div>`;
@@ -939,7 +939,7 @@ export class UI {
         <span class="mp-nm">${esc(z.name)}</span><span class="mp-lv">${lv}</span></button>`;
     }).join('');
     // masmorra: nó extra ligado às Ruínas por um caminho tracejado (não é parada de viagem; trava até o nível e as Ruínas visitadas)
-    const cn = WORLD_NODES.crypt, rp = pos('ruins'), cok = g.char.level >= CRYPT.minLevel && !!vis[CRYPT.needVisited];
+    const cn = WORLD_NODES.crypt, rp = pos('ruins'), cok = cryptUnlocked(g.char);
     const dline = `<line x1="${rp[0]}" y1="${rp[1]}" x2="${cn.x}" y2="${cn.y}" class="dungeon${cok ? ' lit' : ''}"/>`;
     const cnode = `<button class="mp-node dungeon${sel === 'crypt' ? ' sel' : ''}${cok ? '' : ' locked'}" style="left:${cn.x}%;top:${cn.y}%" data-action="map-sel" data-arg="crypt" aria-label="${esc(ZONES.crypt.name)}">
       <span class="mp-ic">${zoneIcon('crypt')}${cok ? '' : `<span class="mp-lock">${LOCK}</span>`}</span><span class="mp-nm">${esc(ZONES.crypt.name)}</span><span class="mp-lv">Masmorra · Nv ${CRYPT.recommended[0]}+</span></button>`;

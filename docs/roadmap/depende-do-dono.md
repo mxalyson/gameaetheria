@@ -39,7 +39,7 @@ Cada especialização (nível 15+) tem 3 habilidades + 1 de Maestria próprias (
 - **Bruxo** (verde tóxico): `wl_curse` caveira com fumaça verde · `wl_drain` mão sugando fios de vida · `wl_pact` dois espectros e pacto escrito · `wl_souls` chuva de almas
 - **Franco-atirador** (turquesa): `sn_aim` mira de luneta com ponto brilhante · `sn_trap` armadilha de cristal de gelo · `sn_retreat` botas com rastro de vento e seta para trás · `sn_lethal` bala perfurante com ondas de choque
 - **Pistoleiro** (âmbar): `gs_fan` cinco virotes em leque · `gs_grenade` granada com pavio · `gs_roll2` duas setas de rolamento encadeadas · `gs_barrage` chuva de virotes em linhas
-- **Guardião** (branco-dourado): `gd_light` flor de luz curando · `gd_ward` vários escudos de luz ligados · `gd_word` livro aberto emitindo luz · `gd_celestial` anjo de asas abertas, coluna de luz
+- **Sentinela** (id guardian; branco-dourado): `gd_light` flor de luz curando · `gd_ward` vários escudos de luz ligados · `gd_word` livro aberto emitindo luz · `gd_celestial` anjo de asas abertas, coluna de luz
 - **Inquisidor** (violeta-âmbar): `inq_judge` raio sagrado em chamas · `inq_mark` pena com selo brilhante · `inq_flame` leque de fogo sagrado · `inq_verdict` livro grande em chamas
 
 ### A5. Ícone do ataque básico das 4 classes (512×512, mesma moldura dos ícones de skill)
@@ -85,7 +85,7 @@ Prompts (base: *"chibi fantasy {classe} hero, anime style, hand-painted, full bo
 4. Bruxo (antigo Criomante): *"... warlock mage, dark green and black robes, toxic green glow, skull-topped staff, hanging vials and tattered hem"*
 5. Franco-atirador (antigo Atirador): *"... sniper archer, teal leather coat with silver fittings, long precision bow with scope-like rune, hooded cape"*
 6. Pistoleiro (antigo Caçador): *"... gunslinger archer, amber and brown gear with brass fittings, compact repeating-crossbow-style bow, bandolier of bolts, short coat"* (a classe segue usando arco; "besta de repetição" é só sabor, sem arma nova)
-7. Guardião: *"... guardian cleric, white and gold vestments, winged shoulder guards, radiant shield-staff, halo ornament"*
+7. Sentinela (id guardian): *"... guardian cleric, white and gold vestments, winged shoulder guards, radiant shield-staff, halo ornament"*
 8. Inquisidor: *"... inquisitor cleric, violet and amber ornate robes, floating rune book, judgement mace with glowing sigils"*
 
 ## A8. Cripta dos Ecos (masmorra, decisão 0017): arte do chefe novo e peças (PROVISÓRIO até chegar)

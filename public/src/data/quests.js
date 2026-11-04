@@ -130,7 +130,7 @@ export const QUESTS = {
     text: {
       offer: 'Três guardiões e dois reflexos: o gelo e a brasa foram o eco tentando se juntar de novo. Hoje todos repousam. Evolua um spirit (cada elemento tem uma missão minha) e volte: quero lhe mostrar o que sobrou.',
       progress: 'Evolua um spirit e volte a mim: peça a missão do elemento dele a mim mesma, cumpra-a e use Evoluir no painel de Spirits. O último capítulo espera.',
-      done: ['Aqui jaz o primeiro eco, inteiro de novo. A vila dorme; os spirits ao seu lado carregam um pouco dele.', 'Você era o último capítulo, herói. A partir de hoje, o eco tem voz, e é a sua.', 'Mas toda estrada tem outra volta. Ouça: sob as Ruínas, os ecos presos ainda sussurram.'],
+      done: ['Aqui jaz o primeiro eco, inteiro de novo. A vila dorme; os spirits ao seu lado carregam um pouco dele.', 'Você era o último capítulo, herói. A partir de hoje, o eco tem voz, e é a sua.', 'Mas toda estrada tem outra volta. Sob as Ruínas, os ecos presos ainda sussurram. E um viajante de capa violeta, que tece ecos, chegou ao Porto e pergunta por você.'],
     },
     objectives: [{ type: 'level', count: 30, label: 'Alcance o nível 30' }, { type: 'spiritStage', count: 1, label: 'Tenha 1 spirit evoluído (forma 2)' }],
     reward: { gold: 8000, xp: 0, potions: 10, items: [{ rarity: 'legendary' }] },
@@ -197,6 +197,12 @@ Object.assign(QUESTS, {
     objectives: [{ type: 'kill', mob: 'any', zone: 'plains', count: 8, label: 'Derrote 8 criaturas da Planície de Cristal' }, { type: 'kill', mob: 'any', zone: 'ruins', count: 7, label: 'Derrote 7 criaturas das Ruínas Sombrias' }],
     reward: { gold: 700, xp: 3200, potions: 3 },
   },
+  porto_eco_no_cais: {
+    id: 'porto_eco_no_cais', name: 'Eco no Cais', giver: 'captain', level: 14, after: 'porto_carga',
+    text: { offer: 'Os marujos juram ouvir sussurros no cais de madrugada, e não é o mar. Vêm de baixo das Ruínas. Derrube doze criaturas de lá e veja se o barulho cede.', progress: 'Doze criaturas nas Ruínas Sombrias, a leste do Porto. O sussurro vem de lá.', done: 'Cedeu, mas não parou. Os ecos presos sussurram sob as Ruínas, e o Guardião vigia a porta deles. Quando estiver forte, fale com a Sábia Yun: ela conhece a cripta.' },
+    objectives: [{ type: 'kill', mob: 'any', zone: 'ruins', count: 12, label: 'Derrote 12 criaturas das Ruínas Sombrias' }],
+    reward: { gold: 800, xp: 3800, potions: 3 },
+  },
   porto_gelo: {
     id: 'porto_gelo', name: 'Carga de Gelo', giver: 'dealer', level: 22, after: 'porto_chegada',
     text: { offer: 'Gelo do Cume vale ouro no verão. Abra três baús no Cume Gélido e traga o que sobrar das cargas congeladas. Divido o lucro, e a palavra é de comerciante.', progress: 'Três baús no Cume Gélido, a leste das Ruínas. Leve poções e um bom casaco.', done: 'Frio de verdade, mercadoria de verdade. Aqui está a sua parte, e mais um pouco.' },
@@ -214,9 +220,9 @@ Object.assign(QUESTS, {
 // ---- Cripta dos Ecos (masmorra por instância, decisão 0017): a Yun apresenta a masmorra; o objetivo `crypt` só o servidor soma ----
 Object.assign(QUESTS, {
   cripta_dos_ecos: {
-    id: 'cripta_dos_ecos', name: 'A Cripta dos Ecos', giver: 'sage', level: 20, after: 'ruinas_sombrias',
+    id: 'cripta_dos_ecos', name: 'A Cripta dos Ecos', giver: 'sage', level: 22, after: 'guardiao_das_ruinas',
     text: {
-      offer: 'Sob as Ruínas dorme uma cripta onde os ecos presos têm um rei: o Soberano dos Ecos, que nunca quis repousar. O Guardião vigia a porta dele. Entre pelo mapa, com até três aliados.',
+      offer: 'Sob as Ruínas dorme uma cripta onde os ecos presos têm um rei: o Soberano dos Ecos, que nunca quis repousar. O Guardião caiu e a porta dele se abriu. Entre pelo mapa, com até três aliados.',
       progress: 'A entrada fica no mapa, ligada às Ruínas: quatro salas, e a última guarda o Soberano. Uma entrada grátis a cada vinte minutos; um contrato do Porto rende uma Chave de Eco, que pula a espera.',
       done: 'Calado, enfim. Era isso que o Guardião guardava. Os fragmentos que ele deixou servem ao Ferreiro Brok: ele forja o eco em aço. Mas os ecos de lá sempre voltam.',
     },

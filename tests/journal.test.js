@@ -452,6 +452,9 @@ test('Cripta dos Ecos: missão da Yun, evento só do servidor, conquistas, Chave
   for (const t of Object.values(q.text)) { assert.ok(t.length <= 220, 'texto curto: ' + t.length); assert.doesNotMatch(t, /\b(tecla|aperte|pressione|clique)\b/i, 'sem citar teclas'); }
   // o objetivo é do servidor: o jogo offline nem oferece a missão
   const d = ensureJournal(hero(22)); d.quests.done.ruinas_sombrias = 1;
+  assert.ok(!offeredBy(d, 'sage', { server: true }).some((x) => x.id === q.id), 'só depois do Guardião');
+  assert.equal(q.after, 'guardiao_das_ruinas'); assert.equal(q.level, 22); assert.equal(CRYPT.minLevel, 22);
+  d.quests.done.guardiao_das_ruinas = 1;
   assert.ok(offeredBy(d, 'sage', { server: true }).some((x) => x.id === q.id));
   assert.ok(!offeredBy(d, 'sage', { server: false }).some((x) => x.id === q.id), 'offline não oferece');
   acceptQuest(d, q.id);
@@ -466,9 +469,12 @@ test('Cripta dos Ecos: missão da Yun, evento só do servidor, conquistas, Chave
   assert.equal(checkSave(old, neu).doc.stats.cryptClears, 0, 'contador é do servidor');
   // entrada: nível, Ruínas visitadas, espera de 20 min e Chave de Eco
   const e = validate(JSON.parse(JSON.stringify(ensureJournal(hero(25))))).char, t0 = 1_000_000_000_000;
-  assert.equal(cryptEntryCheck({ ...e, level: 19 }, t0).code, 'crypt_level');
+  assert.equal(cryptEntryCheck({ ...e, level: 21 }, t0).code, 'crypt_level');
   e.visited = { town: 1 }; assert.equal(cryptEntryCheck(e, t0).code, 'crypt_locked');
   e.visited = { town: 1, ruins: 1 };
+  assert.equal(cryptEntryCheck(e, t0).code, 'crypt_locked', 'Ruínas visitadas mas Guardião de pé');
+  assert.match(cryptEntryCheck(e, t0).reason, /Guardião/);
+  e.quests.done.guardiao_das_ruinas = 1;
   assert.deepEqual([cryptEntryCheck(e, t0).ok, cryptEntryCheck(e, t0).via], [true, 'free']);
   assert.equal(applyCryptEntry(e, t0).ok, true);
   assert.equal(cryptEntryCheck(e, t0 + 60_000).code, 'crypt_wait');
@@ -574,8 +580,70 @@ test('cânone: Cripta, Forja do Eco, Chave de Eco, Pedra de Retorno e Amuleto s�
 test('cânone: nenhuma conquista repete o nome de outra; falas condicionais do Porto e da Yun não ficam inalcançáveis', () => {
   const nomes = ACHIEVEMENTS.map((a) => a.name); assert.equal(new Set(nomes).size, nomes.length, 'nome de conquista repetido');
   const titulos = ACHIEVEMENTS.map((a) => a.title).filter(Boolean); assert.equal(new Set(titulos).size, titulos.length, 'título repetido');
-  const d = ensureJournal(hero(20));
+  const d = ensureJournal(hero(22));
   assert.match(greetFor(d, DIALOGS.sage.greet, { online: false }), /mar conectado/, 'offline: a Yun explica por que a Cripta não abre');
   assert.match(greetFor(d, DIALOGS.sage.greet, { online: true }), /Eco é o que fica/, 'online sem missão: a definição de eco');
   d.quests.done.cripta_dos_ecos = 1; assert.match(greetFor(d, DIALOGS.smith.greet), /Fragmentos de eco/);
+});
+
+// ---------- rodada de história 3: Cripta após o Guardião, Eco no Cais, Místico em aberto, avisos automáticos, Sentinela ----------
+test('Cripta só abre após o Guardião (nível 22); saves antigos com a Cripta já aberta seguem válidos', async () => {
+  const { cryptEntryCheck, cryptLegacy, cryptUnlocked, craftEcho } = await import('../public/src/core/echo.js');
+  const t0 = 1_000_000_000_000;
+  const d = ensureJournal(hero(22)); d.visited = { town: 1, ruins: 1 };
+  assert.equal(cryptEntryCheck(d, t0).code, 'crypt_locked'); assert.equal(cryptUnlocked(d), false);
+  d.quests.done.guardiao_das_ruinas = 1;
+  assert.equal(cryptEntryCheck(d, t0).ok, true); assert.equal(cryptUnlocked(d), true);
+  assert.equal(cryptEntryCheck({ ...d, level: 21 }, t0).code, 'crypt_level');
+  // legado: nível 20 e sem o Guardião, mas já limpou / fez a missão / já entrou
+  for (const mut of [(x) => { x.stats.cryptClears = 1; }, (x) => { x.quests.done.cripta_dos_ecos = 1; }, (x) => { x.echo = { frags: 0, keys: 0, entry: t0 - 1e9 }; }]) {
+    const o = ensureJournal(hero(20)); o.visited = { town: 1, ruins: 1 }; mut(o);
+    assert.equal(cryptLegacy(o), true); assert.equal(cryptEntryCheck(o, t0).ok, true, 'legado não perde a Cripta');
+  }
+  const f = ensureJournal(hero(20)); f.echo = { frags: 99, keys: 0, entry: 0 }; f.gold = 1e6;
+  assert.equal(craftEcho(f, 'eco_weapon', makeRng(1)).ok, false, 'sem legado, a forja pede nível 22');
+  f.stats.cryptClears = 1; assert.equal(craftEcho(f, 'eco_weapon', makeRng(1)).ok, true, 'legado forja');
+});
+
+test('Eco no Cais: missão da Capitã Nv 14, só mata nas Ruínas, textos curtos; aponta Guardião e Cripta', () => {
+  const q = QUESTS.porto_eco_no_cais;
+  assert.equal(q.giver, 'captain'); assert.ok(q.level >= 14 && q.level <= 20); assert.equal(q.after, 'porto_carga');
+  assert.deepEqual(q.objectives.map((o) => [o.type, o.zone]), [['kill', 'ruins']]);
+  for (const t of Object.values(q.text)) { assert.ok(t.length <= 220, 'curto: ' + t.length); assert.doesNotMatch(t, /\b(tecla|aperte|pressione|clique)\b/i); }
+  assert.match(q.text.done, /Guardião/); assert.match(q.text.done, /cripta/);
+  const d = ensureJournal(hero(14));
+  assert.ok(!offeredBy(d, 'captain', { server: true }).some((x) => x.id === q.id), 'precisa de Cargas Perdidas');
+  d.quests.done.porto_carga = 1;
+  assert.ok(offeredBy(d, 'captain', { server: true }).some((x) => x.id === q.id));
+  acceptQuest(d, q.id); kill(d, 12, { zoneId: 'ruins' }); assert.equal(isComplete(d, q.id), true);
+  assert.equal(turnInQuest(d, q.id, rng).ok, true);
+  assert.ok(Object.values(QUESTS).every((x) => x.id === x.id.trim()));
+});
+
+test('Místico: promessa em aberto no epílogo e na Capitã (sem NPC novo); Soberano é o rei das Ruínas', () => {
+  const ep = QUESTS.ecos_unidos.text.done; assert.match(ep[ep.length - 1], /capa violeta[^.]*tece ecos[^.]*Porto/);
+  assert.ok(ep.every((t) => t.length <= 220));
+  const d = ensureJournal(hero(30)); d.quests.done.ecos_unidos = 1;
+  assert.match(greetFor(d, DIALOGS.captain.greet), /capa violeta/);
+  assert.match(QUESTS.cripta_dos_ecos.text.offer, /rei/); assert.match(QUESTS.cripta_dos_ecos.text.offer, /Soberano dos Ecos/);
+});
+
+test('Sentinela: só o nome exibido muda; o id guardian permanece', async () => {
+  const { SPECS } = await import('../public/src/data/specs.js');
+  const { MENTORS } = await import('../public/src/data/mentors.js');
+  assert.equal(SPECS.cleric.guardian.name, 'Sentinela');
+  assert.match(MENTORS.find((m) => m.spec === 'guardian').name, /Sentinela/);
+  assert.match(DIALOGS.mentor_guardian.greet[0].text, /Sentinela/);
+  assert.ok(ZONES.harbor.npcs.some((n) => n.id === 'mentor_guardian' && /Sentinela/.test(n.name)));
+});
+
+test('avisos automáticos: 3 bits novos, textos curtos e 1× por personagem; a máscara cabe no documento', () => {
+  for (const k of ['crypt', 'spec', 'phoenix']) { assert.ok(k in TIP_BITS && TIPS[k]); assert.ok(TIPS[k][1].length <= 220); }
+  assert.match(TIPS.crypt[1], /nó dela no mapa/); assert.match(TIPS.spec[1], /Mestre da sua classe/); assert.match(TIPS.phoenix[1], /Lia/);
+  assert.equal(new Set(Object.values(TIP_BITS)).size, Object.keys(TIP_BITS).length, 'bits únicos');
+  const d = ensureJournal(hero(22));
+  assert.equal(takeTip(d, 'phoenix'), true); assert.equal(takeTip(d, 'phoenix'), false);
+  const old = validate(JSON.parse(JSON.stringify(d))).char, neu = JSON.parse(JSON.stringify(old));
+  neu.stats.tips |= 1 << TIP_BITS.crypt | 1 << TIP_BITS.spec;
+  const r = checkSave(old, neu); assert.equal(r.ok, true); assert.equal(r.doc.stats.tips & ((1 << TIP_BITS.crypt) | (1 << TIP_BITS.spec)), (1 << TIP_BITS.crypt) | (1 << TIP_BITS.spec));
 });

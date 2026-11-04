@@ -14,8 +14,9 @@ export const CRYPT_GEOM = {
 
 export const CRYPT = {
   id: 'crypt', name: 'Cripta dos Ecos',
-  minLevel: 20, recommended: [20, 30], maxPlayers: 4,
+  minLevel: 22, recommended: [22, 30], maxPlayers: 4, // 22 = nível da missão do Guardião (que abre a porta); saves antigos com a Cripta já aberta seguem válidos (core/echo.js cryptLegacy)
   needVisited: 'ruins',                      // a entrada só abre para quem já chegou às Ruínas Sombrias
+  needQuest: 'guardiao_das_ruinas',          // ...e já derrubou o Guardião (a porta da Cripta que ele vigiava)
   cooldownSec: 20 * 60,                      // 1 entrada grátis a cada 20 min por personagem (hora do servidor)
   keyMax: 5,                                 // Chave de Eco: pula a espera; vem dos contratos do Porto (1 por contrato entregue)
   maxDeaths: 3,                              // quedas por herói; na 4ª ele é levado para fora (o grupo inteiro caído = fracasso)

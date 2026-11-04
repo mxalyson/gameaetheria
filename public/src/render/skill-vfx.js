@@ -42,7 +42,7 @@ const BASE = {
   basic_mage: sty('violet', 'holy', 'arcane'), basic_archer: sty('leaf', 'gold', 'nature'), crit: sty('fire', 'amber', 'fire'), absorb: sty('gold', 'holy', 'holy'), heal: sty('leaf', 'holy', 'nature'),
 };
 // cada especialização pinta TODAS as suas habilidades na própria cor: Paladino dourado, Berserker brasa, Arcano prisma violeta, Bruxo verde tóxico,
-// Franco-atirador turquesa, Pistoleiro âmbar, Guardião branco-dourado, Inquisidor violeta-âmbar
+// Franco-atirador turquesa, Pistoleiro âmbar, Sentinela branco-dourado, Inquisidor violeta-âmbar
 const SPEC = {
   paladin: sty('gold', 'holy', 'holy'), berserker: sty('ember', 'fire', 'fire'), arcane: sty('violet', 'holy', 'arcane'), warlock: sty('toxic', 'leaf', 'toxic'),
   sniper: sty('turq', 'holy', 'arcane'), gunslinger: sty('amber', 'fire', 'fire'), guardian: sty('holy', 'gold', 'holy'), inquisitor: sty('violamber', 'amber', 'holy'),

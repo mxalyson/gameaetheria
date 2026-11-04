@@ -373,6 +373,9 @@ test('Cripta: entrada conferida no servidor, portão, ondas, chefe de 2 fases co
   await c.waitFor((m) => m.t === 'reject' && m.code === 'crypt_locked'); // falta chegar às Ruínas
   prep(db, ch, (x) => { x.visited.ruins = 1; });
   c.send({ t: 'crypt_enter' });
+  await c.waitFor((m) => m.t === 'reject' && m.code === 'crypt_locked'); // Guardião das Ruínas ainda de pé
+  prep(db, ch, (x) => { x.quests.done.guardiao_das_ruinas = Date.now(); });
+  c.send({ t: 'crypt_enter' });
   const j = await c.waitFor((m) => m.t === 'zone_joined');
   assert.equal(j.zone, 'crypt'); assert.equal(j.x, G.starts[0]); assert.equal(j.w, G.w);
   assert.ok(db.character(ch).doc.echo.entry > 0, 'a entrada foi carimbada no documento oficial');
@@ -435,7 +438,7 @@ test('Cripta: 3 quedas por herói; na seguinte ele é levado para fora; sem mons
   const { CRYPT } = await import('../public/src/data/crypt.js');
   const { srv, db, players } = await setup(1);
   const { c, ch } = players[0];
-  prep(db, ch, (x) => { x.level = 22; x.visited = { ...(x.visited ?? {}), ruins: 1 }; });
+  prep(db, ch, (x) => { x.level = 22; x.visited = { ...(x.visited ?? {}), ruins: 1 }; x.quests.done.guardiao_das_ruinas = Date.now(); });
   c.send({ t: 'crypt_enter' });
   await c.waitFor((m) => m.t === 'zone_joined');
   const room = [...srv.hub.zoneRooms.values()].find((r) => r.zoneId === 'crypt');

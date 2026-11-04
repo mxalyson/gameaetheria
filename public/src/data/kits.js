@@ -66,7 +66,7 @@ export const KIT_SKILLS = {
   gs_barrage: { name: 'Saraivada', icon: '🔫',  cd: 22, kind: 'projectile', volley: 5, spread: 0.12, waves: 5, waveEvery: 0.18, speed: 850, range: 520, mult: 4.4, radius: 5, color: '#ffb23d',
     desc: 'Cinco rajadas de 5 virotes em sequência (440% cada) na direção do cursor.' },
 
-  // ---- Guardião (cura em grupo, proteção)
+  // ---- Sentinela (id guardian; cura em grupo, proteção)
   gd_light: { name: 'Luz Curativa em Área', icon: '☀️',  cd: 8, kind: 'aoe_self', radius: 280, mult: 1.8, heal: 0.14, allyHeal: 1.0, color: '#fff7c2',
     desc: 'Onda de luz num raio de 280: cura 14% da vida de você e dos aliados e fere os inimigos (180%).' },
   gd_ward: { name: 'Escudo Divino Reforçado', icon: '🛡️',  cd: 15, kind: 'buff', dur: 8, buff: { shieldPct: 0.25, dr: 0.14 }, groupShield: { range: 360, pct: 0.9 }, color: '#fff0b0',

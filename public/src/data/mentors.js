@@ -11,7 +11,7 @@ export const MENTORS = [
   { id: 'mentor_warlock', classId: 'mage', spec: 'warlock', name: 'Morvain, Bruxo', short: 'Morvain' },
   { id: 'mentor_sniper', classId: 'archer', spec: 'sniper', name: 'Lyra, Franco-atiradora', short: 'Lyra' },
   { id: 'mentor_gunslinger', classId: 'archer', spec: 'gunslinger', name: 'Dom Cálix, Pistoleiro', short: 'Dom Cálix' },
-  { id: 'mentor_guardian', classId: 'cleric', spec: 'guardian', name: 'Irmã Aurora, Guardiã', short: 'Irmã Aurora' },
+  { id: 'mentor_guardian', classId: 'cleric', spec: 'guardian', name: 'Irmã Aurora, Sentinela', short: 'Irmã Aurora' },
   { id: 'mentor_inquisitor', classId: 'cleric', spec: 'inquisitor', name: 'Inquisidor Valdor', short: 'Valdor' },
 ];
 export const MENTOR_BY_ID = Object.fromEntries(MENTORS.map((m, i) => [m.id, { ...m, bit: i }]));

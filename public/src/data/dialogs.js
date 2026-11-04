@@ -14,7 +14,7 @@ export const DIALOGS = {
   sage: { greet: [
     { when: { done: 'cripta_dos_ecos' }, text: 'Você calou o Soberano, mas os ecos de lá não se apagam. Os fragmentos que trouxe rendem aço no Ferreiro. A Cripta recupera o fôlego em vinte minutos.' },
     { when: { done: 'ecos_unidos' }, text: 'Os ecos repousam, mas eu ainda os ouço, bem baixinho. Escolha bem quem caminha ao seu lado.' },
-    { when: { level: 20, offline: true }, text: 'Sob as Ruínas há uma cripta onde os ecos presos têm um rei. Ela só se abre com o mar conectado. Volte quando houver rede, herói.' },
+    { when: { level: 22, offline: true }, text: 'Sob as Ruínas há uma cripta onde os ecos presos têm um rei. Ela só se abre com o mar conectado. Volte quando houver rede, herói.' },
     { when: { done: 'anciao_gelido' }, text: 'O frio não era dele. Era do que veio antes. Os spirits ainda estremecem quando falo disso.' },
     { when: { bossKills: 1 }, text: 'Ouço o Carvalho em você, quase um sussurro. Spirits são ecos da natureza: escolha bem quem caminha ao seu lado.' },
     { text: 'Eco é o que fica quando algo não repousa. Spirits são os ecos mansos da natureza. Escolha bem quem caminha ao seu lado.' },
@@ -28,7 +28,7 @@ export const DIALOGS = {
   smith: { greet: [
     { when: { done: 'cripta_dos_ecos' }, text: 'Fragmentos de eco. Bom. Quarenta para a arma, sessenta para a armadura, mais ouro. Uma de cada. Aço que lembra não perdoa.' },
     { when: { level: 25 }, text: 'Seu aço está cansado. O meu fogo, não. E eco preso vira aço novo: fragmentos da Cripta, quarenta a arma, sessenta a armadura.' },
-    { when: { level: 20 }, text: 'Metal bom lembra de quem o forjou. Eco preso também vira aço: fragmentos da Cripta, quarenta a arma, sessenta a armadura. Traga.' },
+    { when: { level: 22 }, text: 'Metal bom lembra de quem o forjou. Eco preso também vira aço: fragmentos da Cripta, quarenta a arma, sessenta a armadura. Traga.' },
     { text: 'Metal bom lembra de quem o forjou. Traga o que veste. Eu deixo mais forte. Ouro, preço justo.' },
   ], service: { label: 'Aprimorar equipamento', panel: 'shop:smith' } },
   master_warrior: { greet: [
@@ -85,7 +85,7 @@ export const DIALOGS = {
     { text: 'Dom Cálix, para servi-lo! Besta de repetição é coisa de arqueiro. Você segue outro caminho? Pois que seja com estilo!' },
   ], service: null },
   mentor_guardian: { greet: [
-    { when: { classId: 'cleric' }, text: 'A luz cuida de quem fica ao lado. A Guardiã cura em área, protege todos com escudo e traz a Palavra de Salvação e a Intervenção Celestial. Ecos nascem de quem caiu sozinho. Ninguém cai.' },
+    { when: { classId: 'cleric' }, text: 'A luz cuida de quem fica ao lado. A Sentinela cura em área, protege todos com escudo e traz a Palavra de Salvação e a Intervenção Celestial. Ecos nascem de quem caiu sozinho. Ninguém cai.' },
     { text: 'Irmã Aurora, a serviço da luz. Esse caminho é de clérigos. O seu é outro, mas a luz alcança todos.' },
   ], service: null },
   mentor_inquisitor: { greet: [
@@ -115,7 +115,8 @@ export const DIALOGS = {
     { text: 'Duelo amistoso: sem pontos, sem rancor, só aço. Ninguém perde Elo no meu ringue. Aceita?' },
   ], service: { label: 'Duelo amistoso 1×1', panel: 'arena:friendly' } },
   captain: { greet: [
-    { when: { done: 'ecos_unidos' }, text: 'A maré mudou depois do que fez. Os barcos voltaram a cantar. Obrigada, herói.' },
+    { when: { done: 'ecos_unidos' }, text: 'A maré mudou depois do que fez. Chegou ao Porto um viajante de capa violeta, que tece ecos, e pergunta por você. Obrigada, herói.' },
+    { when: { done: 'porto_eco_no_cais' }, text: 'O sussurro sob as Ruínas não é problema de maré. Um dia, quando estiver forte, a Sábia Yun lhe mostra a cripta.' },
     { when: { done: 'porto_carga' }, text: 'As cargas voltaram e o cais respira. Eu devia lhe dar um navio. Por ora, aceite meu agradecimento.' },
     { when: { done: 'porto_chegada' }, text: 'Marfim é terra neutra: todo mundo faz escala, ninguém briga, e nem os ecos passam do portão. Por isso os mestres de estilo vieram: veja a praça ao norte. Tem trabalho no cais.' },
     { text: 'Os barcos não saem: as estradas têm ecos demais. Mas o porto vive, e é terra neutra: ninguém saca arma aqui. Loja, banco e quadro, tudo à mão. Boa caça.' },
@@ -130,5 +131,8 @@ export const TIPS = {
   skill: ['Habilidade nova', 'Ela já está num dos botões de habilidade. As ainda bloqueadas mostram o nível em que liberam.'],
   spirit: ['Seu spirit', 'Spirits crescem com você. Para evoluir, faça a missão do elemento dele com a Sábia Yun (no nível 10 do spirit) e depois use Evoluir em Spirits.'],
   boss: ['Primeiro chefe', 'O mapa leva você a lugares já visitados. Pergaminhos de viagem são vendidos pela Mercadora Lia.'],
+  crypt: ['Cripta dos Ecos', 'A Cripta dos Ecos está aberta: toque no nó dela no mapa.'],
+  spec: ['Especialização', 'Fale com o Mestre da sua classe ou um mentor no Porto para escolher sua especialização.'],
+  phoenix: ['Amuleto da Fênix', 'O Amuleto da Fênix evita a perda de ouro e XP; vende na Lia e no Porto.'],
   ritual: ['Cinzas Ardentes', 'Aqui o chefe desperta pelo "Ritual N/40": cada criatura derrotada enche o contador, e o chão estremece ao completar.'],
 };

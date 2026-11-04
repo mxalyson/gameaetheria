@@ -239,7 +239,7 @@ export const ZONES = {
       { id: 'mentor_warlock', name: 'Morvain, Bruxo', x: 1435, y: 395, color: '#6b3f9a', accent: '#e2c8ff', role: 'mentor' },
       { id: 'mentor_sniper', name: 'Lyra, Franco-atiradora', x: 1565, y: 330, color: '#4f9a6a', accent: '#d8f5c8', role: 'mentor' },
       { id: 'mentor_gunslinger', name: 'Dom Cálix, Pistoleiro', x: 1695, y: 395, color: '#a87a3a', accent: '#ffe6b8', role: 'mentor' },
-      { id: 'mentor_guardian', name: 'Irmã Aurora, Guardiã', x: 1825, y: 330, color: '#e8d58a', accent: '#fffbe0', role: 'mentor' },
+      { id: 'mentor_guardian', name: 'Irmã Aurora, Sentinela', x: 1825, y: 330, color: '#e8d58a', accent: '#fffbe0', role: 'mentor' },
       { id: 'mentor_inquisitor', name: 'Inquisidor Valdor', x: 1955, y: 395, color: '#9a3a4a', accent: '#ffd2d8', role: 'mentor' },
     ],
     // Serviços do Porto: NPC que presta cada um (a UI de cada painel é do agente de UI; ver docs/gameplay/porto.md).

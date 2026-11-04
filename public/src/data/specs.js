@@ -54,7 +54,7 @@ export const SPECS = {
   },
   cleric: {
     guardian: {
-      name: 'Guardião', icon: '🛡️', color: '#fff0b0', desc: 'Protetor do grupo: cura em área, escudo para todos os aliados, Palavra de Salvação e Intervenção Celestial.',
+      name: 'Sentinela', icon: '🛡️', color: '#fff0b0', desc: 'Protetor do grupo: cura em área, escudo para todos os aliados, Palavra de Salvação e Intervenção Celestial.',
     },
     inquisitor: {
       name: 'Inquisidor', icon: '⚖️', color: '#ffb36b', desc: 'Dano sagrado: julgamento que queima, marca que amplia o dano, chama purificadora e o Livro do Veredito.',

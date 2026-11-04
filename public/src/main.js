@@ -26,11 +26,13 @@ import { SnapshotDecoder } from './core/snapshot.js';
 import { decodeLook } from './core/aura.js';
 import { noticeText } from './ui/ui.js';
 import { skillOf, basicOf } from './core/specs.js';
+import { cryptUnlocked, cryptLegacy } from './core/echo.js';
+import { SPEC_LEVEL } from './data/specs.js';
 import { SKILLS } from './data/skills.js';
 import { newlyUnlocked, masteryUnlock } from './core/unlocks.js';
 import { spawnSkillVfx, spawnEventVfx } from './render/skill-vfx.js';
 import { depositItem, withdrawItem } from './core/bank.js';
-import { claimDaily, ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, evolvedSpirits, readLore, mentorSeen } from './core/journal.js';
+import { claimDaily, ensureJournal, recordEvent, offeredBy, readyFor, activeFor, acceptQuest, abandonQuest, turnInQuest, setTitle, openChest, chestReady, takeTip, tipSeen, evolvedSpirits, readLore, mentorSeen } from './core/journal.js';
 import { TIPS } from './data/dialogs.js';
 import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
@@ -55,7 +57,7 @@ const MAX_TICKS = 8;
 const SERVER_COUNTED = new Set(['teleport', 'visit', 'spiritStage']); // eventos de diário que o servidor de partidas conta (server/hub.js, server/tx.js); o cliente não os soma online
 
 // Cripta dos Ecos: recusas de crypt_enter (o texto exato vem do servidor em m.reason; estes são o reserva)
-const CRYPT_REJECT = { crypt_level: 'Nível 20 para entrar na Cripta dos Ecos.', crypt_locked: 'Chegue às Ruínas Sombrias a pé para encontrar a entrada.', crypt_wait: 'A Cripta ainda recupera o fôlego: espere ou use uma Chave de Eco.', crypt_over: 'Essa expedição já terminou: aguarde o grupo sair.', not_here: 'Volte à Vila antes de entrar na Cripta.' };
+const CRYPT_REJECT = { crypt_level: 'Nível 22 para entrar na Cripta dos Ecos.', crypt_locked: 'Derrote o Guardião das Ruínas, depois de chegar a elas a pé, para abrir a Cripta.', crypt_wait: 'A Cripta ainda recupera o fôlego: espere ou use uma Chave de Eco.', crypt_over: 'Essa expedição já terminou: aguarde o grupo sair.', not_here: 'Volte à Vila antes de entrar na Cripta.' };
 const TELEPORT_REJECT = { not_visited: 'Você ainda não visitou esse mapa.', no_scroll: 'Sem pergaminho de teletransporte.', in_combat: 'Em combate: espere uns segundos para viajar.', teleport_wait: 'Calma: espere alguns segundos entre viagens.' };
 
 // papel do NPC → painel do serviço (Porto de Marfim; ver docs/gameplay/porto.md)
@@ -352,8 +354,28 @@ class Game {
   }
 
   // Dica de onboarding: aparece 1× por personagem (bit em char.stats.tips) e vira um toast curto.
-  tip(key) {
-    if (this.char && takeTip(this.char, key) && TIPS[key]) this.ui.toast(TIPS[key][0], TIPS[key][1], '');
+  tip(key, ms = 2200) {
+    if (this.char && takeTip(this.char, key) && TIPS[key]) this.ui.toast(TIPS[key][0], TIPS[key][1], '', ms);
+  }
+
+  // Avisos automáticos (Cripta aberta, Nv15 sem especialização, queda sem Amuleto): 1× por personagem, em fila, só em exploração,
+  // sem painel aberto e fora de combate; um por vez (intervalo de 6 s) para não virar spam.
+  autoTip(key) {
+    if (this.char && !tipSeen(this.char, key) && !(this.tipQ ??= []).includes(key)) this.tipQ.push(key);
+  }
+  pumpTips(dt) {
+    const c = this.char;
+    if (!c) return;
+    this.tipClock = (this.tipClock ?? 0) + dt;
+    if (this.tipClock < 1) return;
+    this.tipClock = 0;
+    if (cryptUnlocked(c) && !cryptLegacy(c)) this.autoTip('crypt');
+    if (c.level >= SPEC_LEVEL && !activeSpec(c)) this.autoTip('spec');
+    if (!this.tipQ?.length) return;
+    const t = this.world.time;
+    if (this.ui.anyOpen() || t - (this.player.lastCombat ?? -99) < 8 || t - (this.tipAt ?? -99) < 6) return;
+    this.tipAt = t;
+    this.tip(this.tipQ.shift(), 5000);
   }
 
   save() {
@@ -1035,7 +1057,7 @@ class Game {
     const w = this.world, p = this.player;
     w.update(dt, intents);
     this.handleEvents();
-    if (this.mode === 'explore') { w.updateSpawns(dt, p); this.checkPortals(); this.regen(dt); }
+    if (this.mode === 'explore') { w.updateSpawns(dt, p); this.checkPortals(); this.regen(dt); this.pumpTips(dt); }
     else if (this.mode === 'waves') this.updateWaves(dt);
     else if (this.mode === 'pvp') this.updateMatch(dt);
     this.collectDrops();
@@ -1980,6 +2002,7 @@ class Game {
       return;
     }
     const zid = this.world.zoneId, z = this.world.zone;
+    if (hasDeathPenalty(zid) && !(c.phoenix > 0)) this.autoTip('phoenix'); // 1ª queda em zona de farm sem Amuleto: o aviso sai depois, já em exploração
     const r = hasDeathPenalty(zid) ? applyDeath(c) : { saved: false, gold: 0, xp: 0 }; // Amuleto da Fênix evita a perda; sem ele, −10% do ouro e do XP do nível
     this.mode = 'ended';
     const at = respawnPoint(c, zid, z.spawn ?? { x: FARM_ENTRY, y: FARM_MID });

@@ -35,6 +35,7 @@ Estoque rotativo diário (semente = personagem + nível + dia UTC): 6 itens, de 
 | `porto_chegada` Cofre de Marfim | Capitã Maré | `bank`: guardar 1 item | 10 |
 | `porto_contrato` Palavra de Contrato | Capitã Maré | `daily`: entregar 1 contrato | 10 (após chegada) |
 | `porto_carga` Cargas Perdidas | Capitã Maré | matar 8 na Planície + 7 nas Ruínas | 12 |
+| `porto_eco_no_cais` Eco no Cais | Capitã Maré | matar 12 nas Ruínas; revela os ecos presos sob as Ruínas (Guardião e Cripta) | 14 (após Cargas Perdidas) |
 | `porto_gelo` Carga de Gelo | Bartolomeu | abrir 3 baús no Cume | 22 |
 | `porto_duelo` Duelo de Cais | Kael | `friendlyDuel`: vencer 1 amistoso (**só offline**, `OFFLINE_TYPES`) | 10 |
 Contadores novos em `stats`: `deposits`, `contracts`, `friendlyWins`, `harborVisits` (em `STAT_KEYS_PROGRESS`; o servidor limita o salto). Conquistas: **Marinheiro** (chegar ao Porto) e **Cliente do Cais** (5 contratos). Eventos que o jogo emite: `bank` (após depósito), `friendlyDuel` (vitória), `visit` (ao entrar no Porto); `daily` sai de `claimDaily`.
