@@ -22,8 +22,8 @@ export const CLASSES = {
   archer: {
     id: 'archer', name: 'Arqueiro', icon: '🏹', color: '#4fae7a', accent: '#d6f2c2',
     desc: 'Ataques rápidos de longo alcance e grande mobilidade.',
-    primary: 'agi', base: { str: 3, agi: 10, int: 3, vit: 6 }, growth: { str: 0, agi: 1.9, int: 0, vit: 1.2 },
-    hpBase: 80, weapon: 'bow',
+    primary: 'agi', base: { str: 3, agi: 10, int: 3, vit: 6 }, growth: { str: 0, agi: 1.9, int: 0, vit: 1.6 },
+    hpBase: 170, weapon: 'bow', // vida 80→170 e Vit 1,2→1,6 (2026-11-04, npm run balance): frágil demais, perdia para Guerreiro e Clérigo em todos os níveis
     basic: { kind: 'projectile', speed: 700, range: 560, cd: 0.5, mult: 0.6, color: '#eaffc0', radius: 4 },
     skills: ['rain', 'pierce', 'roll'], mastery: 'arrowstorm',
   },
