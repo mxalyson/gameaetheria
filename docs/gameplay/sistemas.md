@@ -31,7 +31,7 @@ Controles: WASD (eixos isométricos: W sobe na tela), mouse mira, clique ataca, 
 Documento do personagem versionado (v2), validado e com backup; exportar/importar em Opções e na tela de título. Ver `core/savedoc.js`, `save.js`.
 
 ## Mundo e progressão (P8)
-Missões (12), diálogos, baús, mapa (M), diário (J), conquistas e títulos: ver decisão 0012. Economia: `docs/gameplay/economia.md`.
+Missões (12 do arco principal + Porto, incluindo a cadeia Nv 20-28 "Maré de Ecos", 8 etapas: ver `docs/gameplay/porto.md`), diálogos, baús, mapa (M), diário (J), conquistas e títulos: ver decisão 0012. Economia: `docs/gameplay/economia.md`.
 
 
 ## Rodada 2026-11-02 (equipamento por classe, spirit coletor, mestres)

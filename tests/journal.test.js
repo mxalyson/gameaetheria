@@ -647,3 +647,92 @@ test('avisos automáticos: 3 bits novos, textos curtos e 1× por personagem; a m
   neu.stats.tips |= 1 << TIP_BITS.crypt | 1 << TIP_BITS.spec;
   const r = checkSave(old, neu); assert.equal(r.ok, true); assert.equal(r.doc.stats.tips & ((1 << TIP_BITS.crypt) | (1 << TIP_BITS.spec)), (1 << TIP_BITS.crypt) | (1 << TIP_BITS.spec));
 });
+
+// ---------- cadeia do Porto Nv 20-28: "Maré de Ecos" ----------
+const MARE = ['porto_rota_livre', 'porto_cartas_de_mare', 'porto_contratos_de_vesna', 'porto_recado_da_sabia', 'porto_aco_na_geada', 'porto_geada_nas_velas', 'porto_brasa_no_horizonte', 'porto_primeiro_barco'];
+
+test('Maré de Ecos: 8 missões encadeadas, níveis 20-28 crescentes, NPCs/zonas/mobs existentes e objetivos variados', () => {
+  const npcs = new Set(Object.values(ZONES).flatMap((z) => (z.npcs ?? []).map((n) => n.id)));
+  assert.equal(QUESTS[MARE[0]].after, 'porto_eco_no_cais', 'a cadeia nasce do Eco no Cais');
+  let prevLevel = 20;
+  MARE.forEach((id, i) => {
+    const q = QUESTS[id];
+    assert.ok(q, id);
+    if (i) assert.equal(q.after, MARE[i - 1], id + ' encadeia na anterior');
+    assert.ok(q.level >= prevLevel && q.level >= 20 && q.level <= 28, `${id}: nível ${q.level}`); prevLevel = q.level;
+    assert.ok(npcs.has(q.giver) && (!q.turnIn || npcs.has(q.turnIn)), id + ' NPC');
+    for (const o of q.objectives) {
+      if (o.zone && o.zone !== 'any') assert.ok(ZONES[o.zone]?.mobs, `${id}: zona ${o.zone}`);
+      if (o.type === 'kill' && o.mob !== 'any') assert.ok(ZONES[o.zone].mobs.some(([m]) => m === o.mob), `${id}: ${o.mob} não vive em ${o.zone}`);
+    }
+  });
+  assert.ok(ZONES.harbor.npcs.some((n) => n.id === QUESTS.porto_rota_livre.giver), 'o Porto oferece');
+  const tipos = new Set(MARE.flatMap((id) => QUESTS[id].objectives.map((o) => o.type)));
+  for (const t of ['kill', 'chest', 'bank', 'daily', 'miniboss', 'friendlyDuel', 'level']) assert.ok(tipos.has(t), 'falta objetivo ' + t);
+  const zonas = new Set(MARE.flatMap((id) => QUESTS[id].objectives.map((o) => o.zone).filter(Boolean)));
+  for (const z of ['ruins', 'glacier', 'ember']) assert.ok(zonas.has(z), 'falta a zona ' + z);
+  assert.equal(QUESTS.porto_recado_da_sabia.turnIn, 'sage', 'recado entregue na Vila');
+  assert.ok(ACH_ID('primeiro_barco').quest === 'porto_primeiro_barco');
+});
+const ACH_ID = (id) => ACHIEVEMENTS.find((a) => a.id === id);
+
+test('Maré de Ecos: jogada completa em ordem; cada missão aparece no NPC certo e só depois da anterior', () => {
+  const d = ensureJournal(hero(28));
+  d.quests.done.porto_carga = 1; d.quests.done.porto_eco_no_cais = 1;
+  const ev = { kill: (o) => ({ type: 'kill', mobId: o.mob, zoneId: o.zone, boss: false }) };
+  MARE.forEach((id, i) => {
+    const q = QUESTS[id];
+    if (i < MARE.length - 1) assert.ok(!offeredBy(d, QUESTS[MARE[i + 1]].giver, { server: true }).some((x) => x.id === MARE[i + 1]), 'não pula etapa');
+    assert.ok(offeredBy(d, q.giver, { server: true }).some((x) => x.id === id), `${id} oferecida por ${q.giver}`);
+    assert.equal(acceptQuest(d, id).ok, true, id);
+    for (const o of q.objectives) {
+      if (o.type === 'level') continue; // cumprido ao aceitar
+      for (let n = 0; n < (o.count ?? 1); n++) {
+        if (o.type === 'kill') recordEvent(d, ev.kill(o));
+        else if (o.type === 'miniboss') recordEvent(d, { type: 'kill', mobId: 'knight', zoneId: 'ruins', boss: false, mini: true });
+        else if (o.type === 'chest') recordEvent(d, { type: 'chest', zoneId: o.zone });
+        else recordEvent(d, { type: o.type === 'friendlyDuel' ? 'friendlyDuel' : o.type, won: true });
+      }
+    }
+    assert.equal(isComplete(d, id), true, id + ' completa');
+    const quem = q.turnIn ?? q.giver;
+    assert.ok(readyFor(d, quem).includes(id), `${id} entregue em ${quem}`);
+    if (q.turnIn) assert.ok(!readyFor(d, q.giver).includes(id), 'recado não se entrega em quem deu');
+    assert.equal(turnInQuest(d, id, rng).ok, true, id);
+  });
+  assert.ok(d.achievements.primeiro_barco, 'conquista ao fechar a cadeia');
+});
+
+test('Maré de Ecos: exige o pré-requisito e o nível; recado fica pronto ao aceitar', () => {
+  const baixo = ensureJournal(hero(19)); baixo.quests.done.porto_eco_no_cais = 1;
+  assert.ok(!offeredBy(baixo, 'captain', { server: true }).some((x) => x.id === 'porto_rota_livre'), 'Nv 19 ainda não');
+  const sem = ensureJournal(hero(22));
+  assert.equal(acceptQuest(sem, 'porto_recado_da_sabia').ok, false, 'sem a cadeia anterior');
+  const d = ensureJournal(hero(22)); d.quests.done.porto_contratos_de_vesna = 1;
+  assert.equal(acceptQuest(d, 'porto_recado_da_sabia').ok, true);
+  assert.equal(isComplete(d, 'porto_recado_da_sabia'), true, 'recado: só falta entregar à Yun');
+});
+
+test('Maré de Ecos: o servidor aceita cada entrega (XP dentro do teto de plausibilidade e no máximo 2 níveis por entrega)', () => {
+  const maxOutras = Math.max(...Object.values(QUESTS).filter((q) => !MARE.includes(q.id)).map((q) => q.reward?.xp ?? 0));
+  for (const id of MARE) {
+    const q = QUESTS[id];
+    assert.ok((q.reward.xp ?? 0) <= maxOutras, `${id}: XP ${q.reward.xp} acima do maior da campanha (${maxOutras}): MAX_QUEST_XP mudaria`);
+    const old = ensureJournal(hero(q.level)); old.quests.done[q.after] = 1;
+    acceptQuest(old, id); old.quests.active[id].p = q.objectives.map((o) => o.count ?? 1);
+    old.stats.kills = 100;
+    const neu = structuredClone(old);
+    const r = turnInQuest(neu, id, makeRng(3));
+    assert.equal(r.ok, true, id); assert.ok(r.reward.levels <= LIMITS.levelJump, `${id}: ${r.reward.levels} níveis de uma vez`);
+    const chk = checkSave(old, neu); assert.equal(chk.ok, true, `${id}: ${chk.reason}`);
+  }
+});
+
+test('Maré de Ecos: falas de quem oferece/entrega mudam depois de cada etapa', () => {
+  const d = ensureJournal(hero(28));
+  const par = [['captain', 'porto_rota_livre', /estrada leste/], ['captain', 'porto_primeiro_barco', /apito/], ['banker', 'porto_cartas_de_mare', /cartas de maré/], ['hunter', 'porto_contratos_de_vesna', /letra grande/], ['duelist', 'porto_aco_na_geada', /Ringue e gelo/], ['dealer', 'porto_geada_nas_velas', /Velas secas/], ['sage', 'porto_recado_da_sabia', /cartas de maré/]];
+  for (const [npc, done, re] of par) {
+    d.quests.done[done] = 1;
+    assert.match(greetFor(d, DIALOGS[npc].greet, { online: npc === 'sage' }), re, `${npc} após ${done}`);
+  }
+});

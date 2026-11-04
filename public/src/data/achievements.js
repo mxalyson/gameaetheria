@@ -27,6 +27,7 @@ export const ACHIEVEMENTS = [
   { id: 'voz_dos_ecos', name: 'Voz dos Ecos', desc: 'Conclua o arco final: Os Ecos Unidos.', quest: 'ecos_unidos', min: 1, title: 'Voz dos Ecos' },
   { id: 'marinheiro', name: 'Marinheiro', desc: 'Chegue ao Porto de Marfim.', stat: 'harborVisits', min: 1, title: 'Marinheiro' },
   { id: 'cliente_do_cais', name: 'Cliente do Cais', desc: 'Entregue 5 contratos do Quadro do Porto.', stat: 'contracts', min: 5, title: 'Cliente do Cais' },
+  { id: 'primeiro_barco', name: 'Primeiro Barco', desc: 'Conclua a Maré de Ecos e faça o primeiro barco zarpar do Porto.', quest: 'porto_primeiro_barco', min: 1, title: 'Amarra do Cais' },
   // Cripta dos Ecos (masmorra, decisão 0017): contador do SERVIDOR (cryptClears).
   { id: 'cripta_vencida', name: 'Silêncio da Cripta', desc: 'Cale o Soberano dos Ecos, o rei dos ecos presos, na Cripta dos Ecos.', stat: 'cryptClears', min: 1, title: 'Calador de Ecos' },
   { id: 'cripta_veterana', name: 'Eco Inquebrável', desc: 'Vença a Cripta dos Ecos 5 vezes.', stat: 'cryptClears', min: 5, title: 'Eco Inquebrável' },

@@ -217,6 +217,60 @@ Object.assign(QUESTS, {
   },
 });
 
+// ---- Cadeia do Porto, Nv 20-28: "Maré de Ecos" (Capitã Maré quer um barco no mar de novo). Reusa só objetivos existentes; `turnIn` = entrega em outro NPC (recado).
+// Cânone respeitado: Marfim é terra neutra e os barcos estão parados porque as estradas têm ecos demais; os ecos presos sussurram sob as Ruínas (porto_eco_no_cais);
+// a Yun é quem liga o sussurro ao Cume; o Ancião Gélido e o Rubro seguem sendo os reflexos (missões deles, Nv 27+). XP até 36000: abaixo do teto de plausibilidade (MAX_QUEST_XP). ----
+Object.assign(QUESTS, {
+  porto_rota_livre: {
+    id: 'porto_rota_livre', name: 'Rota Livre', giver: 'captain', level: 20, after: 'porto_eco_no_cais',
+    text: { offer: 'Barco sem estrada não carrega nada. Os cavaleiros e espectros das Ruínas fecham a rota leste: abata dez de cada e eu tiro a primeira carta de rota da gaveta.', progress: 'Dez Cavaleiros Caídos e dez Espectros nas Ruínas Sombrias, a leste do Porto. Leve poções.', done: 'A estrada respira de novo. Ainda não é frota, mas é um começo. Tome, é frete adiantado.' },
+    objectives: [{ type: 'kill', mob: 'knight', zone: 'ruins', count: 10, label: 'Derrote 10 Cavaleiros Caídos nas Ruínas Sombrias' }, { type: 'kill', mob: 'wraith', zone: 'ruins', count: 10, label: 'Derrote 10 Espectros nas Ruínas Sombrias' }],
+    reward: { gold: 1000, xp: 12000, potions: 3 },
+  },
+  porto_cartas_de_mare: {
+    id: 'porto_cartas_de_mare', name: 'Cartas de Maré', giver: 'banker', level: 21, after: 'porto_rota_livre',
+    text: { offer: 'A Capitã precisa de cartas náuticas antigas, e o senhor sabe onde papel velho sobrevive: em baús das Ruínas. Abra dois e depois guarde uma carta no meu cofre. Papel precisa de cuidado.', progress: 'Dois baús nas Ruínas Sombrias e um item guardado no banco do Porto. O papel não gosta de umidade, nem de pressa.', done: 'Admirável. As cartas citam um ponto onde o mar sussurra, como o cais. Alguém deveria mostrá-las à Sábia Yun. O senhor conhece a Capitã.' },
+    objectives: [{ type: 'chest', zone: 'ruins', count: 2, label: 'Abra 2 baús nas Ruínas Sombrias' }, { type: 'bank', count: 1, label: 'Guarde 1 item no banco do Porto' }],
+    reward: { gold: 1100, xp: 14000, items: [{ rarity: 'rare' }] },
+  },
+  porto_contratos_de_vesna: {
+    id: 'porto_contratos_de_vesna', name: 'Nome no Quadro', giver: 'hunter', level: 22, after: 'porto_cartas_de_mare',
+    text: { offer: 'Quem escolta barco precisa de nome no meu quadro. Entregue dois contratos e derrube um mini-chefe, e cada contrato ainda rende uma Chave de Eco. Mostre que a estrada é sua.', progress: 'Dois contratos entregues no Quadro e um mini-chefe abatido. Cada contrato rende uma Chave de Eco para a Cripta.', done: 'Nome limpo e escrito em letra grande. A Capitã vai gostar de saber que alguém de confiança fez a ronda.' },
+    objectives: [{ type: 'daily', count: 2, label: 'Entregue 2 contratos do Quadro' }, { type: 'miniboss', mob: 'any', count: 1, label: 'Derrote 1 mini-chefe' }],
+    reward: { gold: 1300, xp: 16000, potions: 3 },
+  },
+  porto_recado_da_sabia: {
+    id: 'porto_recado_da_sabia', name: 'Recado para a Sábia', giver: 'captain', turnIn: 'sage', level: 22, after: 'porto_contratos_de_vesna',
+    text: { offer: 'As cartas de Octávio falam de um sussurro que corre pela costa. Só uma pessoa decifra isso: leve-as à Sábia Yun, na Vila de Lúmen. Pode usar o mapa, se já passou por lá.', progress: 'Leve as cartas de maré à Sábia Yun, na Vila de Lúmen. O mapa viaja de graça de volta à vila.', done: ['Marés e ecos sobem e descem juntos. O sussurro do cais corre para o leste, pelo Cume Gélido.', 'Diga à Capitã que a rota segue a geada. Os ecos de lá são cópias, e quem copia deixa rastro.'] },
+    objectives: [{ type: 'level', count: 22, label: 'Leve as cartas de maré à Sábia Yun, na Vila de Lúmen' }],
+    reward: { gold: 600, xp: 8000, potions: 2 },
+  },
+  porto_aco_na_geada: {
+    id: 'porto_aco_na_geada', name: 'Aço na Geada', giver: 'duelist', level: 23, after: 'porto_recado_da_sabia',
+    text: { offer: 'Se a rota segue a geada, a geada tem dentes. Treino não é medo: ganhe um duelo amistoso no meu ringue e depois cace doze lobos da geada no Cume. Aço aprende em lugares frios.', progress: 'Um duelo amistoso no ringue do Porto e doze Lobos da Geada no Cume Gélido, a leste das Ruínas.', done: 'Ringue e gelo, duas escolas. Aperto de mão, herói. A Capitã já pergunta por você.' },
+    objectives: [{ type: 'friendlyDuel', count: 1, label: 'Vença 1 duelo amistoso' }, { type: 'kill', mob: 'frostwolf', zone: 'glacier', count: 12, label: 'Derrote 12 Lobos da Geada no Cume Gélido' }],
+    reward: { gold: 1500, xp: 20000, items: [{ rarity: 'rare' }] },
+  },
+  porto_geada_nas_velas: {
+    id: 'porto_geada_nas_velas', name: 'Geada nas Velas', giver: 'dealer', level: 25, after: 'porto_aco_na_geada',
+    text: { offer: 'Vela com geada não enfuna, freguês. O frio do Cume desce até o cais e os fogos-fátuos glaciais são os primeiros a chegar. Doze deles e doze geleias gélidas, e eu garanto o seu desconto.', progress: 'Doze Fogos-fátuos Glaciais e doze Geleias Gélidas no Cume Gélido. Leve poções e um bom casaco.', done: 'Velas secas, livro de contas feliz. Desconto de freguês garantido, e a minha palavra é de comerciante.' },
+    objectives: [{ type: 'kill', mob: 'icewisp', zone: 'glacier', count: 12, label: 'Derrote 12 Fogos-fátuos Glaciais no Cume Gélido' }, { type: 'kill', mob: 'frostslime', zone: 'glacier', count: 12, label: 'Derrote 12 Geleias Gélidas no Cume Gélido' }],
+    reward: { gold: 1800, xp: 26000, potions: 3 },
+  },
+  porto_brasa_no_horizonte: {
+    id: 'porto_brasa_no_horizonte', name: 'Brasa no Horizonte', giver: 'captain', level: 27, after: 'porto_geada_nas_velas',
+    text: { offer: 'À noite, o céu a leste fica vermelho. Se o gelo era cópia, o que arde é o quê? Vá até as Cinzas Ardentes e abata doze lobos de brasa e dez espectros de cinzas. Volte com a resposta.', progress: 'Doze Lobos de Brasa e dez Espectros de Cinzas nas Cinzas Ardentes, a leste do Cume. O chão queima: leve poções.', done: 'Cópias de fogo, como a geada. O eco tenta se juntar de novo e erra a conta. Ainda não sei o que fazer, mas agora sei onde olhar.' },
+    objectives: [{ type: 'kill', mob: 'emberwolf', zone: 'ember', count: 12, label: 'Derrote 12 Lobos de Brasa nas Cinzas Ardentes' }, { type: 'kill', mob: 'cinderwraith', zone: 'ember', count: 10, label: 'Derrote 10 Espectros de Cinzas nas Cinzas Ardentes' }],
+    reward: { gold: 2200, xp: 32000, potions: 4 },
+  },
+  porto_primeiro_barco: {
+    id: 'porto_primeiro_barco', name: 'O Primeiro Barco', giver: 'captain', level: 28, after: 'porto_brasa_no_horizonte',
+    text: { offer: 'Um barco só zarpa se a estrada o deixar chegar ao cais. Derrube o Cão do Inferno, o mini-chefe das Cinzas, e traga a carga de dois baús de lá. Se voltar inteiro, eu solto as amarras.', progress: 'Um mini-chefe das Cinzas Ardentes (o Cão do Inferno) e dois baús de lá. Depois, volte ao cais.', done: 'Amarras soltas. Um barco só: as estradas ainda têm ecos demais para uma frota. Mas um barco só já é rota. O Porto nunca esqueceu quem o fez. Obrigada, herói.' },
+    objectives: [{ type: 'miniboss', mob: 'any', count: 1, label: 'Derrote 1 mini-chefe (o Cão do Inferno, nas Cinzas)' }, { type: 'chest', zone: 'ember', count: 2, label: 'Abra 2 baús nas Cinzas Ardentes' }],
+    reward: { gold: 3500, xp: 36000, potions: 5, items: [{ rarity: 'epic' }] },
+  },
+});
+
 // ---- Cripta dos Ecos (masmorra por instância, decisão 0017): a Yun apresenta a masmorra; o objetivo `crypt` só o servidor soma ----
 Object.assign(QUESTS, {
   cripta_dos_ecos: {

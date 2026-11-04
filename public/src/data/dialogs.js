@@ -15,6 +15,7 @@ export const DIALOGS = {
     { when: { done: 'cripta_dos_ecos' }, text: 'Você calou o Soberano, mas os ecos de lá não se apagam. Os fragmentos que trouxe rendem aço no Ferreiro. A Cripta recupera o fôlego em vinte minutos.' },
     { when: { done: 'ecos_unidos' }, text: 'Os ecos repousam, mas eu ainda os ouço, bem baixinho. Escolha bem quem caminha ao seu lado.' },
     { when: { level: 22, offline: true }, text: 'Sob as Ruínas há uma cripta onde os ecos presos têm um rei. Ela só se abre com o mar conectado. Volte quando houver rede, herói.' },
+    { when: { done: 'porto_recado_da_sabia' }, text: 'As cartas de maré do Porto sussurram como os ecos. Marés e ecos sobem e descem juntos. A rota segue a geada.' },
     { when: { done: 'anciao_gelido' }, text: 'O frio não era dele. Era do que veio antes. Os spirits ainda estremecem quando falo disso.' },
     { when: { bossKills: 1 }, text: 'Ouço o Carvalho em você, quase um sussurro. Spirits são ecos da natureza: escolha bem quem caminha ao seu lado.' },
     { text: 'Eco é o que fica quando algo não repousa. Spirits são os ecos mansos da natureza. Escolha bem quem caminha ao seu lado.' },
@@ -95,27 +96,34 @@ export const DIALOGS = {
   // ---- Porto de Marfim (zona `harbor`): `service.panel` é o painel que a UI deve abrir (ver docs/gameplay/porto.md) ----
   banker: { greet: [
     { when: { done: 'cripta_dos_ecos' }, text: 'Fragmentos de eco o senhor carrega consigo: não entram no cofre. Peças forjadas com eles, sim. Aço que lembra também precisa dormir.' },
+    { when: { done: 'porto_cartas_de_mare' }, text: 'As cartas de maré estão seguras no cofre, e a Capitã sabe onde achá-las. O senhor tem mão boa para papel velho.' },
     { when: { done: 'porto_chegada' }, text: 'O primeiro item no cofre é sempre o mais difícil de largar. Os outros, o senhor guarda de olhos fechados.' },
     { when: { level: 20 }, text: 'Um cliente de peso! Seu cofre tem 40 vagas e ninguém além de você tem a chave. Nem eu, juro.' },
     { text: 'Banco de Marfim: guardo o que a mochila não aguenta. Quarenta vagas, sem juros e sem perguntas.' },
   ], service: { label: 'Abrir o banco', panel: 'bank' } },
   hunter: { greet: [
+    { when: { done: 'porto_contratos_de_vesna' }, text: 'Seu nome está em letra grande no quadro, e a Capitã sabe quem fez a ronda. Cada contrato entregue ainda rende uma Chave de Eco.' },
     { when: { done: 'porto_contrato' }, text: 'Seu nome já circula no quadro. Gosto de quem entrega no prazo. Hoje tem contrato novo, e cada um entregue rende uma Chave de Eco.' },
     { when: { bossKills: 1 }, text: 'Já derrubou um chefe, é? Ótimo. O quadro muda todo dia: três contratos, pagamento na entrega.' },
     { text: 'O Quadro renova toda manhã: caça, baús, nada que um iniciante não aguente. Cada contrato entregue rende uma Chave de Eco, que pula a espera da Cripta, sob as Ruínas.' },
   ], service: { label: 'Ver contratos de hoje', panel: 'board' } },
   dealer: { greet: [
+    { when: { done: 'porto_geada_nas_velas' }, text: 'Velas secas e livro de contas feliz. Para quem limpou a geada do cais, o meu preço de freguês é de coração.' },
     { when: { done: 'porto_gelo' }, text: 'O gelo do Cume rendeu bem. Poção e pergaminho com desconto de freguês, e troco itens comuns por um raro. Pergunte.' },
     { when: { level: 20 }, text: 'Mercadoria de navio, nível de gente grande. O estoque gira todo dia: o que sumiu hoje, só volta por sorte.' },
     { text: 'Do cais para a sua mochila! Estoque novo todo dia, preço de porto. Hoje tem até peça épica, se eu não vender antes.' },
   ], service: { label: 'Ver o estoque do dia', panel: 'shop:harbor' } },
   duelist: { greet: [
+    { when: { done: 'porto_aco_na_geada' }, text: 'Ringue e gelo: duas escolas, um herói. Quando a geada voltar a pedir aço, o meu ringue continua de pé.' },
     { when: { offline: false }, text: 'Com o mar conectado, o ringue chama duelistas de verdade. Sem Elo, sem rancor: ranking é da Grande Arena de Doran.' },
     { when: { done: 'porto_duelo' }, text: 'Lembro do seu golpe de cais. Quando quiser outra rodada, o ringue está de pé.' },
     { text: 'Duelo amistoso: sem pontos, sem rancor, só aço. Ninguém perde Elo no meu ringue. Aceita?' },
   ], service: { label: 'Duelo amistoso 1×1', panel: 'arena:friendly' } },
   captain: { greet: [
     { when: { done: 'ecos_unidos' }, text: 'A maré mudou depois do que fez. Chegou ao Porto um viajante de capa violeta, que tece ecos, e pergunta por você. Obrigada, herói.' },
+    { when: { done: 'porto_primeiro_barco' }, text: 'Ouviu o apito? É o primeiro barco em muito tempo, e a rota é sua. Só um, mas o cais voltou a ter horário. Obrigada, herói.' },
+    { when: { done: 'porto_brasa_no_horizonte' }, text: 'O céu vermelho a leste já não me assusta tanto: sei que é cópia. Falta provar que a estrada aguenta um barco.' },
+    { when: { done: 'porto_rota_livre' }, text: 'A estrada leste está mais limpa. Octávio guarda cartas antigas, e a Mestra Vesna pede nomes de confiança. Passe por eles.' },
     { when: { done: 'porto_eco_no_cais' }, text: 'O sussurro sob as Ruínas não é problema de maré. Um dia, quando estiver forte, a Sábia Yun lhe mostra a cripta.' },
     { when: { done: 'porto_carga' }, text: 'As cargas voltaram e o cais respira. Eu devia lhe dar um navio. Por ora, aceite meu agradecimento.' },
     { when: { done: 'porto_chegada' }, text: 'Marfim é terra neutra: todo mundo faz escala, ninguém briga, e nem os ecos passam do portão. Por isso os mestres de estilo vieram: veja a praça ao norte. Tem trabalho no cais.' },
