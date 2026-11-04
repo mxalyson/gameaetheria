@@ -273,7 +273,7 @@ export function drawSkillVfx(g, world, lite = false) {
   if (world !== poolWorld) { P.n = 0; poolWorld = world; lastT = now; }
   DT = Math.min(0.05, Math.max(0, now - lastT)); lastT = now;
   LITE = lite; cap = lite ? 90 : MAXP;
-  if ((!list || !list.length) && P.n === 0) return;
+  if ((!list || !list.length) && P.n === 0 && !anyStatus(world)) return;
   if (!vfxKitReady()) { loadVfxKit(); if (list) for (let i = list.length - 1; i >= 0; i--) if (now - list[i].t0 >= list[i].life) list.splice(i, 1); return; }
   if (DT > 0) { stepP(DT); warmStep(); }
   g.save(); curBl = -1; g.lineCap = 'round';
@@ -307,6 +307,7 @@ export function drawSkillVfx(g, world, lite = false) {
       case 'heal': drawHeal(g, f, k, cx, cy); break;
     }
   }
+  drawStatus(g, world, now);
   drawP(g);
   g.restore(); curBl = -1;
   g.globalAlpha = 1;
@@ -666,6 +667,71 @@ function drawHeal(g, f, k, cx, cy) { // cruzes verdes subindo do alvo, com aura 
     put(g, SP.cross, f.m, 0, cx + Math.sin(i * 2.1 + k * 3) * 14, cy - 6 - u * 44, 15 * (1 - u * 0.4), 15 * (1 - u * 0.4), 0, o * (1 - u * 0.4));
   }
   if (!f.n) { f.n = 1; for (let i = cnt(8); i > 0; i--) em(SP.spark, f.h, 0, cx + (rnd() - 0.5) * 24, cy + (rnd() - 0.5) * 10, 2, 0, 0, 40 + rnd() * 40, 9 + rnd() * 5, 2, 0.6 + rnd() * 0.4, 0, 0, 1, 0.5, -20); }
+}
+
+// ---- estados que ficam no alvo enquanto duram (só leitura do ator: markT/markAmt = Marca; burn com origem Bruxo = Maldição; área 'channel' = Drenar Vida) ----
+// Marca da Pena (Inquisidor, +30%): selo violeta-âmbar girando sobre a cabeça. Martelo Sagrado (Paladino, +15%): selo solar com cruz de luz.
+// Maldição (Bruxo): fiapos verdes subindo do alvo e sigilo tóxico. Sem alocação: tudo é leitura + sprites do kit + partículas do pool.
+const isCurse = (a) => a.burn && a.burn.t > 0 && a.burn.src?.spec === 'warlock';
+const inqMark = (a) => a.markT > 0 && a.markAmt >= 0.25;
+function anyStatus(world) {
+  for (const a of world.actors) if (!a.dead && !a.hidden && (a.markT > 0 || (a.burn && isCurse(a)))) return true;
+  if (world.areas) for (const ar of world.areas) if (ar.kind === 'channel' && ar.ticks > 0) return true;
+  return false;
+}
+const tickAt = (now, perSec, ph) => ((now * perSec + ph) | 0) !== (((now - DT) * perSec + ph) | 0); // emite ~perSec vezes por segundo sem guardar estado
+let stWarm = false;
+function drawStatus(g, world, now) {
+  if (!stWarm) { stWarm = true; warm(PL.violamber); warm(PL.amber); warm(PL.gold); warm(PL.holy); warm(PL.toxic); warm(PL.leaf); }
+  const lite = LITE;
+  for (const a of world.actors) {
+    if (a.dead || a.hidden) continue;
+    const hasMark = a.markT > 0, curse = a.burn ? isCurse(a) : false;
+    if (!hasMark && !curse) continue;
+    const ph = (a.id ?? 1) * 1.37, r = a.r ?? 16, x = a.x, y0 = a.y - r - 30, bob = Math.sin(now * 3 + ph) * 2.5;
+    if (hasMark) {
+      const fade = a.markT < 0.5 ? a.markT / 0.5 : 1, pulse = 0.8 + 0.2 * Math.sin(now * 6 + ph), y = y0 + bob;
+      if (inqMark(a)) { // selo violeta-âmbar com estrela de oito pontas no centro, girando
+        put(g, SP.glow, PL.violamber, 1, x, y, 62, 62, 0, 0.55 * fade * pulse);
+        put(g, SP.rune0, PL.violamber, 0, x, y, 48, 48, now * 1.6 + ph, 0.95 * fade);
+        if (!lite) put(g, SP.rune1, PL.amber, 0, x, y, 31, 31, -now * 2.4 + ph, 0.8 * fade);
+        put(g, SP.star8, PL.amber, 0, x, y, 20 * pulse, 20 * pulse, now * 0.8, fade);
+        if (!lite && tickAt(now, 3, ph)) em(SP.twinkle0 + ((rnd() * 4) | 0), PL.amber, 0, x + (rnd() - 0.5) * 30, y + (rnd() - 0.5) * 12, 0, 0, 0, 18, 12, 3, 0.7, rnd(), 1, 1, 0.7, 0);
+      } else { // selo solar com cruz de luz (marca do martelo)
+        put(g, SP.glow, PL.gold, 1, x, y, 58, 58, 0, 0.5 * fade * pulse);
+        put(g, SP.rune1, PL.gold, 0, x, y, 46, 46, -now * 1.4 + ph, 0.95 * fade);
+        put(g, SP.cross, PL.holy, 0, x, y + 1, 23 * pulse, 23 * pulse, 0, fade);
+        if (!lite && tickAt(now, 3, ph)) em(SP.spark, PL.holy, 0, x + (rnd() - 0.5) * 30, y + 10, 0, 0, 0, 28, 8, 2, 0.8, 0, 0, 1, 0.8, 0);
+      }
+    }
+    if (curse) { // Maldição: névoa tóxica nos pés, sigilo girando e fiapos verdes subindo
+      const fade = a.burn.t < 0.5 ? a.burn.t / 0.5 : 1, pulse = 0.75 + 0.25 * Math.sin(now * 4 + ph);
+      put(g, SP.glow, PL.toxic, 1, x, a.y - r * 0.3, r * 3.2, r * 2.2, 0, 0.4 * fade * pulse);
+      if (!hasMark) {
+        const y = y0 + bob;
+        put(g, SP.rune0, PL.toxic, 0, x, y, 38, 38, now * 1.2 + ph, 0.9 * fade);
+        put(g, SP.glow, PL.leaf, 1, x, y, 26, 26, 0, 0.5 * fade * pulse);
+      }
+      if (tickAt(now, lite ? 2.5 : 5, ph)) em(SP.wisp0 + ((rnd() * 2) | 0), rnd() < 0.5 ? PL.toxic : PL.leaf, 0, x + (rnd() - 0.5) * r * 1.4, a.y - r * 0.2, 4, (rnd() - 0.5) * 12, 0, 46 + rnd() * 30, 10 + rnd() * 5, 5, 1.1, rnd() * TAU, (rnd() - 0.5) * 3, 0.85, 1.1, -10);
+    }
+  }
+  if (world.areas) for (const ar of world.areas) if (ar.kind === 'channel' && ar.ticks > 0) drawDrain(g, ar, now);
+}
+// Drenar Vida: fio de luz tóxica entre o herói e o alvo durante a canalização, com fagulhas correndo do alvo para o herói (a vida voltando)
+function drawDrain(g, ar, now) {
+  const src = ar.src, t = ar.vt;
+  if (!src || src.dead || !t || t.dead) return;
+  const x0 = src.x, y0 = src.y - 22, x1 = t.x, y1 = t.y - 16, dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
+  if (len < 8) return;
+  const ang = Math.atan2(dy, dx), mx = (x0 + x1) / 2, my = (y0 + y1) / 2 + Math.sin(now * 5) * 3, pulse = 0.8 + 0.2 * Math.sin(now * 14);
+  put(g, SP.glow, PL.toxic, 1, mx, my, len + 40, 34 * pulse, ang, 0.5);
+  put(g, SP.ribbon0, PL.toxic, 0, mx, my, len + 24, 12 + 4 * pulse, ang, 0.95);
+  put(g, SP.ribbon1, PL.leaf, 0, mx, my, len, 5, ang, 0.9);
+  put(g, SP.glow, PL.leaf, 1, x1, y1, 34, 34, 0, 0.55 * pulse); // ponta no alvo
+  if (tickAt(now, LITE ? 6 : 12, src.id ?? 1)) { // fagulha correndo do alvo para o herói
+    const u = rnd() * 0.5, sp = 1.4;
+    em(SP.wisp0 + ((rnd() * 2) | 0), PL.leaf, 0, x1 - dx * u, y1 - dy * u, 0, dx * sp * 0.5, dy * sp * 0.5, 0, 11, 4, 0.55, rnd() * TAU, 2, 0.9, 0, 0);
+  }
 }
 
 // o desenho chama isto uma vez por quadro: guarda a posição anterior dos atores que podem se teleportar

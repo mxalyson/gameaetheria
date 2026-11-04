@@ -861,6 +861,7 @@ export class World {
         ar.next = ar.interval;
         if (ar.kind === 'channel') { // Drenar Vida: o inimigo mais próximo dentro do alcance
           const e = this.nearestEnemy(ar.src, ar.r);
+          ar.vt = e; // só apresentação: o fio do Drenar Vida liga o herói a este alvo (render/skill-vfx.js)
           if (e) {
             const got = this.damage(ar.src, e, ar.mult);
             if (got > 0 && !ar.src.dead) this.heal(ar.src, got * ar.leech, true);

@@ -116,3 +116,22 @@ test('kit de VFX: cada habilidade x especialização (e eventos crit/absorb/cura
   assert.ok(Number.isFinite(s.x) && Math.abs(s.x) <= 5);
   assert.ok(performance.now() - t0 < 4000, `${frames} quadros devem desenhar rápido (${(performance.now() - t0) | 0} ms)`);
 });
+
+test('estados no alvo (Marca da Pena, Martelo Sagrado, Maldição) e fio do Drenar Vida: só números válidos, só enquanto duram, sem alocar no pool além do teto', () => {
+  const bad = [], g = fakeCtx(bad);
+  const w = { time: 5, actors: [], svfx: [], areas: [] };
+  const mk = (id, extra) => ({ id, x: 300 + id * 40, y: 300, r: 16, dead: false, kind: 'mob', ...extra });
+  const inq = mk(1, { markT: 5, markAmt: 0.3 }), pal = mk(2, { markT: 5, markAmt: 0.15 }), cur = mk(3, { burn: { t: 7, src: { spec: 'warlock' } } }), fire = mk(4, { burn: { t: 7, src: { spec: 'berserker' } } });
+  const lock = { id: 9, x: 200, y: 300, r: 14, dead: false, kind: 'player', spec: 'warlock' };
+  w.actors.push(inq, pal, cur, fire, lock);
+  w.areas.push({ kind: 'channel', ticks: 4, src: lock, vt: cur });
+  for (const lite of [false, true]) for (let t = 0; t < 8; t += 1 / 30) {
+    w.time = 5 + t; inq.markT = pal.markT = Math.max(0, 5 - t); cur.burn.t = Math.max(0, 7 - t);
+    drawSkillVfx(g, w, lite);
+  }
+  assert.deepEqual(bad, [], 'nenhum desenho pode receber NaN/infinito');
+  // sem estado ativo e sem efeitos: nada a desenhar (retorno antecipado)
+  const calls = []; const spy = new Proxy({}, { get: (t, k) => (...a) => { calls.push(k); } });
+  drawSkillVfx(spy, { time: 20, actors: [{ ...inq, markT: 0 }, { ...cur, burn: null }], svfx: [], areas: [] }, false);
+  assert.ok(calls.length === 0 || calls.every((c) => c === 'save' || c === 'restore'), 'estado vencido não desenha');
+});

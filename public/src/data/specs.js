@@ -29,7 +29,7 @@ export const SPECS = {
     },
     berserker: {
       name: 'Berserker', icon: '🪓', color: '#ff7a2e', noOffhand: true, desc: 'Duas mãos, sem escudo: salto, frenesi e sangramento; quanto menos vida, mais dano. Sem bloqueio e com defesa menor.',
-      mods: { stats: { powerMul: 1.03, defMul: 0.97 }, basic: { mult: 1.12 }, lowHp: { below: 0.5, max: 0.7 } },
+      mods: { stats: { powerMul: 1.05, defMul: 0.97 }, basic: { mult: 1.2 }, lowHp: { below: 0.5, max: 0.7 } },
     },
   },
   mage: {

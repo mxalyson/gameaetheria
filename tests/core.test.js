@@ -575,8 +575,9 @@ test('G3: XP de PvP — vitória 6%, derrota 2%, sem teto por hora, 3º duelo se
   assert.ok(later.summary.xp > 0, 'passada a janela de 30 min volta a pagar');
 });
 
-test('G4: Guardião e Ancião (vida recalibrada após os kits próprios), missões em níveis mais altos; Cavaleiro Rubro intocado', () => {
-  assert.equal(MOBS.guardian.hp, 20); assert.equal(MOBS.frostlord.hp, 21); assert.equal(MOBS.infernoknight.hp, 16);
+test('G4: chefes recalibrados após os kits próprios (Guardião/Ancião vida; Carvalho, Colosso e Cavaleiro Rubro vida e ataque), missões em níveis mais altos', () => {
+  assert.equal(MOBS.guardian.hp, 20); assert.equal(MOBS.frostlord.hp, 21); assert.equal(MOBS.infernoknight.hp, 25); assert.equal(MOBS.infernoknight.atk, 5.3);
+  assert.equal(MOBS.treant.hp, 10); assert.equal(MOBS.treant.atk, 1.55); assert.equal(MOBS.colossus.hp, 13); assert.equal(MOBS.colossus.atk, 2.0);
   assert.equal(QUESTS.guardiao_das_ruinas.level, 22); assert.equal(QUESTS.anciao_gelido.level, 27);
 });
 
@@ -686,7 +687,7 @@ test('G6/G7: a rampa de iniciante dos mobs é leve (só poder) e some no nível 
   assert.ok(makeMobActor('wolf', 1, 0, 0).stats.power < p(1) * 3.1 && makeMobActor('wolf', 1, 0, 0).stats.power > p(1) * 3.1 * 0.9);
   assert.ok(Math.abs(makeMobActor('wolf', 6, 0, 0).stats.power - p(6) * 3.1 * 1.0) / (p(6) * 3.1) < 0.06, 'quase na curva pura no 6');
   assert.equal(makeMobActor('wolf', 6, 0, 0).maxHp, Math.round(pure(6) * 0.9 * 1.15));
-  assert.equal(makeMobActor('treant', 3, 0, 0).maxHp, Math.round(pure(3) * 9));
+  assert.equal(makeMobActor('treant', 3, 0, 0).maxHp, Math.round(pure(3) * 10));
   assert.ok(rookieHp(1) > rookieHp(4) && rookieHp(4) > 0 && rookieHp(10) === 0 && rookiePower(10) === 0, 'bônus de iniciante some antes do PvP (nível 10)');
 });
 

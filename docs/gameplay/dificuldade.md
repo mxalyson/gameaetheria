@@ -287,3 +287,23 @@ Ajuste em `data/mobs.js`: Guardião vida ×9→×20, ataque ×1,7→×2,0; Anci�
     best   Nv19                88            100                 88
 
 Também ficaram mais fáceis com os kits e NÃO foram tocados: Carvalho (normal Nv7 94%, era 69%), Colosso (normal Nv13 19%, era 13%; good Nv10 88%, era 50%) e o Cavaleiro Rubro (good Nv30 100%, era 56%; best Nv25 88%, era 13%; normal Nv30 6%). Início do jogo intacto (Carvalho/lobos). `tests/core.test.js` G4 e o digest de `ruins` em `tests/zone-determinism.test.js` foram atualizados (só `ruins` mudou; forest e plains iguais).
+Carvalho, Colosso e Cavaleiro Rubro recalibrados depois (2026-11-04, `data/mobs.js`; `BOSS_SPAWN` e ritual intactos): Carvalho vida ×9→×10, ataque ×1,5→×1,55; Colosso vida ×10→×13, ataque ×1,6→×2,0; Cavaleiro Rubro vida ×16→×25, ataque ×3,2→×5,3 (tabela por chefe; 16 execuções por célula).
+
+    Chefe / célula               antigo   com kits   agora
+    Carvalho normal Nv7             69        94        75
+    Carvalho normal Nv5             44        50        44
+    Carvalho good   Nv5             88       100        94
+    Colosso  good   Nv10            50        88        50
+    Colosso  normal Nv13            13        19         6
+    Colosso  normal Nv15            63        94        75
+    Colosso  good   Nv13           100       100       100
+    Cavaleiro good  Nv30            56       100        50
+    Cavaleiro best  Nv30            81       100        81
+    Cavaleiro best  Nv25            13        88        25
+    Cavaleiro normal Nv30            0         6         0
+    Cavaleiro good  Nv25             0        25         0
+
+Início do jogo intacto (Guerreiro vs 2 lobos Nv4: 80%). `tests/core.test.js` G4 (hp/atk) e os digests de `forest` e `plains` em `tests/zone-determinism.test.js` foram atualizados (`ruins` igual).
+
+### Berserker sem Maestria no Nv30 (2026-11-04)
+Só dados: `specs.js` (powerMul 1,03→1,05; ataque básico ×1,12→×1,20) e `kits.js` (Ira de Brasa +12%/+15% vel. → +8%/+10%). `npm run balance -- --n 60`: Nv30 sem Maestria 27%→40%, com Maestria 47–53%→57%, Nv20 49%→57% (o ganho do Nv30 vem junto com o do Nv20; vida e defesa intactas). Meta de 45% sem Maestria não atingida sem estourar o Nv20.

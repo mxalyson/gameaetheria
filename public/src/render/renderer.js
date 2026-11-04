@@ -118,7 +118,7 @@ export class Renderer {
     const vis = (x, y) => x > x0 && x < x1 && y > y0 && y < y1;
     if (z.scenery) drawGroundLife(g, world, t, vis);
 
-    for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortal(g, p, t, cam.x + 10, cam.x + this.ww - 10);
+    for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortal(g, p, t);
     const cpSaved = view.cpSaved; // Pedra de Retorno salva (char.checkpoint): anel dourado; as outras ficam em azul-pálido
     for (const c of z.checkpoints ?? []) if (vis(c.x, c.y)) drawCheckpointRing(g, c, t, !!cpSaved && cpSaved.x === c.x && cpSaved.y === c.y);
     if (view.route) drawRoute(g, view.route, t, view.autoOn);
@@ -173,6 +173,7 @@ export class Renderer {
     PROMPTS.length = 0; SAFE.cx = cam.x; SAFE.cy = cam.y; SAFE.zm = zm; SAFE.vw = this.vw; SAFE.vh = this.vh; SAFE.hud = hud;
     const covered = (a) => { const sx = (a.x - cam.x) * zm, sy = (a.y - cam.y) * zm - 40 * zm; for (const [x0, y0, x1, y1] of hud) if (sx > x0 && sx < x1 && sy > y0 && sy < y1) return true; return false; };
     for (const a of world.actors) if (!a.dead && !a.hidden && vis(a.x, a.y) && (a === player || a.kind !== 'mob' || a.boss || !covered(a))) drawBars(g, a, a === player, this.labels);
+    for (const p of z.portals ?? []) if (vis(p.x, p.y)) drawPortalLabel(g, p, cam.x + 10, cam.x + this.ww - 10);
     labelLifts(g, z.npcs, vis, view.questMarks, view.guideNpc);
     for (const n of z.npcs ?? []) if (vis(n.x, n.y)) drawNpcTag(g, n, t, view.questMarks?.[n.id], view.guideNpc === n.id);
     for (const n of z.npcs ?? []) if (vis(n.x, n.y) && view.nearNpc === n.id) drawPrompt(g, n.x, n.y + 22, 'Toque para conversar'); // depois de TODOS os nomes: o aviso desvia deles (sem tecla no texto, decisão 0016); presa à área livre
@@ -840,7 +841,7 @@ function drawTelegraph(g, tg, t) {
 // Cor do portal pelo destino (borda clara, miolo, brilho).
 const PORTAL_COL = { town: ['255,236,170', '255,200,90'], forest: ['190,255,190', '90,200,110'], plains: ['255,200,235', '190,140,255'], ruins: ['225,205,255', '140,100,255'], glacier: ['215,240,255', '110,180,255'], ember: ['255,220,170', '255,110,50'] };
 // Portal: círculo de runas no chão, dois pilares de pedra e um redemoinho vertical de luz que sobe em fagulhas.
-function drawPortal(g, p, t, minX = -1e9, maxX = 1e9) {
+function drawPortal(g, p, t) {
   const [hi, mid] = PORTAL_COL[p.to] ?? PORTAL_COL.ruins, pulse = 0.85 + Math.sin(t * 2.2) * 0.15;
   g.save(); g.translate(p.x, p.y);
   // runas no chão
@@ -870,13 +871,18 @@ function drawPortal(g, p, t, minX = -1e9, maxX = 1e9) {
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   drawNatureNamed(g, 'm_pillar_2', 42, 18, 78, true);
   g.restore();
+}
+
+// Etiqueta do portal: desenhada na fase dos nomes (por cima dos objetos) e presa à área livre da tela, fora de menu, minimapa, retrato e rastreador.
+function drawPortalLabel(g, p, minX, maxX) {
   g.font = '700 13px Cinzel, Nunito, serif';
   g.textAlign = 'center';
   const w = g.measureText(p.label).width + 18, lx = Math.max(minX + w / 2, Math.min(maxX - w / 2, p.x)); // etiqueta presa à tela (V23)
+  const q = safeBox(lx, p.y - 118, w, 22), x = q.x, y = q.y;
   g.fillStyle = 'rgba(24,16,8,0.78)';
-  g.beginPath(); g.roundRect(lx - w / 2, p.y - 118, w, 22, 11); g.fill();
+  g.beginPath(); g.roundRect(x - w / 2, y, w, 22, 11); g.fill();
   g.fillStyle = '#efe6ff';
-  g.fillText(p.label, lx, p.y - 102);
+  g.fillText(p.label, x, y + 16);
 }
 
 // ---------------- barras / nomes ----------------
