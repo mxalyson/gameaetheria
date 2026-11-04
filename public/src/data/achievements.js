@@ -28,7 +28,7 @@ export const ACHIEVEMENTS = [
   { id: 'marinheiro', name: 'Marinheiro', desc: 'Chegue ao Porto de Marfim.', stat: 'harborVisits', min: 1, title: 'Marinheiro' },
   { id: 'cliente_do_cais', name: 'Cliente do Cais', desc: 'Entregue 5 contratos do Quadro do Porto.', stat: 'contracts', min: 5, title: 'Cliente do Cais' },
   // Cripta dos Ecos (masmorra, decisão 0017): contador do SERVIDOR (cryptClears).
-  { id: 'cripta_vencida', name: 'Voz da Cripta', desc: 'Derrote o Soberano dos Ecos na Cripta dos Ecos.', stat: 'cryptClears', min: 1, title: 'Sussurrador da Cripta' },
+  { id: 'cripta_vencida', name: 'Silêncio da Cripta', desc: 'Cale o Soberano dos Ecos, o rei dos ecos presos, na Cripta dos Ecos.', stat: 'cryptClears', min: 1, title: 'Calador de Ecos' },
   { id: 'cripta_veterana', name: 'Eco Inquebrável', desc: 'Vença a Cripta dos Ecos 5 vezes.', stat: 'cryptClears', min: 5, title: 'Eco Inquebrável' },
   // `mask` = o contador é uma máscara de bits (vale quantos bits estão ligados): 1 lore por zona de farm (core/journal.js LORE_ZONES).
   { id: 'leitor_de_ecos', name: 'Leitor de Ecos', desc: 'Leia as 5 inscrições deixadas nas zonas: placas e estátuas.', stat: 'lore', mask: true, min: 5, title: 'Leitor de Ecos' },

@@ -531,16 +531,17 @@ test('servidor: craft grava no banco, responde tx_result e some quando o persona
   await closeAll(srv, c);
 });
 
-test('protocolo e lugar: respec_buy/respec existem só nas cidades (Vila), com id válido; nunca na instância nem no Porto', () => {
+test('protocolo e lugar: respec_buy/respec respec_buy só na Vila e respec na Vila e no Porto (mentores), com id válido; nunca na instância', () => {
   assert.ok(TX({ op: 'respec_buy' }).ok);
   assert.deepEqual(TX({ op: 'respec', id: 'paladin', req: 2, x: 1 }).msg, { t: 'tx', op: 'respec', req: 2, id: 'paladin' });
   assert.equal(TX({ op: 'respec' }).ok, false, 'sem id');
   assert.equal(TX({ op: 'respec', id: '<script>' }).ok, false);
   for (const op of ['respec', 'respec_buy']) {
     assert.equal(placeProblem(op, { inZone: false, hubAt: null }), null);
-    assert.equal(placeProblem(op, { inZone: false, hubAt: 'harbor' }), 'not_here');
     assert.equal(placeProblem(op, { inZone: true, hubAt: null }), 'not_here');
   }
+  assert.equal(placeProblem('respec_buy', { inZone: false, hubAt: 'harbor' }), 'not_here', 'o Selo só se compra do Mestre de Classe, na Vila');
+  assert.equal(placeProblem('respec', { inZone: false, hubAt: 'harbor' }), null, 'escolher/trocar vale nos mentores do Porto');
 });
 
 test('runTx (puro): primeira especialização é grátis; Selo custa 15.000; trocar sem Selo falha e com Selo consome 1 e conta a troca', () => {

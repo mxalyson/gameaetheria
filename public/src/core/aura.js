@@ -6,17 +6,18 @@ import { SPECS } from '../data/specs.js';
 // (códigos 1..8 mantidos ao trocar os ids: bastion->paladin, executioner->berserker, pyromancer->arcane, cryomancer->warlock, marksman->sniper, hunter->gunslinger.)
 export const SPEC_ORDER = ['paladin', 'berserker', 'arcane', 'warlock', 'sniper', 'gunslinger', 'guardian', 'inquisitor'];
 
-// kind = formato da partícula; ring = anéis lentos no chão; n = partículas no tier 1 (o tier 2 usa menos e mais finas).
-// c = cor principal; c2 = cor de realce; t2 = assinatura do tier 2 (prata/branco quente, mais fina e discreta).
+// kind = formato da partícula; ring = anéis lentos no chão; n = partículas no tier 1 (o tier 2, Maestria, usa ~1,6x e é maior/mais brilhante).
+// c = cor principal; c2 = cor de realce; t2 = assinatura do tier 2 (Maestria): a MESMA família de cor, mais saturada e clara, e o conjunto todo mais forte que o tier 1.
+// (c do tier 2 sempre difere da c do tier 1 e as 8 cores principais continuam distintas entre si.)
 export const AURA_STYLES = {
-  paladin:     { c: '#e0b84a', c2: '#bcd2ff', kind: 'spark',   ring: true,  n: 5, rise: 0.4, t2: { c: '#f3dc9a', c2: '#ffffff' } }, // ouro e azul-prata: escudo sagrado
-  berserker:   { c: '#d8322a', c2: '#ff9a50', kind: 'ember',   ring: false, n: 7, rise: 1.0, t2: { c: '#ff6a5a', c2: '#ffe2d0' } },
-  arcane:      { c: '#7f8bff', c2: '#e3dcff', kind: 'crystal', ring: true,  n: 5, rise: 0.6, t2: { c: '#b4bcff', c2: '#ffffff' } }, // cristais violeta-azulados e anel arcano
-  warlock:     { c: '#7fd44a', c2: '#d6ff9a', kind: 'ember',   ring: false, n: 7, rise: 0.8, t2: { c: '#aae878', c2: '#f0ffd8' } }, // brasas verde-veneno subindo
-  sniper:      { c: '#3fd3b0', c2: '#d4fff3', kind: 'spark',   ring: true,  n: 4, rise: 0.6, t2: { c: '#8ff0d8', c2: '#ffffff' } },
-  gunslinger:  { c: '#ffae3d', c2: '#fff0b8', kind: 'spark',   ring: false, n: 6, rise: 0.9, t2: { c: '#ffc977', c2: '#fffbe8' } }, // faíscas de latão: disparos rápidos
-  guardian:    { c: '#fff1b8', c2: '#ffd36a', kind: 'spark',   ring: true,  n: 5, rise: 0.7, t2: { c: '#fffbe6', c2: '#ffffff' } },
-  inquisitor:  { c: '#b070ff', c2: '#ffe08a', kind: 'rune',    ring: true,  n: 5, rise: 0.6, t2: { c: '#d4aaff', c2: '#fff4d0' } },
+  paladin:     { c: '#e0b84a', c2: '#bcd2ff', kind: 'spark',   ring: true,  n: 5, rise: 0.4, t2: { c: '#ffcf3a', c2: '#d6e6ff' } }, // ouro e azul-prata: escudo sagrado
+  berserker:   { c: '#d8322a', c2: '#ff9a50', kind: 'ember',   ring: false, n: 7, rise: 1.0, t2: { c: '#ff3b2e', c2: '#ffc070' } },
+  arcane:      { c: '#7f8bff', c2: '#e3dcff', kind: 'crystal', ring: true,  n: 5, rise: 0.6, t2: { c: '#8f9cff', c2: '#f2eeff' } }, // cristais violeta-azulados e anel arcano
+  warlock:     { c: '#7fd44a', c2: '#d6ff9a', kind: 'ember',   ring: false, n: 7, rise: 0.8, t2: { c: '#8dff3f', c2: '#eaffb8' } }, // brasas verde-veneno subindo
+  sniper:      { c: '#3fd3b0', c2: '#d4fff3', kind: 'spark',   ring: true,  n: 4, rise: 0.6, t2: { c: '#2dffd0', c2: '#e6fff9' } },
+  gunslinger:  { c: '#ffae3d', c2: '#fff0b8', kind: 'spark',   ring: false, n: 6, rise: 0.9, t2: { c: '#ffb52b', c2: '#fff6cc' } }, // faíscas de latão: disparos rápidos
+  guardian:    { c: '#fff1b8', c2: '#ffd36a', kind: 'spark',   ring: true,  n: 5, rise: 0.7, t2: { c: '#fff6c8', c2: '#ffe08a' } },
+  inquisitor:  { c: '#b070ff', c2: '#ffe08a', kind: 'rune',    ring: true,  n: 5, rise: 0.6, t2: { c: '#bd6bff', c2: '#fff0b0' } },
 };
 
 // Tier de quem tem especialização válida: 0 sem aura, 1 especializado, 2 com Maestria. `o` é ator (spec/mastery) ou documento (spec/level/quests).
@@ -39,7 +40,8 @@ export function auraStyle(spec, tier) {
   if (!s) {
     const t2 = tier === 2;
     s = Object.freeze({ spec, tier, kind: base.kind, ring: t2 ? true : base.ring, c: t2 ? base.t2.c : base.c, c2: t2 ? base.t2.c2 : base.c2,
-      n: t2 ? Math.max(2, Math.ceil(base.n / 2)) : base.n, rise: base.rise, alpha: t2 ? 0.55 : 0.9, scale: t2 ? 0.9 : 1.1, thin: t2 });
+      // Maestria: ~1,6x partículas, halo/anéis maiores e mais brilhantes, segundo anel em contra-rotação (ring2)
+      n: t2 ? Math.ceil(base.n * 1.6) : base.n, rise: base.rise, alpha: t2 ? 1 : 0.9, scale: t2 ? 1.4 : 1.1, ring2: t2, big: t2 });
     resolved.set(key, s);
   }
   return s;

@@ -35,7 +35,7 @@ export function placeProblem(op, { inZone, hubAt, shop = 'town' }) {
   const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily' || op === 'recycle' || op === 'mentor_talk';
   if (harborOnly && hubAt !== 'harbor') return 'not_here';
   if (shop === 'harbor' && hubAt !== 'harbor') return 'not_here';
-  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'buy_phoenix', 'sell', 'sell_bulk', 'craft', 'respec', 'respec_buy'].includes(op)) return 'not_here'; // lojas da Vila só na Vila
+  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'buy_phoenix', 'sell', 'sell_bulk', 'craft', 'respec_buy'].includes(op)) return 'not_here'; // lojas da Vila só na Vila (o Selo é do Mestre de Classe); escolher/trocar especialização (`respec`) vale também nos mentores do Porto
   return null;
 }
 

@@ -5,6 +5,8 @@
 //   talk {count} (conversar com os mentores de especialização da própria classe, no Porto: bits em stats.mentors, core/journal.js; o servidor conta)
 //   teleport (usar o teletransporte do mapa)   upgrade (aprimorar um equipamento no Ferreiro)   spiritStage (ter N spirits evoluídos, forma 2)
 // Cânone do arco final: 3 guardiões originais (Carvalho, Colosso, Guardião) e 2 reflexos (Ancião Gélido = gelo, Cavaleiro Rubro = brasa). `text.done` pode ser lista de falas (epílogo).
+// Cânone da Cripta: o Soberano dos Ecos é o rei das Ruínas, preso como eco entre os seus; o Guardião das Ruínas era o último guarda, posto à porta dele e nunca dispensado.
+// O "primeiro eco" do epílogo é outra coisa (a voz original de que os três guardiões eram pedaços). Glossário completo: docs/roadmap/auditoria-historia-2.md.
 // `giver` = NPC que oferece (e recebe a entrega, salvo `turnIn`). `after` = missão exigida antes. Recompensa: ouro, xp (×2,5 depois da curva de XP mais lenta), potions, items [{rarity}].
 export const QUESTS = {
   primeiros_passos: {
@@ -39,7 +41,7 @@ export const QUESTS = {
   },
   cristais_vivos: {
     id: 'cristais_vivos', name: 'Cristais Vivos', giver: 'guard', level: 6, after: 'carvalho_ancestral',
-    text: { offer: 'Depois do bosque, a Planície de Cristal. As pedras andam por lá. Abata doze criaturas.', progress: 'A Planície de Cristal é logo depois do bosque. Siga o portal.', done: 'Doze a menos. A rota comercial agradece. Mas pedra não anda sozinha: algo as chama, lá do coração da planície.' },
+    text: { offer: 'Depois do bosque, a Planície de Cristal. As pedras andam por lá. Abata doze criaturas.', progress: 'A Planície de Cristal é logo depois do bosque. Siga o portal.', done: 'Doze a menos. A rota agradece. Mas pedra não anda sozinha: algo as chama, do coração da planície.' },
     objectives: [{ type: 'kill', mob: 'any', zone: 'plains', count: 12, label: 'Derrote 12 criaturas da Planície de Cristal' }],
     reward: { gold: 250, xp: 1500 },
   },
@@ -69,20 +71,20 @@ export const QUESTS = {
   },
   guardiao_das_ruinas: {
     id: 'guardiao_das_ruinas', name: 'O Guardião Esquecido', giver: 'guard', level: 22, after: 'ruinas_sombrias',
-    text: { offer: 'O Guardião das Ruínas protege algo que não devia existir. Derrube-o e descubra o quê.', progress: 'O Guardião fica no coração das ruínas.', done: 'Ele não lutava para nos matar. Lutava para nos manter longe. Do quê? Não sei. Parecia esperar alguém. Que seu nome seja lembrado.' },
+    text: { offer: 'O Guardião das Ruínas protege algo que não devia existir: a Sábia Yun fala de uma cripta sob o chão dele. Derrube-o e abra o caminho a leste.', progress: 'O Guardião fica no coração das ruínas.', done: 'Ele não lutava para nos matar. Lutava para nos manter longe da cripta. Parecia esperar quem o dispensasse do posto. Seu nome será lembrado.' },
     objectives: [{ type: 'boss', mob: 'guardian', count: 1, label: 'Derrote o Guardião das Ruínas' }],
     reward: { gold: 1200, xp: 6250, items: [{ rarity: 'epic' }] },
   },
   rumo_ao_topo: {
     id: 'rumo_ao_topo', name: 'Rumo ao Topo', giver: 'herbalist', level: 10, after: null,
-    text: { offer: 'Cada região tem uma flor que só abre para quem não desiste. Alcance o nível 20 e traga a flor que cresce entre as Ruínas, num baú esquecido.', progress: 'Continue evoluindo: missões, chefes e arena dão experiência.', done: 'Você chegou longe! As flores abriram para você. Esta bolsa é por sua perseverança.' },
+    text: { offer: 'Querido, cada região tem uma flor que só abre para quem não desiste. Alcance o nível 20 e traga a flor que cresce entre as Ruínas, num baú esquecido.', progress: 'Continue evoluindo: missões, chefes e arena dão experiência.', done: 'Você chegou longe! As flores abriram para você. Esta bolsa é por sua perseverança.' },
     objectives: [{ type: 'level', count: 20, label: 'Alcance o nível 20' }, { type: 'chest', zone: 'ruins', count: 1, label: 'Abra um baú nas Ruínas Sombrias (a flor está lá)' }],
     reward: { gold: 800, xp: 0, items: [{ rarity: 'epic' }] },
   },
   // ---- Tutoriais dos comerciantes (Lia e Brok) ----
   pergaminho_de_cortesia: {
     id: 'pergaminho_de_cortesia', name: 'Pergaminho de Cortesia', giver: 'merchant', level: 3, after: null,
-    text: { offer: 'Cortesia da casa, freguês: abra o mapa pelo menu e viaje a um lugar já visitado. Voltar à vila não custa nada. Depois me diga se não é prático.', progress: 'É só abrir o mapa pelo menu e tocar em Viajar. A Vila é de graça.', done: 'Viu como é prático? Quando precisar ir mais longe, pergaminhos estão sempre na minha loja.' },
+    text: { offer: 'Cortesia da casa, freguês: estando fora da vila, abra o mapa pelo menu e viaje de volta para cá. Voltar à vila não custa nada. Depois me diga se não é prático.', progress: 'Vá a um lugar fora da vila, abra o mapa pelo menu e toque em Viajar até a Vila. É de graça.', done: 'Viu como é prático? Quando precisar ir mais longe, pergaminhos estão sempre na minha loja.' },
     objectives: [{ type: 'teleport', count: 1, label: 'Use 1 teletransporte pelo mapa' }],
     reward: { gold: 80, xp: 300, potions: 2 },
   },
@@ -94,14 +96,14 @@ export const QUESTS = {
   },
   martelo_do_guardiao: {
     id: 'martelo_do_guardiao', name: 'Martelo do Guardião', giver: 'smith', level: 18, after: 'ruinas_sombrias',
-    text: { offer: 'O Guardião das Ruínas tinha um martelo, dizem. Os baús de lá guardam restos dele. Abra três. Traga o que achar.', progress: 'Baús nas Ruínas Sombrias. Três.', done: 'Restos do martelo. Fundi o que deu. Fique com isto.' },
+    text: { offer: 'O Guardião das Ruínas empunha um martelo antigo, dizem. Os baús de lá guardam restos de armas iguais. Abra três. Traga o que achar.', progress: 'Baús nas Ruínas Sombrias. Três.', done: 'Restos de aço antigo. Fundi o que deu. Fique com isto.' },
     objectives: [{ type: 'chest', zone: 'ruins', count: 3, label: 'Abra 3 baús nas Ruínas Sombrias' }],
     reward: { gold: 900, xp: 4500, items: [{ rarity: 'rare' }] },
   },
   // ---- Arco final: "Os Ecos Partidos" (Cume Gélido e Cinzas Ardentes) ----
   cume_gelido: {
     id: 'cume_gelido', name: 'O Silêncio da Geada', giver: 'guard', level: 23, after: 'guardiao_das_ruinas',
-    text: { offer: 'Com o Guardião caído, a passagem a leste se abriu: o Cume Gélido. Dizem que as criaturas de lá são cópias geladas das nossas. Abata vinte.', progress: 'O Cume Gélido fica a leste das Ruínas Sombrias. Leve poções.', done: 'Cópias, eco de ecos... A Sábia Yun vai querer saber disso.' },
+    text: { offer: 'Com o Guardião caído, a passagem a leste se abriu: o Cume Gélido. Dizem que as criaturas de lá são cópias geladas das nossas. Abata vinte.', progress: 'O Cume Gélido fica a leste das Ruínas Sombrias. Leve poções.', done: 'Cópias geladas das nossas criaturas. Eco de eco. A Sábia Yun vai querer saber.' },
     objectives: [{ type: 'kill', mob: 'any', zone: 'glacier', count: 20, label: 'Derrote 20 criaturas do Cume Gélido' }],
     reward: { gold: 1500, xp: 14000, potions: 3 },
   },
@@ -119,7 +121,7 @@ export const QUESTS = {
   },
   cavaleiro_rubro: {
     id: 'cavaleiro_rubro', name: 'O Cavaleiro Rubro', giver: 'arena', level: 29, after: 'cinzas_ardentes',
-    text: { offer: 'Ó, o Rubro! Luta como o Guardião lutava, mas em brasa. Só desperta quando as Cinzas se alimentam de sangue: derrote quarenta criaturas por lá e o chão estremecerá!', progress: 'Se ele tombar e voltar a dormir, derrote quarenta criaturas nas Cinzas: o contador "Ritual" mostra quanto falta.', done: 'Ouvi o chão tremer daqui. Um duelo desses vale uma canção na arena.' },
+    text: { offer: 'Ó, o Rubro! Luta como o Guardião lutava, mas em brasa. Só desperta quando as Cinzas se alimentam de sangue: derrote quarenta criaturas por lá e o chão estremecerá!', progress: 'Derrote quarenta criaturas nas Cinzas: o contador "Ritual" mostra quanto falta, e o chão estremece quando o Rubro desperta!', done: 'Ouvi o chão tremer daqui. Um duelo desses vale uma canção na arena.' },
     objectives: [{ type: 'boss', mob: 'infernoknight', count: 1, label: 'Derrote o Cavaleiro Rubro' }],
     reward: { gold: 4500, xp: 38000, items: [{ rarity: 'legendary' }] },
   },
@@ -128,7 +130,7 @@ export const QUESTS = {
     text: {
       offer: 'Três guardiões e dois reflexos: o gelo e a brasa foram o eco tentando se juntar de novo. Hoje todos repousam. Evolua um spirit (cada elemento tem uma missão minha) e volte: quero lhe mostrar o que sobrou.',
       progress: 'Evolua um spirit e volte a mim: peça a missão do elemento dele a mim mesma, cumpra-a e use Evoluir no painel de Spirits. O último capítulo espera.',
-      done: ['Aqui jaz o primeiro eco, inteiro de novo. A vila dorme; os spirits ao seu lado carregam um pouco dele.', 'Você era o último capítulo, herói. A partir de hoje, o eco tem voz, e é a sua.', 'Mas toda estrada tem outra volta. Ouça: já há um novo sussurro na neve.'],
+      done: ['Aqui jaz o primeiro eco, inteiro de novo. A vila dorme; os spirits ao seu lado carregam um pouco dele.', 'Você era o último capítulo, herói. A partir de hoje, o eco tem voz, e é a sua.', 'Mas toda estrada tem outra volta. Ouça: sob as Ruínas, os ecos presos ainda sussurram.'],
     },
     objectives: [{ type: 'level', count: 30, label: 'Alcance o nível 30' }, { type: 'spiritStage', count: 1, label: 'Tenha 1 spirit evoluído (forma 2)' }],
     reward: { gold: 8000, xp: 0, potions: 10, items: [{ rarity: 'legendary' }] },
@@ -203,7 +205,7 @@ Object.assign(QUESTS, {
   },
   porto_duelo: {
     id: 'porto_duelo', name: 'Duelo de Cais', giver: 'duelist', level: 10, after: null,
-    text: { offer: 'Sem Elo, sem rancor. Vença um duelo amistoso no meu ringue e eu pago a rodada. Só funciona na jornada solo: o mar conectado tem a Grande Arena.', progress: 'O ringue fica aqui ao lado. Fale comigo para aceitar o duelo amistoso.', done: 'Aço limpo e aperto de mão. Boa luta, herói.' },
+    text: { offer: 'Sem Elo, sem rancor. Vença um duelo amistoso no meu ringue e eu pago a rodada. Ranking é coisa da Grande Arena, lá em Lúmen; aqui é só aço.', progress: 'O ringue fica aqui ao lado. Fale comigo para aceitar o duelo amistoso.', done: 'Aço limpo e aperto de mão. Boa luta, herói.' },
     objectives: [{ type: 'friendlyDuel', count: 1, label: 'Vença 1 duelo amistoso' }],
     reward: { gold: 300, xp: 1600, potions: 2 },
   },
@@ -214,9 +216,9 @@ Object.assign(QUESTS, {
   cripta_dos_ecos: {
     id: 'cripta_dos_ecos', name: 'A Cripta dos Ecos', giver: 'sage', level: 20, after: 'ruinas_sombrias',
     text: {
-      offer: 'Sob as Ruínas dorme uma cripta onde os ecos se prendem a si mesmos. Abra o mapa, entre com até três aliados e silencie o Soberano dos Ecos.',
-      progress: 'A entrada fica no mapa, ligada às Ruínas: quatro salas, e a última guarda o Soberano. Uma entrada a cada vinte minutos.',
-      done: 'Calado, enfim. Os fragmentos que ele guardava servem ao Ferreiro Brok: ele sabe forjar o eco em aço.',
+      offer: 'Sob as Ruínas dorme uma cripta onde os ecos presos têm um rei: o Soberano dos Ecos, que nunca quis repousar. O Guardião vigia a porta dele. Entre pelo mapa, com até três aliados.',
+      progress: 'A entrada fica no mapa, ligada às Ruínas: quatro salas, e a última guarda o Soberano. Uma entrada grátis a cada vinte minutos; um contrato do Porto rende uma Chave de Eco, que pula a espera.',
+      done: 'Calado, enfim. Era isso que o Guardião guardava. Os fragmentos que ele deixou servem ao Ferreiro Brok: ele forja o eco em aço. Mas os ecos de lá sempre voltam.',
     },
     objectives: [{ type: 'crypt', count: 1, label: 'Derrote o Soberano dos Ecos na Cripta' }],
     reward: { gold: 1400, xp: 7000, potions: 3, items: [{ rarity: 'epic' }] },

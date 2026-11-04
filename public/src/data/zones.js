@@ -166,7 +166,7 @@ export const ZONES = {
       { id: 'ruins:g2', x: 2300, y: 2300, r: 140, glade: true, mobs: [['gargoyle', 2]], elites: [['wraith', 2]] },
     ],
     // Lore coletável: tocar na peça (perto da trilha) mostra o texto; 1 bit por zona em stats.lore (core/journal.js LORE_ZONES).
-    lore: [{ id: 'ruins', kind: 'statue', x: 690, y: 1413, name: 'Estátua das Ruínas', text: 'Fomos muitos. Restou o guarda. Ele ainda não sabe que acabou.' }],
+    lore: [{ id: 'ruins', kind: 'statue', x: 690, y: 1413, name: 'Estátua das Ruínas', text: 'Fomos muitos. Restou o guarda, que não sabe que acabou. Abaixo, o rei não repousa.' }],
     miniboss: { id: 'knight', name: 'Capitão Caído', level: 20, x: 2300, y: 1500, hpMul: 4, powerMul: 1.4, sizeMul: 1.5, respawn: 600 },
     palette: { ground: '#8d89ac', ground2: '#837fa4', outside: '#2b2840' },
     treeColors: ['#46565f', '#587077', '#789098'],

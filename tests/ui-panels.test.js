@@ -85,15 +85,21 @@ test('Ferreiro: Forja do Eco lista as duas receitas, bloqueia sem fragmentos e m
 test('especialização: primeira escolha grátis; trocar mostra o Selo; o Selo (15.000) só é vendido quando aberto pelo Mestre de Classe', () => {
   const ui = mk();
   const char = { classId: 'mage', level: 20, gold: 20000, seals: 0, spec: null, quests: { done: {} } };
+  // painel normal (menu): só informa; nenhum botão de escolher/trocar/comprar
   let html = ui.specBlock(char);
+  assert.match(html, /fale com o Mestre da sua classe ou com um mentor no Porto/); assert.doesNotMatch(html, /data-action="(spec|buy-seal)"/);
+  Object.assign(char, { spec: 'arcane' });
+  html = ui.specBlock(char);
+  assert.match(html, /Arcano/); assert.match(html, /fale com o Mestre/); assert.doesNotMatch(html, /data-action="(spec|buy-seal)"/); assert.doesNotMatch(html, /Trocar/);
+  // painel do Mestre de Classe ('character:master'): escolha, troca e Selo
+  ui.specMaster = true;
+  Object.assign(char, { spec: null });
+  html = ui.specBlock(char);
   assert.match(html, /A primeira escolha é grátis/); assert.match(html, />Escolher</);
-  assert.equal((html.match(/data-action="spec"/g) ?? []).length, 2); assert.doesNotMatch(html, /buy-seal/);
+  assert.equal((html.match(/data-action="spec"/g) ?? []).length, 2);
   Object.assign(char, { spec: 'arcane' });
   html = ui.specBlock(char);
   assert.match(html, /Trocar · 1 Selo/); assert.match(html, /disabled/, 'sem Selo o botão de trocar fica desabilitado');
-  assert.match(html, /Mestre de Classe, na Vila, vende/); assert.doesNotMatch(html, /buy-seal/);
-  ui.specMaster = true; // painel aberto pelo serviço do Mestre ('character:master')
-  html = ui.specBlock(char);
   assert.match(html, /data-action="buy-seal"/); assert.match(html, /15\.000/);
   char.gold = 100; assert.match(ui.specBlock(char), /buy-seal"\s+disabled/);
   char.seals = 2; char.gold = 20000;

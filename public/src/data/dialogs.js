@@ -3,8 +3,8 @@
 // Condições de `when`: classId, notClassId, level, bossKills, bossKillsMax, done (missão concluída), offline. Voz: Ren seco, Mel afetuosa, Doran teatral, Yun enigmática, Lia esperta, Brok poucas palavras.
 export const DIALOGS = {
   merchant: { greet: [
-    { when: { level: 20 }, text: 'Cliente de nível alto! Só ouro de verdade, por favor. Poções, essências e pergaminhos, como sempre.' },
-    { text: 'Bem-vindo à loja de Lúmen! Poções, essências e equipamentos de segunda mão, tudo com preço justo.' },
+    { when: { level: 20 }, text: 'Cliente de nível alto! Só ouro de verdade, por favor. Poções, essências, pergaminhos e Amuleto da Fênix: ele guarda o seu eco e paga a queda por você.' },
+    { text: 'Bem-vindo à loja de Lúmen! Poções, essências, pergaminhos e o Amuleto da Fênix: se você cair, ele guarda o seu eco e poupa seu ouro e XP.' },
   ], service: { label: 'Abrir a loja', panel: 'shop' } },
   arena: { greet: [
     { when: { done: 'cavaleiro_rubro' }, text: 'Dizem que o Rubro esperou a gente. Arena é isso, esperar. E você, herói, não faz ninguém esperar.' },
@@ -14,18 +14,21 @@ export const DIALOGS = {
   sage: { greet: [
     { when: { done: 'cripta_dos_ecos' }, text: 'Você calou o Soberano, mas os ecos de lá não se apagam. Os fragmentos que trouxe rendem aço no Ferreiro. A Cripta recupera o fôlego em vinte minutos.' },
     { when: { done: 'ecos_unidos' }, text: 'Os ecos repousam, mas eu ainda os ouço, bem baixinho. Escolha bem quem caminha ao seu lado.' },
+    { when: { level: 20, offline: true }, text: 'Sob as Ruínas há uma cripta onde os ecos presos têm um rei. Ela só se abre com o mar conectado. Volte quando houver rede, herói.' },
     { when: { done: 'anciao_gelido' }, text: 'O frio não era dele. Era do que veio antes. Os spirits ainda estremecem quando falo disso.' },
     { when: { bossKills: 1 }, text: 'Ouço o Carvalho em você, quase um sussurro. Spirits são ecos da natureza: escolha bem quem caminha ao seu lado.' },
-    { text: 'Spirits são ecos da natureza. Escolha bem quem caminha ao seu lado.' },
+    { text: 'Eco é o que fica quando algo não repousa. Spirits são os ecos mansos da natureza. Escolha bem quem caminha ao seu lado.' },
   ], service: { label: 'Falar de spirits', panel: 'sage' } },
   guard: { greet: [
     { when: { done: 'cavaleiro_rubro' }, text: 'Cinzas apagadas, estrada livre. Por enquanto.' },
     { when: { done: 'guardiao_das_ruinas' }, text: 'O Guardião caiu e as ruínas ficaram quietas demais. Fique atento.' },
-    { when: { bossKillsMax: 0 }, text: 'Se o bosque te assustar, volte. Sem vergonha. No mapa, os lugares já visitados oferecem teletransporte.' },
+    { when: { bossKillsMax: 0 }, text: 'Se o bosque te assustar, volte. Sem vergonha. Toque numa Pedra de Retorno: ela guarda o seu eco e, se você cair, acorda você ali.' },
     { text: 'A vila está calma por enquanto. Volte quando houver mais perigo à vista. No mapa, os lugares já visitados oferecem teletransporte.' },
   ], service: null },
   smith: { greet: [
-    { when: { level: 25 }, text: 'Seu aço está cansado. O meu fogo, não. Traga.' },
+    { when: { done: 'cripta_dos_ecos' }, text: 'Fragmentos de eco. Bom. Quarenta para a arma, sessenta para a armadura, mais ouro. Uma de cada. Aço que lembra não perdoa.' },
+    { when: { level: 25 }, text: 'Seu aço está cansado. O meu fogo, não. E eco preso vira aço novo: fragmentos da Cripta, quarenta a arma, sessenta a armadura.' },
+    { when: { level: 20 }, text: 'Metal bom lembra de quem o forjou. Eco preso também vira aço: fragmentos da Cripta, quarenta a arma, sessenta a armadura. Traga.' },
     { text: 'Metal bom lembra de quem o forjou. Traga o que veste. Eu deixo mais forte. Ouro, preço justo.' },
   ], service: { label: 'Aprimorar equipamento', panel: 'shop:smith' } },
   master_warrior: { greet: [
@@ -58,47 +61,48 @@ export const DIALOGS = {
   ], service: null },
   // ---- Mentores de especialização (Porto de Marfim, data/mentors.js): a fala explica a especialização; o painel do diálogo mostra as habilidades e o botão de escolha (ui.js) ----
   mentor_paladin: { greet: [
-    { when: { classId: 'warrior' }, text: 'Escudo erguido, fé firme. O Paladino segura a linha para que o grupo avance: o Grito de Guerra dura mais e ampara aliados, a Investida é curta e dá escudo a quem está perto. Menos brilho, mais muralha.' },
+    { when: { classId: 'warrior' }, text: 'Escudo erguido, fé firme. O Paladino lança o Martelo Sagrado, ergue a Aura de Bastião sobre os aliados e avança com a Investida do Escudo. Ecos quebram quem luta só: seja muralha.' },
     { text: 'Sou Sir Aurelion, e carrego a muralha do grupo. O caminho do escudo é de guerreiros; o seu é outro, mas honro quem protege.' },
   ], service: null },
   mentor_berserker: { greet: [
-    { when: { classId: 'warrior' }, text: 'Sem escudo, sem medo! O Berserker empunha as duas mãos e luta melhor quanto menos vida tem: Golpe Giratório e Investida muito mais fortes. Quem se esconde atrás de ferro não sente a fúria.' },
+    { when: { classId: 'warrior' }, text: 'Sem escudo, sem medo! Berserker fazer Salto Brutal, Frenesi, Machadada em Arco, tudo de duas mãos. Frenesi custar sangue, dar fúria. Eco não sangra. Grumak sangra e vence.' },
     { text: 'Grumak! Eu golpear forte, eu sangrar, eu vencer. Isso é caminho de guerreiro. Você ter outro? Tudo bem. Grumak respeita.' },
   ], service: null },
   mentor_arcane: { greet: [
-    { when: { classId: 'mage' }, text: 'Precisão e controle, jovem. O Arcano atravessa fileiras com o projétil arcano, atordoa com a Nova Arcana e vai e volta num Teleporte mais longo. Cada gesto é um cálculo.' },
+    { when: { classId: 'mage' }, text: 'Precisão e controle, jovem. O Arcano dispara o Raio Prismático, ergue a Barreira Arcana e some no Passo Fase, deixando uma mina. Todo eco segue um padrão; eu o decifro.' },
     { text: 'Velyra, a serviço da trama arcana. A arte do controle é dos magos; a sua escola é outra, mas toda magia nasce do mesmo silêncio.' },
   ], service: null },
   mentor_warlock: { greet: [
-    { when: { classId: 'mage' }, text: 'Ah, uma alma curiosa... O Bruxo vive do frio do eco: maldições que corroem, gelo que prende e a vida dos inimigos escorrendo para você. Não é para os de estômago fraco.' },
+    { when: { classId: 'mage' }, text: 'Ah, uma alma curiosa... O Bruxo vive do frio do eco: Maldição que salta de alvo em alvo, Drenar Vida e espectros do Pacto Sombrio. Não é para os de estômago fraco.' },
     { text: 'Morvain, às ordens das sombras. O caminho do frio é de magos. O seu é outro? Pois guarde os arrepios para si.' },
   ], service: null },
   mentor_sniper: { greet: [
-    { when: { classId: 'archer' }, text: 'Respire, mire, solte. A Franco-atiradora vê longe e acerta mais: flecha perfurante, tiro certeiro e alcance que nenhuma presa imagina. Um disparo, uma história.' },
+    { when: { classId: 'archer' }, text: 'Respire, mire, solte. A Franco-atiradora prende o alvo na Armadilha de Gelo, recua com o Recuo Tático e acerta o Tiro Mira Perfeita. Um eco só ouve o próprio nome; a flecha chega antes.' },
     { text: 'Lyra. Sou do alcance, e o alcance é dos arqueiros. Seu caminho é outro; ainda assim, mire alto.' },
   ], service: null },
   mentor_gunslinger: { greet: [
-    { when: { classId: 'archer' }, text: 'Rajada, granada e rolamento! O Pistoleiro dispara a besta de repetição em leque, joga explosivos e some num rolamento duplo. Perto ou longe, ninguém dorme. Tem fogo, tem estilo!' },
+    { when: { classId: 'archer' }, text: 'Rajada, granada e rolamento! O Pistoleiro dispara a besta de repetição em leque, joga explosivos e some num rolamento duplo. Eco também cai com pólvora, amigo! Tem fogo, tem estilo!' },
     { text: 'Dom Cálix, para servi-lo! Besta de repetição é coisa de arqueiro. Você segue outro caminho? Pois que seja com estilo!' },
   ], service: null },
   mentor_guardian: { greet: [
-    { when: { classId: 'cleric' }, text: 'A luz cuida de quem fica ao lado. A Guardiã cura em área, ergue escudo sobre todos os aliados e traz de volta a esperança com a Palavra de Salvação e a Intervenção Celestial. Ninguém cai sozinho.' },
+    { when: { classId: 'cleric' }, text: 'A luz cuida de quem fica ao lado. A Guardiã cura em área, protege todos com escudo e traz a Palavra de Salvação e a Intervenção Celestial. Ecos nascem de quem caiu sozinho. Ninguém cai.' },
     { text: 'Irmã Aurora, a serviço da luz. Esse caminho é de clérigos. O seu é outro, mas a luz alcança todos.' },
   ], service: null },
   mentor_inquisitor: { greet: [
-    { when: { classId: 'cleric' }, text: 'A luz também sabe queimar. O Inquisidor julga, marca o culpado para sofrer mais dano e purifica com chama sagrada, até o Livro do Veredito. A fé como sentença.' },
+    { when: { classId: 'cleric' }, text: 'A luz também sabe queimar. O Inquisidor julga, marca o culpado para sofrer mais dano e purifica com chama sagrada, até o Livro do Veredito. Todo eco é um réu que recusa repousar.' },
     { text: 'Valdor, inquisidor. A sentença sagrada é caminho de clérigos. O seu é outro? Que a sua consciência o julgue com justiça.' },
   ], service: null },
   // ---- Porto de Marfim (zona `harbor`): `service.panel` é o painel que a UI deve abrir (ver docs/gameplay/porto.md) ----
   banker: { greet: [
+    { when: { done: 'cripta_dos_ecos' }, text: 'Fragmentos de eco o senhor carrega consigo: não entram no cofre. Peças forjadas com eles, sim. Aço que lembra também precisa dormir.' },
     { when: { done: 'porto_chegada' }, text: 'O primeiro item no cofre é sempre o mais difícil de largar. Os outros, o senhor guarda de olhos fechados.' },
     { when: { level: 20 }, text: 'Um cliente de peso! Seu cofre tem 40 vagas e ninguém além de você tem a chave. Nem eu, juro.' },
     { text: 'Banco de Marfim: guardo o que a mochila não aguenta. Quarenta vagas, sem juros e sem perguntas.' },
   ], service: { label: 'Abrir o banco', panel: 'bank' } },
   hunter: { greet: [
-    { when: { done: 'porto_contrato' }, text: 'Seu nome já circula no quadro. Gosto de quem entrega no prazo. Hoje tem contrato novo.' },
+    { when: { done: 'porto_contrato' }, text: 'Seu nome já circula no quadro. Gosto de quem entrega no prazo. Hoje tem contrato novo, e cada um entregue rende uma Chave de Eco.' },
     { when: { bossKills: 1 }, text: 'Já derrubou um chefe, é? Ótimo. O quadro muda todo dia: três contratos, pagamento na entrega.' },
-    { text: 'O Quadro de Contratos renova toda manhã. Caça, baús, nada que um iniciante não aguente. Volte amanhã por mais.' },
+    { text: 'O Quadro renova toda manhã: caça, baús, nada que um iniciante não aguente. Cada contrato entregue rende uma Chave de Eco, que pula a espera da Cripta, sob as Ruínas.' },
   ], service: { label: 'Ver contratos de hoje', panel: 'board' } },
   dealer: { greet: [
     { when: { done: 'porto_gelo' }, text: 'O gelo do Cume rendeu bem. Poção e pergaminho com desconto de freguês, e troco itens comuns por um raro. Pergunte.' },
@@ -106,21 +110,21 @@ export const DIALOGS = {
     { text: 'Do cais para a sua mochila! Estoque novo todo dia, preço de porto. Hoje tem até peça épica, se eu não vender antes.' },
   ], service: { label: 'Ver o estoque do dia', panel: 'shop:harbor' } },
   duelist: { greet: [
-    { when: { offline: false }, text: 'Com o mar conectado, a Grande Arena de Doran tem adversários de carne e osso. O duelo amistoso, por ora, é só na jornada solo!' },
+    { when: { offline: false }, text: 'Com o mar conectado, o ringue chama duelistas de verdade. Sem Elo, sem rancor: ranking é da Grande Arena de Doran.' },
     { when: { done: 'porto_duelo' }, text: 'Lembro do seu golpe de cais. Quando quiser outra rodada, o ringue está de pé.' },
     { text: 'Duelo amistoso: sem pontos, sem rancor, só aço. Ninguém perde Elo no meu ringue. Aceita?' },
   ], service: { label: 'Duelo amistoso 1×1', panel: 'arena:friendly' } },
   captain: { greet: [
     { when: { done: 'ecos_unidos' }, text: 'A maré mudou depois do que fez. Os barcos voltaram a cantar. Obrigada, herói.' },
     { when: { done: 'porto_carga' }, text: 'As cargas voltaram e o cais respira. Eu devia lhe dar um navio. Por ora, aceite meu agradecimento.' },
-    { when: { done: 'porto_chegada' }, text: 'Entre a Planície e as Ruínas, é aqui que todo mundo faz escala. Tem trabalho no cais, se quiser.' },
-    { text: 'Os barcos estão parados desde o último eco. Mas o porto vive: loja, banco e quadro, tudo à mão. Boa caça.' },
+    { when: { done: 'porto_chegada' }, text: 'Marfim é terra neutra: todo mundo faz escala, ninguém briga, e nem os ecos passam do portão. Por isso os mestres de estilo vieram: veja a praça ao norte. Tem trabalho no cais.' },
+    { text: 'Os barcos não saem: as estradas têm ecos demais. Mas o porto vive, e é terra neutra: ninguém saca arma aqui. Loja, banco e quadro, tudo à mão. Boa caça.' },
   ], service: null },
 };
 
 // Dicas de onboarding (cada uma 1× por personagem; bits em core/journal.js TIP_BITS). [título, texto]
 export const TIPS = {
-  forest: ['Bosque Verdejante', 'Ataque as criaturas e use as habilidades; as que têm cadeado liberam com o nível.'],
+  forest: ['Bosque Verdejante', 'Ataque as criaturas e use as habilidades; as com cadeado liberam com o nível. Toque numa Pedra de Retorno: se cair, você acorda nela.'],
   chest: ['Primeiro baú', 'O item novo já está na mochila: abra a Mochila no menu e equipe o melhor. Vale abrir todos os baús que encontrar.'],
   level: ['Pontos de atributo', 'Abra Personagem no menu e distribua os pontos para ficar mais forte.'],
   skill: ['Habilidade nova', 'Ela já está num dos botões de habilidade. As ainda bloqueadas mostram o nível em que liberam.'],

@@ -1,6 +1,8 @@
 // Mentores de especialização: um NPC por especialização na Praça dos Mestres de Estilo (Porto de Marfim, data/zones.js harbor).
 // Para ESCOLHER a especialização o jogador precisa ter conversado com os DOIS mentores da própria classe (objetivo `talk` da Prova do Mestre,
 // data/quests.js); pode conversar com todos por curiosidade. A conversa grava um bit em `stats.mentors` (core/journal.js); o servidor conta (tx `mentor_talk`).
+// Cânone: o Porto de Marfim é terra neutra (nem os ecos passam do portão); por isso as escolas de estilo desembarcaram ali, cada uma com uma frase sobre os ecos
+// (data/dialogs.js). Mestres de Classe (Vila) ensinam o ofício; mentores (Porto) ensinam o estilo. As falas citam as habilidades do kit (tests/journal.test.js).
 // A ordem define o bit (não reordenar: os bits ficam salvos no documento).
 export const MENTORS = [
   { id: 'mentor_paladin', classId: 'warrior', spec: 'paladin', name: 'Sir Aurelion, Paladino', short: 'Sir Aurelion' },

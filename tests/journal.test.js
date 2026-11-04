@@ -217,7 +217,10 @@ test('textos de jogo: até 220 caracteres por fala, sem teclas e sem NPC inexist
   for (const a of ACHIEVEMENTS) lines.push([`ach.${a.id}`, a.desc]);
   for (const [where, s] of lines) {
     assert.ok(s.length <= 220, `${where}: ${s.length} caracteres`);
-    assert.ok(!/tecla|\[E\]|\(H\)|\(G\)/i.test(s), `${where}: cita tecla`);
+    assert.ok(!/tecla|\[E\]|\(H\)|\(G\)|\((E|M|J)\)|WASD|\b(clique|aperte|pressione)\b/i.test(s), `${where}: cita tecla`);
+    assert.ok(!/undefined|NaN|\[object|null/.test(s), `${where}: valor vazio no texto`);
+    assert.ok(!/sempre dia|aba[s]? (Comprar|Vender)|botão de defesa|aparo/i.test(s), `${where}: cita algo removido`);
+    assert.ok(/[.!?…"]$/.test(s), `${where}: não termina em pontuação`);
   }
   assert.equal(QUESTS.ecos_unidos.text.done.length, 3, 'epílogo em 3 linhas');
   for (const g of Object.values(DIALOGS).map((d) => d.greet)) assert.ok(typeof g === 'string' || !g[g.length - 1].when, 'a última fala é o padrão');
@@ -532,4 +535,47 @@ test('servidor (plausible): talk é objetivo só do servidor no modo estrito e o
   const oldD = hero(16, 'warrior'); const neu = structuredClone(oldD); neu.stats.mentors = 1;
   assert.equal(checkSave(oldD, neu, Date.now(), { strictPve: true }).reason, 'pve_mentors');
   assert.ok(checkSave(oldD, neu, Date.now(), {}).ok, 'modo não estrito aceita (como a lore)');
+});
+
+// ---------- coerência narrativa (auditoria de história 2) ----------
+import { SPECS } from '../public/src/data/specs.js';
+import { SKILLS } from '../public/src/data/skills.js';
+import { ECHO_RECIPES } from '../public/src/data/crypt.js';
+
+const sem = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+test('mentores: a fala da própria classe cita as habilidades do kit atual e uma frase sobre os ecos', () => {
+  for (const m of MENTORS) {
+    const kit = SPECS[m.classId][m.spec].kit.skills.map((id) => sem(SKILLS[id].name.split(' ')[0]));
+    const g = DIALOGS[m.id].greet.find((x) => x.when?.classId === m.classId).text, t = sem(g);
+    assert.ok(kit.filter((w) => t.includes(w)).length >= 2, `${m.id}: a fala não cita o kit (${kit.join(', ')})`);
+    assert.match(g, /\beco/i, `${m.id}: sem frase de ligação com os ecos`);
+    assert.ok(DIALOGS[m.id].greet.at(-1).when == null, 'a última fala é o padrão');
+  }
+  assert.doesNotMatch(DIALOGS.mentor_berserker.greet[0].text + DIALOGS.mentor_paladin.greet[1].text, /escudo erguido/i, 'o Berserker não fala de escudo como estilo');
+});
+
+test('cânone: Cripta, Forja do Eco, Chave de Eco, Pedra de Retorno e Amuleto são explicados em diálogo', () => {
+  const todas = (id) => DIALOGS[id].greet.map((g) => g.text).join(' | ') + ' | ' + Object.values(QUESTS).filter((q) => q.giver === id).flatMap((q) => Object.values(q.text).flat()).join(' | ');
+  assert.match(todas('sage'), /Soberano dos Ecos/); assert.match(todas('sage'), /Chave de Eco/); assert.match(todas('sage'), /Guardião/);
+  assert.match(todas('smith'), /fragmentos/i); assert.match(todas('smith'), /quarenta/); assert.match(todas('smith'), /sessenta/);
+  assert.match(todas('hunter'), /Chave de Eco/);
+  assert.match(todas('captain'), /neutra/); assert.match(todas('banker'), /Fragmentos de eco/);
+  assert.match(todas('guard'), /Pedra de Retorno/); assert.match(todas('merchant'), /Amuleto da Fênix/);
+  assert.match(TIPS.forest.join(' '), /Pedra de Retorno/);
+  // os números da Forja citados por Brok batem com a receita
+  assert.deepEqual([ECHO_RECIPES.eco_weapon.frags, ECHO_RECIPES.eco_armor.frags], [40, 60]);
+  // o Guardião das Ruínas é ligado à cripta nas duas pontas (oferta do Ren e fala da Yun)
+  assert.match(QUESTS.guardiao_das_ruinas.text.offer, /cripta/); assert.match(QUESTS.cripta_dos_ecos.text.offer, /Guardião/);
+  // missão que fala do Guardião vivo não o trata no passado (ele só cai na missão de nível 22)
+  assert.doesNotMatch(QUESTS.martelo_do_guardiao.text.offer, /\btinha\b/);
+});
+
+test('cânone: nenhuma conquista repete o nome de outra; falas condicionais do Porto e da Yun não ficam inalcançáveis', () => {
+  const nomes = ACHIEVEMENTS.map((a) => a.name); assert.equal(new Set(nomes).size, nomes.length, 'nome de conquista repetido');
+  const titulos = ACHIEVEMENTS.map((a) => a.title).filter(Boolean); assert.equal(new Set(titulos).size, titulos.length, 'título repetido');
+  const d = ensureJournal(hero(20));
+  assert.match(greetFor(d, DIALOGS.sage.greet, { online: false }), /mar conectado/, 'offline: a Yun explica por que a Cripta não abre');
+  assert.match(greetFor(d, DIALOGS.sage.greet, { online: true }), /Eco é o que fica/, 'online sem missão: a definição de eco');
+  d.quests.done.cripta_dos_ecos = 1; assert.match(greetFor(d, DIALOGS.smith.greet), /Fragmentos de eco/);
 });

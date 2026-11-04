@@ -1,5 +1,5 @@
 // Aura de evolução do herói (efeito de luz/partícula procedural; NÃO desenha o personagem). Estilos em core/aura.js.
-// Custo por herói com aura: 2 drawImage (halo + anel) + poucas partículas (um drawImage cada) de sprites de luz pintados UMA vez por (spec, tier, qualidade).
+// Custo por herói com aura: 2 drawImage (halo + anel; 3 na Maestria, com o 2º anel) + poucas partículas (um drawImage cada) de sprites de luz pintados UMA vez por (spec, tier, qualidade).
 // Qualidade baixa: só o halo. Sem alocação no quadro: posições das partículas são função pura de (tempo, id, índice).
 import { auraStyle, auraTier } from '../core/aura.js';
 
@@ -16,32 +16,27 @@ function paintHalo(st) {
   const c = mk(HALO, HALO); if (!c) return null;
   const x = c.getContext('2d'), m = HALO / 2;
   const gr = x.createRadialGradient(m, m, 0, m, m, m);
-  gr.addColorStop(0, st.c + (st.thin ? '30' : '58')); gr.addColorStop(0.55, st.c + (st.thin ? '16' : '2c')); gr.addColorStop(1, st.c + '00');
+  gr.addColorStop(0, st.c + (st.big ? '88' : '58')); gr.addColorStop(0.55, st.c + (st.big ? '44' : '2c')); gr.addColorStop(1, st.c + '00'); // Maestria: halo mais denso
   x.fillStyle = gr; x.fillRect(0, 0, HALO, HALO);
   return c;
 }
-// Anel tracejado em círculo (o desenho o achata em elipse isométrica e gira devagar). Tier 2: fio fino com três gemas.
+// Anel tracejado em círculo (o desenho o achata em elipse isométrica e gira devagar). Maestria: traço mais grosso e brilhante, anel interno cheio e três gemas.
 function paintRing(st) {
   const c = mk(RING, RING); if (!c) return null;
   const x = c.getContext('2d'), m = RING / 2, r = m - 6;
-  x.lineCap = 'round'; x.strokeStyle = st.c; x.shadowColor = st.c; x.shadowBlur = 5;
-  if (st.thin) {
-    x.globalAlpha = 0.8; x.lineWidth = 1; x.beginPath(); x.arc(m, m, r, 0, Math.PI * 2); x.stroke();
-    x.fillStyle = st.c2; x.shadowBlur = 6;
-    for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3; x.beginPath(); x.arc(m + Math.cos(a) * r, m + Math.sin(a) * r, 2, 0, Math.PI * 2); x.fill(); }
-  } else {
-    x.lineWidth = 2.4; const seg = 6;
-    for (let i = 0; i < seg; i++) { const a = i * Math.PI * 2 / seg; x.globalAlpha = i % 2 ? 0.55 : 0.95; x.beginPath(); x.arc(m, m, r, a, a + 0.62); x.stroke(); }
-    x.globalAlpha = 0.5; x.lineWidth = 1; x.strokeStyle = st.c2; x.beginPath(); x.arc(m, m, r - 7, 0, Math.PI * 2); x.stroke();
-  }
+  x.lineCap = 'round'; x.strokeStyle = st.c; x.shadowColor = st.c; x.shadowBlur = st.big ? 9 : 5;
+  x.lineWidth = st.big ? 3.4 : 2.4; const seg = 6;
+  for (let i = 0; i < seg; i++) { const a = i * Math.PI * 2 / seg; x.globalAlpha = i % 2 ? (st.big ? 0.8 : 0.55) : 1; x.beginPath(); x.arc(m, m, r, a, a + 0.62); x.stroke(); }
+  x.globalAlpha = st.big ? 0.8 : 0.5; x.lineWidth = st.big ? 1.6 : 1; x.strokeStyle = st.c2; x.beginPath(); x.arc(m, m, r - 7, 0, Math.PI * 2); x.stroke();
+  if (st.big) { x.fillStyle = st.c2; x.globalAlpha = 1; for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3 + 0.3; x.beginPath(); x.arc(m + Math.cos(a) * r, m + Math.sin(a) * r, 2.6, 0, Math.PI * 2); x.fill(); } }
   return c;
 }
 // Partícula: ponto de luz (spark), brasa, cristal (losango), folha ou runa (estrela de 4 pontas), conforme o estilo.
 function paintPart(st) {
   const c = mk(PART, PART); if (!c) return null;
   const x = c.getContext('2d'), m = PART / 2;
-  x.shadowColor = st.c; x.shadowBlur = 6; x.fillStyle = st.c2;
-  const k = st.thin ? 0.7 : 1;
+  x.shadowColor = st.c; x.shadowBlur = st.big ? 8 : 6; x.fillStyle = st.c2;
+  const k = st.big ? 1.25 : 1;
   if (st.kind === 'crystal') { x.beginPath(); x.moveTo(m, m - 7 * k); x.lineTo(m + 3.5 * k, m); x.lineTo(m, m + 7 * k); x.lineTo(m - 3.5 * k, m); x.closePath(); x.fill(); x.fillStyle = st.c; x.globalAlpha = 0.6; x.beginPath(); x.moveTo(m, m - 7 * k); x.lineTo(m + 3.5 * k, m); x.lineTo(m, m); x.closePath(); x.fill(); }
   else if (st.kind === 'leaf') { x.save(); x.translate(m, m); x.rotate(-0.6); x.beginPath(); x.ellipse(0, 0, 6 * k, 2.8 * k, 0, 0, Math.PI * 2); x.fillStyle = st.c; x.fill(); x.strokeStyle = st.c2; x.lineWidth = 0.8; x.beginPath(); x.moveTo(-5 * k, 0); x.lineTo(5 * k, 0); x.stroke(); x.restore(); }
   else if (st.kind === 'rune') { x.beginPath(); x.moveTo(m, m - 7 * k); x.quadraticCurveTo(m, m, m + 7 * k, m); x.quadraticCurveTo(m, m, m, m + 7 * k); x.quadraticCurveTo(m, m, m - 7 * k, m); x.quadraticCurveTo(m, m, m, m - 7 * k); x.fill(); }
@@ -74,9 +69,11 @@ export function drawAuraBack(g, a, t, q, feetY) {
   const w = 74 * st.scale * pulse;
   g.drawImage(e.halo, a.x - w, feetY - w * 0.5, w * 2, w);
   if (e.ring) {
-    g.save(); g.translate(a.x, feetY); g.scale(1, 0.5); g.rotate(t * (st.thin ? 0.35 : 0.5) + (a.id ?? 0));
-    const r = 34 * st.scale; g.globalAlpha = prev * (st.thin ? 0.8 : 0.85);
-    g.drawImage(e.ring, -r, -r, r * 2, r * 2); g.restore();
+    g.save(); g.translate(a.x, feetY); g.scale(1, 0.5); g.rotate(t * 0.5 + (a.id ?? 0));
+    const r = 34 * st.scale; g.globalAlpha = prev * 0.9;
+    g.drawImage(e.ring, -r, -r, r * 2, r * 2);
+    if (st.ring2) { g.rotate(-t * 1.1 - (a.id ?? 0) * 2); const r2 = r * 0.68; g.globalAlpha = prev * 0.85; g.drawImage(e.ring, -r2, -r2, r2 * 2, r2 * 2); } // segundo anel, menor, em contra-rotação
+    g.restore();
   }
   g.globalAlpha = prev; auraStats.drawn++;
 }
@@ -87,7 +84,7 @@ export function drawAuraMotes(g, a, t, q, feetY) {
   const tier = auraTier(a); if (!tier || a.dead) return;
   const e = get(a.spec, tier, q); if (!e.part) return;
   const st = e.st, n = q === 1 ? Math.max(1, st.n >> 1) : st.n, prev = g.globalAlpha, id = a.id ?? 0;
-  const s = st.thin ? 9 : 12;
+  const s = st.big ? 15 : 12;
   for (let i = 0; i < n; i++) {
     const ph = (t * (0.25 + st.rise * 0.25) + h01(id, i)) % 1;       // vida da partícula 0..1
     const ang = h01(id, i + 31) * 6.283 + t * 0.6 * (i % 2 ? 1 : -1);

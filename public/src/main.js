@@ -1720,14 +1720,14 @@ class Game {
     if (this.serverTx({ op: 'buy_phoenix', n, shop: this.shopKind() }, (m) => this.ui.toast(PHOENIX.name, `Você tem ${m.phoenix}. Evita a perda de ouro e XP ao cair.`, 'gold'))) return;
     if (!this.spend(PHOENIX.price * n)) return;
     this.char.phoenix = (this.char.phoenix ?? 0) + n;
-    this.ui.toast(PHOENIX.name, `Você tem ${this.char.phoenix}. Evita a perda de ouro e XP ao cair.`, 'gold');
+    this.ui.toast(PHOENIX.name, `Você tem ${this.char.phoenix}. Ele guarda o seu eco: ao cair, nada de ouro nem XP se perde.`, 'gold');
     this.ui.render(); this.save();
   }
 
   // Pedra de Retorno: grava o ponto de renascimento da zona (online o servidor confere a zona e a proximidade).
   useCheckpoint(stone) {
     if (!stone || (this.mode !== 'explore' && !this.inNetZone()) || this.player?.dead) return;
-    const done = () => this.ui.toast('Ponto de retorno salvo', 'Se você cair neste mapa, renasce aqui.', 'gold');
+    const done = () => this.ui.toast('Ponto de retorno salvo', 'A pedra guardou o seu eco. Se você cair neste mapa, renasce aqui.', 'gold');
     if (this.serverTx({ op: 'checkpoint_set', id: stone.id }, done)) return;
     if (this.inNetZone()) return;
     if (setCheckpoint(this.char, this.world.zoneId, stone.id)) { done(); this.save(); }

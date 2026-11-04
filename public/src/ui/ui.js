@@ -612,6 +612,14 @@ export class UI {
     const list = specsOf(char.classId);
     if (char.level < SPEC_LEVEL) return `<h3>Especialização</h3><p class="hint">${LOCK} Libera no nível ${SPEC_LEVEL} (você está no ${char.level}): duas escolhas que ajustam suas habilidades.</p>`;
     const seals = sealsOf(char), has = !!specInfo(char.classId, char.spec);
+    if (!this.specMaster) { // painel do menu: só informa (escolher/trocar fica no Mestre de Classe e nos mentores, para não ser fácil trocar)
+      const info = list && char.spec ? specInfo(char.classId, char.spec) : null;
+      const note = '<p class="hint">Para trocar de especialização, fale com o Mestre da sua classe ou com um mentor no Porto.</p>';
+      if (!info) return `<h3 id="master-section">Especialização <span class="pts">nenhuma</span></h3>${note}`;
+      return `<h3 id="master-section">Especialização <span class="pts">${info.name}</span></h3>
+        <div class="shop-item sel"><div class="cell r-epic"><span class="ic">${info.icon}</span></div><div><div class="nm">${info.name} ✔</div><div class="sub">${info.desc}</div></div></div>
+        ${this.skillCards(char.spec)}${note}`;
+    }
     const buy = this.specMaster
       ? `<div class="shop-item"><div class="cell r-epic"><span class="ic">🔖</span></div><div><div class="nm">Selo de Reespecialização</div><div class="sub">Consumido ao trocar de especialização.</div></div>
           <button class="btn small" data-action="buy-seal" ${char.gold < SEAL_PRICE ? 'disabled' : ''}>${COIN} ${SEAL_PRICE.toLocaleString('pt-BR')}</button></div>`

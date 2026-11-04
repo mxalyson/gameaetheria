@@ -17,14 +17,20 @@ test('painel do personagem: especialização travada antes do nível 15 e com 2 
   await page.evaluate(() => window.game.ui.openPanel('character'));
   await expect(page.locator('.panel')).toContainText('Libera no nível 15');
   await expect(page.locator('[data-action="spec"]')).toHaveCount(0);
+  // no menu o painel só informa: nenhum botão de escolher/trocar/comprar Selo
   await page.evaluate(() => { window.game.char.level = 15; window.game.ui.closePanels(); window.game.ui.openPanel('character'); });
+  await expect(page.locator('[data-action="spec"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="buy-seal"]')).toHaveCount(0);
+  await expect(page.locator('.panel')).toContainText('fale com o Mestre da sua classe ou com um mentor no Porto');
+  // escolher só no painel do Mestre de Classe
+  await page.evaluate(() => { window.game.ui.closePanels(); window.game.ui.openPanel('character:master'); });
   await expect(page.locator('[data-action="spec"]')).toHaveCount(2);
   expect(errors).toEqual([]);
 });
 
 test('escolher Arcano: fica salvo, vale no herói e a barra passa ao kit do Arcano (Raio Prismático)', async ({ page }) => {
   const errors = await criar(page);
-  await page.evaluate(() => { window.game.char.level = 15; window.game.char.quests.done.prova_do_mestre = Date.now(); window.game.ui.openPanel('character'); }); // exige a Prova do Mestre da classe
+  await page.evaluate(() => { window.game.char.level = 15; window.game.char.quests.done.prova_do_mestre = Date.now(); window.game.ui.openPanel('character:master'); }); // exige a Prova do Mestre da classe; escolher só no painel do Mestre
   await page.click('[data-action="spec"][data-arg="arcane"]'); // primeira escolha: sem confirmação, grátis
   const r = await page.evaluate(async () => {
     const g = window.game;

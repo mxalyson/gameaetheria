@@ -34,10 +34,11 @@ test('tier: 0 sem spec ou antes do nv 15; 1 com spec; 2 com Maestria', () => {
   assert.equal(auraTier(a), 2); assert.equal(auraSpec(a), 'arcane');
 });
 
-test('estilo: tier 2 é mais discreto e fino que o tier 1; determinístico e sem aura -> null', () => {
+test('estilo: tier 2 (Maestria) é MAIS FORTE que o tier 1 (partículas ≈1,6x, halo/anéis maiores, 2º anel); determinístico e sem aura -> null', () => {
   for (const s of SPEC_ORDER) {
     const t1 = auraStyle(s, 1), t2 = auraStyle(s, 2);
-    assert.ok(t2.alpha < t1.alpha && t2.n <= t1.n && t2.thin && !t1.thin && t2.ring, s);
+    assert.ok(t2.alpha >= t1.alpha && t2.scale > t1.scale && t2.big && !t1.big && t2.ring2 && !t1.ring2 && t2.ring, s);
+    assert.ok(t2.n > t1.n && t2.n >= Math.floor(t1.n * 1.6) && t2.n <= Math.ceil(t1.n * 1.6), s + ': ≈1,6x partículas');
     assert.notEqual(t1.c, t2.c);
     assert.equal(auraStyle(s, 1), t1, 'resolvido uma vez (mesma referência)');
   }
