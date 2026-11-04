@@ -14,15 +14,15 @@ const FEET_Y = 12;                    // os pés do herói antigo ficam em a.y +
 // Visual de evolução de um personagem ou ator (arte do dono). tier 0 = comum, 1 = especialização (nv 15, aura), 2 = Maestria (nv 25, aura refinada).
 // `atlasVariant` é o id do atlas de variante (pasta em atlas-rig/) quando existe arte para `classe:spec:tier`; senão undefined e vale o atlas da classe + aura (render/aura.js).
 // Para acrescentar um herói de evolução: gerar o atlas (ver docs/art-direction/personagens-miniatura.md) e registrar aqui. Ver docs/art-direction/aura-evolucao.md.
-const VARIANT_ATLASES = { // Maestria (Nv 25): arte do dono por especialização; carrega sob demanda, com fallback ao atlas da classe
-  'warrior:paladin:2': 'paladin_nv25', 'warrior:berserker:2': 'berserker_nv25',
-  'archer:sniper:2': 'sniper_nv25', 'archer:gunslinger:2': 'gunslinger_nv25',
-  'mage:warlock:2': 'warlock_nv25', 'cleric:guardian:2': 'guardian_nv25',
-  'mage:arcane:2': 'arcane_nv25', 'cleric:inquisitor:2': 'inquisitor_nv25', // chibi_heroes.glb do dono (rig v2)
+const VARIANT_ATLASES = { // visual novo por especialização (vale da escolha da especialização em diante, junto com o kit de habilidades; a Maestria só acrescenta a habilidade e a aura mais refinada); carrega sob demanda, com fallback ao atlas da classe
+  'warrior:paladin': 'paladin_nv25', 'warrior:berserker': 'berserker_nv25',
+  'archer:sniper': 'sniper_nv25', 'archer:gunslinger': 'gunslinger_nv25',
+  'mage:warlock': 'warlock_nv25', 'cleric:guardian': 'guardian_nv25',
+  'mage:arcane': 'arcane_nv25', 'cleric:inquisitor': 'inquisitor_nv25', // chibi_heroes.glb do dono (rig v2)
 };
 export function heroLook(o) {
   const tier = auraTier(o), spec = tier ? auraSpec(o) : null;
-  return { tier, spec, atlasVariant: spec ? VARIANT_ATLASES[`${o?.classId}:${spec}:${tier}`] : undefined };
+  return { tier, spec, atlasVariant: spec ? (tier >= 1 ? VARIANT_ATLASES[`${o?.classId}:${spec}`] : undefined) : undefined };
 }
 
 export const VARIANT_TEX_K = 0.8;

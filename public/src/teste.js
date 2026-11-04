@@ -28,7 +28,7 @@ export function buildTesteChar(kind) {
   c.gold = 99999; c.potions = 30; c.scrolls = 10;
   if (spec && SPECS[classId]?.[spec]) {
     c.spec = spec;
-    c.quests.done.prova_do_mestre = 1; c.quests.done.maestria = 1; // Maestria: aura refinada + atlas de Nv 25
+    c.quests.done.prova_do_mestre = 1; c.quests.done.maestria = 1; // Maestria: aura refinada (o visual novo já vem da especialização)
   }
   const noShield = spec && SPECS[classId]?.[spec]?.noOffhand;
   c.equipment.weapon = generateItem(rng, 25, { slot: 'weapon', rarityId: 'epic', weaponType: undefined, classId });
@@ -57,7 +57,7 @@ export function installTesteUi(game) {
   const zoneNow = () => game.world?.zoneId ?? 'town';
   const evo = TESTE_KINDS[TESTE][1] ? TESTE : 'paladino'; // o herói evoluído pedido na URL (ou o Paladino); o 'base' é a mesma classe sem especialização
   const baseKind = { warrior: 'paladino-base', mage: 'mago-base', archer: 'arqueiro-base', cleric: 'clerigo-base' }[TESTE_KINDS[evo][0]];
-  btn('teste-evo', evo === 'paladino' ? 'Paladino Nv25' : 'Evoluído Nv25', () => game.testeSwitch(evo, zoneNow()));
+  btn('teste-evo', evo === 'paladino' ? 'Paladino' : 'Evoluído', () => game.testeSwitch(evo, zoneNow()));
   btn('teste-base', TESTE_KINDS[evo][0] === 'warrior' ? 'Guerreiro base' : 'Herói base', () => game.testeSwitch(baseKind, zoneNow()));
   btn('teste-vila', 'Vila', () => game.testeSwitch(window.TESTE.kind, 'town'));
   btn('teste-bosque', 'Bosque', () => game.testeSwitch(window.TESTE.kind, 'forest'));

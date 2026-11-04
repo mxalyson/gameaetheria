@@ -1241,8 +1241,9 @@ class Game {
       a.probe = { x: p.x, y: p.y, t: 0 };
     }
     const mv = followPath(a.path, p, 20);
-    if (!mv) { a.path = null; if (goal.portal) { intent.mx = Math.sign(goal.x - p.x) * 0.5; intent.my = 0; intent.spd = 1; } return; } // chegou ao fim do caminho: encosta no portal / recalcula
+    if (!mv) { a.path = null; if (goal.portal) { intent.mx = Math.sign(goal.x - p.x) * 0.5; intent.my = 0; intent.spd = 1; intent.run = true; } return; } // chegou ao fim do caminho: encosta no portal / recalcula
     intent.mx = mv.mx; intent.my = mv.my; intent.spd = 1; intent.attack = false; intent.cast = null;
+    intent.run = true; // auto-viagem corre como o joystick na borda (a simulação e o servidor só concedem fora de combate e nas zonas permitidas)
     intent.aimX = p.x + mv.mx * 200; intent.aimY = p.y + mv.my * 200;
     // travado? (sem andar 6 px em 1,3 s): recalcula; 3 vezes seguidas pausa
     a.probe.t += dt;
