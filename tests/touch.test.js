@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stickVector, nearestTarget, pickAim, aimModeFor, dragAim, interactTarget, STICK_RADIUS, DEADZONE } from '../public/src/touch-logic.js';
+import { stickVector, nearestTarget, pickAim, aimModeFor, dragAim, interactTarget, skillLayout, TB_GAP, STICK_RADIUS, DEADZONE } from '../public/src/touch-logic.js';
 import { loadPrefs, changePref, resolveQuality, SCALE_MIN, SCALE_MAX } from '../public/src/prefs.js';
 import { SKILLS } from '../public/src/data/skills.js';
 
@@ -112,4 +112,20 @@ test('segurar para explicar: só vale parado e depois de ~0,4 s', async () => {
   assert.equal(isHold(HOLD_MS, 0), true);
   assert.equal(isHold(900, 5), true, 'tremor do dedo não cancela');
   assert.equal(isHold(900, 40), false, 'arrastar é mirar na mão, não segurar');
+});
+
+test('botões de toque: distância entre centros >= 1,15 × (r1 + r2) e nada sai da tela, em vários tamanhos e escalas', () => {
+  for (const [w, h] of [[844, 390], [874, 402], [667, 375], [932, 430], [1280, 720]]) for (const ui of [0.6, 0.7, 0.8, 0.9, 1]) {
+    const L = skillLayout(w, h, ui, { right: 0, bottom: 0 }), ks = Object.keys(L.items);
+    for (let i = 0; i < ks.length; i++) {
+      const a = L.items[ks[i]];
+      assert.ok(a.sx - a.sr >= 0 && a.sx + a.sr <= w && a.sy - a.sr >= 0 && a.sy + a.sr <= h, `${ks[i]} fora da tela ${w}x${h} ui ${ui}`);
+      for (let j = i + 1; j < ks.length; j++) {
+        const b = L.items[ks[j]];
+        assert.ok(Math.hypot(a.sx - b.sx, a.sy - b.sy) >= TB_GAP * (a.sr + b.sr) - 1e-6, `${ks[i]} x ${ks[j]} sobrepõem em ${w}x${h} ui ${ui}`);
+      }
+    }
+    // alvo de toque físico: a habilidade (50 px) na escala mínima 0,8 continua com 40 px
+    assert.ok(L.items.s0.d * L.scale >= 40 - 1e-6);
+  }
 });

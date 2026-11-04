@@ -6,7 +6,7 @@ import { isSkillUnlocked, skillUnlockLevel, skillIdAt, kitIds } from './core/unl
 import { skillOf, basicOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { asset } from './assets-version.js';
-import { stickVector, pickAim, aimModeFor, dragAim, interactTarget, isHold, HOLD_MS } from './touch-logic.js';
+import { stickVector, pickAim, aimModeFor, dragAim, interactTarget, isHold, HOLD_MS, skillLayout } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -28,6 +28,16 @@ export class TouchControls {
   }
 
   get scale() { return this.game.uiScale ?? 1; }
+
+  // Posição e tamanho de cada botão vêm de skillLayout (touch-logic.js): variáveis CSS por botão, nenhum par se sobrepõe
+  applyLayout() {
+    const L = skillLayout(innerWidth, innerHeight, this.scale), map = { atk: '.atk', s0: '.sk0', s1: '.sk1', s2: '.sk2', s3: '.sk3', pot: '.pot', act: '.act' };
+    for (const [k, sel] of Object.entries(map)) {
+      const el = this.root.querySelector(sel), it = L.items[k];
+      if (!el || k === 'atk') continue;
+      el.style.setProperty('--cx', String(it.x)); el.style.setProperty('--cy', String(it.y)); el.style.setProperty('--d', String(it.d));
+    }
+  }
 
   setMode(mode) { this.mode = mode; this.refresh(); }
 
@@ -66,6 +76,8 @@ export class TouchControls {
         <div class="tbtn slot act hidden" data-t="interact"><span class="icon"></span></div>
       </div>`;
 
+    this.applyLayout();
+    addEventListener('resize', () => this.applyLayout());
     const zone = $('stick-zone'), knob = $('stick-knob');
     zone.addEventListener('pointerdown', (e) => {
       if (this.stickId !== null) return;

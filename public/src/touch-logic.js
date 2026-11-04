@@ -77,3 +77,39 @@ export function interactTarget(player, world) {
   const lore = (zone.lore ?? []).find((l) => len(l.x - player.x, l.y - player.y) < LORE_REACH);
   return lore ? { kind: 'lore', ref: lore } : null;
 }
+
+// ---------- geometria dos botões de toque (canto inferior direito) ----------
+// Tudo em px do "contêiner" #tbtns (sem escala): x = distância da borda DIREITA, y = da borda de BAIXO (centros). O contêiner todo é
+// escalado por --tb (= máx(ui, .8)) com origem no canto, então as razões entre distâncias não mudam com a escala da interface.
+// Regra: a distância entre os centros de QUALQUER par >= GAP × (r1 + r2). Dois anéis em volta do ataque:
+//  anel 1 (raio 84, passo 45°): s0 à esquerda, s1 na diagonal, s2 em cima; anel 2 (raio 150): Maestria (s3) entre s1 e s2;
+//  poção à esquerda de s0; interagir (baú/NPC/pedra) acima da poção, à esquerda do arco.
+export const TB_GAP = 1.15, TB_MIN_SCALE = 0.8, TB_RIGHT = 10, TB_BOTTOM = 8;
+export const TB_R = { atk: 44, sk: 25, mastery: 27, pot: 25, act: 30 }; // raios (px do contêiner)
+const RING1 = 84, RING2 = 150, STEP = Math.PI / 4;
+export const TB_SIZE = { w: 236, h: 214 }; // contêiner (cabe a Maestria no anel 2 e a poção/interagir à esquerda)
+
+// ângulo: 0 = esquerda do ataque, cresce para cima (PI/2 = em cima)
+const polar = (cx, cy, R, a) => ({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) });
+
+export function skillLayout(vw, vh, ui = 1, { right = 0, bottom = 0 } = {}) {
+  const scale = Math.max(ui, TB_MIN_SCALE);
+  const A = { x: TB_R.atk, y: TB_R.atk, r: TB_R.atk };
+  const items = {
+    atk: A,
+    s0: { ...polar(A.x, A.y, RING1, 0), r: TB_R.sk },
+    s1: { ...polar(A.x, A.y, RING1, STEP), r: TB_R.sk },
+    s2: { ...polar(A.x, A.y, RING1, STEP * 2), r: TB_R.sk },
+    s3: { ...polar(A.x, A.y, RING2, STEP * 1.5), r: TB_R.mastery },
+  };
+  items.pot = { x: items.s0.x + 62, y: A.y, r: TB_R.pot };
+  items.act = { x: items.pot.x, y: items.pot.y + 66, r: TB_R.act };
+  const ox = TB_RIGHT + right, oy = TB_BOTTOM + bottom; // folga da borda (incl. área segura)
+  for (const k of Object.keys(items)) {
+    const it = items[k];
+    it.x = Math.round(it.x * 10) / 10; it.y = Math.round(it.y * 10) / 10;
+    it.d = it.r * 2;
+    it.sx = vw - ox - it.x * scale; it.sy = vh - oy - it.y * scale; it.sr = it.r * scale; // centro e raio na tela
+  }
+  return { scale, w: TB_SIZE.w, h: TB_SIZE.h, items };
+}

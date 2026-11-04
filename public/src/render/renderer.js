@@ -904,6 +904,7 @@ function drawObjective(g, ob, t) {
   g.restore();
 }
 
+const LABEL_STEPS = [14, 28, 42, -14, -28]; // degraus (mundo) tentados para a etiqueta de nome: sobe, depois desce
 function drawBars(g, a, isPlayer, placed) {
   if (a.kind === 'spirit') return;
   const showMob = a.kind === 'mob' && (a.hp < a.maxHp || a.elite || a.boss);
@@ -935,14 +936,15 @@ function drawBars(g, a, isPlayer, placed) {
   else if (a.kind === 'mob') label = `Nv ${a.level}${a.boss || a.elite ? ' · ' + a.name : ''}`;
   if (label) {
     // etiquetas coladas se afastam para cima (V21): até 3 degraus de 12 px; a posição fica registrada no quadro
-    let ly = top - 4;
-    if (placed) {
-      const hw = g.measureText(label).width / 2 + 2;
-      for (let n = 0; n < 3 && placed.some((q) => Math.abs(q.x - a.x) < q.hw + hw && Math.abs(q.y - ly) < 12); n++) ly -= 12;
-      placed.push({ x: a.x, y: ly, hw });
-    }
-    const sp = safeBox(a.x, ly - 11, g.measureText(label).width + 6, 14); // etiqueta presa à tela e fora do menu
-    const lx = sp.x; ly = sp.y + 11;
+    // A colisão é testada na posição FINAL (já presa à tela e fora do menu): dois elites perto do menu caíam no mesmo ponto e as etiquetas se sobrepunham.
+    const tw = g.measureText(label).width, hw = tw / 2 + 5;
+    const sp = safeBox(a.x, top - 4 - 11, tw + 6, 14);
+    let lx = sp.x, ly = sp.y + 11;
+    const busy = () => placed && placed.some((q) => Math.abs(q.x - lx) < q.hw + hw && Math.abs(q.y - ly) < 13);
+    // ocupado: sobe e desce em degraus de 14 px SOBRE a posição já presa (o prendimento ao menu devolvia sempre o mesmo ponto)
+    const by = ly;
+    for (let n = 0; n < LABEL_STEPS.length && busy(); n++) ly = by + LABEL_STEPS[n];
+    if (placed) placed.push({ x: lx, y: ly, hw });
     g.strokeText(label, lx, ly);
     g.fillStyle = a.boss ? '#ffb4a8' : a.elite ? '#ffd27a' : a.kind === 'rival' && a.team === 1 ? '#bfe0ff' : '#ffffff';
     g.fillText(label, lx, ly);
