@@ -17,9 +17,13 @@ function listFiles(dir) {
   });
 }
 
+// Só arquivos de arte entram no hash: o Windows cria Thumbs.db/desktop.ini nas pastas de imagem (fora do Git), e o hash da máquina do dono
+// nunca batia com o de um clone limpo (teste de ASSET_V falhando em qualquer outro computador).
+const ART = /\.(webp|png|jpe?g|svg|json|woff2?|ttf)$/i;
+
 export function assetsHash() {
   const h = createHash('sha1');
-  for (const f of listFiles(join(PUB, 'assets'))) {
+  for (const f of listFiles(join(PUB, 'assets')).filter((f) => ART.test(f))) {
     h.update(relative(PUB, f).split('\\').join('/')).update('\0').update(readFileSync(f)).update('\0');
   }
   return h.digest('hex').slice(0, 8);
