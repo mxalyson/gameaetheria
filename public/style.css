@@ -282,9 +282,9 @@ body.online .online-only { display: inline-block; }
 .tbtn.sk0, .tbtn.sk1, .tbtn.sk2 { width: 50px; height: 50px; }
 .tbtn.pot { width: 50px; height: 50px; right: 184px; bottom: 19px; }
 .tbtn.pot .icon { font-size: 22px; }
-/* botão de voltar à vila: medalhão pintado como moldura e a casa 3D recortada dentro (assets/icons/ui/home.webp?v=51401d49) */
-.tbtn.home, .slot.medal { background: url(assets/ui/medal-normal.webp?v=51401d49) center / 100% 100% no-repeat; border: 0; border-radius: 50%; box-shadow: none; overflow: visible; }
-.tbtn.home:active, .tbtn.home.down, .slot.medal:active { background-image: url(assets/ui/medal-pressed.webp?v=51401d49); }
+/* botão de voltar à vila: medalhão pintado como moldura e a casa 3D recortada dentro (assets/icons/ui/home.webp?v=17fd58fc) */
+.tbtn.home, .slot.medal { background: url(assets/ui/medal-normal.webp?v=17fd58fc) center / 100% 100% no-repeat; border: 0; border-radius: 50%; box-shadow: none; overflow: visible; }
+.tbtn.home:active, .tbtn.home.down, .slot.medal:active { background-image: url(assets/ui/medal-pressed.webp?v=17fd58fc); }
 .tbtn.home .icon, .slot.medal .icon { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; }
 .tbtn.home .icon img, .slot.medal .icon img { width: 70%; height: 70%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); pointer-events: none; }
 .zone-ic { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,.45)); }
@@ -431,7 +431,7 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 @media (max-height: 320px) { :root { --card-w: 100px; --map: 96px; } }
 
 /* cartão do herói: moldura de bronze com 4 gemas; o retrato entra no vão escuro (10%,15,4% · 44,3%×69%) e os dois tubos saem pela direita */
-#hud-player { left: calc(8px + env(safe-area-inset-left, 0px)); top: 8px; width: var(--card-w); height: calc(var(--card-w) * .637); padding: 0; gap: 0; display: block; background: url(assets/ui/hero-card.webp?v=51401d49) center/100% 100% no-repeat; border: 0; border-radius: 0; box-shadow: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
+#hud-player { left: calc(8px + env(safe-area-inset-left, 0px)); top: 8px; width: var(--card-w); height: calc(var(--card-w) * .637); padding: 0; gap: 0; display: block; background: url(assets/ui/hero-card.webp?v=17fd58fc) center/100% 100% no-repeat; border: 0; border-radius: 0; box-shadow: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
 #hud-player .portrait { position: absolute; left: 10%; top: 15.4%; width: 44.3%; height: 69%; border-radius: 6px; background: #141a28; box-shadow: none; border: 0; font-size: 0; overflow: hidden; display: grid; place-items: center; z-index: 2; }
 #hud-player .portrait img { width: 96%; height: 96%; object-fit: contain; filter: none; }
 #hud-player .bars { display: contents; }
@@ -439,11 +439,11 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 #hud-name { position: absolute; left: 40%; top: 1%; max-width: 135%; font: 800 10px Nunito, sans-serif; color: #fff6d6; text-shadow: 0 1px 2px #000, 0 0 4px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #hud-player .name-row #hud-level, #hud-level { position: absolute; left: 1%; bottom: -8%; min-width: 22px; height: 20px; padding: 0 6px; display: grid; place-items: center; z-index: 3; border-radius: 10px; font: 900 11px Nunito, sans-serif; color: #3a2600; background: radial-gradient(circle at 35% 30%, #fff0a6, #c98f12); box-shadow: 0 0 0 1.5px #8a5d08, 0 2px 4px rgba(0,0,0,.45); }
 /* vidros de poção: tubo vazio por baixo; o líquido (vida vermelha, XP dourado: nunca azul, o jogo não tem mana) só aparece até a fração --v (11,9%–84% da peça = parte de vidro) */
-#hud-player .bar { position: absolute; left: 38.7%; width: 135.5%; height: auto; aspect-ratio: 520 / 117; margin: 0; border-radius: 0; background: url(assets/ui/vial-empty.webp?v=51401d49) center/100% 100% no-repeat; overflow: visible; }
+#hud-player .bar { position: absolute; left: 38.7%; width: 135.5%; height: auto; aspect-ratio: 520 / 117; margin: 0; border-radius: 0; background: url(assets/ui/vial-empty.webp?v=17fd58fc) center/100% 100% no-repeat; overflow: visible; }
 #hud-player .bar.hp { top: 16.5%; } #hud-player .bar.xp { top: 47%; height: auto; }
 #hud-player .bar .fill { position: absolute; inset: 0; width: 100% !important; height: 100% !important; border-radius: 0; transition: clip-path .15s; clip-path: inset(0 calc(100% - (11.9% + var(--v, 1) * 72.1%)) 0 0); }
-#hud-player .bar.hp .fill:not(.shield) { background: url(assets/ui/vial-hp.webp?v=51401d49) center/100% 100% no-repeat; }
-#hud-player .bar.xp .fill { background: url(assets/ui/vial-xp.webp?v=51401d49) center/100% 100% no-repeat; }
+#hud-player .bar.hp .fill:not(.shield) { background: url(assets/ui/vial-hp.webp?v=17fd58fc) center/100% 100% no-repeat; }
+#hud-player .bar.xp .fill { background: url(assets/ui/vial-xp.webp?v=17fd58fc) center/100% 100% no-repeat; }
 #hud-player .bar.hp .fill.shield { inset: auto; left: 11.9%; top: 26%; height: 5px !important; width: calc(var(--s, 0) * 72.1%) !important; clip-path: none; background: rgba(255,226,120,.9); border-radius: 3px; box-shadow: 0 0 4px rgba(255,200,60,.8); }
 #hud-player .bar span { left: 12%; right: 16%; font: 900 10px Nunito, sans-serif; color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; z-index: 2; }
 #hud-player .bar.xp span { font-size: 9px; }
@@ -452,7 +452,7 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 
 /* minimapa: anel pintado por cima de um canvas redondo (radar centrado no jogador); o vão do anel é 19,7%–80,4% */
 #hud-zone { right: calc(8px + env(safe-area-inset-right, 0px)); top: 8px; width: var(--map); height: var(--map); padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
-#hud-zone::after { content: ''; position: absolute; inset: 0; background: url(assets/ui/minimap-ring.webp?v=51401d49) center/100% 100% no-repeat; pointer-events: none; z-index: 2; }
+#hud-zone::after { content: ''; position: absolute; inset: 0; background: url(assets/ui/minimap-ring.webp?v=17fd58fc) center/100% 100% no-repeat; pointer-events: none; z-index: 2; }
 #hud-zone #minimap, body.touch #minimap { position: absolute; display: block; left: 19.7%; top: 19.4%; width: 60.7%; height: 61%; margin: 0; border-radius: 50%; background: rgba(20,30,40,.5); box-shadow: none; }
 #zone-name { display: none; }
 body:not(.touch) #zone-name { display: block; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin: -2px 0 0; white-space: nowrap; font: 800 12px Cinzel, serif; color: #fff6d6; text-shadow: 0 1px 3px #000, 0 0 5px #000; }
@@ -462,43 +462,43 @@ body:not(.online) .menu-btns .online-only { display: none; } /* grupo só com co
 .menu-btns button, body.touch .menu-btns button { width: 40px; height: 40px; padding: 0; background: none; border: 0; border-radius: 50%; box-shadow: none; font-size: 0; display: grid; place-items: center; }
 .menu-btns button img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
 .menu-btns button:active img { filter: brightness(1.25) drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
-.menu-btns button.txt { background: url(assets/ui/medal-normal.webp?v=51401d49) center/100% 100% no-repeat; font-size: 17px; color: #fff0a6; }
+.menu-btns button.txt { background: url(assets/ui/medal-normal.webp?v=17fd58fc) center/100% 100% no-repeat; font-size: 17px; color: #fff0a6; }
 body.touch .menu-btns { position: fixed; top: 8px; right: calc(8px + var(--map) + 8px + env(safe-area-inset-right, 0px)); width: auto; flex-wrap: nowrap; justify-content: flex-start; gap: 4px; }
 @media (max-height: 420px) { .menu-btns button, body.touch .menu-btns button { width: 36px; height: 36px; } }
 @media (max-height: 320px) { .menu-btns button, body.touch .menu-btns button { width: 34px; height: 34px; } }
 
 /* ===== PAINÉIS PINTADOS (B5, parte 2): moldura em 9 fatias, botões, células de raridade, dica e faixa — só a "pele" mudou; marcação e ações iguais ===== */
-.panel { --pb: 26px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp?v=51401d49) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; box-shadow: none; backdrop-filter: none; filter: drop-shadow(0 14px 22px rgba(0,0,0,.55)); }
+.panel { --pb: 26px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp?v=17fd58fc) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; box-shadow: none; backdrop-filter: none; filter: drop-shadow(0 14px 22px rgba(0,0,0,.55)); }
 .panel header { padding: 0 2px 6px; }
 .panel h2 { color: #f6ebc9; text-shadow: 0 2px 0 #000b; letter-spacing: .6px; }
 .panel .body { padding: 0 4px 4px; }
-.panel .x { width: 36px; height: 36px; border-radius: 50%; border: 0; background: url(assets/ui/medal-normal.webp?v=51401d49) center / 100% 100% no-repeat; color: #f6ebc9; font-weight: 900; text-shadow: 0 1px 0 #000; }
-.panel .x:hover { background: url(assets/ui/medal-normal.webp?v=51401d49) center / 100% 100% no-repeat; filter: brightness(1.2); }
-.panel .x:active { background-image: url(assets/ui/medal-pressed.webp?v=51401d49); }
+.panel .x { width: 36px; height: 36px; border-radius: 50%; border: 0; background: url(assets/ui/medal-normal.webp?v=17fd58fc) center / 100% 100% no-repeat; color: #f6ebc9; font-weight: 900; text-shadow: 0 1px 0 #000; }
+.panel .x:hover { background: url(assets/ui/medal-normal.webp?v=17fd58fc) center / 100% 100% no-repeat; filter: brightness(1.2); }
+.panel .x:active { background-image: url(assets/ui/medal-pressed.webp?v=17fd58fc); }
 body.touch .panel .x { width: 42px; height: 42px; }
 
-.btn { --bb: 14px; min-height: 36px; border: var(--bb) solid transparent; border-image: url(assets/ui/btn-normal.webp?v=51401d49) 80 fill / var(--bb) stretch; border-radius: 0; background: none; padding: 0 8px; margin: -4px 0; color: #f6ebc9; text-shadow: 0 2px 0 #000b; letter-spacing: .3px; transition: filter .1s, transform .1s; }
+.btn { --bb: 14px; min-height: 36px; border: var(--bb) solid transparent; border-image: url(assets/ui/btn-normal.webp?v=17fd58fc) 80 fill / var(--bb) stretch; border-radius: 0; background: none; padding: 0 8px; margin: -4px 0; color: #f6ebc9; text-shadow: 0 2px 0 #000b; letter-spacing: .3px; transition: filter .1s, transform .1s; }
 .btn:hover { background: none; filter: brightness(1.15); transform: none; }
-.btn:active { border-image-source: url(assets/ui/btn-pressed.webp?v=51401d49); transform: translateY(1px); }
-.btn.primary, .btn.sel { background: none; border-color: transparent; border-image-source: url(assets/ui/btn-primary.webp?v=51401d49); color: #fff6d6; }
+.btn:active { border-image-source: url(assets/ui/btn-pressed.webp?v=17fd58fc); transform: translateY(1px); }
+.btn.primary, .btn.sel { background: none; border-color: transparent; border-image-source: url(assets/ui/btn-primary.webp?v=17fd58fc); color: #fff6d6; }
 .btn.primary:hover { background: none; }
-.btn:disabled, .btn.disabled { border-image-source: url(assets/ui/btn-disabled.webp?v=51401d49); color: #a8a6a0; cursor: default; filter: none; }
-.btn.ghost { border-image-source: url(assets/ui/btn-normal.webp?v=51401d49); opacity: .85; }
+.btn:disabled, .btn.disabled { border-image-source: url(assets/ui/btn-disabled.webp?v=17fd58fc); color: #a8a6a0; cursor: default; filter: none; }
+.btn.ghost { border-image-source: url(assets/ui/btn-normal.webp?v=17fd58fc); opacity: .85; }
 .btn.small { padding: 0 4px; min-height: 30px; --bb: 12px; }
 .btn.big { padding: 0 18px; min-height: 46px; --bb: 16px; }
 .btn.wide { padding: 0 8px; min-height: 44px; margin: 2px 0; }
 body.touch .btn.small { padding: 0 6px; }
 
-.cell { width: 54px; height: 54px; border: 0; border-radius: 0; box-shadow: none; background: url(assets/ui/rarity-0.webp?v=51401d49) center / 100% 100% no-repeat; }
-.cell.r-uncommon { background-image: url(assets/ui/rarity-1.webp?v=51401d49); }
-.cell.r-rare { background-image: url(assets/ui/rarity-4.webp?v=51401d49); box-shadow: none; }
-.cell.r-epic { background-image: url(assets/ui/rarity-6.webp?v=51401d49); box-shadow: none; }
-.cell.r-legendary { background-image: url(assets/ui/rarity-5.webp?v=51401d49); box-shadow: none; }
-.cell.empty { background: url(assets/ui/rarity-0.webp?v=51401d49) center / 100% 100% no-repeat; opacity: .38; border: 0; }
+.cell { width: 54px; height: 54px; border: 0; border-radius: 0; box-shadow: none; background: url(assets/ui/rarity-0.webp?v=17fd58fc) center / 100% 100% no-repeat; }
+.cell.r-uncommon { background-image: url(assets/ui/rarity-1.webp?v=17fd58fc); }
+.cell.r-rare { background-image: url(assets/ui/rarity-4.webp?v=17fd58fc); box-shadow: none; }
+.cell.r-epic { background-image: url(assets/ui/rarity-6.webp?v=17fd58fc); box-shadow: none; }
+.cell.r-legendary { background-image: url(assets/ui/rarity-5.webp?v=17fd58fc); box-shadow: none; }
+.cell.empty { background: url(assets/ui/rarity-0.webp?v=17fd58fc) center / 100% 100% no-repeat; opacity: .38; border: 0; }
 .cell .ic { text-shadow: 0 1px 3px #000a; }
 
-#tooltip { --tb: 22px; max-width: 300px; padding: 0; border: var(--tb) solid transparent; border-image: url(assets/ui/tip.webp?v=51401d49) 70 fill / var(--tb) stretch; border-radius: 0; background: none; box-shadow: none; filter: drop-shadow(0 8px 14px rgba(0,0,0,.5)); }
-#arena-banner { background: url(assets/ui/banner.webp?v=51401d49) center / 100% 100% no-repeat; padding: .35em 1.6em; text-shadow: 0 2px 0 #000b; }
+#tooltip { --tb: 22px; max-width: 300px; padding: 0; border: var(--tb) solid transparent; border-image: url(assets/ui/tip.webp?v=17fd58fc) 70 fill / var(--tb) stretch; border-radius: 0; background: none; box-shadow: none; filter: drop-shadow(0 8px 14px rgba(0,0,0,.5)); }
+#arena-banner { background: url(assets/ui/banner.webp?v=17fd58fc) center / 100% 100% no-repeat; padding: .35em 1.6em; text-shadow: 0 2px 0 #000b; }
 @media (max-height: 520px) { .panel { --pb: 20px; } .cell { width: 48px; height: 48px; } }
 .inv-grid { grid-template-columns: repeat(6, minmax(0, 56px)); gap: 4px; }
 .inv-grid .cell { width: 100%; height: auto; aspect-ratio: 1; }
@@ -508,7 +508,7 @@ body.touch .btn.small { padding: 0 6px; }
 .char-head .avatar.art img { width: 100%; height: 100%; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
 
 /* ===== B5 parte 2b: criação de personagem, diálogo de NPC e barra do chefe pintados ===== */
-.create-wrap { --pb: 30px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp?v=51401d49) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; padding: 4px 8px 8px; filter: drop-shadow(0 16px 28px rgba(0,0,0,.6)); }
+.create-wrap { --pb: 30px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp?v=17fd58fc) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; padding: 4px 8px 8px; filter: drop-shadow(0 16px 28px rgba(0,0,0,.6)); }
 .create-wrap h1 { text-shadow: 0 2px 0 #000b; letter-spacing: 1px; }
 .class-card { background: rgba(8,10,26,.55); border: 2px solid rgba(201,162,74,.28); border-radius: 12px; }
 .class-card.sel { border-color: color-mix(in srgb, var(--cc) 55%, #e8c46a); background: color-mix(in srgb, var(--cc) 20%, rgba(8,10,26,.6)); }
@@ -517,16 +517,16 @@ body.touch .btn.small { padding: 0 6px; }
 .create-row input { background: rgba(8,10,26,.7); border: 2px solid rgba(201,162,74,.55); }
 @media (max-height: 520px) { .create-wrap { --pb: 22px; } .cc-icon.art { width: 40px; height: 40px; } }
 
-.npc-line { --db: 18px; margin: 0 0 10px; padding: 2px 6px; border: var(--db) solid transparent; border-image: url(assets/ui/dialog.webp?v=51401d49) 60 fill / var(--db) stretch; color: #3b2a14; font-style: italic; font-weight: 700; text-shadow: 0 1px 0 rgba(255,246,214,.5); }
+.npc-line { --db: 18px; margin: 0 0 10px; padding: 2px 6px; border: var(--db) solid transparent; border-image: url(assets/ui/dialog.webp?v=17fd58fc) 60 fill / var(--db) stretch; color: #3b2a14; font-style: italic; font-weight: 700; text-shadow: 0 1px 0 rgba(255,246,214,.5); }
 
 #boss-bar { width: min(460px, 56vw); }
-#boss-name { position: relative; margin: 0 auto 2px; padding: 5px 40px 7px; width: max-content; max-width: 100%; background: url(assets/ui/plaque.webp?v=51401d49) center / 100% 100% no-repeat; color: #fff0d6; text-shadow: 0 2px 0 #000b; }
+#boss-name { position: relative; margin: 0 auto 2px; padding: 5px 40px 7px; width: max-content; max-width: 100%; background: url(assets/ui/plaque.webp?v=17fd58fc) center / 100% 100% no-repeat; color: #fff0d6; text-shadow: 0 2px 0 #000b; }
 #boss-bar .bar { height: 14px; border: 2px solid #c9a24a; border-radius: 8px; background: #2a0e12; box-shadow: 0 0 0 1px #4a2a18, 0 4px 10px rgba(0,0,0,.5); }
 #boss-bar .fill { border-radius: 5px; background: linear-gradient(180deg, #ff9a88 0%, #d9473b 55%, #9c2a24 100%); }
 /* retrato do chefe: recorte frontal do sprite pintado, em medalhão dourado à esquerda da barra */
 #boss-portrait { --s: 58px; --cols: 5; --rows: 8; --ratio: 1.2; display: none; position: absolute; left: -34px; top: 6px; width: var(--s); height: var(--s); box-sizing: border-box; border-radius: 50%; border: 3px solid #c9a24a; background-color: #2a0e12; background-repeat: no-repeat; background-size: cover; background-position: center top; box-shadow: 0 0 0 1px #4a2a18, 0 4px 10px rgba(0,0,0,.55), inset 0 0 8px rgba(0,0,0,.6); z-index: 2; }
 body.touch #boss-portrait { --s: 44px; left: -26px; top: 2px; }
-.npc-line { border: 0; border-image: none; background: url(assets/ui/dialog.webp?v=51401d49) center / 100% 100% no-repeat; padding: 16px 18px 16px 21%; color: #f6ebc9; text-shadow: 0 2px 0 #000b; min-height: 74px; display: flex; align-items: center; }
+.npc-line { border: 0; border-image: none; background: url(assets/ui/dialog.webp?v=17fd58fc) center / 100% 100% no-repeat; padding: 16px 18px 16px 21%; color: #f6ebc9; text-shadow: 0 2px 0 #000b; min-height: 74px; display: flex; align-items: center; }
 body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 @media (max-height: 520px) {
   .create-wrap { padding: 0 6px 4px; }
@@ -559,7 +559,7 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .npc-line { position: relative; }
 .npc-emb { position: absolute; left: 3.2%; top: 50%; width: 15%; aspect-ratio: 3 / 4; transform: translateY(-50%); display: grid; place-items: center; pointer-events: none; }
 .npc-emb img { width: 92%; height: 92%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
-.result { --pb: 28px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp?v=51401d49) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; padding: 6px 24px 8px; filter: drop-shadow(0 16px 28px rgba(0,0,0,.6)); }
+.result { --pb: 28px; background: none; border: var(--pb) solid transparent; border-image: url(assets/ui/panel-9.webp?v=17fd58fc) 135 134 131 135 fill / var(--pb) stretch; border-radius: 0; padding: 6px 24px 8px; filter: drop-shadow(0 16px 28px rgba(0,0,0,.6)); }
 .result h1 { text-shadow: 0 2px 0 #000b; }
 .result .sub { color: #cdd3ea; }
 @media (max-height: 520px) { .result { --pb: 22px; padding: 0 14px 4px; } }
@@ -572,13 +572,13 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 .cc-icon.art img.por { border-radius: 50%; object-fit: cover; object-position: 50% 14%; background: radial-gradient(circle at 50% 35%, #34476e, #141a2e); box-shadow: 0 0 0 2px #c9a24a; }
 
 /* ===== B5 parte 2c: avisos, ouro e log pintados (sobras do estilo antigo: caixas escuras e fonte comum) ===== */
-.toast { --tb: 20px; background: none; border: var(--tb) solid transparent; border-image: url(assets/ui/tip.webp?v=51401d49) 70 fill / var(--tb) stretch; border-radius: 0; padding: 0 10px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); box-shadow: none; }
+.toast { --tb: 20px; background: none; border: var(--tb) solid transparent; border-image: url(assets/ui/tip.webp?v=17fd58fc) 70 fill / var(--tb) stretch; border-radius: 0; padding: 0 10px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); box-shadow: none; }
 .toast.gold { border-color: transparent; box-shadow: none; filter: drop-shadow(0 0 12px rgba(255,211,77,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
 .toast .t1 { color: #fff0c8; text-shadow: 0 2px 0 #000b; }
 .toast .t2 { color: #e6dcc0; font-family: Cinzel, serif; font-weight: 700; font-size: 12px; text-shadow: 0 1px 0 #000a; }
-#hud-gold > span { --bb: 12px; background: none; border: var(--bb) solid transparent; border-image: url(assets/ui/btn-normal.webp?v=51401d49) 80 fill / var(--bb) stretch; border-radius: 0; padding: 0 6px; font: 800 13px Cinzel, serif; color: #f6ebc9; text-shadow: 0 2px 0 #000b; margin: -4px 0; }
-#hud-gold .pts { border-image-source: url(assets/ui/btn-primary.webp?v=51401d49); color: #fff6d6; background: none; }
-.log-line { --db: 12px; background: none; border: var(--db) solid transparent; border-image: url(assets/ui/tip.webp?v=51401d49) 70 fill / var(--db) stretch; border-radius: 0; padding: 0 4px; font: 700 12px Cinzel, serif; color: #f6ebc9; margin: -6px 0; }
+#hud-gold > span { --bb: 12px; background: none; border: var(--bb) solid transparent; border-image: url(assets/ui/btn-normal.webp?v=17fd58fc) 80 fill / var(--bb) stretch; border-radius: 0; padding: 0 6px; font: 800 13px Cinzel, serif; color: #f6ebc9; text-shadow: 0 2px 0 #000b; margin: -4px 0; }
+#hud-gold .pts { border-image-source: url(assets/ui/btn-primary.webp?v=17fd58fc); color: #fff6d6; background: none; }
+.log-line { --db: 12px; background: none; border: var(--db) solid transparent; border-image: url(assets/ui/tip.webp?v=17fd58fc) 70 fill / var(--db) stretch; border-radius: 0; padding: 0 4px; font: 700 12px Cinzel, serif; color: #f6ebc9; margin: -6px 0; }
 /* a faixa da arena ("1×1 — começa em 3", "Lute!") ficava em cima da barra do rival: desce abaixo dela */
 #arena-banner { top: 36%; }
 @media (max-height: 520px) { #arena-banner { top: 38%; font-size: 20px; } }
@@ -652,8 +652,8 @@ body.touch #boss-bar { top: 54px; width: min(420px, 48vw); }
 
 /* ===== Auditoria visual, média/baixa (V5–V30) ===== */
 /* V6: botão de interagir (toque) no mesmo medalhão pintado dos outros; o ícone é pintado (baú ou pergaminho), sem disco amarelo */
-.tbtn.act { width: 60px; height: 60px; background: url(assets/ui/medal-normal.webp?v=51401d49) center / 100% 100% no-repeat; border: 0; border-radius: 50%; box-shadow: none; animation: act-glow 1.4s ease-in-out infinite; }
-.tbtn.act.down { background-image: url(assets/ui/medal-pressed.webp?v=51401d49); }
+.tbtn.act { width: 60px; height: 60px; background: url(assets/ui/medal-normal.webp?v=17fd58fc) center / 100% 100% no-repeat; border: 0; border-radius: 50%; box-shadow: none; animation: act-glow 1.4s ease-in-out infinite; }
+.tbtn.act.down { background-image: url(assets/ui/medal-pressed.webp?v=17fd58fc); }
 .tbtn.act .icon { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0; }
 .tbtn.act .icon img { width: 66%; height: 66%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); pointer-events: none; }
 @keyframes act-glow { 50% { filter: drop-shadow(0 0 8px rgba(255,214,120,.9)) brightness(1.12); } }
@@ -680,7 +680,7 @@ body.panel-open #toast-layer { top: 6%; }
 @media (max-height: 520px) { body.boss-on #toast-layer { top: 40%; } }
 
 /* V18: pílula do ritual com a moldura de metal da barra do chefe */
-#ritual { top: calc(var(--map) + 30px); right: calc(8px + env(safe-area-inset-right, 0px)); padding: 5px 26px 7px; background: url(assets/ui/plaque.webp?v=51401d49) center / 100% 100% no-repeat; border: 0; border-radius: 0; color: #fff0d6; text-shadow: 0 2px 0 #000b; font-size: 12px; white-space: nowrap; }
+#ritual { top: calc(var(--map) + 30px); right: calc(8px + env(safe-area-inset-right, 0px)); padding: 5px 26px 7px; background: url(assets/ui/plaque.webp?v=17fd58fc) center / 100% 100% no-repeat; border: 0; border-radius: 0; color: #fff0d6; text-shadow: 0 2px 0 #000b; font-size: 12px; white-space: nowrap; }
 body.touch #ritual { top: calc(var(--map) + 10px); }
 body:not(.touch) #ritual { top: calc(var(--map) + 150px); }
 
@@ -689,7 +689,7 @@ body:not(.touch) #ritual { top: calc(var(--map) + 150px); }
 .slot.art.blocked .icon img, .tbtn.sk.blocked .icon img { filter: grayscale(.85) brightness(.5); }
 
 /* V24: item opalino: moldura prateada (rarity-2, que sobrava) com brilho em arco-íris pulsando */
-.cell.opal { background-image: url(assets/ui/rarity-2.webp?v=51401d49); animation: opal-pulse 2.8s linear infinite; }
+.cell.opal { background-image: url(assets/ui/rarity-2.webp?v=17fd58fc); animation: opal-pulse 2.8s linear infinite; }
 .cell.opal::after { content: ''; position: absolute; inset: 6%; border-radius: 12px; pointer-events: none; mix-blend-mode: screen; opacity: .55;
   background: linear-gradient(115deg, rgba(255,120,200,.0) 10%, rgba(255,140,220,.7) 28%, rgba(120,230,255,.7) 46%, rgba(170,255,170,.7) 62%, rgba(255,230,130,.7) 78%, rgba(255,120,200,0) 92%); background-size: 220% 100%; animation: opal-sheen 3.4s ease-in-out infinite; }
 @keyframes opal-pulse { 0%, 100% { filter: drop-shadow(0 0 5px rgba(255,150,230,.7)); } 33% { filter: drop-shadow(0 0 7px rgba(130,230,255,.8)); } 66% { filter: drop-shadow(0 0 6px rgba(190,255,170,.75)); } }
@@ -755,7 +755,7 @@ body:not(.touch) #ritual { top: calc(var(--map) + 150px); }
 .mp-paths line.dungeon.lit { stroke: #7fe0ea; stroke-opacity: .9; }
 .mp-node.dungeon .mp-nm { color: #9fe8f2; }
 .mp-node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 1px; width: 92px; padding: 2px 0; background: none; border: 0; color: #f6ebc9; cursor: pointer; font-family: Nunito, sans-serif; }
-.mp-ic { position: relative; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; background: url(assets/ui/medal-normal.webp?v=51401d49) center / 100% 100% no-repeat; }
+.mp-ic { position: relative; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; background: url(assets/ui/medal-normal.webp?v=17fd58fc) center / 100% 100% no-repeat; }
 .mp-ic .zone-ic { width: 30px; height: 30px; }
 .mp-node.sel .mp-ic { filter: drop-shadow(0 0 7px #ffd34d) brightness(1.15); }
 .mp-node.here .mp-ic { box-shadow: 0 0 0 2px #7dff9b; }
@@ -909,15 +909,15 @@ body:not(.touch) #ritual { top: calc(var(--map) + 150px); }
 body:has(#hud-gold .pts) #qtrack { top: calc(8px + var(--card-w) * .637 + 12px + 40px + var(--sat, 0px)); } /* com o aviso "+N pontos" ele vem primeiro */
 #qtrack button { padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto; flex: none; position: relative; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
 #qtrack .qt-ic { width: 34px; height: 34px; } #qtrack .qt-ic img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
-#qtrack .qt-txt { --bb: 9px; min-width: 0; flex: 0 1 auto; margin-left: -4px; pointer-events: auto; cursor: pointer; background: none; border: var(--bb) solid transparent; border-image: url(assets/ui/btn-normal.webp?v=51401d49) 80 fill / var(--bb) stretch; border-radius: 0; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 800 11px/18px Nunito, system-ui, sans-serif; color: #fff6d6; text-shadow: 0 1px 2px #000, 0 0 3px #000; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+#qtrack .qt-txt { --bb: 9px; min-width: 0; flex: 0 1 auto; margin-left: -4px; pointer-events: auto; cursor: pointer; background: none; border: var(--bb) solid transparent; border-image: url(assets/ui/btn-normal.webp?v=17fd58fc) 80 fill / var(--bb) stretch; border-radius: 0; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 800 11px/18px Nunito, system-ui, sans-serif; color: #fff6d6; text-shadow: 0 1px 2px #000, 0 0 3px #000; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
 #qtrack b { display: none; } /* o nome da missão fica no diário (title); a linha mostra o objetivo e o destino */
 #qtrack span, #qtrack em { font: 800 11px/18px Nunito, system-ui, sans-serif; color: #fff6d6; font-style: normal; }
 #qtrack em { color: #bfeaff; } #qtrack em::before { content: ' · '; color: #ffd98a; }
 #qtrack em.go { color: #b6ffb0; } #qtrack em.warn { color: #ffb4a8; }
-#qtrack .qt-btn { width: 34px; height: 34px; background: url(assets/ui/medal-normal.webp?v=51401d49) center / 100% 100% no-repeat; color: #ffe08a; display: grid; place-items: center; }
+#qtrack .qt-btn { width: 34px; height: 34px; background: url(assets/ui/medal-normal.webp?v=17fd58fc) center / 100% 100% no-repeat; color: #ffe08a; display: grid; place-items: center; }
 #qtrack .qt-btn svg { width: 54%; height: 54%; margin-top: 2px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.7)); pointer-events: none; }
 #qtrack .qt-btn.stop { color: #ffb4a8; }
-#qtrack .qt-btn:active { background-image: url(assets/ui/medal-pressed.webp?v=51401d49); }
+#qtrack .qt-btn:active { background-image: url(assets/ui/medal-pressed.webp?v=17fd58fc); }
 .quest-card .btn-col { display: flex; flex-direction: column; gap: 4px; }
 
 /* ---- geometria dos botões de toque (touch-logic.js skillLayout): centro (--cx da borda direita, --cy da de baixo) e diâmetro (--d), em px do contêiner.
