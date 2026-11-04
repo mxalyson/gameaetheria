@@ -93,3 +93,7 @@ export async function gracefulShutdown({ ops, game, httpServer, db, log, graceMs
   try { db.close?.(); } catch { /* ok */ }
   log.info('desligado');
 }
+
+// IP do cliente atrás do proxy de confiança: o ÚLTIMO valor de X-Forwarded-For é o que o nosso proxy acrescenta; os anteriores vêm do
+// próprio cliente (forjáveis) e, se usados, deixavam burlar o limite de tentativas de login trocando o cabeçalho a cada pedido.
+export const clientIp = (xff) => String(xff ?? '').split(',').map((s) => s.trim()).filter(Boolean).pop() ?? '';

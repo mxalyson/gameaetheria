@@ -38,7 +38,7 @@ import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
 import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue, harborPrice, needsSellConfirm } from './shop.js';
 import { TouchControls } from './touch.js';
-import { interactTarget } from './touch-logic.js';
+import { interactTarget, carryCast } from './touch-logic.js';
 import { PHOENIX, applyDeath, hasDeathPenalty, setCheckpoint, respawnPoint } from './core/phoenix.js';
 import { QualityGovernor } from './quality-governor.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality, resolveScale } from './prefs.js';
@@ -380,7 +380,10 @@ class Game {
 
   save() {
     if (this.online) { this.cloud?.markDirty(); return; } // online: o servidor é a fonte oficial; o localStorage não guarda o personagem
-    if (this.char) saveChar(this.char);
+    if (!this.char) return;
+    const ok = saveChar(this.char);
+    if (!ok && !this.saveWarned) { this.saveWarned = true; this.ui.toast('Não foi possível salvar', 'O armazenamento do aparelho está cheio ou bloqueado. Libere espaço ou exporte o personagem nas Opções.', ''); }
+    if (ok) this.saveWarned = false;
   }
 
   // ---------------- modo online ----------------
@@ -1033,10 +1036,12 @@ class Game {
         }
       }
       if (!p.dead && this.auto) this.autoDrive(intents[p.id], dt); // auto-viagem: troca o movimento pelo caminho (o joystick/ataque pausam)
+      this.castHold = p.dead ? null : carryCast(this.castHold, intents[p.id]); // pedido de habilidade espera o próximo tick (telas de 90/120 Hz)
       this.acc = Math.min((this.acc ?? 0) + dt, FIXED_DT * MAX_TICKS);
       while (this.acc >= FIXED_DT) {
         this.acc -= FIXED_DT;
         this.tick(FIXED_DT, intents);
+        this.castHold = null; // um tick rodou: o pedido foi entregue à simulação
         if (this.world !== w) { this.acc = 0; break; } // trocou de zona no meio dos ticks
         // o toque na tecla da skill vale uma vez só, não uma por tick
         for (const k of Object.keys(intents)) intents[k] = { ...intents[k], cast: null };
@@ -1376,15 +1381,16 @@ class Game {
   usePotion() {
     const p = this.player, c = this.char;
     if (this.inNetZone()) { // instância online: o servidor cura, debita a poção e controla a recarga de 8 s
-      if (p.dead || this.potionCd > 0 || p.hp >= p.maxHp) return;
+      if (p.dead || this.potionCd > 0) return;
       if (!c.potions) return this.ui.log('Sem poções! Compre com a Mercadora Lia.', '#ffb4a8');
+      if (p.hp >= p.maxHp) return this.ui.log('Sua vida já está cheia.', '#ffe9a0');
       this.serverTx({ op: 'potion' }, () => { this.potionCd = 8; this.world.burst(p.x, p.y, '#ff7a8a', 14, 120); });
       return;
     }
     if (this.mode === 'pvp' || this.mode === 'net') return this.ui.log('Poções são proibidas nas partidas.', '#ffb4a8');
     if (p.dead || this.potionCd > 0) return;
     if (!c.potions) return this.ui.log('Sem poções! Compre com a Mercadora Lia.', '#ffb4a8');
-    if (p.hp >= p.maxHp) return;
+    if (p.hp >= p.maxHp) return this.ui.log('Sua vida já está cheia.', '#ffe9a0');
     c.potions--;
     this.potionCd = 8;
     this.world.heal(p, p.maxHp * 0.35);

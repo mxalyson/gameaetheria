@@ -32,10 +32,6 @@ export function generateItem(rng, level, { classId, rarityId, slot, weaponType, 
     stats.def = Math.round((0.5 + level * 0.15) * rarity.mul * roll());
     stats.hp = Math.round((1 + level * 0.25) * rarity.mul * roll());
     stats.block = SHIELD_BLOCK[rarity.id];
-  } else if (slot === 'offhand') {
-    stats.def = Math.round((0.5 + level * 0.15) * rarity.mul * roll());
-    stats.hp = Math.round((1 + level * 0.25) * rarity.mul * roll());
-    stats.block = SHIELD_BLOCK[rarity.id];
   } else if (slot === 'helm' || slot === 'boots') {
     stats.def = Math.round((2 + level * 0.9) * rarity.mul * roll());
   }

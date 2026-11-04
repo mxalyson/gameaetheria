@@ -9,6 +9,7 @@ import { cleanName, migrate, validate, parseSave } from '../public/src/core/save
 import { newCharacter, createSpirit } from '../public/src/core/progression.js';
 import { makeRng } from '../public/src/core/rng.js';
 import { CLASSES } from '../public/src/data/classes.js';
+import { clientIp } from './ops.js';
 
 const SMALL = 8 * 1024, BIG = 320 * 1024;
 
@@ -66,7 +67,7 @@ export function createApi(db, { googleClientId = null, origins = [], trustProxy 
     const cors = origin && origins.includes(origin) ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS' } : {};
     if (req.method === 'OPTIONS') { res.writeHead(cors['Access-Control-Allow-Origin'] ? 204 : 403, { ...SEC, ...cors }); res.end(); return true; }
     if (origin && !cors['Access-Control-Allow-Origin']) { err(res, 403, 'bad_origin', 'Origem não permitida.'); return true; }
-    const ip = (trustProxy && String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
+    const ip = (trustProxy && clientIp(req.headers['x-forwarded-for'])) || req.socket.remoteAddress || '?';
     if (limited(ipLimit, ip, 240)) { err(res, 429, 'rate_limit', 'Muitas requisições.', cors); return true; }
     const route = `${req.method} ${url.pathname}`;
     try {

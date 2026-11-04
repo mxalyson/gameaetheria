@@ -66,11 +66,11 @@ export function createAuth(db, { googleClientId = null, fetchJwks = defaultFetch
     const acc = validEmail(email) ? db.accountByEmail(email) : null;
     const generic = new AuthError('bad_credentials', 'E-mail ou senha incorretos.', 401);
     if (!acc || !acc.pw_hash) { await verifyPassword(String(password ?? ''), await dummyHash()); throw generic; }
-    if (acc.disabled) throw new AuthError('disabled', 'Conta desativada.', 403);
     if (acc.locked_until > now()) { db.audit('login_locked', { accountId: acc.id, ip }); throw new AuthError('locked', 'Muitas tentativas. Tente novamente em alguns minutos.', 429); }
     if (typeof password !== 'string' || !(await verifyPassword(password, acc.pw_hash))) {
       db.registerFailure(acc.id, now()); db.audit('login_fail', { accountId: acc.id, ip }); throw generic;
     }
+    if (acc.disabled) throw new AuthError('disabled', 'Conta desativada.', 403); // só para quem acertou a senha: não revela quais e-mails têm conta
     db.registerSuccess(acc.id); db.audit('login', { accountId: acc.id, ip });
     return { token: db.createSession(acc.id, now()), account: publicAccount(acc) };
   }
@@ -98,7 +98,13 @@ export function createAuth(db, { googleClientId = null, fetchJwks = defaultFetch
     if (!acc) {
       const email = normalizeEmail(claims.email);
       const byMail = validEmail(email) ? db.accountByEmail(email) : null;
-      if (byMail) { db.linkGoogle(byMail.id, claims.sub); acc = db.account(byMail.id); } // e-mail verificado pelo Google: vincula
+      if (byMail) {
+        // e-mail verificado pelo Google: vincula. O cadastro por senha nunca provou a posse do e-mail, então quem o criou pode ser outra pessoa:
+        // a senha, os códigos de recuperação e as sessões abertas deixam de valer (o dono verificado assume a conta sozinho)
+        db.linkGoogle(byMail.id, claims.sub);
+        if (byMail.pw_hash) { db.setPassword(byMail.id, null); db.setRecoveryCodes(byMail.id, []); db.audit('google_link_reset', { accountId: byMail.id, ip }); }
+        acc = db.account(byMail.id);
+      }
       else { acc = db.account(db.createAccount({ email: validEmail(email) ? email : null, googleSub: claims.sub }, now())); isNew = true; }
     }
     if (acc.disabled) throw new AuthError('disabled', 'Conta desativada.', 403);

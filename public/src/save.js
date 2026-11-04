@@ -39,14 +39,15 @@ export function loadChar() {
 
 export function takeLoadInfo() { const i = info; info = null; return i; }
 
+// Devolve false se o aparelho recusou gravar (armazenamento cheio/bloqueado): quem chama avisa o jogador em vez de perder progresso calado.
 export function saveChar(char) {
-  if (sandbox()) return;
+  if (sandbox()) return true;
   const now = Date.now();
   if (now - lastBackup > BACKUP_EVERY_MS) {
     const cur = read(KEY);
     if (cur) { write(BACKUP_KEY, cur); lastBackup = now; }
   }
-  write(KEY, JSON.stringify(char));
+  return write(KEY, JSON.stringify(char));
 }
 
 export { parseSave, buildExport as exportSave };

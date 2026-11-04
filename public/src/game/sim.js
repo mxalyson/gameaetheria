@@ -791,8 +791,12 @@ export class World {
         }
       }
       if (!done && !p.pierce) {
-        for (const o of this.layout.obstacles) {
-          if (o.block && Math.hypot(o.x - p.x, o.y - p.y) < o.r + p.radius * 0.5) { done = true; break; }
+        // obstáculos com `block`: círculos (árvores, pilares) e retângulos (muros e sarcófagos da Cripta; antes o teste só via círculos e o tiro atravessava o muro)
+        const q = (this._pq ??= { x: 0, y: 0, r: 0 }), h = p.radius * 0.5;
+        q.x = p.x; q.y = p.y; q.r = p.radius;
+        for (const o of this.nearObstacles(q)) {
+          if (!o.block) continue;
+          if (o.w ? p.x > o.x - h && p.x < o.x + o.w + h && p.y > o.y - h && p.y < o.y + o.h + h : Math.hypot(o.x - p.x, o.y - p.y) < o.r + h) { done = true; break; }
         }
       }
       if (done) {
