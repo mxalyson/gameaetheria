@@ -74,9 +74,6 @@ export const OPAL_NAMES = { sword: 'Espada Opalina', staff: 'Cajado Opalino', bo
 export const EPITHETS = ['da Aurora', 'do Lobo', 'das Marés', 'do Crepúsculo', 'da Tempestade', 'do Eco', 'da Brasa', 'do Orvalho', 'dos Ventos', 'da Lua Pálida'];
 
 // per: escala por nível do item. flat: faixa fixa (porcentagens).
-// Atributo implícito da arma (principal da classe: arco → Agilidade) por nível do item, antes da raridade (core/loot.js).
-export const WEAPON_IMPLICIT = 0.25;
-
 export const AFFIXES = [
   { stat: 'str', per: 0.55 },
   { stat: 'agi', per: 0.55 },

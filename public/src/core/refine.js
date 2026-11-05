@@ -6,7 +6,7 @@ import { affixPool, rollAffixValue, generateEchoItem, OPAL } from './loot.js';
 import { findGear } from './enhance.js';
 import { echoFrags, ensureEcho } from './echo.js';
 
-// Base de cada espaço (o que NÃO é afixo). A arma nova traz também o implícito (principal da classe), que fica fora de `affix`.
+// Base de cada espaço (o que NÃO é afixo).
 const BASE_KEYS = { weapon: ['atk'], armor: ['def', 'hp'], helm: ['def'], boots: ['def'], offhand: ['def', 'hp', 'block'], ring: [], amulet: [] };
 
 // Afixos do item. Item novo grava `affix`; item antigo (sem o campo) tem os afixos deduzidos: tudo que não é base do espaço.

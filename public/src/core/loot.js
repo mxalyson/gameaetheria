@@ -1,7 +1,7 @@
 import { CLASSES } from '../data/classes.js';
 import { rollBossWhistle } from './mounts.js';
 import { CRYPT, ECHO_NAMES, ECHO_ITEM } from '../data/crypt.js';
-import { SLOTS, RARITIES, RARITY, WEAPON_TYPES, BASE_NAMES, GEAR_NAMES, EPITHETS, AFFIXES, OPAL_NAMES, SHIELD_CLASSES, SHIELD_BLOCK, WEAPON_IMPLICIT } from '../data/items.js';
+import { SLOTS, RARITIES, RARITY, WEAPON_TYPES, BASE_NAMES, GEAR_NAMES, EPITHETS, AFFIXES, OPAL_NAMES, SHIELD_CLASSES, SHIELD_BLOCK } from '../data/items.js';
 
 let counter = 0;
 export const uid = () => Date.now().toString(36) + (counter++).toString(36) + Math.floor(Math.random() * 1e6).toString(36);
@@ -37,8 +37,6 @@ export function generateItem(rng, level, { classId, rarityId, slot, weaponType, 
   if (slot === 'weapon') {
     weaponType = weaponType ?? CLASSES[classId]?.weapon ?? rng.pick(Object.keys(WEAPON_TYPES));
     stats.atk = Math.round((6 + level * 2.4) * rarity.mul * roll());
-    // atributo implícito: toda arma traz o atributo principal da classe (arco → Agilidade), até a comum de nível 1
-    stats[primary] = Math.max(1, Math.round((1 + level * WEAPON_IMPLICIT) * rarity.mul * roll()));
   } else if (slot === 'armor') {
     stats.def = Math.round((3 + level * 1.6) * rarity.mul * roll());
     stats.hp = Math.round((10 + level * 5) * rarity.mul * roll());
@@ -54,7 +52,7 @@ export function generateItem(rng, level, { classId, rarityId, slot, weaponType, 
   const nAffixes = slot === 'offhand' ? 0 : rarity.affixes + (slot === 'ring' || slot === 'amulet' ? 1 : 0); // escudo: sem afixos (defesa, vida e bloqueio já são o item; medido em npm run balance)
   // escudo: afixos só defensivos (vida/defesa); ataque e atributo principal ficam com as outras peças (não vira 7º espaço de poder)
   const pool = affixPool(slot, stats);
-  const affix = {}; // só os afixos sorteados (a lapidação troca um deles; a base e o implícito ficam)
+  const affix = {}; // só os afixos sorteados (a lapidação troca um deles; a base fica)
   for (let i = 0; i < nAffixes && pool.length; i++) {
     const idx = Math.floor(rng.next() * pool.length);
     // anel/amuleto: o primeiro afixo é sempre o atributo principal da classe (stats focados na classe)

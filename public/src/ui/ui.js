@@ -845,7 +845,7 @@ export class UI {
         <div class="refine-btns"><button class="btn small" data-action="refine" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>Lapidar · ${COIN} ${cost}</button>
         ${res ? `<button class="btn small" data-action="resonate" data-arg="${it.id}" ${frags >= res.frags && char.gold >= res.gold ? '' : 'disabled'}>Ressoar Nv ${it.level}→${char.level} · ${ECHO_FRAG} ${res.frags} + ${COIN} ${res.gold}</button>` : ''}</div></div>`;
     }).join('') || '<p class="empty-msg">Nenhum item equipado com atributos extras.</p>';
-    return `<h3 id="refine-section">Lapidar equipado</h3><p class="hint">A pedra sorteia UM atributo extra do item e o troca por outro sorteado (pode vir melhor ou pior). A base, o atributo garantido e o aprimoramento ficam. Cada lapidação no mesmo item custa um pouco mais.</p>${rows}`;
+    return `<h3 id="refine-section">Lapidar equipado</h3><p class="hint">A pedra sorteia UM atributo extra do item e o troca por outro sorteado (pode vir melhor ou pior). A base do item e o aprimoramento ficam. Cada lapidação no mesmo item custa um pouco mais.</p>${rows}`;
   }
 
   panel_arena() {

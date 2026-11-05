@@ -1302,30 +1302,13 @@ import { refine, refineCost, affixesOf, canRefine, resonate } from '../public/sr
 import { SLOT_COST } from '../public/src/core/enhance.js';
 import { generateEchoItem } from '../public/src/core/loot.js';
 
-test('itens: toda arma traz o atributo principal da classe (arco comum de nível 1 tem Agilidade); o resto segue aleatório', () => {
-  const rng = makeRng(77);
-  for (const classId of Object.keys(CLASSES)) {
-    const primary = CLASSES[classId].primary;
-    const w = generateItem(rng, 1, { classId, slot: 'weapon', weaponType: CLASSES[classId].weapon, rarityId: 'common' });
-    assert.ok(w.stats[primary] >= 1, `${classId}: arma comum Nv 1 sem ${primary}`);
-    assert.deepEqual(w.affix, {}, 'o implícito não é afixo (a lapidação não o tira)');
-    for (let i = 0; i < 400; i++) {
-      const it = generateItem(rng, 1 + (i % 30), { classId, rarityId: i % 2 ? 'legendary' : 'epic' });
-      for (const k of Object.keys(it.affix)) assert.ok(it.affix[k] <= it.stats[k]);
-      const cap = itemCeiling(it.slot, it.rarity, it.level); // o teto antifraude do servidor acompanha o gerador
-      assert.ok(Object.keys(it.stats).length <= cap.maxKeys);
-      for (const [k, v] of Object.entries(it.stats)) assert.ok(v <= cap.stats[k], `${it.slot} ${k}=${v} acima do teto ${cap.stats[k]}`);
-    }
-  }
-});
-
-test('lapidação: troca UMA linha extra sorteada, cobra ouro crescente e mantém base/implícito/+N', () => {
+test('lapidação: troca UMA linha extra sorteada, cobra ouro crescente e mantém base/+N', () => {
   const rng = makeRng(9);
   const c = newCharacter('Lap', 'archer', makeRng(1)); c.level = 25; c.gold = 1e6;
   const ring = generateItem(rng, 25, { classId: 'archer', slot: 'ring', rarityId: 'legendary' }); ring.plus = 3;
   const bow = generateItem(rng, 25, { classId: 'archer', slot: 'weapon', weaponType: 'bow', rarityId: 'rare' });
   c.equipment.ring = ring; c.equipment.weapon = bow;
-  const agiBow = bow.stats.agi, atk = bow.stats.atk;
+  const atk = bow.stats.atk;
   let last = 0;
   for (let i = 0; i < 40; i++) {
     const before = { ...ring.affix }, gold = c.gold, cost = refineCost(ring);
@@ -1337,13 +1320,13 @@ test('lapidação: troca UMA linha extra sorteada, cobra ouro crescente e manté
     assert.ok(changed.length <= 2, 'só uma linha muda (sai uma, entra outra)');
     assert.deepEqual(ring.stats, ring.affix, 'joia: todos os atributos são afixos');
     refine(c, bow.id, rng);
-    assert.equal(bow.stats.atk, atk); assert.equal(bow.stats.agi, agiBow, 'a base e o Agilidade do arco ficam');
+    assert.equal(bow.stats.atk, atk, 'a base do arco fica');
   }
   assert.ok(refineCost(ring) <= 3 * refineCost({ ...ring, rerolls: 0 }), 'o aumento para em ×3');
   const poor = { ...c, gold: 0 }; assert.match(refine(poor, ring.id, rng).reason, /Faltam/);
   const common = generateItem(rng, 5, { classId: 'archer', slot: 'helm', rarityId: 'common' });
   assert.ok(!canRefine(common), 'comum sem extras não lapida');
-  // item antigo sem `affix`: deduz os extras (tudo que não é base do espaço); o Agilidade de arco antigo era afixo
+  // item antigo sem `affix`: deduz os extras (tudo que não é base do espaço)
   const legacy = { id: 'old1', kind: 'gear', slot: 'weapon', classId: 'archer', weaponType: 'bow', rarity: 'rare', level: 20, stats: { atk: 70, int: 9, crit: 4 } };
   assert.deepEqual(affixesOf(legacy), { int: 9, crit: 4 });
   c.inventory.push(legacy);

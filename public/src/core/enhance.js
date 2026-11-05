@@ -1,4 +1,4 @@
-// Aprimoramento de equipamento (ralo de ouro de fim de jogo): cada +N soma PLUS_BONUS de TODOS os atributos do item (base, implícito e extras), sem risco de perder o item.
+// Aprimoramento de equipamento (ralo de ouro de fim de jogo): cada +N soma PLUS_BONUS de TODOS os atributos do item (base e extras), sem risco de perder o item.
 // Custo cresce com o nível do item, a raridade e o +N atual; a venda NÃO devolve o ouro gasto (é um ralo de verdade).
 import { RARITY, SLOTS } from '../data/items.js';
 
