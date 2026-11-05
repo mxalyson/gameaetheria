@@ -17,6 +17,15 @@ ENVF=/etc/aetheria.env
 
 [ "$(id -u)" = 0 ] || { echo "Rode com sudo: sudo bash $0 seu-dominio"; exit 1; }
 [[ "$DOMINIO" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || { echo "Informe o domínio (ex.: sudo bash $0 aetheria.duckdns.org)"; exit 1; }
+# Proteção contra colagem errada (aconteceu: "…duckdns.orgsudo"): se já existe configuração com outro domínio, para em vez de quebrar o HTTPS.
+if [ -f "$ENVF" ]; then
+  ATUAL="$(sed -n 's#^PUBLIC_URL=https://##p' "$ENVF" | head -1)"
+  if [ -n "$ATUAL" ] && [ "$ATUAL" != "$DOMINIO" ] && [ "${TROCAR_DOMINIO:-0}" != 1 ]; then
+    echo "O servidor já está configurado para \"$ATUAL\", mas você digitou \"$DOMINIO\"."
+    echo "Confira o comando (cole só uma vez). Para trocar de domínio de propósito: sudo TROCAR_DOMINIO=1 bash $0 $DOMINIO"
+    exit 1
+  fi
+fi
 export DEBIAN_FRONTEND=noninteractive
 
 echo "== 1/7 Pacotes básicos"
@@ -52,6 +61,7 @@ chown aetheria:aetheria "$DADOS"
 chmod 700 "$DADOS"
 
 echo "== 5/7 Configuração ($ENVF) e serviço"
+[ "${TROCAR_DOMINIO:-0}" = 1 ] && [ -f "$ENVF" ] && sed -i "s#^PUBLIC_URL=.*#PUBLIC_URL=https://$DOMINIO#" "$ENVF"
 if [ ! -f "$ENVF" ]; then # não sobrescreve: suas mudanças (ex.: GOOGLE_CLIENT_ID) ficam
   cat > "$ENVF" <<EOF
 # Aetheria — modo de porta única atrás do Caddy (HTTPS). Mudou algo? sudo systemctl restart aetheria
