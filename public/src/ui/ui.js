@@ -1020,6 +1020,8 @@ export class UI {
         <span class="opt-val">${pr[k] ? pr[k] + '%' : 'desligado'}</span>
         <button class="btn small" data-action="pref" data-arg="${k}:+10" ${pr[k] >= 100 ? 'disabled' : ''}>+</button>
         <button class="btn small ${pr[k] === 0 ? 'sel' : ''}" data-action="pref" data-arg="${k}:0">Mudo</button></div></div>`).join('')}
+      <div class="opt-row"><b>Som</b><button class="btn small" data-action="sound-test">Testar som</button></div>
+      <p class="hint">Sem som? Aumente o volume do aparelho e toque em Testar som. No iPhone o som só começa depois de um toque na tela.</p>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
       </div><div class="col">

@@ -71,16 +71,28 @@ export function musicFor({ mode, zone, bossNear }) {
   return 'explore';
 }
 
+// iPhone/iPad (inclusive Chrome e Firefox no iOS: todos usam o WebKit). No iOS o volume de <audio> é só leitura e o WebAudio obedece à chave de silencioso.
+export const isIOS = (nav = globalThis.navigator) => !!nav && (/iP(hone|ad|od)/.test(nav.userAgent ?? '') || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1));
+
 export class AudioEngine {
   constructor({ musicVol = 0.5, sfxVol = 0.8 } = {}) {
     this.musicVol = musicVol; this.sfxVol = sfxVol;
     this.ctx = null; this.buf = new Map(); this.loading = new Map(); this.last = new Map(); this.voices = 0;
-    this.track = null; this.el = {}; this.want = null;
+    this.track = null; this.el = {}; this.want = null; this.primed = false;
+    this.ios = isIOS();
+    // Só gestos que o WebKit aceita como "ativação" liberam som (pointerdown/touchstart NÃO contam no iPhone). Fica escutando sempre: barato, e
+    // reativa depois de uma ligação/segundo plano (estado 'interrupted' do iOS).
     const unlock = () => this.unlock();
-    for (const t of ['pointerdown', 'keydown', 'touchend']) addEventListener(t, unlock, { capture: true, passive: true });
-    document.addEventListener('visibilitychange', () => { if (!this.ctx) return; if (document.hidden) this.ctx.suspend?.(); else this.ctx.resume?.(); });
+    for (const t of ['touchend', 'pointerup', 'click', 'keydown']) addEventListener(t, unlock, { capture: true, passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return;
+      if (document.hidden) { this.ctx.suspend?.().catch?.(() => {}); for (const el of Object.values(this.el)) el.pause(); }
+      else { this.ctx.resume?.().catch?.(() => {}); const el = this.track && this.el[this.track]; if (el && this.musicVol > 0) el.play?.().catch(() => {}); }
+    });
   }
   unlock() {
+    // iOS 16.4+: sessão de "reprodução" = toca mesmo com a chave de silencioso ligada (sem isto o WebAudio fica mudo no iPhone em modo silencioso)
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch { /* navegador sem audioSession */ }
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       this.ctx = new AC();
@@ -89,15 +101,24 @@ export class AudioEngine {
       this.applyVolumes();
       for (const id of ['blade', 'bow', 'magic', 'hit', 'hurt', 'cast', 'open', 'close']) this.load(id); // os mais comuns já ficam prontos
     }
-    if (this.ctx.state === 'suspended') this.ctx.resume?.();
+    if (this.ctx.state !== 'running') this.ctx.resume?.().catch?.(() => {}); // 'suspended' ou 'interrupted' (iOS)
+    if (!this.primed) { // iOS: um som vazio tocado DENTRO do gesto libera o canal do WebAudio
+      try { const src = this.ctx.createBufferSource(); src.buffer = this.ctx.createBuffer(1, 1, 22050); src.connect(this.ctx.destination); src.start(0); } catch { /* ok */ }
+      // cada <audio> precisa tocar 1 vez dentro de um gesto no iOS; senão a troca de música ao entrar numa zona (fora de gesto) é bloqueada
+      if (this.musicVol > 0) for (const name of Object.keys(MUSIC)) { const el = this.musicEl(name); if (name !== this.want) { el.muted = true; el.play?.().then(() => { if (this.track !== name) el.pause(); el.muted = false; }).catch(() => { el.muted = false; }); } } // mudo: aquece sem tocar
+      this.primed = true;
+    }
     if (this.want) this.setMusic(this.want, true);
   }
+  // Toque de teste (botão nas Opções): libera e confirma que o som sai. Devolve o estado para a interface explicar.
+  test() { this.unlock(); this.play('levelup', { force: true }); return this.ctx?.state ?? 'sem suporte'; }
   setVolumes(musicVol, sfxVol) { this.musicVol = musicVol; this.sfxVol = sfxVol; this.applyVolumes(); }
   applyVolumes() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.sfxGain.gain.setTargetAtTime(this.sfxVol, t, 0.05);
     this.musicGain.gain.setTargetAtTime(this.musicVol * 0.55, t, 0.2); // música sempre abaixo dos efeitos
+    if (this.ios) for (const el of Object.values(this.el)) el.volume = Math.min(1, this.musicVol * 0.55); // no iPhone é ignorado (só leitura); no iPad vale
     if (this.musicVol <= 0) this.stopMusic(); else if (this.want && !this.track) this.setMusic(this.want, true);
   }
   load(id) {
@@ -111,8 +132,9 @@ export class AudioEngine {
     }
   }
   // Toca um efeito. `dist` (px até o jogador) atenua; longe demais não toca. Sem repetição dentro de MIN_GAP e no máximo 12 vozes.
-  play(id, { dist = 0, rate = 1 } = {}) {
-    const def = SFX[id]; if (!def || !this.ctx || this.sfxVol <= 0 || dist > HEAR_RANGE || this.ctx.state !== 'running') return false;
+  play(id, { dist = 0, rate = 1, force = false } = {}) {
+    const def = SFX[id]; if (!def || !this.ctx || (this.sfxVol <= 0 && !force) || dist > HEAR_RANGE) return false;
+    if (this.ctx.state !== 'running' && !force) return false;
     const now = this.ctx.currentTime, gap = MIN_GAP[id] ?? 0.03;
     if (now - (this.last.get(id) ?? -1) < gap || this.voices >= 12) return false;
     const f = def.files[Math.floor(Math.random() * def.files.length)], b = this.buf.get(f);
@@ -132,24 +154,35 @@ export class AudioEngine {
     const at = s.at, dist = at && me ? Math.hypot(at.x - me.x, at.y - me.y) : 0;
     this.play(s.id, { dist });
   }
-  // Música: um elemento <audio> por faixa (streaming, pouca memória), ligado ao ganho do WebAudio (no iPhone o volume do elemento não muda).
+  // Música: um elemento <audio> por faixa (streaming, pouca memória). Fora do iOS passa pelo ganho do WebAudio (volume e troca suave);
+  // no iOS toca direto (o volume do elemento é só leitura lá, e o WebAudio obedece à chave de silencioso): volume pelos botões do aparelho, 0 desliga.
+  musicEl(name) {
+    let el = this.el[name];
+    if (el) return el;
+    el = this.el[name] = new Audio(asset(MUSIC_DIR + MUSIC[name] + '.mp3'));
+    el.loop = true; el.preload = 'auto'; el.setAttribute('playsinline', '');
+    if (!this.ios && this.ctx) {
+      el.crossOrigin = 'anonymous';
+      el.fade = this.ctx.createGain(); el.fade.gain.value = 0;
+      this.ctx.createMediaElementSource(el).connect(el.fade); el.fade.connect(this.musicGain);
+    } else el.volume = Math.min(1, this.musicVol * 0.55);
+    return el;
+  }
   setMusic(name, force = false) {
     this.want = name;
     if (!this.ctx || this.musicVol <= 0 || (!force && this.track === name)) return;
     if (this.track === name && this.el[name] && !this.el[name].paused) return;
     const old = this.track && this.el[this.track];
     this.track = name;
-    let el = this.el[name];
-    if (!el) {
-      el = this.el[name] = new Audio(asset(MUSIC_DIR + MUSIC[name] + '.mp3'));
-      el.loop = true; el.preload = 'auto'; el.crossOrigin = 'anonymous';
-      el.fade = this.ctx.createGain(); el.fade.gain.value = 0;
-      this.ctx.createMediaElementSource(el).connect(el.fade); el.fade.connect(this.musicGain);
-    }
+    const el = this.musicEl(name);
     const t = this.ctx.currentTime;
-    if (old && old !== el) { old.fade.gain.setTargetAtTime(0, t, 0.6); setTimeout(() => { if (this.el[this.track] !== old) old.pause(); }, 2500); } // troca suave (~2 s)
-    el.fade.gain.setTargetAtTime(1, t, 0.8);
+    if (old && old !== el) {
+      if (old.fade) { old.fade.gain.setTargetAtTime(0, t, 0.6); setTimeout(() => { if (this.el[this.track] !== old) old.pause(); }, 2500); } // troca suave (~2 s)
+      else old.pause();
+    }
+    if (el.fade) el.fade.gain.setTargetAtTime(1, t, 0.8);
+    el.muted = false;
     el.play?.().catch(() => { /* bloqueado até o próximo toque: unlock() tenta de novo */ this.track = null; });
   }
-  stopMusic() { for (const el of Object.values(this.el)) { el.fade.gain.value = 0; el.pause(); } this.track = null; }
+  stopMusic() { for (const el of Object.values(this.el)) { if (el.fade) el.fade.gain.value = 0; el.pause(); } this.track = null; }
 }

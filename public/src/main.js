@@ -235,6 +235,7 @@ class Game {
       case 'buy-seal': this.buySealAsk(); break;
       case 'sort-inv': this.sortInventory(); break;
       case 'pref': this.setPref(arg); break;
+      case 'sound-test': { const st = this.audio.test(); this.ui.toast('Som', st === 'running' ? 'Tocou um sino. Se não ouviu, aumente o volume do aparelho.' : 'O navegador ainda não liberou o som: toque em Testar som de novo.', ''); break; }
       case 'chat': this.chatBox?.toggle(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'fullscreen': this.toggleFullscreen(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'buy-potion': this.buyPotion(Number(arg)); break;
@@ -1296,7 +1297,7 @@ class Game {
     const mv = followPath(a.path, p, 20);
     if (!mv) { a.path = null; if (goal.portal) { intent.mx = Math.sign(goal.x - p.x) * 0.5; intent.my = 0; intent.spd = 1; intent.run = true; } return; } // chegou ao fim do caminho: encosta no portal / recalcula
     intent.mx = mv.mx; intent.my = mv.my; intent.spd = 1; intent.attack = false; intent.cast = null;
-    intent.run = true; // auto-viagem corre como o joystick na borda (a simulação e o servidor só concedem fora de combate e nas zonas permitidas)
+    intent.run = true; // só a auto-viagem da missão corre (+30%; decisão do dono, 2026-11-05: o joystick não corre mais). A simulação e o servidor só concedem fora de combate e nas zonas permitidas
     intent.aimX = p.x + mv.mx * 200; intent.aimY = p.y + mv.my * 200;
     // travado? (sem andar 6 px em 1,3 s): recalcula; 3 vezes seguidas pausa
     a.probe.t += dt;
