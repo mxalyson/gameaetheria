@@ -7,8 +7,10 @@ import { World, makeHeroActor, makeSpiritActor } from '../public/src/game/sim.js
 import { makeRng } from '../public/src/core/rng.js';
 import { mobXp, createSpirit } from '../public/src/core/progression.js';
 import { rollMobLoot } from '../public/src/core/loot.js';
+import { MOUNT_MUL } from '../public/src/data/mounts.js';
 import { applyZoneBatch } from '../public/src/core/rewards.js';
 import { MOBS, XP_MULT } from '../public/src/data/mobs.js';
+import { RARITY } from '../public/src/data/items.js';
 import { ZONES } from '../public/src/data/zones.js';
 import { TICK_DT, SNAPSHOT_EVERY, PROTOCOL_VERSION } from '../public/src/core/protocol.js';
 import { POTION_HEAL, POTION_COOLDOWN } from './tx.js';
@@ -22,7 +24,7 @@ export const RESPAWN_AFTER = 4;  // s morto até renascer na entrada da zona
 const SHARE_RADIUS = 900;        // quem está longe do abate não ganha nada dele
 const r1 = (n) => Math.round(n * 10) / 10;
 const idle = () => ({ mx: 0, my: 0, aimX: 0, aimY: 0, attack: false, cast: null });
-const emptyBatch = () => ({ xp: 0, gold: 0, potions: 0, items: [], essences: [], kills: [], skills: [], deaths: 0, frags: 0, crypt: false });
+const emptyBatch = () => ({ xp: 0, gold: 0, potions: 0, whistles: 0, items: [], essences: [], kills: [], skills: [], deaths: 0, frags: 0, crypt: false });
 
 // Ponto de entrada numa zona vindo de `from` (o portal de lá aponta para cá). null = portal inexistente (movimento ilegal).
 export function entryPoint(zoneId, from) {
@@ -92,7 +94,7 @@ export class ZoneRoom {
     if (!p || p.left) return;
     if (m.seq <= p.lastSeq) { this.send.stats.staleInputs++; return; }
     p.lastSeq = m.seq;
-    p.input = { mx: m.mx, my: m.my, aimX: m.aimX, aimY: m.aimY, attack: m.attack, cast: m.cast ?? p.input.cast, run: m.run === true };
+    p.input = { mx: m.mx, my: m.my, aimX: m.aimX, aimY: m.aimY, attack: m.attack, cast: m.cast ?? p.input.cast, run: m.run === true, mount: m.mount ?? p.input.mount }; // mount: pedido de montar/desmontar, entregue uma vez só (como cast); quem decide é World.applyIntent
   }
   dropped(session) { const p = session.player; if (p && !p.left) { p.dropT = this.clock; p.input = idle(); } }
   resumed(session) { const p = session.player; if (p && !p.left) p.dropT = null; }
@@ -107,7 +109,7 @@ export class ZoneRoom {
     for (const p of this.players.values()) {
       if (p.left) continue;
       intents[p.actor.id] = p.actor.dead ? { mx: 0, my: 0 } : { ...p.input };
-      p.input.cast = null;
+      p.input.cast = null; p.input.mount = undefined;
       if (!ref && !p.actor.dead) ref = p.actor;
     }
     if (ref) this.world.updateSpawns(TICK_DT, ref);
@@ -169,12 +171,16 @@ export class ZoneRoom {
       if (Math.hypot(a.x - m.x, a.y - m.y) > SHARE_RADIUS) continue;
       if (!m.summoned) p.pend.xp += mobXp(m.level, a.level, mul); // esbirros de chefe não dão XP nem loot
       p.pend.kills.push({ mobId: m.mobId, boss: !!m.boss, mini: !!m.miniboss, spiritType: this.spiritTypeOf(p) });
+      const seen = []; // o que ESTE jogador ganhou, só para o visual (spirit busca no chão); o servidor já gravou no lote
       for (const d of rollMobLoot(this.rng, m, p.classId, p.pity, rm)) {
+        if (d.kind === 'item') seen.push(['i', RARITY[d.item.rarity]?.index ?? 0]); else if (d.kind === 'potion') seen.push(['p', 0]); else if (d.kind === 'essence') seen.push(['e', 0]);
         if (d.kind === 'gold') p.pend.gold += d.amount;
         else if (d.kind === 'potion') p.pend.potions += d.amount;
+        else if (d.kind === 'whistle') p.pend.whistles += d.amount; // Apito de Montaria
         else if (d.kind === 'item') p.pend.items.push({ ...d.item, id: 'i' + randomBytes(9).toString('base64url') });
         else if (d.kind === 'essence') p.pend.essences.push(createSpirit(this.rng, { luck: d.luck, level: Math.max(1, a.level - 2) }));
       }
+      if (seen.length) this.events.push({ e: 'loot', to: a.id, x: Math.round(m.x), y: Math.round(m.y), d: seen.slice(0, 8) });
     }
   }
 
@@ -184,7 +190,7 @@ export class ZoneRoom {
   // Grava o lote pendente do jogador (operação idempotente). Devolve o resumo ou null.
   flush(p) {
     const b = p.pend;
-    if (!p.charId || !this.db || !(b.xp || b.gold || b.potions || b.items.length || b.essences.length || b.kills.length || b.skills.length || b.deaths || b.frags || b.crypt)) return null;
+    if (!p.charId || !this.db || !(b.xp || b.gold || b.potions || b.whistles || b.items.length || b.essences.length || b.kills.length || b.skills.length || b.deaths || b.frags || b.crypt)) return null;
     b.pity = { ...p.pity }; p.pend = emptyBatch();
     const opId = `zone:${this.matchId}:${p.charId}:${++this.flushSeq}`;
     try {
@@ -198,7 +204,7 @@ export class ZoneRoom {
     } catch (e) {
       // a operação reverteu (nada foi gravado): devolve o lote ao pendente para a próxima tentativa, em vez de perder a recompensa
       const n = p.pend;
-      n.xp += b.xp; n.gold += b.gold; n.potions += b.potions; n.deaths += b.deaths; n.frags += b.frags; n.crypt = n.crypt || b.crypt;
+      n.xp += b.xp; n.gold += b.gold; n.potions += b.potions; n.whistles += b.whistles; n.deaths += b.deaths; n.frags += b.frags; n.crypt = n.crypt || b.crypt;
       n.items.unshift(...b.items); n.essences.unshift(...b.essences); n.kills.unshift(...b.kills); n.skills.unshift(...b.skills);
       try { this.db.audit('zone_reward_error', { accountId: p.accountId, detail: e.message }); } catch { /* sem auditoria */ }
       return null;
@@ -209,7 +215,7 @@ export class ZoneRoom {
   syncLevel(p, doc) {
     const fresh = makeHeroActor(doc, p.actor.x, p.actor.y, 'player', 1);
     const levelUp = fresh.level !== p.actor.level;
-    Object.assign(p.actor, { level: fresh.level, spec: fresh.spec, mastery: fresh.mastery, stats: fresh.stats, maxHp: fresh.maxHp, hp: levelUp ? fresh.maxHp : Math.min(p.actor.hp, fresh.maxHp) });
+    Object.assign(p.actor, { level: fresh.level, spec: fresh.spec, mastery: fresh.mastery, mounts: fresh.mounts, mountId: fresh.mountId, stats: fresh.stats, maxHp: fresh.maxHp, hp: levelUp ? fresh.maxHp : Math.min(p.actor.hp, fresh.maxHp) });
   }
 
   leave(p, reason = 'left') {
@@ -233,7 +239,7 @@ export class ZoneRoom {
   statics(list) { return list.map((p) => ({ id: p.actor.id, name: p.name, classId: p.classId, level: p.actor.level, maxHp: p.actor.maxHp })); }
   meJson(p) {
     const a = p.actor;
-    return JSON.stringify({ spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.slowT > 0 ? 1 - a.slowAmt : 1)), c: [r1(a.cds.basic), r1(a.cds.s0), r1(a.cds.s1), r1(a.cds.s2), r1(a.cds.s3 ?? 0)] });
+    return JSON.stringify({ spd: Math.round(a.stats.moveSpeed * a.speedMul * (a.mounted ? MOUNT_MUL : 1) * (a.slowT > 0 ? 1 - a.slowAmt : 1)), c: [r1(a.cds.basic), r1(a.cds.s0), r1(a.cds.s1), r1(a.cds.s2), r1(a.cds.s3 ?? 0)] });
   }
   frameFor(commit) {
     const tuples = [...this.players.values()].filter((p) => !p.left).map((p) => actorTuple(p.actor, !!p.session?.ws));

@@ -45,5 +45,17 @@ if (process.argv[1]?.endsWith('texture-budget.mjs')) {
   console.log('  TOTAL c/ variante'.padEnd(22) + totals.map((t, i) => mib(t + vt[i]).padStart(28)).join(''));
   const v3 = SCALES.map((_, i) => totals[i] + vs[i].sort((x, y) => y - x).slice(0, 3).reduce((x, y) => x + y, 0));
   console.log('  4 classes + 3 variantes'.padEnd(22) + v3.map((t) => mib(t).padStart(28)).join('') + '   (própria + 2 de outros, as maiores)');
+  // Montarias (render/mount-sprites.js): carrega no máximo 2 ao mesmo tempo; qualidade baixa usa a imagem -lo, média/alta a imagem cheia.
+  const MDIR = 'public/assets/mounts';
+  if (existsSync(MDIR)) {
+    console.log('\nMontarias (MiB decodificados; alta = média, baixa = -lo):');
+    const mb = [];
+    for (const id of ['wolf', 'horse', 'gryphon']) {
+      const m = JSON.parse(readFileSync(join(MDIR, id + '.json'), 'utf8')); mb.push([m.sizes.hi.bytes_decoded, m.sizes.lo.bytes_decoded]);
+      console.log(`  ${id}`.padEnd(22) + `${mib(m.sizes.hi.bytes_decoded)} alta ${mib(m.sizes.lo.bytes_decoded)} baixa   (${m.frames} quadro(s); meta ≤ 8 MiB)`);
+    }
+    const top2 = (i) => mb.map((x) => x[i]).sort((x, y) => y - x).slice(0, 2).reduce((x, y) => x + y, 0);
+    console.log('  pior par carregado'.padEnd(22) + `${mib(top2(0))} alta ${mib(top2(1))} baixa`);
+  }
   console.log(`\nOrçamento assumido: ${BUDGET_MIB} MiB. Partida 4×4 com as 4 classes: ` + SCALES.map(([n], i) => `${n}: ${totals[i] / 1048576 <= BUDGET_MIB ? 'dentro' : 'ACIMA'}`).join(' · '));
 }

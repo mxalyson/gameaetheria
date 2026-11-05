@@ -76,7 +76,7 @@ export class NetClient {
   decline(partyId) { this.invites = this.invites.filter((i) => i.partyId !== partyId); this.send({ t: 'party_decline', partyId }); }
   leaveParty() { this.send({ t: 'party_leave' }); }
   kick(name) { this.send({ t: 'party_kick', name }); }
-  sendInput(i) { this.send({ t: 'input', seq: ++this.seq, mx: i.mx, my: i.my, aimX: i.aimX, aimY: i.aimY, attack: !!i.attack, cast: i.cast ?? null, ...(i.run ? { run: true } : {}) }); }
+  sendInput(i) { this.send({ t: 'input', seq: ++this.seq, mx: i.mx, my: i.my, aimX: i.aimX, aimY: i.aimY, attack: !!i.attack, cast: i.cast ?? null, ...(i.run ? { run: true } : {}), ...(i.mount === true || i.mount === false ? { mount: i.mount } : {}) }); }
   ping() { this.send({ t: 'ping', ts: performance.now() }); }
   close() { this.closing = true; this.ws?.close(); this.connected = false; this.joined = false; this.token = null; }
 }

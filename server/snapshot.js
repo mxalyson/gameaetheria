@@ -2,6 +2,7 @@
 // frame(): recebe as entidades como tuplas e devolve { a, m, n, g, k } só com o que mudou desde o snapshot anterior (ou tudo, no quadro-chave).
 import { F, KEYFRAME_EVERY } from '../public/src/core/snapshot.js';
 import { lookCode } from '../public/src/core/aura.js';
+import { mountCode } from '../public/src/core/mounts.js';
 
 const r1 = (n) => Math.round(n * 10) / 10;
 // Tuplas são comparadas elemento a elemento com a anterior (guardada por referência: nunca é alterada depois); antes viravam texto a cada quadro.
@@ -9,8 +10,10 @@ const sameT = (a, b) => { if (!b || a.length !== b.length) return false; for (le
 // 8º elemento = aura de evolução (spec+tier, core/aura.js); só entra quando há aura, então o formato antigo continua válido.
 export const actorTuple = (a, online, extra = 0) => {
   const t = [a.id, r1(a.x), r1(a.y), Math.round(a.hp), Math.round(a.facing * 100),
-    (a.dead ? F.DEAD : 0) | (a.moving ? F.MOVING : 0) | (a.swing > 0 ? F.SWING : 0) | (a.stunT > 0 ? F.STUN : 0) | (online ? 0 : F.OFFLINE) | extra, Math.round(a.shield)];
-  if (a.spec) { const lk = lookCode(a); if (lk) t.push(lk); }
+    (a.dead ? F.DEAD : 0) | (a.moving ? F.MOVING : 0) | (a.swing > 0 ? F.SWING : 0) | (a.stunT > 0 ? F.STUN : 0) | (online ? 0 : F.OFFLINE) | (a.mounted ? F.MOUNTED : 0) | extra, Math.round(a.shield)];
+  const lk = a.spec ? lookCode(a) : 0, mc = a.mounted ? mountCode(a.mountId) : 0;
+  if (lk || mc) t.push(lk); // montado: o 9º elemento é o código da montaria (core/mounts.js mountCode); a aura (8º) vai 0 se não houver
+  if (mc) t.push(mc);
   return t;
 };
 export const mobTuple = (m) => [m.id, r1(m.x), r1(m.y), Math.round(m.hp), Math.round(m.facing * 100), (m.dead ? F.DEAD : 0) | (m.moving ? F.MOVING : 0) | (m.swing > 0 ? F.SWING : 0)];

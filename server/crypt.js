@@ -87,6 +87,7 @@ export class CryptRoom extends ZoneRoom {
         for (const d of rollMobLoot(this.rng, m, p.classId, p.pity)) {
           if (d.kind === 'gold') p.pend.gold += d.amount;
           else if (d.kind === 'potion') p.pend.potions += d.amount;
+          else if (d.kind === 'whistle') p.pend.whistles += d.amount; // Apito de Montaria (o chefe da Cripta também pode soltar)
           else if (d.kind === 'item') p.pend.items.push({ ...d.item, id: 'i' + randomBytes(9).toString('base64url') });
         }
       } else p.pend.gold += Math.round(this.rng.int(m.level * 2 + 1, m.level * 4 + 3) * (m.elite ? 3 : 1));

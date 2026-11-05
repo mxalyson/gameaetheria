@@ -151,7 +151,8 @@ export function drawHeroSprite(g, a, t) {
     if (a.dash && st.clip !== 'dash') restart('dash');
     else if (a.swing > st.prevSwing + 1e-4 && !a.dash) restart(Math.abs(a.swing - 0.3) < 0.02 ? 'skill' : 'attack'); // golpe básico 0,25 s; skill 0,3 s (sim.js)
     else if (a.hitFlash > 0 && st.prevHit <= 0 && !acting) restart('hit');
-    else if (!acting) { const want = a.moving ? 'walk' : 'idle'; if (st.clip !== want) restart(want); }
+    // montado: quem anda é a montaria (render/mount-sprites.js); o herói fica na pose parada
+    else if (!acting) { const want = a.moving && !a.mounted ? 'walk' : 'idle'; if (st.clip !== want) restart(want); }
   }
   st.prevSwing = a.swing; st.prevHit = a.hitFlash;
   const c = clips[st.clip];
@@ -169,7 +170,7 @@ export function drawHeroSprite(g, a, t) {
   const f = c.loop ? frameAt(c, tt % len) : frameAt(c, Math.min(tt, len - 1e-6));
   const acting = ACTING.has(st.clip) && st.clip !== 'hit' && !(clips[st.clip].loop) && tt < len;
   if (wspeed) { // inclina o corpo no sentido do movimento, com mola (passa do ponto ao parar/virar): o personagem "pesa" em vez de deslizar em pé
-    const tgt = a.moving && !acting && !a.dead ? Math.min(st.v / wspeed, 1.6) * Math.cos(st.moveFace) * LEAN_K : 0;
+    const tgt = a.moving && !acting && !a.dead && !a.mounted ?Math.min(st.v / wspeed, 1.6) * Math.cos(st.moveFace) * LEAN_K : 0;
     const h = Math.min(dt, 1 / 30);
     st.leanV += (400 * (tgt - st.lean) - 28 * st.leanV) * h; st.lean += st.leanV * h;
   }

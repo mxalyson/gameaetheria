@@ -23,6 +23,7 @@ export const DIALOGS = {
   guard: { greet: [
     { when: { done: 'cavaleiro_rubro' }, text: 'Cinzas apagadas, estrada livre. Por enquanto.' },
     { when: { done: 'guardiao_das_ruinas' }, text: 'O Guardião caiu e as ruínas ficaram quietas demais. Fique atento.' },
+    { when: { done: 'matilha_da_estrada' }, text: 'Cinza gosta de você, dá para ver. Monte fora de combate; se alguém a ferir, ela se solta de você. Montaria não luta, herói.' },
     { when: { bossKillsMax: 0 }, text: 'Se o bosque te assustar, volte. Sem vergonha. Toque numa Pedra de Retorno: ela guarda o seu eco e, se você cair, acorda você ali.' },
     { text: 'A vila está calma por enquanto. Volte quando houver mais perigo à vista. No mapa, os lugares já visitados oferecem teletransporte.' },
   ], service: null },

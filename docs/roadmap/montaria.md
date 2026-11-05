@@ -1,6 +1,21 @@
-# Montaria — desenho (NÃO implementado)
+# Montaria — desenho aprovado e sistema implementado
 
-Status: **pendente (só desenho)**. O correr (+30%, sem botão) já existe (`docs/gameplay/sistemas.md`); a montaria é o degrau seguinte de mobilidade.
+## Status por parte (2026-11-05, decisão 0018)
+| Parte | Estado |
+|---|---|
+| Dados (`data/mounts.js`), regras (`core/mounts.js`) | **implementado e testado** (Node) |
+| Simulação: velocidade 1,5× (não soma com o correr), desmontar em combate/ataque/skill/dano/queda/atordoamento/zona | **implementado e testado** |
+| Documento (`mounts`, `mount`, `whistles`), migração, plausibilidade, importação | **implementado e testado** |
+| Servidor: intenção `mount`, transações `mount_use_whistle`/`mount_set`, snapshot (bit + código), Apito no lote da zona e da Cripta | **implementado e testado** (unidade/protocolo; sem teste de ponta a ponta com WebSocket real) |
+| Missão `matilha_da_estrada` (Lobo), conquista Veterano (Grifo), Apito (chefes, baús, Cripta) | **implementado e testado** |
+| UI de toque: botão Montar/Desmontar, toque duplo no herói, "Montar automático", painel Personagem, auto-viagem | **implementado**; lógica pura testada; **não testado no navegador/e2e nem em aparelho real** |
+| Arte das montarias e do herói montado | **fora deste trabalho** (outro agente, `render/`); contrato: `a.mounted`, `a.mountId` |
+| Ícone do Apito e do botão | **provisório (emoji/ícone reaproveitado)**: pendência A11 |
+| Validado no iPhone/Android | **pendente** |
+
+Texto de desenho original abaixo (mantido como referência).
+
+O correr (+30%, sem botão) já existe (`docs/gameplay/sistemas.md`); a montaria é o degrau seguinte de mobilidade.
 
 ## Como obter
 - **Missão de cadeia** na Vila (NPC estábulo/guarda de rota) no nível 12 que entrega a primeira montaria (lobo cinzento); as demais por **item** (Apito de Montaria, raridade rara/épica) vindo de chefes, Cripta e baús, e uma por conquista. Montarias são do **personagem** (lista no documento v3, campo aditivo `mounts: []` e `mount: id|null`).

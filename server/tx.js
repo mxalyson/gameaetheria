@@ -17,6 +17,7 @@ import { craftEcho } from '../public/src/core/echo.js';
 import { chooseSpec, buySeal } from '../public/src/core/specs.js';
 import { MENTOR_BY_ID } from '../public/src/data/mentors.js';
 import { PHOENIX, setCheckpoint } from '../public/src/core/phoenix.js';
+import { useWhistle, ownedMounts } from '../public/src/core/mounts.js';
 
 export class TxError extends Error {}
 const fail = (msg) => { throw new TxError(msg); };
@@ -29,7 +30,7 @@ export const CHEST_REACH = 130;    // px entre o ATOR do servidor e o baú (o cl
 // Onde cada operação existe: dentro da instância baú/poção/lore e equipamento/atributos/spirit ativo; nas cidades, o resto. Devolve o código de recusa ou null.
 export function placeProblem(op, { inZone, hubAt, shop = 'town' }) {
   const inst = op === 'chest' || op === 'potion' || op === 'lore' || op === 'checkpoint_set'; // só existem dentro da instância
-  const both = ['spirit_set', 'equip', 'unequip', 'alloc', 'alloc_auto'].includes(op); // valem na instância e nas cidades
+  const both = ['spirit_set', 'equip', 'unequip', 'alloc', 'alloc_auto', 'mount_use_whistle', 'mount_set'].includes(op); // valem na instância e nas cidades
   if (inZone) return both || inst ? null : 'not_here';
   if (inst) return 'not_here';
   const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily' || op === 'recycle' || op === 'mentor_talk';
@@ -61,7 +62,7 @@ export function runTx(doc, m, ctx) {
       if (Math.hypot(a.x - chest.x, a.y - chest.y) > CHEST_REACH) fail('Chegue mais perto do baú.');
       const r = openChest(c, chest, ctx.room.zoneId, ctx.rng, now);
       if (!r.ok) fail(r.reason);
-      Object.assign(s, { gold: r.gold, item: r.item, quests: questsReady(r), achievements: r.achievements, chestId: chest.id });
+      Object.assign(s, { gold: r.gold, item: r.item, ...(r.whistle ? { whistle: true } : {}), quests: questsReady(r), achievements: r.achievements, chestId: chest.id });
       break;
     }
     case 'potion': {
@@ -185,6 +186,17 @@ export function runTx(doc, m, ctx) {
       if (!MENTOR_BY_ID[m.id]) fail('Mentor inexistente.');
       const ev = recordEvent(c, { type: 'talk', npc: m.id }, now);
       Object.assign(s, { npc: m.id, quests: questsReady(ev), achievements: ev.achievements });
+      break;
+    }
+    case 'mount_use_whistle': { // Apito de Montaria: o servidor gasta 1 e sorteia a montaria (uma por tipo; core/mounts.js)
+      const r = useWhistle(c, ctx.rng);
+      if (!r.ok) fail(r.reason);
+      Object.assign(s, { mount: r.mount, whistles: r.whistles });
+      break;
+    }
+    case 'mount_set': { // escolhe a montaria ativa: precisa ser do personagem (lista oficial do documento + missão/conquista)
+      if (!ownedMounts(c).includes(m.id)) fail('Você não tem essa montaria.');
+      c.mount = m.id; s.mount = m.id;
       break;
     }
     case 'lore': { // placa/estátua da zona: servidor confere zona, proximidade e a 1ª leitura (bit em stats.lore + conquista)

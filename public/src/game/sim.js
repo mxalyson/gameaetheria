@@ -11,16 +11,27 @@ import { MOBS, MOB_CURVE, LEVEL_GAP, BOSS_SPAWN, BOSS_REPEAT, CAMP_RESPAWN } fro
 import { isSkillUnlocked, skillIdAt } from '../core/unlocks.js';
 import { ZONES } from '../data/zones.js';
 import { SPIRITS } from '../data/spirits.js';
+import { RARITY } from '../data/items.js';
 import { buildLayout, campSpawns, minibossSpawn } from './layout.js';
 import { mobIntent, rivalIntent } from './ai.js';
 import { blockChance, inFrontArc, BLOCK } from '../core/block.js';
 import { nightMods, hourFromMs, zoneHasCycle } from '../core/daycycle.js';
+import { MOUNT_MUL } from '../data/mounts.js';
+import { ownedMounts, activeMount, mountProblem } from '../core/mounts.js';
 
 const DAY_MODS = { aggroMul: 1, rewardMul: 1 };
 
 const TAU = Math.PI * 2;
 // Spirit coletor: fora de combate busca o drop mais próximo (até `range` px do dono) e o traz; `hand` = distância em que entrega ao dono.
 export const SPIRIT_FETCH = { range: 260, speed: 320, grab: 16, hand: 30 };
+// Máscara do que o spirit busca (opção do dono): bits 0-4 = raridade do item (comum..lendário), 5 = poções, 6 = essências. Padrão: tudo.
+export const SPIRIT_PICK_ALL = 0b1111111;
+export function spiritWants(mask, d) {
+  if (d.kind === 'item') return ((mask >> (RARITY[d.item?.rarity]?.index ?? 0)) & 1) === 1;
+  if (d.kind === 'potion') return ((mask >> 5) & 1) === 1;
+  if (d.kind === 'essence') return ((mask >> 6) & 1) === 1;
+  return true;
+}
 export const DROP_LIFE = 120, DROP_BLINK = 10, DROP_MAX = 120; // drops no chão: vida (s), piscar final (s) e teto por mundo
 export const RUN_MUL = 1.3, RUN_COMBAT_GRACE = 3; // correr (sprint): +30% fora de combate (docs/gameplay/sistemas.md)
 export const RUN_ZONES = new Set(['town', 'forest', 'plains', 'harbor', 'ruins', 'glacier', 'ember']); // nunca arena PvP, ondas nem Cripta (equilíbrio do PvP)
@@ -48,6 +59,7 @@ export function makeHeroActor(char, x, y, kind = 'player', team = 1) {
     kind, team, name: char.name, classId: char.classId, level: char.level, spec: activeSpec(char), x, y, r: 15,
     stats: st, hp: st.maxHp, maxHp: st.maxHp, cds: { basic: 0, s0: 0, s1: 0, s2: 0, s3: 0 },
     mastery: hasMastery(char), // Maestria concluída: libera a habilidade s3 (nível 25 + missão); o servidor lê isto do documento
+    mounts: ownedMounts(char), mountId: activeMount(char), mounted: false, // montarias: posse e escolhida vêm do documento; `mounted` só muda em applyIntent (game/sim.js) e vai no snapshot
   });
 }
 
@@ -106,6 +118,7 @@ export class World {
     this.telegraphs = [];
     this.queue = []; // ações adiadas (mira do franco-atirador, rajadas em sequência): { t, src, fn }
     this.drops = [];
+    this.spiritPick = SPIRIT_PICK_ALL; // o que o spirit busca (máscara; ver spiritWants)
     this.fx = [];
     this.particles = [];
     this.texts = [];
@@ -317,7 +330,22 @@ export class World {
     a.swing = Math.max(0, a.swing - dt);
   }
 
+  // Montaria (docs/roadmap/montaria.md, decisão 0018). `it.mount` = pedido (true monta, false desmonta, ausente mantém). Montar exige posse, zona de farm (RUN_ZONES), fora de combate (3 s) e sem atacar/conjurar;
+  // desmonta sozinho ao atacar, conjurar, tomar/causar dano (lastCombat), cair, ser atordoado ou sair da zona permitida. Devolve true se o quadro deve IGNORAR ataque/skill (tocar neles só desmonta).
+  stepMount(a, it) {
+    if (a.kind !== 'player') return false;
+    const acting = !!it.attack || it.cast != null;
+    if (a.mounted && (acting || a.dead || a.stunT > 0 || !RUN_ZONES.has(this.zoneId) || this.time - a.lastCombat < RUN_COMBAT_GRACE)) { a.mounted = false; this.events.push({ type: 'dismount', actor: a }); return acting; }
+    if (it.mount === false) a.mounted = false;
+    else if (it.mount === true && !a.mounted && !acting) {
+      const why = mountProblem(a, { zoneOk: RUN_ZONES.has(this.zoneId), time: this.time });
+      if (why) a.mountDenied = why; else { a.mounted = true; a.mountDenied = null; }
+    }
+    return false;
+  }
+
   applyIntent(a, it, dt) {
+    if (this.stepMount(a, it)) it = { ...it, attack: false, cast: null }; // montado: tocar em ataque/habilidade só desmonta, sem ação
     if (a.stunT > 0) {
       a.moving = false;
       // só a Intervenção Divina (`castStunned`) rompe o atordoamento: remove o efeito e é lançada na hora
@@ -331,8 +359,8 @@ export class World {
     if (len > 0.01) {
       mx /= len; my /= len;
       // Correr: só em zonas de farm/cidade/instância PvE, fora de combate (3 s) e sem atacar/conjurar neste quadro; o servidor ignora o pedido do cliente se algo disso falhar
-      a.running = it.run === true && a.kind === 'player' && RUN_ZONES.has(this.zoneId) && !it.attack && it.cast == null && this.time - a.lastCombat >= RUN_COMBAT_GRACE;
-      const sp = a.stats.moveSpeed * a.speedMul * (a.running ? RUN_MUL : 1) * (it.spd ?? 1) * (a.slowT > 0 ? 1 - a.slowAmt : 1) * (a.buffs.length ? 1 + this.buffVal(a, 'move') : 1);
+      a.running = !a.mounted && it.run === true && a.kind === 'player' && RUN_ZONES.has(this.zoneId) && !it.attack && it.cast == null && this.time - a.lastCombat >= RUN_COMBAT_GRACE; // montado: a montaria SUBSTITUI o correr (não acumula)
+      const sp = a.stats.moveSpeed * a.speedMul * (a.mounted ? MOUNT_MUL : a.running ? RUN_MUL : 1) * (it.spd ?? 1) * (a.slowT > 0 ? 1 - a.slowAmt : 1) * (a.buffs.length ? 1 + this.buffVal(a, 'move') : 1);
       this.moveActor(a, mx * sp * dt, my * sp * dt);
       a.moving = true;
       a.walk += dt * sp / 28;
@@ -747,6 +775,7 @@ export class World {
     if (t.hp <= 0) {
       t.hp = 0;
       t.dead = true;
+      t.mounted = false; // caiu: desmonta (renascer volta a pé)
       t.deadT = 0;
       t.dash = null;
       this.burst(t.x, t.y, t.kind === 'mob' ? MOBS[t.mobId].color : '#ffffff', 26, 220);
@@ -971,11 +1000,11 @@ export class World {
       return true;
     }
     let d = s.fetch;
-    if (d && (d.taken || d.carried || d.fetched || !this.drops.includes(d))) d = s.fetch = null;
+    if (d && (d.taken || d.carried || d.fetched || !this.drops.includes(d) || !spiritWants(this.spiritPick, d))) d = s.fetch = null;
     if (!d) {
       let best = Infinity;
       for (const c of this.drops) {
-        if (c.taken || c.carried || c.fetched || c.kind === 'gold' || c.t < 0.4 || Math.hypot(c.x - o.x, c.y - o.y) > F.range) continue;
+        if (c.taken || c.carried || c.fetched || c.kind === 'gold' || !spiritWants(this.spiritPick, c) || c.t < 0.4 || Math.hypot(c.x - o.x, c.y - o.y) > F.range) continue;
         const dd = Math.hypot(c.x - s.x, c.y - s.y);
         if (dd < best) { best = dd; d = c; }
       }

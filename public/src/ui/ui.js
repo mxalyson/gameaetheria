@@ -28,6 +28,8 @@ import { MENTOR_BY_ID, mentorsOfClass, MENTOR_SQUARE } from '../data/mentors.js'
 import { SCALE_MIN, SCALE_MAX, resolveScale } from '../prefs.js';
 import { asset } from '../assets-version.js';
 import { zoneHasCycle, isNight } from '../core/daycycle.js';
+import { MOUNTS, MOUNT_IDS, WHISTLE } from '../data/mounts.js';
+import { ownedMounts, activeMount } from '../core/mounts.js';
 import { PHOENIX } from '../core/phoenix.js';
 import { currentHour } from '../render/sky.js';
 
@@ -483,6 +485,7 @@ export class UI {
       rows.push({ icon: `<span class="cell r-${r.item.rarity}${r.item.opal ? ' opal' : ''}"><span class="ic">${itemIcon(r.item)}</span>${plusBadge(r.item)}</span>`, text: esc(r.item.name), color: R.color, sub: `${R.name} · Nv ${r.item.level}${r.item.converted ? ' · mochila cheia: virou ouro' : ' · está na mochila'}` });
     }
     rows.push({ icon: `<span class="rw-coin">${COIN}</span>`, text: `+${r.gold} ouro`, color: '#ffd34d' });
+    if (r.whistle) rows.push({ icon: `<span class="rw-coin">🎺</span>`, text: esc(WHISTLE.name), color: RARITY[WHISTLE.rarity].color, sub: 'Use em Personagem > Montarias' }); // ícone provisório (pendência de arte A11)
     this.reward({ title: 'Baú aberto!', rows });
   }
 
@@ -612,7 +615,21 @@ export class UI {
       ${stats}
       <div class="row-btns"><button class="btn small" data-action="toggle" data-arg="skills">Habilidades</button></div>
       ${this.specBlock(char)}
+      ${this.mountBlock(char)}
       </div></div>`);
+  }
+
+  // Montarias (decisão 0018): lista das possuídas, escolha da ativa, Montar/Desmontar e Apito. Sem compra por ouro; como obter vem de data/mounts.js.
+  mountBlock(char) {
+    const own = ownedMounts(char), act = activeMount(char), wh = char.whistles ?? 0, on = !!this.game.player?.mounted;
+    const rows = MOUNT_IDS.map((id) => {
+      const M = MOUNTS[id], has = own.includes(id), R = RARITY[M.rarity];
+      const btn = !has ? '' : id === act ? '<span class="sub">Ativa</span>' : `<button class="btn small" data-action="mount-set" data-arg="${id}">Usar</button>`;
+      return `<div class="mount-row ${has ? '' : 'locked'}"><div><b style="color:${R.color}">${esc(M.name)}</b><div class="sub">${has ? esc(M.desc) : esc(M.how)}</div></div>${btn}</div>`;
+    }).join('');
+    const ctl = [own.length ? `<button class="btn small" data-action="mount-toggle">${on ? 'Desmontar' : 'Montar'}</button>` : '', wh ? `<button class="btn small" data-action="mount-whistle">Usar ${esc(WHISTLE.name)} (${wh})</button>` : ''].join('');
+    return `<h3>Montarias</h3>${rows}${ctl ? `<div class="row-btns">${ctl}</div>` : ''}
+      <p class="hint">+50% de velocidade fora de combate, nas vilas e zonas de farm (nunca em arena, ondas ou Cripta). Desmonta ao atacar, usar habilidade, tomar dano ou falar com alguém.</p>`;
   }
 
   // Especialização (nível 15): duas por classe; a primeira escolha é grátis, trocar consome um Selo de Reespecialização (vendido pelo Mestre de Classe).
@@ -1011,8 +1028,14 @@ export class UI {
         <button class="btn small ${pr.scale === 'auto' ? 'sel' : ''}" data-action="pref" data-arg="scale:auto">Auto</button></div></div>
       <div class="opt-row"><b>Qualidade gráfica</b>${seg('quality', [['auto', 'Auto'], ['high', 'Alta'], ['medium', 'Média'], ['low', 'Baixa']])}</div>
       <p class="hint">Baixa e média reduzem névoa, partículas e resolução: ajudam em celulares fracos e economizam bateria.</p>
+      <div class="opt-row"><b>Montar automático</b><div class="seg"><button class="btn small ${pr.autoMount ? '' : 'sel'}" data-action="pref" data-arg="autoMount:off">Desligado</button><button class="btn small ${pr.autoMount ? 'sel' : ''}" data-action="pref" data-arg="autoMount:on">Ligado</button></div></div>
+      <p class="hint">Ligado: depois de andar 1,5 s fora de combate (com uma montaria), o herói monta sozinho. Se você desmontar à mão, ele só monta de novo depois que você parar.</p>
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Toque (padrão)'], ['keyboard', 'Teclado e mouse']])}</div>
       <p class="hint">À noite o ar escurece e as criaturas enxergam mais longe, mas dão um pouco mais de XP, ouro e itens. O ciclo de dia e noite é sempre ligado.</p>
+      <div class="opt-row"><b>O que o spirit pega</b>
+        <div class="seg wrap">${[['Comum', 0], ['Incomum', 1], ['Raro', 2], ['Épico', 3], ['Lendário', 4], ['Poções', 5], ['Essências', 6]].map(([label, bit]) => `<button class="btn small ${(pr.spiritPick >> bit) & 1 ? 'sel' : ''}" data-action="pref" data-arg="spiritPick:${bit}">${label}</button>`).join('')}
+        <button class="btn small" data-action="pref" data-arg="spiritPick:all">Tudo</button><button class="btn small" data-action="pref" data-arg="spiritPick:none">Nada</button></div></div>
+      <p class="hint">O spirit só busca no chão o que estiver marcado; o resto você pega andando por cima. Online, o servidor guarda tudo na hora e o spirit só mostra o que trouxe.</p>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
       </div><div class="col">

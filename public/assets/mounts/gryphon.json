@@ -1,0 +1,37 @@
+{
+ "frames": 3,
+ "names": [
+  "open",
+  "raised",
+  "closed"
+ ],
+ "sizes": {
+  "hi": {
+   "file": "gryphon.webp",
+   "w": 248,
+   "h": 256,
+   "bytes_decoded": 761856
+  },
+  "lo": {
+   "file": "gryphon-lo.webp",
+   "w": 155,
+   "h": 160,
+   "bytes_decoded": 297600
+  }
+ },
+ "feet": [
+  0.4879,
+  0.9481
+ ],
+ "seat": [
+  0.4879,
+  0.4623
+ ],
+ "shadow": [
+  0.4879,
+  0.9564,
+  0.3806,
+  0.0603
+ ],
+ "aspect": 0.9682
+}

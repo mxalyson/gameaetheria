@@ -39,6 +39,7 @@ export const TX_OPS = {
   mentor_talk: { id: true }, // conversa com um mentor de especialização no Porto (objetivo `talk` da Prova do Mestre; o servidor confere que o jogador está no Porto)
   respec_buy: {}, respec: { id: true }, // Mestre de Classe: comprar o Selo de Reespecialização / escolher ou trocar de especialização (o Selo é conferido e gasto no servidor)
   buy_phoenix: { n: [1, 20], shop: true }, checkpoint_set: { id: true }, // Amuleto da Fênix (preço e teto do servidor) / Pedra de Retorno (o servidor confere zona e proximidade)
+  mount_use_whistle: {}, mount_set: { id: true }, // montarias: usar o Apito (o servidor sorteia a montaria e gasta o Apito) / escolher a ativa (precisa ser sua)
   craft: { id: true }, // forja do Ferreiro: item Eco (fragmentos da Cripta + ouro); id = receita (data/crypt.js ECHO_RECIPES)
 };
 const TX_ID = /^[A-Za-z0-9_:.-]{1,48}$/;
@@ -81,6 +82,7 @@ export function parseClientMessage(data) {
         mx: clamp(data.mx, -1, 1), my: clamp(data.my, -1, 1),
         aimX: clamp(data.aimX, -10000, 10000), aimY: clamp(data.aimY, -10000, 10000),
         attack: data.attack === true, cast: data.cast ?? null,
+        ...(data.mount === true || data.mount === false ? { mount: data.mount } : {}), // montar/desmontar: pedido aditivo (o servidor confere posse, zona e combate em game/sim.js)
         ...(data.run === true ? { run: true } : {}), // correr: campo aditivo; o servidor só o honra fora de combate e em zonas de farm (game/sim.js)
       } };
     }

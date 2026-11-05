@@ -6,7 +6,7 @@ import { whenNatureReady } from './render/nature-sprites.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { UI, esc } from './ui/ui.js';
-import { World, makeHeroActor, makeMobActor, makeSpiritActor } from './game/sim.js';
+import { World, makeHeroActor, makeMobActor, makeSpiritActor, SPIRIT_FETCH, SPIRIT_PICK_ALL, spiritWants, RUN_ZONES } from './game/sim.js';
 import { waterWaypoint } from './game/ai.js';
 import { questTarget, guideGoal, pickTracked, trackerText, buildNavGrid, findPath, followPath, lineFree, autoPauseReason } from './core/autopath.js';
 import { makeRng } from './core/rng.js';
@@ -38,7 +38,9 @@ import { QUESTS } from './data/quests.js';
 import { ACH } from './data/achievements.js';
 import { PRICES, SCROLL_MAX, buildShopStock, sellValue, harborSellValue, harborPrice, needsSellConfirm } from './shop.js';
 import { TouchControls } from './touch.js';
-import { interactTarget, carryCast } from './touch-logic.js';
+import { interactTarget, carryCast, stepAutoMount } from './touch-logic.js';
+import { MOUNTS, MOUNT_REASONS, MOUNT_AUTO_DELAY, WHISTLE } from './data/mounts.js';
+import { ownedMounts, activeMount, mountProblem, useWhistle, addWhistles } from './core/mounts.js';
 import { PHOENIX, applyDeath, hasDeathPenalty, setCheckpoint, respawnPoint } from './core/phoenix.js';
 import { QualityGovernor } from './quality-governor.js';
 import { loadPrefs, savePrefs, changePref, resolveQuality, resolveScale } from './prefs.js';
@@ -71,6 +73,7 @@ class Game {
     this.ui = new UI(this);
     this.prefs = loadPrefs();
     this.qgov = new QualityGovernor();
+    this.autoMountSt = { t: 0, hold: false }; // estado do "montar automático" (touch-logic.js stepAutoMount); antes do TouchControls, que lê mountUiOk
     this.touch = new TouchControls(this);
     this.portrait = matchMedia('(orientation: portrait) and (pointer: coarse)');
     this.applyPrefs();
@@ -231,6 +234,9 @@ class Game {
       case 'buy-seal': this.buySealAsk(); break;
       case 'sort-inv': this.sortInventory(); break;
       case 'pref': this.setPref(arg); break;
+      case 'mount-toggle': this.toggleMount(); break;
+      case 'mount-set': this.setMount(arg); break;
+      case 'mount-whistle': this.useWhistleItem(); break;
       case 'fullscreen': this.toggleFullscreen(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'buy-potion': this.buyPotion(Number(arg)); break;
       case 'buy-scroll': this.buyScroll(Number(arg)); break;
@@ -598,6 +604,7 @@ class Game {
     if (r.items) parts.push(`${r.items} item(ns)`);
     if (r.frags) parts.push(`+${r.frags} Fragmento(s) de Eco`);
     if (r.potions) parts.push(`+${r.potions} 🧪`);
+    if (r.whistles) { parts.push(`+${r.whistles} ${WHISTLE.name}`); this.ui.toast(WHISTLE.name + '!', 'Use em Personagem > Montarias para chamar uma montaria.', 'gold'); }
     if (parts.length) this.ui.log(parts.join(' · '), '#ffd27a');
     if (r.deaths) { // queda na instância: o servidor já cobrou (ou gastou o Amuleto da Fênix)
       const dr = { saved: (r.deathsSaved ?? 0) >= r.deaths, gold: r.lostGold ?? 0, xp: r.lostXp ?? 0 };
@@ -640,6 +647,7 @@ class Game {
       try { const r = await this.online.getCharacter(this.charId); this.char = r.character; this.cloud.attach(this.charId, r.rev, () => this.char, { paused: this.inNetZone() }); } catch { /* o próximo lote relê */ }
     } else if (m.op === 'potion') this.char.potions = m.potions;
     else if (m.op === 'spirit_set') this.char.activeSpirit = m.spirit;
+    this.syncMountActor(); // montarias novas (missão do lobo, Apito) ou escolha trocada: o ator local acompanha o documento oficial
     free();
     this.refreshShopStocks();
     if (this.player && !this.inNetZone() && this.mode === 'explore') this.refreshStats();
@@ -714,7 +722,14 @@ class Game {
       case 'swing': {
         if (!a) break;
         a.swing = 0.25;
-        const b = a.kind === 'mob' || !CLASSES[a.classId] ? null : basicOf(a.classId, a.spec);
+        if (a.kind === 'mob') { // mesmo ataque básico da simulação (sim.js basicSpec): projétil do atirador/mago ou corte branco do corpo a corpo; antes o monstro online "atacava" sem desenho
+          const M = MOBS[a.mobId], ang = e.ang ?? a.facing;
+          if (!M) break;
+          if (M.kind === 'ranged') this.netShoot(a, ang, { speed: M.projSpeed, range: M.range + 60, color: M.projColor, radius: a.boss ? 10 : 6 });
+          else w.addFx({ type: 'slash', x: a.x, y: a.y, ang, arc: 1.7, r: M.range + a.r * 0.5, t: 0, life: 0.2, color: '#ffffff' });
+          break;
+        }
+        const b = !CLASSES[a.classId] ? null : basicOf(a.classId, a.spec);
         if (!b) break;
         if (b.kind === 'melee') w.addFx({ type: 'slash', x: a.x, y: a.y, ang: e.ang ?? a.facing, arc: b.arc, r: b.range, t: 0, life: 0.2, color: b.color });
         else this.netShoot(a, e.ang ?? a.facing, b);
@@ -732,6 +747,12 @@ class Game {
         else { w.burst(a.x, a.y, s.color ?? '#fff', 14, 150); }
         break;
       }
+      case 'loot': { // butim do MEU abate (o servidor já gravou): vira drop só visual no chão para o spirit buscar (netSpiritFetch); nada é dado por ele
+        if (!this.player || e.to !== this.player.netId || !this.inNetZone()) break;
+        const KIND = { i: 'item', p: 'potion', e: 'essence' };
+        e.d.forEach(([k, r], i) => { const ang = i * 2.4, v = 60 + (i % 3) * 25; w.drops.push({ kind: KIND[k] ?? 'item', item: { rarity: ['common', 'uncommon', 'rare', 'epic', 'legendary'][r] ?? 'common', name: '' }, amount: 1, x: e.x, y: e.y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, t: 0, cosmetic: true }); });
+        break;
+      }
       case 'death': { const t = this.netEntity(e.actor); if (t) w.burst(t.x, t.y, t.kind === 'mob' ? MOBS[t.mobId]?.color ?? '#fff' : '#ffffff', 26, 220); break; }
       case 'telegraph': w.telegraphs.push({ x: e.x, y: e.y, r: e.r, t: 0, delay: e.delay, color: e.color, done: false, src: { dead: false } }); break;
       case 'boss_warn': if (e.stage === 'omen') this.ui.toast('O chão estremece…', `${e.name} desperta`, 'gold'); else this.ui.log(`<b>${e.name}</b> surgiu!`, '#ffb4a8'); break;
@@ -745,6 +766,33 @@ class Game {
   }
 
   // projétil só VISUAL (o dano vem do servidor): voa em linha reta até o alcance
+  // Spirit na instância online: o loot é gravado pelo servidor na hora, então no chão só há drops VISUAIS (d.cosmetic, evento 'loot'). O spirit voa até o drop
+  // que a opção "o que o spirit pega" aceita, traz ao herói e ele some com o texto do butim; os não aceitos somem quando o herói passa perto (ou em 8 s). Nada vai para a mochila por aqui.
+  netSpiritFetch(s, me, dt) {
+    const w = this.world, F = SPIRIT_FETCH, mask = this.prefs.spiritPick ?? SPIRIT_PICK_ALL;
+    const step = (x, y, sp) => { const d = Math.hypot(x - s.x, y - s.y), m = Math.min(d, sp * dt); if (d > 0) { s.x += (x - s.x) / d * m; s.y += (y - s.y) / d * m; } };
+    const show = (d) => { d.taken = true; const R = d.kind === 'item' ? RARITY[d.item.rarity] : null; w.addText({ x: me.x, y: me.y - 34, t: 0, life: 0.9, text: R ? R.name : d.kind === 'potion' ? '🧪' : '✦', size: 12, color: R ? R.color : '#ff9aa8' }); };
+    for (const d of w.drops) if (d.cosmetic && !d.taken && !d.carried && (d.t > 8 || (!spiritWants(mask, d) && d.t > 0.5 && Math.hypot(d.x - me.x, d.y - me.y) < 60))) d.taken = true;
+    if (me.dead || (me.lastDamaged ?? -99) > w.time - 3 || (me.lastDealt ?? -99) > w.time - 3) { if (s.cf) s.cf.carried = false; s.cf = null; } // em combate o spirit larga tudo e volta (igual ao jogo offline)
+    let d = s.cf;
+    if (d && (d.taken || !w.drops.includes(d))) d = s.cf = null;
+    if (!d) {
+      let best = Infinity;
+      if (!me.dead && !((me.lastDamaged ?? -99) > w.time - 3) && !((me.lastDealt ?? -99) > w.time - 3)) for (const c of w.drops) {
+        if (!c.cosmetic || c.taken || c.carried || c.t < 0.4 || !spiritWants(mask, c) || Math.hypot(c.x - me.x, c.y - me.y) > F.range) continue;
+        const dd = Math.hypot(c.x - s.x, c.y - s.y); if (dd < best) { best = dd; d = c; }
+      }
+      if (!d) { w.drops = w.drops.filter((x) => !x.taken); return false; }
+      s.cf = d;
+    }
+    if (d.carried) {
+      if (Math.hypot(me.x - s.x, me.y - s.y) <= F.hand) { show(d); s.cf = null; w.drops = w.drops.filter((x) => !x.taken); return false; }
+      step(me.x, me.y, F.speed); d.x = s.x; d.y = s.y; return true;
+    }
+    if (Math.hypot(d.x - s.x, d.y - s.y) <= F.grab) { d.carried = true; return true; }
+    step(d.x, d.y, F.speed); return true;
+  }
+
   netShoot(a, ang, spec) {
     this.world.projectiles.push({ x: a.x + Math.cos(ang) * (a.r + 4), y: a.y + Math.sin(ang) * (a.r + 4), vx: Math.cos(ang) * spec.speed, vy: Math.sin(ang) * spec.speed, ang,
       team: a.team, src: a, mult: 0, radius: spec.radius ?? 6, color: spec.color ?? '#fff', range: spec.range ?? 500, traveled: 0, pierce: !!spec.pierce, explode: spec.explode ?? 0, stun: spec.stun ?? 0, hit: new Set(), dead: false, cosmetic: true });
@@ -765,11 +813,16 @@ class Game {
     }
     if (this.inNetZone() && !p.dead && this.auto) this.autoDrive(intent, dt); // instância online: o mesmo movimento normal, sem teleporte
     if (intent.cast != null) this.netCastPending = intent.cast;
+    if (this.inNetZone()) { // montaria (decisão 0018): o pedido vai uma vez só; o servidor decide e o resultado volta no snapshot (`mounted`)
+      const m = { mx: intent.mx, my: intent.my, attack: intent.attack, cast: intent.cast };
+      this.mountStep(m, dt);
+      if (m.mount === true || m.mount === false) { this.netMountPending = m.mount; this.mountReq = undefined; }
+    }
     this.netIntent = intent;
-    if (this.netInfo && this.netLast?.state !== 'over' && ((this.netT += dt) >= 1 / 30 || this.netCastPending != null)) {
+    if (this.netInfo && this.netLast?.state !== 'over' && ((this.netT += dt) >= 1 / 30 || this.netCastPending != null || this.netMountPending != null)) {
       this.netT = 0;
-      net?.sendInput({ ...intent, cast: this.netCastPending });
-      this.netCastPending = null;
+      net?.sendInput({ ...intent, cast: this.netCastPending, ...(this.netMountPending != null ? { mount: this.netMountPending } : {}) });
+      this.netCastPending = null; this.netMountPending = null;
     }
     this.updateNet(dt);
     const focus = p.dead ? ([...this.netActors.values()].find((a) => !a.dead && a.mark !== 'foe') ?? p) : p;
@@ -794,6 +847,7 @@ class Game {
       ent.dead = se.dead; ent.deadT = se.dead ? ent.deadT + dt : 0;
       ent.swing = se.swing ? Math.max(ent.swing, 0.1) : Math.max(0, ent.swing - dt);
       ent.stunT = se.stun ? 1 : 0; ent.shield = se.shield ?? 0;
+      if (!isMob) { ent.mounted = !!se.mounted; ent.mountId = se.mounted ? (se.mountId ?? ent.mountId ?? null) : ent.mountId ?? null; } // montaria: o servidor decide; a arte lê `mounted`/`mountId` (dos outros jogadores vem do snapshot)
       if (!isMob && ent !== this.player && ent.lookCode !== se.look) { ent.lookCode = se.look; const lk = decodeLook(se.look); ent.spec = lk.spec; ent.mastery = lk.tier === 2; } // aura dos outros jogadores
       ent.hitFlash = Math.max(0, (ent.hitFlash ?? 0) - dt);
       if (se.moving) ent.walk += dt * (se.spd ?? 200) / 28;
@@ -848,7 +902,7 @@ class Game {
     w.updateVisuals(dt);
     if (this.netInfo.mode === 'zone') {
       const me = this.player, k = Math.min(1, dt * 6);
-      for (const sa of w.actors) if (sa.kind === 'spirit' && sa.owner === me.id) { sa.x += (me.x - 20 - sa.x) * k; sa.y += (me.y - 10 - sa.y) * k; }
+      for (const sa of w.actors) if (sa.kind === 'spirit' && sa.owner === me.id) { if (!this.netSpiritFetch(sa, me, dt)) { sa.x += (me.x - 20 - sa.x) * k; sa.y += (me.y - 10 - sa.y) * k; } }
       this.nearChest = (w.zone.chests ?? []).find((c) => Math.hypot(c.x - me.x, c.y - me.y) < 70)?.id ?? null; // botão de interagir / dica do baú
     }
     if (this.netInfo.mode === 'zone') { if (this.deathCard && !this.player.dead && performance.now() > this.deathCard) { this.deathCard = false; this.ui.hideScreen(); } this.ui.banner(this.player.dead ? 'Você caiu… renasce no ponto salvo em instantes' : null); return; }
@@ -974,6 +1028,7 @@ class Game {
     p.level = this.char.level;
     p.spec = activeSpec(this.char); // a especialização também mexe nos atributos (data/specs.js › mods)
     p.mastery = hasMastery(this.char); // a Maestria libera a 4ª habilidade (s3)
+    this.syncMountActor(); // missão/Apito/escolha podem ter mudado a lista de montarias
   }
 
   // ---------------- preferências do aparelho ----------------
@@ -1037,11 +1092,13 @@ class Game {
         }
       }
       if (!p.dead && this.auto) this.autoDrive(intents[p.id], dt); // auto-viagem: troca o movimento pelo caminho (o joystick/ataque pausam)
+      if (intents[p.id]) this.mountStep(intents[p.id], dt); // montar automático + pedido de montar/desmontar do botão
       this.castHold = p.dead ? null : carryCast(this.castHold, intents[p.id]); // pedido de habilidade espera o próximo tick (telas de 90/120 Hz)
       this.acc = Math.min((this.acc ?? 0) + dt, FIXED_DT * MAX_TICKS);
       while (this.acc >= FIXED_DT) {
         this.acc -= FIXED_DT;
         this.tick(FIXED_DT, intents);
+        this.mountReq = undefined; // o pedido de montar/desmontar foi entregue (vale uma vez só)
         this.castHold = null; // um tick rodou: o pedido foi entregue à simulação
         if (this.world !== w) { this.acc = 0; break; } // trocou de zona no meio dos ticks
         // o toque na tecla da skill vale uma vez só, não uma por tick
@@ -1061,6 +1118,7 @@ class Game {
   // Um tick da simulação (passo fixo).
   tick(dt, intents) {
     const w = this.world, p = this.player;
+    w.spiritPick = this.prefs.spiritPick ?? SPIRIT_PICK_ALL;
     w.update(dt, intents);
     this.handleEvents();
     if (this.mode === 'explore') { w.updateSpawns(dt, p); this.checkPortals(); this.regen(dt); this.pumpTips(dt); }
@@ -1139,6 +1197,7 @@ class Game {
 
   // NPC: com missão para oferecer/entregar/acompanhar abre o diálogo; sem missão, abre direto o serviço (como antes).
   talk(npc) {
+    this.unmountForAction(); // conversar desmonta
     const c = this.char;
     const hasQuest = npc.role === 'quest' || offeredBy(c, npc.id, { server: !!this.online }).length || readyFor(c, npc.id).length || activeFor(c, npc.id).length;
     if (npc.role === 'mentor') return this.talkMentor(npc);
@@ -1231,9 +1290,11 @@ class Game {
     this.auto = { qid: g.id, target: g.target, path: null, key: '', paused: null, hp: this.player.hp, probe: { x: this.player.x, y: this.player.y, t: 0 }, fails: 0 };
     this.ui.toast('Auto-viagem', `Rumo a: ${g.target.label ?? g.tk.name}. Mexa o joystick para parar.`, '');
   }
-  autoStop(silent = false) { if (this.auto && !silent) this.ui.toast('Auto-viagem cancelada', '', ''); this.auto = null; }
+  autoStop(silent = false) { if (this.auto && !silent) this.ui.toast('Auto-viagem cancelada', '', ''); this.autoUnmount(); this.auto = null; }
+  autoUnmount() { if (this.auto?.byMount) { this.auto.byMount = false; this.unmountForAction(); } } // a auto-viagem montou o herói: desmonta ao terminar/pausar (montou por conta própria = fica como está)
   autoPause(reason) {
     if (!this.auto || this.auto.paused) return;
+    this.autoUnmount();
     this.auto.paused = reason; this.auto.path = null;
     this.ui.toast('Auto-viagem pausada', reason === 'lowhp' ? 'Vida baixa. Toque em Continuar quando estiver pronto.' : reason === 'blocked' ? 'Caminho bloqueado. Ande um pouco e tente de novo.' : 'Toque em Continuar para seguir.', '');
   }
@@ -1258,10 +1319,13 @@ class Game {
     if (!goal) return this.autoStop(true);
     const d = Math.hypot(goal.x - p.x, goal.y - p.y);
     if (!goal.portal && d <= goal.reach) {
+      this.autoUnmount(); // chegou: desmonta (se foi a auto-viagem que montou)
       this.auto = null;
       this.ui.toast('Você chegou', a.target.label ?? '', 'gold');
       return;
     }
+    // Montaria: com uma montaria e em zona permitida, a auto-viagem monta sozinha (o servidor/simulação confere combate e zona) e viaja a +50% (substitui o correr)
+    if (!p.mounted && this.mountUiOk()) { this.syncMountActor(); intent.mount = true; if (!a.byMount) a.byMount = true; }
     const key = `${w.zoneId}:${goal.x}:${goal.y}`;
     if (a.key !== key || !a.path) { // (re)calcula: zona nova, alvo novo ou travou
       a.key = key;
@@ -1317,6 +1381,7 @@ class Game {
     if (this.serverTx({ op: 'quest_turnin', id }, (m) => {
       this.ui.toast('Missão concluída!', [QUESTS[id].name, m.reward.gold ? `+${m.reward.gold} ouro` : '', m.reward.xp ? `+${m.reward.xp} XP` : ''].filter(Boolean).join(' · '), 'gold');
       for (const it of m.reward.items ?? []) this.ui.log(`Recompensa: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
+      if (m.reward.mount) { this.syncMountActor(); this.ui.toast('Nova montaria: ' + MOUNTS[m.reward.mount].name, 'Toque em Montar (fora de combate) ou escolha em Personagem.', 'gold'); }
       if (id === 'maestria') { const mu = masteryUnlock(this.char.classId, activeSpec(this.char)); this.ui.toast('Nova habilidade: ' + SKILLS[mu.id].name, SKILLS[mu.id].desc, 'gold'); }
     })) return;
     const r = turnInQuest(this.char, id, this.rng);
@@ -1324,6 +1389,7 @@ class Game {
     const R = r.reward;
     this.ui.toast('Missão concluída!', [QUESTS[id].name, R.gold ? `+${R.gold} ouro` : '', R.xp ? `+${R.xp} XP` : ''].filter(Boolean).join(' · '), 'gold');
     for (const it of R.items) this.ui.log(`Recompensa: <b style="color:${RARITY[it.rarity].color}">${it.name}</b>`);
+    if (R.mount) this.ui.toast('Nova montaria: ' + MOUNTS[R.mount].name, 'Toque em Montar (fora de combate) ou escolha em Personagem.', 'gold');
     if (R.levels) this.onLevelUp();
     this.refreshStats();
     if (id === 'maestria') { // a Maestria também ensina a habilidade do 4º slot
@@ -1335,9 +1401,54 @@ class Game {
     this.save(); this.ui.render();
   }
 
+  // ---------------- montarias (decisão 0018; regras em core/mounts.js e game/sim.js stepMount) ----------------
+  // A interface só PEDE montar/desmontar (`mountReq`, entregue uma vez à simulação como a skill); quem decide é a simulação (local offline, servidor online).
+  mountZoneOk() { return RUN_ZONES.has(this.world?.zoneId); }
+  // Botão Montar/Desmontar e toque duplo: só com montaria possuída, vivo e em zona permitida (explorando offline ou numa instância online).
+  mountUiOk() {
+    const p = this.player;
+    if (!p || p.dead || !this.char || !ownedMounts(this.char).length || !this.mountZoneOk()) return false;
+    return this.mode === 'explore' || this.inNetZone();
+  }
+  syncMountActor() { const p = this.player; if (p && this.char) { p.mounts = ownedMounts(this.char); p.mountId = activeMount(this.char); } }
+  toggleMount() {
+    const p = this.player;
+    if (!p || !this.mountUiOk()) return;
+    if (p.mounted) { this.mountReq = false; this.autoMountSt.hold = true; p.mounted = false; return; } // desmontar à mão: vale na hora e segura o "automático" até parar de andar
+    this.syncMountActor();
+    const why = mountProblem(p, { zoneOk: this.mountZoneOk(), time: this.world.time });
+    if (why) return this.ui.toast('Montaria', MOUNT_REASONS[why], '');
+    this.mountReq = true; // monta no próximo tick (a simulação confere de novo)
+    this.ui.toast(MOUNTS[p.mountId]?.name ?? 'Montaria', 'Montado: +50% de velocidade. Atacar, usar habilidade ou apanhar desmonta.', '');
+  }
+  // Ações que desmontam (conversar, abrir baú, ler placa): o pedido vale na hora no jogo offline; online o servidor desmonta ao receber `mount: false`.
+  unmountForAction() { const p = this.player; if (p?.mounted) { this.mountReq = false; p.mounted = false; } }
+  setMount(id) {
+    if (!ownedMounts(this.char).includes(id)) return;
+    if (this.serverTx({ op: 'mount_set', id }, (m) => { this.char.mount = m.mount; this.syncMountActor(); })) return;
+    this.char.mount = id; this.syncMountActor(); this.save(); this.ui.render();
+  }
+  useWhistleItem() {
+    const got = (mount) => { this.syncMountActor(); this.ui.toast(MOUNTS[mount].name + '!', 'Nova montaria. Escolha a ativa em Personagem e toque em Montar (fora de combate).', 'gold'); };
+    if (this.serverTx({ op: 'mount_use_whistle' }, (m) => got(m.mount))) return;
+    const r = useWhistle(this.char, this.rng);
+    if (!r.ok) return this.ui.toast(WHISTLE.name, r.reason, '');
+    got(r.mount); this.save(); this.ui.render();
+  }
+  // Quadro a quadro, com a intenção do jogador: "montar automático" (opção) e entrega única do pedido pendente.
+  mountStep(intent, dt) {
+    const p = this.player;
+    if (!p || p.dead) return;
+    const moving = Math.hypot(intent.mx ?? 0, intent.my ?? 0) > 0.05 && !intent.attack && intent.cast == null;
+    const ok = this.mountUiOk() && !(this.world.time - (p.lastCombat ?? -99) < 3);
+    if (stepAutoMount(this.autoMountSt, { enabled: !!this.prefs?.autoMount, moving, ok, mounted: !!p.mounted }, dt, MOUNT_AUTO_DELAY)) { this.syncMountActor(); this.mountReq = true; }
+    if (this.mountReq != null) intent.mount = this.mountReq;
+  }
+
   // Botão de interagir (toque) e tecla E: NPC por perto conversa; senão abre o baú.
   interact() {
     const t = interactTarget(this.player, this.world);
+    if (t) this.unmountForAction(); // falar/abrir baú/ler placa: desmonta
     if (this.inNetZone()) { if (this.player.dead) return; if (t?.kind === 'chest') this.useChest(t.ref.id); else if (t?.kind === 'checkpoint') this.useCheckpoint(t.ref); else if (t?.kind === 'lore') this.readLore(t.ref); return; } // instância online: baú e placa de lore (NPCs ficam nas cidades)
     if (t?.kind === 'npc') this.talk(t.ref);
     else if (t?.kind === 'chest') this.useChest(t.ref.id);
@@ -1360,12 +1471,13 @@ class Game {
   useChest(id) {
     const chest = (this.world.zone.chests ?? []).find((c) => c.id === id);
     if (!chest || (this.mode !== 'explore' && !this.inNetZone())) return;
+    this.unmountForAction(); // abrir baú desmonta
     if (this.inNetZone()) { // o servidor confere a distância, a recarga e sorteia o prêmio
       if (this.chestsOpen?.has(id)) return this.ui.log('O baú está vazio por enquanto.', '#ffb4a8');
       this.serverTx({ op: 'chest', id }, (m) => {
         this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
         this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${m.gold}`, size: 15, color: '#ffd34d' });
-        this.ui.chestReward({ gold: m.gold, item: m.item });
+        this.ui.chestReward({ gold: m.gold, item: m.item, whistle: m.whistle });
         this.chestsOpen = new Set(Object.keys(this.char.chests ?? {}).filter((k) => !chestReady(this.char, k)));
       });
       return;
@@ -1418,6 +1530,10 @@ class Game {
       if (l.kind === 'gold') { // ouro vai direto para a mochila (sem drop no chão), com texto flutuante
         this.char.gold += l.amount;
         this.world.addText({ x: this.player.x, y: this.player.y - 34, t: 0, life: 0.8, text: `+${l.amount}`, size: 13, color: '#ffd34d' });
+        continue;
+      }
+      if (l.kind === 'whistle') { // Apito de Montaria: vai direto ao personagem (sem drop no chão), com aviso
+        if (addWhistles(this.char, l.amount ?? 1) > 0) { this.ui.toast(WHISTLE.name + '!', 'Use em Personagem > Montarias para chamar uma montaria.', 'gold'); this.world.burst(m.x, m.y, '#ffd34d', 30, 260); }
         continue;
       }
       this.dropAt(m.x, m.y, l);

@@ -13,6 +13,8 @@ import { BANK_SIZE } from './bank.js';
 import { ACH, STAT_KEYS_PROGRESS } from '../data/achievements.js';
 import { CRYPT } from '../data/crypt.js';
 import { PHOENIX, stoneAt } from './phoenix.js';
+import { ownedMounts } from './mounts.js';
+import { WHISTLE } from '../data/mounts.js';
 
 export { SAVE_VERSION };
 export const SAVE_FORMAT = 'aetheria-save';
@@ -190,6 +192,11 @@ export function validate(doc) {
     for (const [id, v] of Object.entries(isObj(doc.daily) && isObj(doc.daily[k]) ? doc.daily[k] : {}).slice(0, 12)) if (/^d\d{1,7}-\d-[a-z]+-[a-z]+$/.test(id)) daily[k][id] = int(v, 0, 99, 0);
   }
 
+  // Montarias (campos aditivos, sem mudar SAVE_VERSION): lista salva + as ganhas por missão/conquista; `mount` = escolhida (precisa ser sua); Apitos = contador.
+  const mounts = ownedMounts({ mounts: Array.isArray(doc.mounts) ? doc.mounts.slice(0, 16) : [], quests, achievements });
+  const mount = mounts.includes(doc.mount) ? doc.mount : (mounts[0] ?? null);
+  const whistles = int(doc.whistles, 0, WHISTLE.max, 0);
+
   const visited = {};
   for (const id of Object.keys(isObj(doc.visited) ? doc.visited : {})) if (ZONES[id] && (ZONES[id].hub || ZONES[id].mobs)) visited[id] = 1;
   if (!isObj(doc.visited)) for (const [id, z] of Object.entries(ZONES)) if (z.mobs && z.level[0] <= level) visited[id] = 1; // saves antigos: libera o que o nível já alcança
@@ -200,9 +207,9 @@ export function validate(doc) {
     xp: int(doc.xp, 0, 1e9, 0), statPoints, alloc,
     seals: int(doc.seals, 0, SEAL_MAX, 0), specChanges: int(doc.specChanges, 0, 9999, 0), // Selos de Reespecialização e trocas pagas (histórico)
     gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0), scrolls: int(doc.scrolls, 0, 99, 0), phoenix: int(doc.phoenix, 0, PHOENIX.max, 0), // Amuletos da Fênix (core/phoenix.js)
-    equipment, inventory, bank, spirits, activeSpirit, spec,
+    equipment, inventory, bank, spirits, activeSpirit, spec, mounts, mount, whistles,
     arena: { rating: int(a.rating, 0, 5000, 1000), wins: int(a.wins, 0, 1e6, 0), losses: int(a.losses, 0, 1e6, 0), bestWave: int(a.bestWave, 0, 1e4, 0), ratings },
-    pity: { epic: int(doc.pity?.epic, 0, 9999, 0), legendary: int(doc.pity?.legendary, 0, 9999, 0), opal: int(doc.pity?.opal, 0, 99, 0) }, // proteção de azar do loot
+    pity: { epic: int(doc.pity?.epic, 0, 9999, 0), legendary: int(doc.pity?.legendary, 0, 9999, 0), opal: int(doc.pity?.opal, 0, 99, 0), ...(int(doc.pity?.whistle, 0, 999, 0) > 0 ? { whistle: int(doc.pity?.whistle, 0, 999, 0) } : {}) }, // proteção de azar do loot (whistle: chefes sem Apito, só aparece quando > 0)
     created: int(doc.created, 0, 4e12, Date.now()),
     echo: { frags: int(doc.echo?.frags, 0, CRYPT.frags.cap, 0), keys: int(doc.echo?.keys, 0, CRYPT.keyMax, 0), entry: int(doc.echo?.entry, 0, 4e12, 0) }, // Cripta dos Ecos (core/echo.js)
   };

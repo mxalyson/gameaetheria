@@ -1,0 +1,35 @@
+{
+ "frames": 1,
+ "names": [
+  "still"
+ ],
+ "sizes": {
+  "hi": {
+   "file": "wolf.webp",
+   "w": 256,
+   "h": 214,
+   "bytes_decoded": 219136
+  },
+  "lo": {
+   "file": "wolf-lo.webp",
+   "w": 160,
+   "h": 134,
+   "bytes_decoded": 85760
+  }
+ },
+ "feet": [
+  0.5048,
+  0.9308
+ ],
+ "seat": [
+  0.4727,
+  0.3442
+ ],
+ "shadow": [
+  0.4727,
+  0.9404,
+  0.3698,
+  0.0769
+ ],
+ "aspect": 1.1962
+}

@@ -1,4 +1,5 @@
 import { CLASSES } from '../data/classes.js';
+import { rollBossWhistle } from './mounts.js';
 import { CRYPT, ECHO_NAMES, ECHO_ITEM } from '../data/crypt.js';
 import { SLOTS, RARITIES, RARITY, WEAPON_TYPES, BASE_NAMES, GEAR_NAMES, EPITHETS, AFFIXES, OPAL_NAMES, SHIELD_CLASSES, SHIELD_BLOCK } from '../data/items.js';
 
@@ -128,6 +129,7 @@ export function rollMobLoot(rng, mob, playerClassId, pity = null, rewardMul = 1)
   }
   if (rng.chance(mob.boss ? 0.25 : mob.elite ? 0.05 : 0.012)) out.push({ kind: 'essence', luck: mob.boss ? 1.5 : 0.3 });
   if (rng.chance(mob.boss ? 1 : 0.04)) out.push({ kind: 'potion', amount: mob.boss ? 3 : 1 });
+  if (mob.boss && rollBossWhistle(rng, pity)) out.push({ kind: 'whistle', amount: 1 }); // Apito de Montaria (core/mounts.js): só chefes, com pity; sem pity (cooperativo) não rola
   return out;
 }
 

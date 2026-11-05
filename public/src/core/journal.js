@@ -16,6 +16,8 @@ import { makeRng, hashString } from './rng.js';
 import { grantEchoKey } from './echo.js';
 import { MENTOR_BY_ID, mentorsOfClass } from '../data/mentors.js';
 import { SPECS } from '../data/specs.js';
+import { WHISTLE } from '../data/mounts.js';
+import { addWhistles, ownedMounts } from './mounts.js';
 
 export const SERVER_TYPES = new Set(['pvp', 'coop', 'crypt']); // objetivos que só o servidor soma
 export const OFFLINE_TYPES = new Set(); // objetivos que só existem no jogo solo (vazio desde que o duelo amistoso passou a rodar online: o servidor conta a vitória)
@@ -165,7 +167,8 @@ export function turnInQuest(doc, id, rng, now = Date.now()) {
     if (doc.inventory.length < INVENTORY_SIZE) { doc.inventory.push(it); items.push(it); } else doc.gold += it.value;
   }
   const out = recordEvent(doc, { type: 'level', level: doc.level }, now);
-  return { ok: true, reward: { gold: r.gold ?? 0, xp: r.xp ?? 0, potions: r.potions ?? 0, items, levels }, achievements: out.achievements, quests: out.quests };
+  if (r.mount) doc.mounts = ownedMounts({ ...doc, mounts: [...(doc.mounts ?? []), r.mount] }); // montaria da missão (Lobo Cinzento): fica na lista do documento
+  return { ok: true, reward: { gold: r.gold ?? 0, xp: r.xp ?? 0, potions: r.potions ?? 0, items, levels, ...(r.mount ? { mount: r.mount } : {}) }, achievements: out.achievements, quests: out.quests };
 }
 
 // ---------- conquistas ----------
@@ -249,8 +252,9 @@ export function openChest(doc, chest, zoneId, rng, now = Date.now()) {
     item = generateItem(rng, lvl, { classId: doc.classId, luck: 0.25 * tier });
     if (doc.inventory.length < INVENTORY_SIZE) doc.inventory.push(item); else { doc.gold += item.value; item = { ...item, converted: true }; }
   }
+  const whistle = rng.chance(WHISTLE.chest * tier) && addWhistles(doc, 1) > 0; // Apito de Montaria (core/mounts.js): chance baixa fixa, sem pity
   const out = recordEvent(doc, { type: 'chest', zoneId }, now);
-  return { ok: true, gold, item, quests: out.quests, achievements: out.achievements };
+  return { ok: true, gold, item, whistle, quests: out.quests, achievements: out.achievements };
 }
 
 // ---------- Quadro de Contratos do Porto (missões diárias determinísticas) ----------

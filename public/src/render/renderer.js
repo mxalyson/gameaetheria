@@ -4,6 +4,7 @@ import { safeBoxScreen, placeBoxes } from './safe-box.js';
 import { asset } from '../assets-version.js';
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawAuraBack, drawAuraMotes } from './aura.js';
+import { drawMountBack, drawMountFront, mountLift, mountBaseLift } from './mount-sprites.js';
 
 let auraQ = 2; // qualidade para a aura de evolução (0 só halo, 1 meio, 2 cheio); atualizada em setQuality
 import { drawSkillVfx, drawSkillProjectile, drawBasicSlash, vfxShake, trackActors } from './skill-vfx.js';
@@ -367,6 +368,7 @@ function drawShadow(g, it) {
   const o = it.o;
   if (it.k === 'actor') {
     if (o.kind === 'spirit') { ellipse(g, o.x, o.y + 26, 7, 3); g.fill(); return; }
+    if (o.mounted && o.kind !== 'mob') return; // a montaria desenha a própria sombra (maior)
     ellipse(g, o.x, o.y + o.r * 0.8, o.r * 0.95, o.r * 0.38); g.fill();
     if (o.kind === 'mob') { ellipse(g, o.x, o.y + o.r * 0.82, o.r * 1.15, o.r * 0.44); g.fill(); } // mobs: base mais escura, destaca do chão (V28)
   } else if (it.k === 'npc') { ellipse(g, o.x, o.y + 12, 14, 5); g.fill(); }
@@ -537,8 +539,12 @@ function drawActorHero(g, a, t) {
   // visual novo (opcional, ?visual=miniatura): sprite do herói em miniatura; se ainda não carregou, cai no desenho antigo
   const feetY = a.y + 12;
   if (a.spec) drawAuraBack(g, a, t, auraQ, feetY); // aura de evolução (luz procedural atrás do herói)
+  // montado (a.mounted/a.mountId, também de outros jogadores): montaria atrás, herói sentado na sela (sobe por mountLift) e a frente da montaria cobrindo as pernas
+  const mnt = !!a.mounted && !a.dead;
+  if (mnt) { drawMountBack(g, a, t, auraQ, feetY); g.save(); g.translate(0, -mountLift(a)); }
   const r = heroSpritesEnabled() ? drawHeroSprite(g, a, t) : false;
   if (r === false) drawHero(g, a, a.classId, t, cls.color, cls.accent); // 'wait' = carregando: não desenha (a tela de carregamento cobre)
+  if (mnt) { g.restore(); drawMountFront(g, a, t, auraQ, feetY); }
   if (a.spec) drawAuraMotes(g, a, t, auraQ, feetY);
   g.restore();
   drawStatus(g, a, t);
@@ -913,11 +919,11 @@ function drawObjective(g, ob, t) {
 const _dustPrev = new WeakMap();
 function drawRunDust(g, actors, t) {
   let any = false;
-  for (const a of actors) if (a.running && a.moving && !a.dead) { any = true; break; }
+  for (const a of actors) if ((a.running || a.mounted) && a.moving && !a.dead) { any = true; break; }
   if (!any) return;
   loadVfx(); if (!vfxKitReady()) return;
   for (const a of actors) {
-    if (!a.running || !a.moving || a.dead) continue;
+    if (!(a.running || a.mounted) || !a.moving || a.dead) continue;
     const pv = _dustPrev.get(a); let dx = 0, dy = 0;
     if (pv) { dx = a.x - pv.x; dy = a.y - pv.y; const l = Math.hypot(dx, dy); if (l > 0.01) { dx /= l; dy /= l; pv.dx = dx; pv.dy = dy; } else { dx = pv.dx; dy = pv.dy; } }
     _dustPrev.set(a, { x: a.x, y: a.y, dx, dy });
@@ -936,7 +942,7 @@ function drawBars(g, a, isPlayer, placed) {
   const showMob = a.kind === 'mob' && (a.hp < a.maxHp || a.elite || a.boss);
   if (a.kind === 'mob' && !showMob) return;
   const w = a.kind === 'mob' ? Math.max(34, a.r * 2.2) : 38;
-  const top = a.y - (a.kind === 'mob' ? a.r * (MOBS[a.mobId].shape === 'treant' ? 2.6 : 1.6) : 40) - 10;
+  const top = a.y - (a.kind === 'mob' ? a.r * (MOBS[a.mobId].shape === 'treant' ? 2.6 : 1.6) : 40) - 10 - (a.kind === 'mob' ? 0 : mountBaseLift(a)); // montado: a barra sobe junto com o herói
   const x = a.x - w / 2;
   g.fillStyle = 'rgba(20,20,35,0.6)';
   g.beginPath(); g.roundRect(x - 1, top - 1, w + 2, 7, 3); g.fill();

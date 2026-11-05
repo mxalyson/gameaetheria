@@ -9,7 +9,7 @@ export const ACHIEVEMENTS = [
   { id: 'explorador', name: 'Explorador', desc: 'Abra 10 baús.', stat: 'chests', min: 10, title: 'Explorador' },
   { id: 'saqueador', name: 'Saqueador', desc: 'Abra 50 baús.', stat: 'chests', min: 50, title: 'o Saqueador' },
   { id: 'aventureiro', name: 'Aventureiro', desc: 'Alcance o nível 10.', stat: 'level', min: 10, title: 'Aventureiro' },
-  { id: 'veterano', name: 'Veterano', desc: 'Alcance o nível 20.', stat: 'level', min: 20, title: 'Veterano' },
+  { id: 'veterano', name: 'Veterano', desc: 'Alcance o nível 20. Recompensa: Grifo Dourado (montaria).', stat: 'level', min: 20, title: 'Veterano', mount: 'gryphon' }, // `mount`: montaria concedida (core/mounts.js derivedMounts)
   { id: 'lenda', name: 'Lenda de Aetheria', desc: 'Alcance o nível 30.', stat: 'level', min: 30, title: 'Lenda de Aetheria' },
   { id: 'recadeiro', name: 'Recadeiro', desc: 'Complete 5 missões.', stat: 'quests', min: 5, title: 'Recadeiro' },
   { id: 'heroi_da_vila', name: 'Herói da Vila', desc: 'Complete 10 missões.', stat: 'quests', min: 10, title: 'Herói da Vila' },

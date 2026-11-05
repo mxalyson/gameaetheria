@@ -10,6 +10,7 @@ import { xpToNext } from '../public/src/core/progression.js';
 import { PRICES } from '../public/src/shop.js';
 import { PHOENIX } from '../public/src/core/phoenix.js';
 import { SPECS, SPEC_LEVEL, SPEC_ALIASES } from '../public/src/data/specs.js';
+import { ownedMounts, derivedMounts } from '../public/src/core/mounts.js';
 
 // itemSlack: folga sobre o máximo que o gerador (core/loot.js) consegue sortear; itemLevelAhead: quantos níveis acima do herói um drop pode vir (chefes/zonas mais fortes).
 export const LIMITS = { levelJump: 2, goldBase: 5000, goldPerLevel: 800, newItems: 12, potions: 25, spirits: 3, waves: 6, statJump: 400, skillUsesJump: 1500, newQuests: 3, doneQuests: 3, newChests: 6, plusJump: 10, itemSlack: 1.15, itemLevelAhead: 10, xpPerKillMul: 3, xpFreeLevels: 1.5 };
@@ -51,6 +52,7 @@ export function sanitizeImport(doc, fresh) {
   for (const k of Object.keys(doc.equipment)) if (!ok(doc.equipment[k])) delete doc.equipment[k];
   doc.inventory = doc.inventory.filter(ok);
   doc.bank = (doc.bank ?? []).filter(ok);
+  doc.mounts = [...derivedMounts(doc)]; doc.mount = null; doc.whistles = 0; // importar não dá montaria nem Apito (só as derivadas de missão/conquista que o servidor recalcula)
   doc.scrolls = 0; doc.phoenix = 0; doc.echo = { frags: 0, keys: 0, entry: 0 }; doc.pity = { epic: 0, legendary: 0, opal: 0 }; doc.visited = { ...fresh.visited };
   return doc;
 }
@@ -78,6 +80,9 @@ export function pveProblem(old, neu) {
   if (neu.gold > old.gold) return 'pve_gold';
   if ((neu.echo?.frags ?? 0) > (old.echo?.frags ?? 0) || (neu.echo?.keys ?? 0) > (old.echo?.keys ?? 0)) return 'pve_echo';
   if (neu.potions > old.potions) return 'pve_potions';
+  if ((neu.whistles ?? 0) > (old.whistles ?? 0)) return 'pve_whistles'; // Apito de Montaria: só cai pelo lote da instância e só se gasta pela transação
+  const ownedBefore = new Set(ownedMounts(old)), earned = derivedMounts(neu);
+  for (const id of neu.mounts ?? []) if (!ownedBefore.has(id) && !earned.has(id)) return 'pve_mounts'; // montaria que não veio de missão/conquista: só a transação mount_use_whistle concede
   const had = itemIds(old);
   for (const id of itemIds(neu)) if (!had.has(id)) return 'pve_items';
   const plusOld = plusById(old);
@@ -199,6 +204,7 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   const phoenix = Math.max(0, Math.min(neu.phoenix ?? 0, opts.strictPve ? (old.phoenix ?? 0) : (old.phoenix ?? 0) + paidP));
   const checkpoint = opts.strictPve ? old.checkpoint : neu.checkpoint;
   const pity = {}; for (const k of ['epic', 'legendary', 'opal']) pity[k] = Math.min(neu.pity?.[k] ?? 0, old.pity?.[k] ?? 0);
+  const pw = Math.min(neu.pity?.whistle ?? 0, old.pity?.whistle ?? 0); if (pw > 0) pity.whistle = pw;
   // Contratos diários (core/journal.js): o dia nunca volta nem salta além de amanhã, e a entrega do dia não se desfaz (sem repetir recompensa).
   const nowDay = Math.floor(now / 86400000), od = old.daily, nd = neu.daily;
   let daily = nd;
@@ -211,6 +217,10 @@ export function checkSave(oldDoc, neuDoc, now = Date.now(), opts = {}) {
   const out = { ...neu, seals, specChanges, echo, ...(daily ? { daily } : {}), arena, stats, quests, chests, scrolls, phoenix, visited: { ...(old.visited ?? {}) }, pity, achievements: { ...old.achievements } };
   if (checkpoint) out.checkpoint = checkpoint; else delete out.checkpoint;
   checkAchievements(out, now); // as conquistas são recalculadas aqui: o cliente não "se concede" nenhuma
+  // Montarias e Apitos são do servidor: a lista oficial só cresce pela transação (Apito) ou por missão/conquista recalculadas acima; o cliente só escolhe a ativa entre as suas. Apito só cai.
+  out.mounts = ownedMounts({ ...out, mounts: old.mounts ?? [] });
+  out.mount = out.mounts.includes(neu.mount) ? neu.mount : (out.mounts[0] ?? null);
+  out.whistles = Math.min(neu.whistles ?? 0, old.whistles ?? 0);
   out.title = out.title && out.achievements[out.title] != null ? out.title : null;
   return { ok: true, doc: out };
 }

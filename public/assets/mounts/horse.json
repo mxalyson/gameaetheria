@@ -1,0 +1,35 @@
+{
+ "frames": 1,
+ "names": [
+  "still"
+ ],
+ "sizes": {
+  "hi": {
+   "file": "horse.webp",
+   "w": 256,
+   "h": 251,
+   "bytes_decoded": 257024
+  },
+  "lo": {
+   "file": "horse-lo.webp",
+   "w": 160,
+   "h": 157,
+   "bytes_decoded": 100480
+  }
+ },
+ "feet": [
+  0.4974,
+  0.9507
+ ],
+ "seat": [
+  0.5838,
+  0.4085
+ ],
+ "shadow": [
+  0.5147,
+  0.9595,
+  0.3282,
+  0.0599
+ ],
+ "aspect": 1.0194
+}

@@ -6,7 +6,7 @@ import { isSkillUnlocked, skillUnlockLevel, skillIdAt, kitIds } from './core/unl
 import { skillOf, basicOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { asset } from './assets-version.js';
-import { stickVector, stepRun, pickAim, aimModeFor, dragAim, interactTarget, isHold, HOLD_MS, skillLayout } from './touch-logic.js';
+import { stickVector, stepRun, pickAim, aimModeFor, dragAim, interactTarget, isHold, HOLD_MS, skillLayout, isHeroDoubleTap } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -32,7 +32,7 @@ export class TouchControls {
 
   // Posição e tamanho de cada botão vêm de skillLayout (touch-logic.js): variáveis CSS por botão, nenhum par se sobrepõe
   applyLayout() {
-    const L = skillLayout(innerWidth, innerHeight, this.scale), map = { atk: '.atk', s0: '.sk0', s1: '.sk1', s2: '.sk2', s3: '.sk3', pot: '.pot', act: '.act' };
+    const L = skillLayout(innerWidth, innerHeight, this.scale), map = { atk: '.atk', s0: '.sk0', s1: '.sk1', s2: '.sk2', s3: '.sk3', pot: '.pot', act: '.act', mnt: '.mnt' };
     for (const [k, sel] of Object.entries(map)) {
       const el = this.root.querySelector(sel), it = L.items[k];
       if (!el || k === 'atk') continue;
@@ -75,6 +75,7 @@ export class TouchControls {
         <div class="tbtn slot sk sk3" data-t="skill" data-i="3"><span class="icon"></span><div class="cd"></div><span class="cdt"></span></div>
         <div class="tbtn slot pot" data-t="potion"><span class="icon">🧪</span><span class="count"></span><div class="cd"></div></div>
         <div class="tbtn slot act hidden" data-t="interact"><span class="icon"></span></div>
+        <div class="tbtn slot mnt hidden" data-t="mount"><span class="icon">🐎</span><span class="lbl">Montar</span></div>
       </div>`;
 
     this.applyLayout();
@@ -104,6 +105,15 @@ export class TouchControls {
       this.move = { x: 0, y: 0, mag: 0 }; this.stickRaw = 0; this.runSt.t = 0; this.runSt.on = false;
       $('stick').classList.add('hidden');
     };
+    // Toque duplo no herói: monta/desmonta (o mesmo pedido do botão). Só conta toque curto e parado (arrastar é o joystick).
+    zone.addEventListener('pointerup', (e) => {
+      if (e.pointerId !== this.stickId || !this.origin) return;
+      const g = this.game, p = g.player;
+      if (!p || Math.hypot(e.clientX - this.origin.x, e.clientY - this.origin.y) > 14 || !g.mountUiOk?.()) { this.lastTap = null; return; }
+      const z = g.renderer?.zoom ?? 1, tap = { t: performance.now(), x: e.clientX, y: e.clientY };
+      const hero = { x: (p.x - g.cam.x) * z, y: (p.y - g.cam.y) * z }; // mesma conversão do mouse (main.js: mouse.x / zoom + cam.x)
+      if (isHeroDoubleTap(this.lastTap, tap, hero)) { this.lastTap = null; g.toggleMount(); } else this.lastTap = tap;
+    }, true);
     zone.addEventListener('pointerup', endStick);
     zone.addEventListener('pointercancel', endStick);
 
@@ -153,6 +163,7 @@ export class TouchControls {
       if (st.t === 'skill') this.castQueue.push({ i: st.i, aim: st.aim });
       else if (st.t === 'potion') g.usePotion();
       else if (st.t === 'interact') g.interact();
+      else if (st.t === 'mount') g.toggleMount();
     };
     tb.addEventListener('pointerup', (e) => release(e, true));
     tb.addEventListener('pointercancel', (e) => release(e, false));
@@ -220,6 +231,15 @@ export class TouchControls {
     setCd(pot, game.potionCd, 8, false);
     pot.querySelector('.count').textContent = String(game.char.potions);
     pot.classList.toggle('empty', !game.char.potions || game.mode === 'pvp');
+    // Montaria: botão só com montaria possuída em zona permitida; montado, ataque e habilidades ficam esmaecidos (tocar neles desmonta, sem ação: game/sim.js stepMount)
+    const mnt = this.root.querySelector('.mnt'), mOk = !!game.mountUiOk?.();
+    mnt.classList.toggle('hidden', !mOk);
+    if (mOk) {
+      const on = !!p.mounted;
+      mnt.classList.toggle('on', on);
+      const lbl = mnt.querySelector('.lbl'); if (lbl && lbl.textContent !== (on ? 'Desmontar' : 'Montar')) lbl.textContent = on ? 'Desmontar' : 'Montar';
+    }
+    this.root.classList.toggle('mounted', mOk && !!p.mounted);
     // botão contextual: balão pintado para NPC, baú para baú, cristal sobre pedra (save-point) para a Pedra de Retorno
     let tg = game.mode === 'explore' || game.inNetZone?.() ? interactTarget(p, game.world) : null;
     if (tg && game.mode !== 'explore' && tg.kind !== 'chest' && tg.kind !== 'checkpoint') tg = null; // na instância online só o baú e a Pedra de Retorno (o servidor confere)

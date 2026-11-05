@@ -97,7 +97,7 @@ export function interactTarget(player, world) {
 //  anel 1 (raio 84, passo 45°): s0 à esquerda, s1 na diagonal, s2 em cima; anel 2 (raio 150): Maestria (s3) entre s1 e s2;
 //  poção à esquerda de s0; interagir (baú/NPC/pedra) acima da poção, à esquerda do arco.
 export const TB_GAP = 1.15, TB_MIN_SCALE = 0.8, TB_RIGHT = 10, TB_BOTTOM = 8;
-export const TB_R = { atk: 44, sk: 25, mastery: 27, pot: 25, act: 30 }; // raios (px do contêiner)
+export const TB_R = { atk: 44, sk: 25, mastery: 27, pot: 25, act: 30, mnt: 28 }; // raios (px do contêiner)
 const RING1 = 84, RING2 = 150, STEP = Math.PI / 4;
 export const TB_SIZE = { w: 236, h: 214 }; // contêiner (cabe a Maestria no anel 2 e a poção/interagir à esquerda)
 
@@ -116,6 +116,7 @@ export function skillLayout(vw, vh, ui = 1, { right = 0, bottom = 0 } = {}) {
   };
   items.pot = { x: items.s0.x + 62, y: A.y, r: TB_R.pot };
   items.act = { x: items.pot.x, y: items.pot.y + 66, r: TB_R.act };
+  items.mnt = { x: items.act.x, y: items.act.y + 68, r: TB_R.mnt }; // Montar/Desmontar: acima de "interagir", só aparece com montaria possuída em zona permitida
   const ox = TB_RIGHT + right, oy = TB_BOTTOM + bottom; // folga da borda (incl. área segura)
   for (const k of Object.keys(items)) {
     const it = items[k];
@@ -134,4 +135,21 @@ export function carryCast(hold, intent) {
   if (intent.cast != null) return { cast: intent.cast, aimX: intent.aimX, aimY: intent.aimY };
   if (hold) { intent.cast = hold.cast; intent.aimX = hold.aimX; intent.aimY = hold.aimY; }
   return hold;
+}
+
+// ---------- montaria (decisão 0018) ----------
+// "Montar automático" (opção do aparelho, padrão desligada): andar fora de combate por `delay` s monta sozinho. st = { t, hold }: `hold` = o jogador desmontou à mão e não quer montar de novo
+// até parar de andar (o toque no botão vale mais que a opção). Devolve true no quadro em que deve pedir para montar.
+export function stepAutoMount(st, { enabled, moving, ok, mounted }, dt, delay = 1.5) {
+  if (!moving) { st.t = 0; st.hold = false; return false; }
+  if (!enabled || !ok || mounted || st.hold) { st.t = 0; return false; }
+  st.t += dt;
+  if (st.t < delay) return false;
+  st.t = 0;
+  return true;
+}
+// Toque duplo no herói: dois toques a até `ms` ms um do outro, perto um do outro (px) e o último sobre o herói (raio `r`, px de tela).
+export function isHeroDoubleTap(prev, tap, hero, { ms = 350, gap = 44, r = 64 } = {}) {
+  if (!prev || !tap || !hero) return false;
+  return tap.t - prev.t <= ms && Math.hypot(tap.x - prev.x, tap.y - prev.y) <= gap && Math.hypot(tap.x - hero.x, tap.y - hero.y) <= r;
 }

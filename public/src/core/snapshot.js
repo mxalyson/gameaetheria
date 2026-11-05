@@ -2,7 +2,8 @@
 // `match_found` / `n`; cada snapshot leva só as entidades que mudaram (tuplas curtas); a cada KEYFRAME_EVERY snapshots (e quando alguém
 // reconecta) vai um quadro-chave completo. WebSocket entrega em ordem e sem perda, então deltas são seguros. Este arquivo é o DECODIFICADOR
 // (cliente e testes); o codificador está em server/snapshot.js. O decodificador devolve o mesmo formato "completo" que os consumidores já usavam.
-export const F = { DEAD: 1, MOVING: 2, SWING: 4, STUN: 8, OFFLINE: 16 };
+import { mountFromCode } from './mounts.js';
+export const F = { DEAD: 1, MOVING: 2, SWING: 4, STUN: 8, OFFLINE: 16, MOUNTED: 32 }; // MOUNTED: montado (o 9º elemento da tupla traz o código da montaria); cliente antigo ignora o bit
 export const KEYFRAME_EVERY = 20; // snapshots (≈ 1 s a 20 Hz)
 
 export class SnapshotDecoder {
@@ -27,6 +28,7 @@ export class SnapshotDecoder {
       a.dead = !!(t[5] & F.DEAD); a.moving = !!(t[5] & F.MOVING); a.swing = !!(t[5] & F.SWING); a.stun = !!(t[5] & F.STUN); a.online = !(t[5] & F.OFFLINE);
       a.shield = t[6] ?? 0;
       a.look = t[7] ?? 0; // aura de evolução (core/aura.js decodeLook); ausente = 0
+      a.mounted = !!(t[5] & F.MOUNTED); a.mountId = a.mounted ? mountFromCode(t[8]) : null; // montaria dos outros jogadores (a arte lê `mounted` e `mountId`)
     }
     for (const n of msg.n ?? []) this.mobs.set(n.id, { id: n.id, mob: n.mob, level: n.level, boss: !!n.boss, elite: !!n.elite, miniboss: !!n.mb, name: n.nm, r: n.r, summoned: !!n.su, camp: n.cp, maxHp: n.maxHp, x: 0, y: 0, hp: n.maxHp, facing: 0, dead: false, moving: false, swing: false, _seen: true });
     for (const t of msg.m ?? []) {

@@ -7,7 +7,9 @@ export const SCALE_MAX = 150;
 export const SCALE_STEP = 10;
 export const QUALITIES = ['auto', 'high', 'medium', 'low'];
 export const CONTROLS = ['auto', 'touch', 'keyboard'];
-const DEFAULTS = { scale: 'auto', quality: 'auto', controls: 'auto' };
+// spiritPick: máscara do que o spirit busca (bits 0-4 = raridade comum..lendário, 5 = poções, 6 = essências; game/sim.js SPIRIT_PICK_ALL = 127)
+export const SPIRIT_PICK_ALL = 0b1111111;
+const DEFAULTS = { scale: 'auto', quality: 'auto', controls: 'auto', spiritPick: SPIRIT_PICK_ALL, autoMount: false };
 
 // Escala automática da interface (%): acompanha a viewport (referência 1250×575 pt, piso 60%, teto 100%).
 // Celular deitado (iPhone 874×402) cai para ~70% (84% ainda deixava painéis ocupando a tela toda); tela de 1250×575 ou mais fica em 100%. O tamanho manual (60–150%) continua nas Opções.
@@ -22,6 +24,8 @@ const clean = (p) => ({
   scale: p.scale === 'auto' ? 'auto' : Math.max(SCALE_MIN, Math.min(SCALE_MAX, Math.round(Number(p.scale) / SCALE_STEP) * SCALE_STEP || DEFAULTS.scale)),
   quality: QUALITIES.includes(p.quality) ? p.quality : DEFAULTS.quality,
   controls: CONTROLS.includes(p.controls) ? p.controls : DEFAULTS.controls,
+  spiritPick: Number.isInteger(p.spiritPick) ? p.spiritPick & SPIRIT_PICK_ALL : SPIRIT_PICK_ALL,
+  autoMount: p.autoMount === true, // "Montar automático" (decisão 0018): padrão desligado
 });
 
 export function loadPrefs() {
@@ -39,6 +43,8 @@ export function changePref(prefs, arg, w, h) {
   if (key === 'scale' && val === 'auto') next.scale = 'auto';
   else if (key === 'scale') next.scale = resolveScale(prefs, w, h) + (val.startsWith('+') || val.startsWith('-') ? Number(val) : Number(val) - resolveScale(prefs, w, h));
   else if (key === 'quality' || key === 'controls') next[key] = val;
+  else if (key === 'autoMount') next.autoMount = val === 'on'; // 'on' | 'off'
+  else if (key === 'spiritPick') next.spiritPick = val === 'all' ? SPIRIT_PICK_ALL : val === 'none' ? 0 : prefs.spiritPick ^ (1 << Number(val)); // 'all' | 'none' | número do bit para alternar
   return clean(next);
 }
 
