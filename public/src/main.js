@@ -262,6 +262,7 @@ class Game {
       case 'sell': this.sell(arg); break;
       case 'buy-essence': this.buyEssence(arg); break;
       case 'spirit-on': this.setSpirit(arg); break;
+      case 'spirit-tab': this.ui.spTab = arg === 'pick' ? 'pick' : 'list'; this.ui.render(); break; // abas do painel de spirits: lista × o que o spirit pega
       case 'spirit-free': this.freeSpirit(arg); break;
       case 'spirit-evolve': this.evolveSpirit(arg); break;
       case 'teleport': this.teleport(arg); break;
@@ -934,7 +935,12 @@ class Game {
     w.updateVisuals(dt);
     if (this.netInfo.mode === 'zone') {
       const me = this.player, k = Math.min(1, dt * 6);
-      for (const sa of w.actors) if (sa.kind === 'spirit' && sa.owner === me.id) { sa.x += (me.x - 20 - sa.x) * k; sa.y += (me.y - 10 - sa.y) * k; }
+      me.spiritPick = this.prefs.spiritPick ?? SPIRIT_PICK_ALL;
+      for (const sa of w.actors) if (sa.kind === 'spirit' && sa.owner === me.id) {
+        // o servidor decide e grava a coleta (zone_pickup); aqui o spirit visual voa até o drop com a MESMA busca da simulação (game/sim.js updateSpiritFetch), então a animação aparece online também
+        if (!w.updateSpiritFetch(sa, me, dt)) { sa.x += (me.x - 20 - sa.x) * k; sa.y += (me.y - 10 - sa.y) * k; }
+      }
+      w.events.length = 0; // o evento 'pickup' da busca visual não é usado online (eventos vêm do servidor)
       this.nearChest = (w.zone.chests ?? []).find((c) => Math.hypot(c.x - me.x, c.y - me.y) < 70)?.id ?? null; // botão de interagir / dica do baú
     }
     if (this.netInfo.mode === 'zone') { if (this.deathCard && !this.player.dead && performance.now() > this.deathCard) { this.deathCard = false; this.ui.hideScreen(); } this.ui.banner(this.player.dead ? 'Você caiu… renasce no ponto salvo em instantes' : null); return; }
@@ -1093,7 +1099,7 @@ class Game {
     this.prefs = changePref(this.prefs, arg, innerWidth, innerHeight);
     savePrefs(this.prefs);
     this.applyPrefs();
-    if (this.ui.isOpen('options')) this.ui.render();
+    if (this.ui.isOpen('options') || this.ui.isOpen('spirits')) this.ui.render();
   }
 
   toggleFullscreen() {

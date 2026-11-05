@@ -754,9 +754,16 @@ export class UI {
           <button class="btn small ghost" data-action="spirit-free" data-arg="${sp.id}">Libertar</button>
         </div></div>`;
     }).join('') : '<p class="empty-msg">Você ainda não tem spirits. Derrote monstros para achar <b>Essências</b> ou visite a Sábia Yun na vila.</p>';
+    const tab = this.spTab === 'pick' ? 'pick' : 'list', pr = this.game.prefs;
+    const tabs = `<div class="seg"><button class="btn small ${tab === 'list' ? 'sel' : ''}" data-action="spirit-tab" data-arg="list">Meus spirits</button><button class="btn small ${tab === 'pick' ? 'sel' : ''}" data-action="spirit-tab" data-arg="pick">O que o spirit pega</button></div>`;
+    const pick = `<p class="hint">O spirit ativo busca no chão só o que estiver marcado; o resto você pega andando por cima. Vale online e offline e fica salvo neste aparelho.</p>
+      <div class="opt-row"><b>Itens por raridade</b><div class="seg wrap">${[['Comum', 0], ['Incomum', 1], ['Raro', 2], ['Épico', 3], ['Lendário', 4]].map(([label, bit]) => `<button class="btn small ${(pr.spiritPick >> bit) & 1 ? 'sel' : ''}" data-action="pref" data-arg="spiritPick:${bit}">${label}</button>`).join('')}</div></div>
+      <div class="opt-row"><b>Outros</b><div class="seg wrap">${[['Poções', 5], ['Essências', 6]].map(([label, bit]) => `<button class="btn small ${(pr.spiritPick >> bit) & 1 ? 'sel' : ''}" data-action="pref" data-arg="spiritPick:${bit}">${label}</button>`).join('')}</div></div>
+      <div class="opt-row"><b>Atalhos</b><div class="seg"><button class="btn small" data-action="pref" data-arg="spiritPick:all">Tudo</button><button class="btn small" data-action="pref" data-arg="spiritPick:none">Nada</button><button class="btn small" data-action="pref" data-arg="spiritPick:24">Só épico e lendário</button></div></div>`;
     return this.frame('spirits', `Spirits <small>${char.spirits.length}/${MAX_SPIRITS}</small>`, `
-      <p class="hint">O spirit ativo luta ao seu lado e ganha XP junto com você (até o seu nível).</p>
-      <div class="sp-list">${list}</div>`);
+      ${tabs}
+      ${tab === 'pick' ? pick : `<p class="hint">O spirit ativo luta ao seu lado e ganha XP junto com você (até o seu nível).</p>
+      <div class="sp-list">${list}</div>`}`);
   }
 
   // Lojas de itens (Mercadora Lia na Vila, Mercador do Porto): painel único; estoque aqui, mochila ao lado (tocar vende; "Selecionar vários" vende em lote). O Ferreiro Brok não vende nem compra (panel_smith).
@@ -1059,10 +1066,6 @@ export class UI {
       <p class="hint">Ligado: depois de andar 1,5 s fora de combate (com uma montaria), o herói monta sozinho. Se você desmontar à mão, ele só monta de novo depois que você parar.</p>
       <div class="opt-row"><b>Controles</b>${seg('controls', [['auto', 'Toque (padrão)'], ['keyboard', 'Teclado e mouse']])}</div>
       <p class="hint">À noite o ar escurece e as criaturas enxergam mais longe, mas dão um pouco mais de XP, ouro e itens. O ciclo de dia e noite é sempre ligado.</p>
-      <div class="opt-row"><b>O que o spirit pega</b>
-        <div class="seg wrap">${[['Comum', 0], ['Incomum', 1], ['Raro', 2], ['Épico', 3], ['Lendário', 4], ['Poções', 5], ['Essências', 6]].map(([label, bit]) => `<button class="btn small ${(pr.spiritPick >> bit) & 1 ? 'sel' : ''}" data-action="pref" data-arg="spiritPick:${bit}">${label}</button>`).join('')}
-        <button class="btn small" data-action="pref" data-arg="spiritPick:all">Tudo</button><button class="btn small" data-action="pref" data-arg="spiritPick:none">Nada</button></div></div>
-      <p class="hint">O spirit só busca no chão o que estiver marcado; o resto você pega andando por cima. Vale também online.</p>
       ${['music', 'sfx'].map((k) => `<div class="opt-row"><b>${k === 'music' ? 'Música' : 'Efeitos sonoros'}</b>
         <div class="seg"><button class="btn small" data-action="pref" data-arg="${k}:-10" ${pr[k] <= 0 ? 'disabled' : ''}>−</button>
         <span class="opt-val">${pr[k] ? pr[k] + '%' : 'desligado'}</span>
