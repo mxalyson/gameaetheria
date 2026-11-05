@@ -72,3 +72,6 @@ Baixados em 2026-11-04; licença conferida na página de cada um. Convertidos pa
 - **Medieval: The Bard's Tale (loop)** — RandomMind, CC0: https://opengameart.org/content/medieval-the-bards-tale (`music/explore.mp3`, mapas de exploração).
 - **Heartfelt Battle (loopable)** — request, CC0: https://opengameart.org/content/heartfelt-battle-loopable-fantasy-stringspianohorn (`music/battle.mp3`, chefes, arena, ondas e Cripta).
 Texto sugerido para a tela de créditos: "Sons: Kenney, rubberduck · Música: cynicmusic, RandomMind, request (CC0, OpenGameArt)".
+
+## Montarias (Meshy, CC BY 4.0)
+Lobo, cavalo e grifo dourado: modelos 3D gerados no Meshy a partir das imagens do proprietário, fotografados em 8 direções por `tools/mount-bake.mjs` (`public/assets/mounts/*-3d*`). Mesma licença dos demais modelos Meshy (CC BY 4.0); os GLB ficam fora do Git.

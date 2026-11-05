@@ -51,8 +51,10 @@ if (process.argv[1]?.endsWith('texture-budget.mjs')) {
     console.log('\nMontarias (MiB decodificados; alta = média, baixa = -lo):');
     const mb = [];
     for (const id of ['wolf', 'horse', 'gryphon']) {
-      const m = JSON.parse(readFileSync(join(MDIR, id + '.json'), 'utf8')); mb.push([m.sizes.hi.bytes_decoded, m.sizes.lo.bytes_decoded]);
-      console.log(`  ${id}`.padEnd(22) + `${mib(m.sizes.hi.bytes_decoded)} alta ${mib(m.sizes.lo.bytes_decoded)} baixa   (${m.frames} quadro(s); meta ≤ 8 MiB)`);
+      // arte 3D (8 direções) + a 2D antiga de reserva (as duas ficam decodificadas enquanto a montaria está em cache)
+      const m2 = JSON.parse(readFileSync(join(MDIR, id + '.json'), 'utf8')), f3 = join(MDIR, id + '-3d.json'), m3 = existsSync(f3) ? JSON.parse(readFileSync(f3, 'utf8')) : null;
+      const hi = (m3?.sizes.hi.bytes_decoded ?? 0) + m2.sizes.hi.bytes_decoded, lo = (m3?.sizes.lo.bytes_decoded ?? 0) + m2.sizes.lo.bytes_decoded; mb.push([hi, lo]);
+      console.log(`  ${id}`.padEnd(22) + `${mib(hi)} alta ${mib(lo)} baixa   (${m3 ? `3D: 8 dir x ${m3.cols} quadros + 2D reserva` : `${m2.frames} quadro(s)`}; meta ≤ 8 MiB)`);
     }
     const top2 = (i) => mb.map((x) => x[i]).sort((x, y) => y - x).slice(0, 2).reduce((x, y) => x + y, 0);
     console.log('  pior par carregado'.padEnd(22) + `${mib(top2(0))} alta ${mib(top2(1))} baixa`);

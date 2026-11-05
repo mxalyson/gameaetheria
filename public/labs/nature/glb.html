@@ -58,6 +58,15 @@ window.loadGlb = async (file) => {
   return parts.map((p, i) => ({ idx: i, tris: p.tris, size: p.size.toArray().map((v) => +v.toFixed(3)), center: p.center.toArray().map((v) => +v.toFixed(3)), min: p.bb.min.toArray().map((v) => +v.toFixed(3)) }));
 };
 
+// Gira as peças `idx` em torno do eixo Y pelo centro da caixa delas (corrige modelos que não olham para +Z). Devolve o mesmo formato de loadGlb.
+window.yawParts = (idx, deg) => {
+  const list = idx < 0 ? parts : Array.isArray(idx) ? idx.map((i) => parts[i]) : [parts[idx]], a = deg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a), bb = new THREE.Box3(); for (const p of list) bb.union(p.bb);
+  const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+  for (const p of list) { const A = p.geo.attributes.position.array, N = p.geo.attributes.normal?.array;
+    for (let v = 0; v < A.length; v += 3) { const x = A[v] - cx, z = A[v + 2] - cz; A[v] = x * c + z * sn + cx; A[v + 2] = -x * sn + z * c + cz; if (N) { const nx = N[v], nz = N[v + 2]; N[v] = nx * c + nz * sn; N[v + 2] = -nx * sn + nz * c; } }
+    p.geo.attributes.position.needsUpdate = true; if (N) p.geo.attributes.normal.needsUpdate = true; p.geo.computeBoundingBox(); p.bb = p.geo.boundingBox; p.center = p.bb.getCenter(new THREE.Vector3()); p.size = p.bb.getSize(new THREE.Vector3()); }
+  return parts.map((p, i) => ({ idx: i, tris: p.tris, size: p.size.toArray().map((v) => +v.toFixed(3)), center: p.center.toArray().map((v) => +v.toFixed(3)), min: p.bb.min.toArray().map((v) => +v.toFixed(3)) }));
+};
 function cameraFor(box, el, ppmWanted) {
   const E = THREE.MathUtils.degToRad(el), dist = 30, cam = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 200);
   cam.position.set(0, Math.sin(E) * dist, Math.cos(E) * dist); cam.lookAt(0, 0, 0); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
@@ -141,7 +150,21 @@ function deformHeavy(style, Hm, Dz, Dx) {
     return [X, Y * cp - Z * sn, Y * sn + Z * cp];
   };
 }
+// 'flap' (montaria voadora): as asas giram em torno do ombro (eixo Z do modelo, só a parte afastada do corpo), o corpo sobe na batida para baixo e a cauda/patas atrasam.
+function deformFlap(Hm, Dz, Dx) {
+  const x0 = Dx * 0.16, y0 = Hm * 0.52;
+  return (x, y, z, t) => {
+    const T = 2 * Math.PI * t, s = Math.sin(T), u = Math.abs(x) / Dx, w = clamp01((u - 0.16) / 0.3), sg = x >= 0 ? 1 : -1;
+    const phi = w * (0.5 + 0.5 * s) * 1.1 - w * 0.0; // 0 = erguida, 1,1 rad = batida para baixo
+    const lx = Math.abs(x) - x0 * w, ly = y - y0, c = Math.cos(phi), sn = Math.sin(phi);
+    const nx = lx * c + ly * sn + x0 * w, ny = -lx * sn + ly * c + y0;
+    const low = clamp01(1 - y / (Hm * 0.5)), lag = 0.035 * Hm * low * Math.sin(T - 0.9), tail = clamp01((-z / Dz - 0.3) / 0.7);
+    const bob = 0.045 * Hm * s;
+    return [sg * nx, ny + bob + lag, z + tail * 0.02 * Hm * Math.sin(T - 1)];
+  };
+}
 function deformFor(style, Hm, Dz, Dx) {
+  if (style === 'flap') return deformFlap(Hm, Dz, Dx);
   if (style === 'stomp' || style === 'float' || style === 'prowl') return deformHeavy(style, Hm, Dz, Dx);
   return (x, y, z, t) => {
     const T = 2 * Math.PI * t, s = Math.sin(T), c = Math.cos(T), h = y / Hm;
@@ -156,23 +179,26 @@ function deformFor(style, Hm, Dz, Dx) {
     return [x + tail * 0.14 * Hm * Math.sin(2 * T + 1), y2, z2];
   };
 }
-window.bakeAnim = async (idx, { style = 'hop', frames = 6, el = 40, max = 128, aa = 2, pad = 0.05 } = {}) => {
+window.bakeAnim = async (idx, { style = 'hop', frames = 6, el = 40, max = 128, aa = 2, pad = 0.05, idle = false, track = null } = {}) => {
   const list = idx < 0 ? parts : Array.isArray(idx) ? idx.map((i) => parts[i]) : [parts[idx]], bb = new THREE.Box3(); for (const p of list) bb.union(p.bb);
   const foot = new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.min.y, (bb.min.z + bb.max.z) / 2), sz = bb.getSize(new THREE.Vector3());
   const geos = list.map((p) => { const g = p.geo.clone(); g.translate(-foot.x, -foot.y, -foot.z); return g; });
   const orig = geos.map((g) => g.attributes.position.array.slice()), root = new THREE.Group(), group = new THREE.Group();
   for (const g of geos) { const m = new THREE.Mesh(g, material); m.frustumCulled = false; group.add(m); } root.add(group); scene.add(root);
   const fn = deformFor(style, sz.y, sz.z / 2, sz.x / 2);
-  const pose = (f) => { geos.forEach((g, i) => { const a = g.attributes.position.array, o = orig[i]; for (let v = 0; v < a.length; v += 3) { const r = fn(o[v], o[v + 1], o[v + 2], f / frames); a[v] = r[0]; a[v + 1] = r[1]; a[v + 2] = r[2]; } g.attributes.position.needsUpdate = true; g.computeBoundingBox(); }); };
+  const NF = frames + (idle ? 1 : 0); // idle: um quadro extra SEM deformação (parado)
+  const pose = (f) => { if (f >= frames) { geos.forEach((g, i) => { g.attributes.position.array.set(orig[i]); g.attributes.position.needsUpdate = true; g.computeBoundingBox(); }); return; } geos.forEach((g, i) => { const a = g.attributes.position.array, o = orig[i]; for (let v = 0; v < a.length; v += 3) { const r = fn(o[v], o[v + 1], o[v + 2], f / frames); a[v] = r[0]; a[v + 1] = r[1]; a[v + 2] = r[2]; } g.attributes.position.needsUpdate = true; g.computeBoundingBox(); }); };
   let U = { minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9 }, cam0;
-  for (let f = 0; f < frames; f++) { pose(f); for (let k = 0; k < 8; k++) { root.rotation.y = k * Math.PI / 4; root.updateMatrixWorld(true); const c = cameraFor(new THREE.Box3().setFromObject(root), el); cam0 = c.cam; U = { minX: Math.min(U.minX, c.minX), maxX: Math.max(U.maxX, c.maxX), minY: Math.min(U.minY, c.minY), maxY: Math.max(U.maxY, c.maxY) }; } }
+  for (let f = 0; f < NF; f++) { pose(f); for (let k = 0; k < 8; k++) { root.rotation.y = k * Math.PI / 4; root.updateMatrixWorld(true); const c = cameraFor(new THREE.Box3().setFromObject(root), el); cam0 = c.cam; U = { minX: Math.min(U.minX, c.minX), maxX: Math.max(U.maxX, c.maxX), minY: Math.min(U.minY, c.minY), maxY: Math.max(U.maxY, c.maxY) }; } }
   const w0 = U.maxX - U.minX, h0 = U.maxY - U.minY, ppm = max / Math.max(w0, h0) / (1 + 2 * pad), px = pad * Math.max(w0, h0);
   const L = U.minX - px, R = U.maxX + px, B = U.minY - px, T = U.maxY + px, cam = cam0; cam.left = L; cam.right = R; cam.top = T; cam.bottom = B; cam.updateProjectionMatrix();
-  const W = Math.ceil((R - L) * ppm), H = Math.ceil((T - B) * ppm), sheet = document.createElement('canvas'); sheet.width = W * frames; sheet.height = H * 8; const sg = sheet.getContext('2d'); sg.imageSmoothingQuality = 'high';
+  const W = Math.ceil((R - L) * ppm), H = Math.ceil((T - B) * ppm), sheet = document.createElement('canvas'); sheet.width = W * NF; sheet.height = H * 8; const sg = sheet.getContext('2d'); sg.imageSmoothingQuality = 'high';
   renderer.setSize(W * aa, H * aa); renderer.setClearColor(0x000000, 0);
-  for (let f = 0; f < frames; f++) { pose(f); for (let k = 0; k < 8; k++) { root.rotation.y = k * Math.PI / 4; root.updateMatrixWorld(true); renderer.render(scene, cam); sg.drawImage(renderer.domElement, f * W, k * H, W, H); } }
+  const tracks = track ? track.map(() => Array.from({ length: 8 }, () => [])) : null, v3 = new THREE.Vector3();
+  for (let f = 0; f < NF; f++) { pose(f); for (let k = 0; k < 8; k++) { root.rotation.y = k * Math.PI / 4; root.updateMatrixWorld(true); renderer.render(scene, cam); sg.drawImage(renderer.domElement, f * W, k * H, W, H);
+    if (tracks) track.forEach((p, n) => { const r = f >= frames ? p : fn(p[0], p[1], p[2], f / frames); v3.set(r[0], r[1], r[2]).applyMatrix4(root.matrixWorld).applyMatrix4(cam.matrixWorldInverse); tracks[n][k].push([+((v3.x - L) / (R - L) * W).toFixed(1), +((T - v3.y) / (T - B) * H).toFixed(1)]); }); } }
   const o = new THREE.Vector3(0, 0, 0).applyMatrix4(cam.matrixWorldInverse); scene.remove(root);
-  return { png: sheet.toDataURL('image/png'), cell: [W, H], cols: frames, rows: 8, frames, style, ax: Math.round((o.x - L) / (R - L) * W), ay: Math.round((T - o.y) / (T - B) * H), ppm, size: sz.toArray().map((v) => +v.toFixed(3)) };
+  return { png: sheet.toDataURL('image/png'), cell: [W, H], cols: NF, rows: 8, frames, idle, tracks, style, ax: Math.round((o.x - L) / (R - L) * W), ay: Math.round((T - o.y) / (T - B) * H), ppm, size: sz.toArray().map((v) => +v.toFixed(3)) };
 };
 window.glbReady = true;
 </script>
