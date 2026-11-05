@@ -1,10 +1,20 @@
 import { CLASSES } from '../data/classes.js';
 import { rollBossWhistle } from './mounts.js';
 import { CRYPT, ECHO_NAMES, ECHO_ITEM } from '../data/crypt.js';
-import { SLOTS, RARITIES, RARITY, WEAPON_TYPES, BASE_NAMES, GEAR_NAMES, EPITHETS, AFFIXES, OPAL_NAMES, SHIELD_CLASSES, SHIELD_BLOCK } from '../data/items.js';
+import { SLOTS, RARITIES, RARITY, WEAPON_TYPES, BASE_NAMES, GEAR_NAMES, EPITHETS, AFFIXES, OPAL_NAMES, SHIELD_CLASSES, SHIELD_BLOCK, WEAPON_IMPLICIT } from '../data/items.js';
 
 let counter = 0;
 export const uid = () => Date.now().toString(36) + (counter++).toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+
+// Afixos possíveis para um item: sem repetir o que a base já tem (vida/defesa podem somar) e escudo só defensivo. O resto é sorte (como sempre foi).
+export function affixPool(slot, stats) {
+  return AFFIXES.filter((a) => (!(a.stat in stats) || a.stat === 'hp' || a.stat === 'def') && (slot !== 'offhand' || a.stat === 'hp' || a.stat === 'def'));
+}
+export function rollAffixValue(rng, a, level, rarity) {
+  return a.flat
+    ? Math.round(rng.int(a.flat[0], a.flat[1]) * rarity.mul)
+    : Math.max(1, Math.round(level * a.per * rng.range(0.7, 1.2) * rarity.mul + (a.per >= 1 ? a.per * 2 : 1)));
+}
 
 // luck > 0 desloca o peso para raridades altas.
 export function rollRarity(rng, luck = 0) {
@@ -23,9 +33,12 @@ export function generateItem(rng, level, { classId, rarityId, slot, weaponType, 
   const roll = () => rng.range(0.85, 1.15); // faixa de variação do atributo base: dois itens do mesmo tipo/raridade raramente são iguais
   const stats = {};
 
+  const primary = CLASSES[classId].primary;
   if (slot === 'weapon') {
     weaponType = weaponType ?? CLASSES[classId]?.weapon ?? rng.pick(Object.keys(WEAPON_TYPES));
     stats.atk = Math.round((6 + level * 2.4) * rarity.mul * roll());
+    // atributo implícito: toda arma traz o atributo principal da classe (arco → Agilidade), até a comum de nível 1
+    stats[primary] = Math.max(1, Math.round((1 + level * WEAPON_IMPLICIT) * rarity.mul * roll()));
   } else if (slot === 'armor') {
     stats.def = Math.round((3 + level * 1.6) * rarity.mul * roll());
     stats.hp = Math.round((10 + level * 5) * rarity.mul * roll());
@@ -40,16 +53,16 @@ export function generateItem(rng, level, { classId, rarityId, slot, weaponType, 
   // Joias sempre ganham um afixo extra (não têm atributo base).
   const nAffixes = slot === 'offhand' ? 0 : rarity.affixes + (slot === 'ring' || slot === 'amulet' ? 1 : 0); // escudo: sem afixos (defesa, vida e bloqueio já são o item; medido em npm run balance)
   // escudo: afixos só defensivos (vida/defesa); ataque e atributo principal ficam com as outras peças (não vira 7º espaço de poder)
-  const pool = AFFIXES.filter((a) => (!(a.stat in stats) || a.stat === 'hp' || a.stat === 'def') && (slot !== 'offhand' || a.stat === 'hp' || a.stat === 'def'));
+  const pool = affixPool(slot, stats);
+  const affix = {}; // só os afixos sorteados (a lapidação troca um deles; a base e o implícito ficam)
   for (let i = 0; i < nAffixes && pool.length; i++) {
     const idx = Math.floor(rng.next() * pool.length);
     // anel/amuleto: o primeiro afixo é sempre o atributo principal da classe (stats focados na classe)
-    const pi = i === 0 && (slot === 'ring' || slot === 'amulet') ? pool.findIndex((x) => x.stat === CLASSES[classId].primary) : -1;
+    const pi = i === 0 && (slot === 'ring' || slot === 'amulet') ? pool.findIndex((x) => x.stat === primary) : -1;
     const a = pool.splice(pi >= 0 ? pi : idx, 1)[0];
-    const v = a.flat
-      ? Math.round(rng.int(a.flat[0], a.flat[1]) * rarity.mul)
-      : Math.max(1, Math.round(level * a.per * rng.range(0.7, 1.2) * rarity.mul + (a.per >= 1 ? a.per * 2 : 1)));
+    const v = rollAffixValue(rng, a, level, rarity);
     stats[a.stat] = (stats[a.stat] ?? 0) + v;
+    affix[a.stat] = v;
   }
 
   let name = slot === 'weapon' ? BASE_NAMES[weaponType][tier] : GEAR_NAMES[classId][slot][tier];
@@ -57,7 +70,7 @@ export function generateItem(rng, level, { classId, rarityId, slot, weaponType, 
 
   return {
     id: uid(), kind: 'gear', name, slot, classId, weaponType: slot === 'weapon' ? weaponType : null,
-    rarity: rarity.id, level, reqLevel: Math.max(1, level - 2), stats,
+    rarity: rarity.id, level, reqLevel: Math.max(1, level - 2), stats, affix,
     value: Math.round((6 + level * 3) * rarity.mul ** 2),
   };
 }
@@ -101,6 +114,7 @@ export function generateOpalItem(rng, level, classId, forceSlot = null) {
   const cls = CLASSES[classId] ?? CLASSES.warrior;
   const it = generateItem(rng, level, weapon ? { slot: 'weapon', weaponType: cls.weapon, rarityId } : { slot: 'armor', classId, rarityId });
   for (const k of Object.keys(it.stats)) it.stats[k] = Math.round(it.stats[k] * OPAL.statMul);
+  for (const k of Object.keys(it.affix)) it.affix[k] = Math.round(it.affix[k] * OPAL.statMul);
   if (weapon) { it.stats.crit = (it.stats.crit ?? 0) + 6; it.stats.atkSpeed = (it.stats.atkSpeed ?? 0) + 6; it.stats.lifesteal = (it.stats.lifesteal ?? 0) + 4; }
   else { it.stats.vit = (it.stats.vit ?? 0) + Math.round(level * 0.6); it.stats.moveSpeed = (it.stats.moveSpeed ?? 0) + 5; it.stats.lifesteal = (it.stats.lifesteal ?? 0) + 3; }
   it.name = (weapon ? OPAL_NAMES[it.weaponType] : OPAL_NAMES.armor) + (rarityId === 'legendary' ? ' Radiante' : '');
@@ -140,6 +154,7 @@ export function generateEchoItem(rng, level, classId, slot = 'weapon') {
   const cls = CLASSES[classId] ?? CLASSES.warrior;
   const it = generateItem(rng, level, weapon ? { slot: 'weapon', weaponType: cls.weapon, rarityId: 'epic' } : { slot: 'armor', classId: cls.id ?? classId, rarityId: 'epic' });
   for (const k of Object.keys(it.stats)) it.stats[k] = Math.round(it.stats[k] * ECHO_ITEM.statMul);
+  for (const k of Object.keys(it.affix)) it.affix[k] = Math.round(it.affix[k] * ECHO_ITEM.statMul);
   for (const [k, v] of Object.entries(ECHO_ITEM[weapon ? 'weapon' : 'armor'])) it.stats[k] = (it.stats[k] ?? 0) + v;
   if (!weapon) it.stats.vit = (it.stats.vit ?? 0) + Math.round(level * ECHO_ITEM.vitPerLevel);
   it.name = weapon ? ECHO_NAMES.weapon[it.weaponType] : ECHO_NAMES.armor[it.classId];

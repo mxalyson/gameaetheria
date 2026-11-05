@@ -388,6 +388,7 @@ body.touch .menu-btns button { width: 44px; height: 40px; }
 .qlist { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
 .qlist li { opacity: .92; } .qlist li.done { color: #9be8b0; } .qlist li b { margin-left: 4px; }
 .map-link { text-align: center; color: var(--muted, #9aa3b8); font-size: 12px; margin: 2px 0; }
+.refine-btns { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
 .shop-item.locked { opacity: .6; } .shop-item.sel { outline: 2px solid #ffcf4a; border-radius: 12px; }
 
 /* ---- Celular deitado (pouca altura): só o MINIMAPA no canto (sem painel, nome da zona nem moldura) e os ícones do menu numa fileira SEMPRE visível ao lado dele.

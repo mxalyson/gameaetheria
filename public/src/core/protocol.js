@@ -41,6 +41,7 @@ export const TX_OPS = {
   respec_buy: {}, respec: { id: true }, // Mestre de Classe: comprar o Selo de Reespecialização / escolher ou trocar de especialização (o Selo é conferido e gasto no servidor)
   buy_phoenix: { n: [1, 20], shop: true }, checkpoint_set: { id: true }, // Amuleto da Fênix (preço e teto do servidor) / Pedra de Retorno (o servidor confere zona e proximidade)
   mount_use_whistle: {}, mount_set: { id: true }, // montarias: usar o Apito (o servidor sorteia a montaria e gasta o Apito) / escolher a ativa (precisa ser sua)
+  refine: { id: true }, resonate: { id: true }, // Ferreiro: lapidar (troca um atributo extra sorteado) / ressonância do Eco (leva a peça ao nível atual); core/refine.js
   craft: { id: true }, // forja do Ferreiro: item Eco (fragmentos da Cripta + ouro); id = receita (data/crypt.js ECHO_RECIPES)
 };
 const TX_ID = /^[A-Za-z0-9_:.-]{1,48}$/;

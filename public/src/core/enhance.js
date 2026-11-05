@@ -1,4 +1,4 @@
-// Aprimoramento de equipamento (ralo de ouro de fim de jogo): cada +N soma PLUS_BONUS dos atributos BASE do item, sem risco de perder o item.
+// Aprimoramento de equipamento (ralo de ouro de fim de jogo): cada +N soma PLUS_BONUS de TODOS os atributos do item (base, implícito e extras), sem risco de perder o item.
 // Custo cresce com o nível do item, a raridade e o +N atual; a venda NÃO devolve o ouro gasto (é um ralo de verdade).
 import { RARITY, SLOTS } from '../data/items.js';
 
@@ -8,12 +8,16 @@ export const LATE_FROM = 6, LATE_MUL = 0.6;
 
 export const plusMul = (item) => 1 + PLUS_BONUS * (item?.plus ?? 0);
 
+// Peso do espaço no preço: +8 numa arma rende ~+22% de dano e numa armadura ~+30% de defesa, mas num anel só ~+13%/+10%
+// (medido em 2026-11-05); joias, escudo, elmo e botas custam menos para o ouro render parecido em qualquer peça.
+export const SLOT_COST = { weapon: 1, armor: 1, helm: 0.75, boots: 0.75, ring: 0.6, amulet: 0.6, offhand: 0.6 };
+
 // Custo do próximo nível (de +n para +n+1).
 export function enhanceCost(item) {
   const n = (item.plus ?? 0) + 1;
   // G10: +6..+8 custam 60% do que a curva daria (6 lendários +8: 543 mil → ≈ 396 mil; carreira ≈ 440 mil de ouro)
   const late = n >= LATE_FROM ? LATE_MUL : 1;
-  return Math.round((60 + item.level * 15 * (1 + RARITY[item.rarity].index * 0.25) * n ** 1.6) * late);
+  return Math.round((60 + item.level * 15 * (1 + RARITY[item.rarity].index * 0.25) * n ** 1.6) * late * (SLOT_COST[item.slot] ?? 1));
 }
 
 export function findGear(char, id) {

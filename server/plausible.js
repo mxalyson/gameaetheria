@@ -5,7 +5,7 @@
 import { QUESTS } from '../public/src/data/quests.js';
 import { SERVER_STATS, STAT_KEYS_PROGRESS, FLAG_STATS } from '../public/src/data/achievements.js';
 import { ensureJournal, requirementsMet, checkAchievements, SERVER_TYPES, PVE_SERVER_TYPES, MAX_ACTIVE, isComplete, LORE_MASK } from '../public/src/core/journal.js';
-import { RARITY, AFFIXES, SHIELD_BLOCK } from '../public/src/data/items.js';
+import { RARITY, AFFIXES, SHIELD_BLOCK, WEAPON_IMPLICIT } from '../public/src/data/items.js';
 import { xpToNext } from '../public/src/core/progression.js';
 import { PRICES } from '../public/src/shop.js';
 import { PHOENIX } from '../public/src/core/phoenix.js';
@@ -24,11 +24,14 @@ export function itemCeiling(slot, rarityId, level) {
   else if (slot === 'armor') { add('def', Math.round((3 + level * 1.6) * mul * 1.15)); add('hp', Math.round((10 + level * 5) * mul * 1.15)); }
   else if (slot === 'offhand') { add('def', Math.round((0.5 + level * 0.15) * mul * 1.15)); add('hp', Math.round((1 + level * 0.25) * mul * 1.15)); add('block', SHIELD_BLOCK[rarityId]); }
   else if (slot === 'helm' || slot === 'boots') add('def', Math.round((2 + level * 0.9) * mul * 1.15));
-  const baseKeys = Object.keys(c).length;
+  // arma: atributo implícito (principal da classe, WEAPON_IMPLICIT) conta como chave de base; não soma com afixo do mesmo atributo (o sorteio não repete)
+  const implicit = slot === 'weapon' ? Math.max(1, Math.round((1 + level * WEAPON_IMPLICIT) * mul * 1.15)) : 0;
+  const baseKeys = Object.keys(c).length + (implicit ? 1 : 0);
   for (const a of AFFIXES) {
     const v = a.flat ? Math.round(a.flat[1] * mul) : Math.max(1, Math.round(level * a.per * 1.2 * mul + (a.per >= 1 ? a.per * 2 : 1)));
     if (a.stat === 'hp' || a.stat === 'def') add(a.stat, v); else c[a.stat] = v;
   }
+  if (implicit) for (const k of ['str', 'agi', 'int']) c[k] = Math.max(c[k] ?? 0, implicit);
   for (const k of Object.keys(c)) c[k] = Math.ceil(c[k] * LIMITS.itemSlack) + 1;
   const maxKeys = baseKeys + r.affixes + (slot === 'ring' || slot === 'amulet' ? 1 : 0);
   return { stats: c, maxKeys, value: Math.ceil((6 + level * 3) * mul * mul * LIMITS.itemSlack) + 1 };

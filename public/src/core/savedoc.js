@@ -86,7 +86,18 @@ function cleanItem(it) {
     ...(it.opal === true ? { opal: true } : {}), // exclusivo do último chefe
     ...(it.eco === true ? { eco: true } : {}), // item Eco da Cripta (só o servidor emite)
     ...(int(it.plus, 0, MAX_PLUS, 0) > 0 ? { plus: int(it.plus, 0, MAX_PLUS, 0) } : {}),
+    ...(isObj(it.affix) ? { affix: cleanAffix(it.affix, stats) } : {}), // afixos sorteados (core/refine.js); nunca maiores que o atributo total
+    ...(int(it.rerolls, 0, 999, 0) > 0 ? { rerolls: int(it.rerolls, 0, 999, 0) } : {}),
   };
+}
+
+function cleanAffix(aff, stats) {
+  const out = {};
+  for (const [k, v] of Object.entries(aff)) {
+    const n = Math.round(Number(v));
+    if (k in stats && Number.isFinite(n) && n > 0) out[k] = Math.min(n, stats[k]);
+  }
+  return out;
 }
 
 function cleanSpirit(sp) {

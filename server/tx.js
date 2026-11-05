@@ -14,6 +14,7 @@ import { validate } from '../public/src/core/savedoc.js';
 import { QUESTS } from '../public/src/data/quests.js';
 import { CLASSES } from '../public/src/data/classes.js';
 import { craftEcho } from '../public/src/core/echo.js';
+import { refine, resonate } from '../public/src/core/refine.js';
 import { chooseSpec, buySeal } from '../public/src/core/specs.js';
 import { MENTOR_BY_ID } from '../public/src/data/mentors.js';
 import { PHOENIX, setCheckpoint } from '../public/src/core/phoenix.js';
@@ -36,7 +37,7 @@ export function placeProblem(op, { inZone, hubAt, shop = 'town' }) {
   const harborOnly = op === 'bank_deposit' || op === 'bank_withdraw' || op === 'claim_daily' || op === 'recycle' || op === 'mentor_talk';
   if (harborOnly && hubAt !== 'harbor') return 'not_here';
   if (shop === 'harbor' && hubAt !== 'harbor') return 'not_here';
-  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'buy_phoenix', 'sell', 'sell_bulk', 'craft', 'respec_buy'].includes(op)) return 'not_here'; // lojas da Vila só na Vila (o Selo é do Mestre de Classe); escolher/trocar especialização (`respec`) vale também nos mentores do Porto
+  if (shop === 'town' && hubAt && ['buy_item', 'buy_potion', 'buy_scroll', 'buy_phoenix', 'sell', 'sell_bulk', 'craft', 'resonate', 'respec_buy'].includes(op)) return 'not_here'; // lojas da Vila só na Vila (o Selo é do Mestre de Classe); escolher/trocar especialização (`respec`) vale também nos mentores do Porto
   return null;
 }
 
@@ -236,6 +237,19 @@ export function runTx(doc, m, ctx) {
       if (!r.ok) fail(r.reason);
       const ev = recordEvent(c, { type: 'spiritStage', count: evolvedSpirits(c) }, now); // objetivo spiritStage contado aqui, não no cliente
       Object.assign(s, { cost: r.cost, type: c.spirits.find((x) => x.id === m.id).type, quests: questsReady(ev), achievements: ev.achievements });
+      break;
+    }
+    case 'refine': { // Lapidação: o servidor sorteia a linha que sai e o afixo que entra (core/refine.js)
+      const r = refine(c, m.id, ctx.rng);
+      if (!r.ok) fail(r.reason);
+      recordEvent(c, { type: 'upgrade' }, now);
+      Object.assign(s, { cost: r.cost, out: r.out, in: r.in, name: r.name });
+      break;
+    }
+    case 'resonate': { // Ressonância do Eco: refaz a peça no nível atual (fragmentos + ouro)
+      const r = resonate(c, m.id, ctx.rng);
+      if (!r.ok) fail(r.reason);
+      Object.assign(s, { frags: r.frags, cost: r.gold, from: r.from, to: r.to, name: r.name, fragsTotal: c.echo.frags });
       break;
     }
     case 'craft': { // Ferreiro Brok: 1 arma e 1 armadura Eco por personagem (core/echo.js); fragmentos só vêm da Cripta (lote da instância)

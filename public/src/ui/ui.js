@@ -17,6 +17,7 @@ import { PRICES, harborPrice, needsSellConfirm } from '../shop.js';
 import { pickBossTarget } from './boss-target.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, preloadSkillIcons, skillCategory, CATEGORIES } from '../render/skill-icons.js';
 import { MAX_PLUS, PLUS_BONUS, plusMul, enhanceCost } from '../core/enhance.js';
+import { affixesOf, canRefine, refineCost, resonanceCost } from '../core/refine.js';
 import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { DIALOGS, TIPS } from '../data/dialogs.js';
@@ -830,7 +831,21 @@ export class UI {
         <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${SLOT_NAMES[it.slot]} · +${it.plus ?? 0} de ${MAX_PLUS} · +${PLUS_BONUS * 100}% dos atributos por nível</div></div>
         ${max ? `<span class="tag">Máx +${MAX_PLUS}</span>` : `<button class="btn small" data-action="enhance" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>+${(it.plus ?? 0) + 1} · ${COIN} ${cost}</button>`}</div>`;
     }).join('') || '<p class="empty-msg">Equipe um item para aprimorá-lo.</p>';
-    return `${this.echoForge()}<h3 id="smith-section">Aprimorar equipado <span class="pts">máx +${MAX_PLUS}</span></h3>${rows}`;
+    return `${this.echoForge()}<h3 id="smith-section">Aprimorar equipado <span class="pts">máx +${MAX_PLUS}</span></h3>${rows}${this.refineSection()}`;
+  }
+
+  // Lapidação (core/refine.js): troca UM atributo extra, sorteado, por outro sorteado. Nada se escolhe; pode piorar. Ressonância: Eco no nível atual.
+  refineSection() {
+    const { char } = this.game, frags = char.echo?.frags ?? 0;
+    const rows = SLOTS.map((sl) => char.equipment[sl]).filter(canRefine).map((it) => {
+      const cost = refineCost(it), aff = Object.entries(affixesOf(it)).map(([k, v]) => fmtStat(k, v)).join(' · ');
+      const res = it.eco && char.level > it.level ? resonanceCost(it) : null;
+      return `<div class="shop-item">${this.itemCell(it, 'noop', it.slot)}
+        <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}</div><div class="sub">${aff}</div></div>
+        <div class="refine-btns"><button class="btn small" data-action="refine" data-arg="${it.id}" ${char.gold < cost ? 'disabled' : ''}>Lapidar · ${COIN} ${cost}</button>
+        ${res ? `<button class="btn small" data-action="resonate" data-arg="${it.id}" ${frags >= res.frags && char.gold >= res.gold ? '' : 'disabled'}>Ressoar Nv ${it.level}→${char.level} · ${ECHO_FRAG} ${res.frags} + ${COIN} ${res.gold}</button>` : ''}</div></div>`;
+    }).join('') || '<p class="empty-msg">Nenhum item equipado com atributos extras.</p>';
+    return `<h3 id="refine-section">Lapidar equipado</h3><p class="hint">A pedra sorteia UM atributo extra do item e o troca por outro sorteado (pode vir melhor ou pior). A base, o atributo garantido e o aprimoramento ficam. Cada lapidação no mesmo item custa um pouco mais.</p>${rows}`;
   }
 
   panel_arena() {

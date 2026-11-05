@@ -655,3 +655,22 @@ test('tx mentor_talk: só no Porto; grava o bit, avança o objetivo talk da Prov
   assert.equal(isComplete(d, 'prova_do_mestre'), false, 'ainda faltam o mini-chefe e a assinatura');
   assert.equal(doc.stats.mentors, 0, 'original intacto');
 });
+
+test('refine/resonate (Ferreiro): o servidor sorteia a lapidação e a ressonância; fora da instância; Ressonância só na Vila', async () => {
+  const { generateItem, generateEchoItem } = await import('../public/src/core/loot.js');
+  assert.deepEqual(TX({ op: 'refine', id: 'abc', stat: 'agi' }).msg, { t: 'tx', op: 'refine', req: 0, id: 'abc' }, 'o cliente não escolhe o atributo');
+  assert.equal(TX({ op: 'refine' }).ok, false);
+  assert.equal(placeProblem('refine', { inZone: true }), 'not_here');
+  assert.equal(placeProblem('resonate', { inZone: false, hubAt: 'harbor' }), 'not_here');
+  const doc = newOfficialCharacter('Lapi', 'archer'); doc.level = 26; doc.gold = 20_000; doc.echo = { frags: 30, keys: 0, entry: 0 };
+  const rng = makeRng(4);
+  doc.equipment.ring = generateItem(rng, 24, { classId: 'archer', slot: 'ring', rarityId: 'epic' });
+  doc.equipment.weapon = generateEchoItem(rng, 22, 'archer', 'weapon');
+  const ctx = { rng: makeRng(8), now: Date.now() };
+  const r = runTx(doc, { op: 'refine', id: doc.equipment.ring.id }, ctx);
+  assert.ok(r.doc.gold < doc.gold && r.doc.equipment.ring.rerolls === 1 && r.summary.in.stat && r.summary.out.stat);
+  assert.equal(doc.equipment.ring.rerolls, undefined, 'o documento original não muda');
+  const r2 = runTx(r.doc, { op: 'resonate', id: doc.equipment.weapon.id }, ctx);
+  assert.equal(r2.doc.equipment.weapon.level, 26); assert.equal(r2.doc.echo.frags, 5); assert.equal(r2.summary.to, 26);
+  assert.throws(() => runTx(r2.doc, { op: 'resonate', id: doc.equipment.weapon.id }, ctx), TxError);
+});

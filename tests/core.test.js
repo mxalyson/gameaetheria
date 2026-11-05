@@ -207,10 +207,11 @@ test('aprimorar: cobra ouro, soma 6% por nível aos atributos, para no máximo e
   const cost = enhanceCost(w);
   const r = enhance(c, w.id);
   assert.equal(r.ok, true); assert.equal(c.gold, 1e9 - cost); assert.equal(w.plus, 1);
-  assert.ok(computeStats(c).power > base, 'poder sobe');
+  assert.ok(computeStats(c).power >= base, 'poder não cai (arma de nível 1: +8% pode sumir no arredondamento)');
   assert.ok(enhanceCost(w) > cost, 'cada nível custa mais');
   for (let i = 1; i < MAX_PLUS; i++) assert.equal(enhance(c, w.id).ok, true);
   assert.equal(w.plus, MAX_PLUS);
+  assert.ok(computeStats(c).power > base, 'poder sobe');
   assert.equal(enhance(c, w.id).ok, false, 'máximo');
   c.gold = 0; w.plus = 0;
   assert.equal(enhance(c, w.id).ok, false, 'sem ouro');
@@ -1294,4 +1295,75 @@ test('projétil para no muro da Cripta (retângulo com block) e passa pela porta
   assert.equal(wall.hit, false, 'o muro bloqueia a flecha');
   assert.equal(wall.left, 0, 'a flecha morre no muro');
   assert.equal(shoot((wl.gap[0] + wl.gap[1]) / 2).hit, true, 'pela porta a flecha passa e acerta');
+});
+
+// ---------- itens: atributo implícito da arma, sem atributo inútil, lapidação e ressonância (2026-11-05) ----------
+import { refine, refineCost, affixesOf, canRefine, resonate } from '../public/src/core/refine.js';
+import { SLOT_COST } from '../public/src/core/enhance.js';
+import { generateEchoItem } from '../public/src/core/loot.js';
+
+test('itens: toda arma traz o atributo principal da classe (arco comum de nível 1 tem Agilidade); o resto segue aleatório', () => {
+  const rng = makeRng(77);
+  for (const classId of Object.keys(CLASSES)) {
+    const primary = CLASSES[classId].primary;
+    const w = generateItem(rng, 1, { classId, slot: 'weapon', weaponType: CLASSES[classId].weapon, rarityId: 'common' });
+    assert.ok(w.stats[primary] >= 1, `${classId}: arma comum Nv 1 sem ${primary}`);
+    assert.deepEqual(w.affix, {}, 'o implícito não é afixo (a lapidação não o tira)');
+    for (let i = 0; i < 400; i++) {
+      const it = generateItem(rng, 1 + (i % 30), { classId, rarityId: i % 2 ? 'legendary' : 'epic' });
+      for (const k of Object.keys(it.affix)) assert.ok(it.affix[k] <= it.stats[k]);
+      const cap = itemCeiling(it.slot, it.rarity, it.level); // o teto antifraude do servidor acompanha o gerador
+      assert.ok(Object.keys(it.stats).length <= cap.maxKeys);
+      for (const [k, v] of Object.entries(it.stats)) assert.ok(v <= cap.stats[k], `${it.slot} ${k}=${v} acima do teto ${cap.stats[k]}`);
+    }
+  }
+});
+
+test('lapidação: troca UMA linha extra sorteada, cobra ouro crescente e mantém base/implícito/+N', () => {
+  const rng = makeRng(9);
+  const c = newCharacter('Lap', 'archer', makeRng(1)); c.level = 25; c.gold = 1e6;
+  const ring = generateItem(rng, 25, { classId: 'archer', slot: 'ring', rarityId: 'legendary' }); ring.plus = 3;
+  const bow = generateItem(rng, 25, { classId: 'archer', slot: 'weapon', weaponType: 'bow', rarityId: 'rare' });
+  c.equipment.ring = ring; c.equipment.weapon = bow;
+  const agiBow = bow.stats.agi, atk = bow.stats.atk;
+  let last = 0;
+  for (let i = 0; i < 40; i++) {
+    const before = { ...ring.affix }, gold = c.gold, cost = refineCost(ring);
+    assert.ok(cost >= last); last = cost;
+    const r = refine(c, ring.id, rng);
+    assert.ok(r.ok); assert.equal(c.gold, gold - cost); assert.equal(ring.rerolls, i + 1); assert.equal(ring.plus, 3);
+    assert.equal(Object.keys(ring.affix).length, Object.keys(before).length, 'mesmo número de linhas');
+    const changed = Object.keys({ ...before, ...ring.affix }).filter((k) => before[k] !== ring.affix[k]);
+    assert.ok(changed.length <= 2, 'só uma linha muda (sai uma, entra outra)');
+    assert.deepEqual(ring.stats, ring.affix, 'joia: todos os atributos são afixos');
+    refine(c, bow.id, rng);
+    assert.equal(bow.stats.atk, atk); assert.equal(bow.stats.agi, agiBow, 'a base e o Agilidade do arco ficam');
+  }
+  assert.ok(refineCost(ring) <= 3 * refineCost({ ...ring, rerolls: 0 }), 'o aumento para em ×3');
+  const poor = { ...c, gold: 0 }; assert.match(refine(poor, ring.id, rng).reason, /Faltam/);
+  const common = generateItem(rng, 5, { classId: 'archer', slot: 'helm', rarityId: 'common' });
+  assert.ok(!canRefine(common), 'comum sem extras não lapida');
+  // item antigo sem `affix`: deduz os extras (tudo que não é base do espaço); o Agilidade de arco antigo era afixo
+  const legacy = { id: 'old1', kind: 'gear', slot: 'weapon', classId: 'archer', weaponType: 'bow', rarity: 'rare', level: 20, stats: { atk: 70, int: 9, crit: 4 } };
+  assert.deepEqual(affixesOf(legacy), { int: 9, crit: 4 });
+  c.inventory.push(legacy);
+  for (let i = 0; i < 6; i++) refine(c, 'old1', rng);
+  assert.equal(legacy.stats.atk, 70); assert.equal(Object.keys(legacy.affix).length, 2);
+  // documento valida e guarda affix/rerolls
+  const v = validate(structuredClone(c)); assert.ok(v.ok);
+  assert.deepEqual(v.char.equipment.ring.affix, ring.affix); assert.equal(v.char.equipment.ring.rerolls, ring.rerolls);
+});
+
+test('ressonância do Eco: refaz a peça no nível atual mantendo +N; aprimorar joia custa menos que arma', () => {
+  const rng = makeRng(3);
+  const c = newCharacter('Res', 'mage', makeRng(2)); c.level = 30; c.gold = 50_000; c.echo = { frags: 30, keys: 0, entry: 0 };
+  const eco = generateEchoItem(rng, 22, 'mage', 'weapon'); eco.plus = 5; c.equipment.weapon = eco;
+  const atk = eco.stats.atk;
+  const r = resonate(c, eco.id, rng);
+  assert.ok(r.ok); assert.equal(eco.level, 30); assert.equal(eco.plus, 5); assert.ok(eco.eco && eco.stats.atk > atk);
+  assert.equal(c.echo.frags, 5);
+  assert.match(resonate(c, eco.id, rng).reason, /já está/);
+  const base = { level: 25, rarity: 'legendary', plus: 0 };
+  assert.ok(enhanceCost({ ...base, slot: 'ring' }) < enhanceCost({ ...base, slot: 'weapon' }));
+  assert.equal(SLOT_COST.weapon, 1);
 });

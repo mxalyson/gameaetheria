@@ -1,5 +1,6 @@
 import { TESTE, buildTesteChar, installTesteUi } from './teste.js'; // modo ?teste= (sandbox); primeiro, para window.TESTE existir antes dos demais módulos
 import { enhance, findGear } from './core/enhance.js';
+import { refine } from './core/refine.js';
 import './no-zoom.js';
 import { heroSpritesEnabled, preloadHero, showHeroLoading } from './render/hero-sprites.js';
 import { whenNatureReady } from './render/nature-sprites.js';
@@ -53,7 +54,7 @@ import { CLASSES } from './data/classes.js';
 import { MOBS, XP_MULT } from './data/mobs.js';
 import { soloWaveSpec, WAVES } from './core/economy.js';
 import { ZONES, teleportCost, FARM_ENTRY, FARM_MID } from './data/zones.js';
-import { RARITY, INVENTORY_SIZE, SLOTS } from './data/items.js';
+import { RARITY, INVENTORY_SIZE, SLOTS, STAT_LABELS, PERCENT_STATS } from './data/items.js';
 import { SPIRITS, SPIRIT_RARITY_MUL, MAX_SPIRITS } from './data/spirits.js';
 
 const TOWN = ZONES.town.spawn;
@@ -236,6 +237,8 @@ class Game {
       case 'item': this.ui.selecting() ? this.ui.toggleSel(arg) : this.ui.sellMode() ? this.sell(arg) : this.ui.isOpen('bank') ? this.bankPut(arg) : this.equip(arg); break;
       case 'unequip': this.unequip(arg); break;
       case 'enhance': this.enhanceItem(arg); break;
+      case 'refine': this.refineItem(arg); break;
+      case 'resonate': this.resonateEcho(arg); break;
       case 'crypt-enter': this.enterCrypt(); break;
       case 'craft-echo': this.craftEcho(arg); break;
       case 'alloc': this.alloc(arg); break;
@@ -1761,6 +1764,23 @@ class Game {
   craftEcho(id) {
     if (this.serverTx({ op: 'craft', id }, (m) => { this.ui.toast('Forjado!', m.name, 'gold'); this.refreshStats(); })) return;
     this.ui.toast('Ferreiro Brok', 'A forja do Eco só funciona com o servidor de partidas conectado.', '');
+  }
+
+  // Lapidação: o sorteio é do servidor online; offline, do RNG local. Mostra o que saiu e o que entrou.
+  refineItem(id) {
+    const fmt = (x) => `${x.v}${PERCENT_STATS.has(x.stat) ? '%' : ''} ${STAT_LABELS[x.stat]}`;
+    const show = (r) => this.ui.toast(`${r.name} lapidado`, `Saiu ${fmt(r.out)} · entrou ${fmt(r.in)}`, 'gold');
+    if (this.serverTx({ op: 'refine', id }, (m) => { show(m); this.refreshStats(); })) return;
+    const r = refine(this.char, id, this.rng);
+    if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
+    show(r);
+    this.gameEvent({ type: 'upgrade' });
+    this.refreshStats(); this.ui.render(); this.save();
+  }
+  // Ressonância do Eco: só online (fragmentos e o Eco são do servidor), como a forja.
+  resonateEcho(id) {
+    if (this.serverTx({ op: 'resonate', id }, (m) => { this.ui.toast('Eco ressoou!', `${m.name}: nível ${m.from} → ${m.to}`, 'gold'); this.refreshStats(); })) return;
+    this.ui.toast('Ferreiro Brok', 'A ressonância do Eco só funciona com o servidor de partidas conectado.', '');
   }
 
   enhanceItem(id) {
