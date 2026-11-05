@@ -4,7 +4,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomBytes } from 'node:crypto';
 
-export const MAX_CHARACTERS = 4;
+export const MAX_CHARACTERS = 3; // por conta (pedido do dono, 2026-11-04; antes 4). Contas que já têm 4 mantêm os 4, mas não criam mais
 export const SESSION_TTL_MS = 14 * 24 * 3600 * 1000;
 export const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 export const newToken = (bytes = 32) => randomBytes(bytes).toString('base64url');

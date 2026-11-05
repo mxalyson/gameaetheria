@@ -7,3 +7,5 @@ art-local
 public/labs
 docs
 tests
+*.log
+.env

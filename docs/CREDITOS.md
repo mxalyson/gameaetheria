@@ -63,3 +63,12 @@ Golem de Quartzo (`golem`, monstro), Sábia Yun e Mestre Doran: modelos 3D do Me
 
 ## Folhas de ícones geradas (origem/licença a confirmar pelo dono)
 As folhas de ícones de habilidades, itens, spirits, UI e retratos (originais em `docs/art-direction/fontes-icones/`, recortadas pelos scripts `tools/*-from-sheets.py`, `tools/*-from-images.py` e `tools/ui-icon-from-atlas.py`) foram geradas por IA fora deste repositório. **Origem exata e licença/termos de uso do gerador: a confirmar pelo dono antes de qualquer publicação.** Vale também para a marca d'água do gerador visível em algumas folhas.
+
+## Áudio (licença CC0 — domínio público; crédito não é obrigatório, mas registramos)
+Baixados em 2026-11-04; licença conferida na página de cada um. Convertidos para MP3 (`public/assets/audio/`; efeitos em mono, volume igualado) sem outra alteração.
+- **RPG Sound Pack** — Kenney (www.kenney.nl), CC0: https://opengameart.org/content/50-rpg-sound-effects (`whoosh*`, `slice*`, `chop`, `coins1`, `book_*`, `cloth`).
+- **80 CC0 RPG SFX** — rubberduck, CC0: https://opengameart.org/content/80-cc0-rpg-sfx (`blade*`, `metal*`, `hurt*`, `die1`, `roar*`, `spell*`, `fire*`, `gem*`, `coins2`, `item1`, `lock1`).
+- **Town Theme RPG** — cynicmusic, CC0: https://opengameart.org/content/town-theme-rpg (`music/town.mp3`, Vila e Porto).
+- **Medieval: The Bard's Tale (loop)** — RandomMind, CC0: https://opengameart.org/content/medieval-the-bards-tale (`music/explore.mp3`, mapas de exploração).
+- **Heartfelt Battle (loopable)** — request, CC0: https://opengameart.org/content/heartfelt-battle-loopable-fantasy-stringspianohorn (`music/battle.mp3`, chefes, arena, ondas e Cripta).
+Texto sugerido para a tela de créditos: "Sons: Kenney, rubberduck · Música: cynicmusic, RandomMind, request (CC0, OpenGameArt)".

@@ -26,7 +26,7 @@ export const SKILLS = {
     desc: 'Cura 16% da vida (aliados próximos recebem 70% disso) e fere inimigos próximos.' },
   divineshield: { name: 'Escudo Divino', icon: '🛡️', cd: 15, kind: 'buff', dur: 6, buff: { shieldPct: 0.28 }, allyShield: 0.6, allyRange: 260, color: '#ffe9a0',
     desc: 'Escudo de 28% da vida máxima; o aliado mais próximo (até 260) recebe 60% dele.' },
-  judgement: { name: 'Julgamento', icon: '⚖️', cd: 6, kind: 'projectile', speed: 560, range: 560, mult: 2.6, stun: 1.5, radius: 9, color: '#fff6c2',
+  judgement: { name: 'Julgamento', icon: '⚖️', cd: 6, kind: 'projectile', speed: 560, range: 560, mult: 2.6, stun: 1.0, radius: 9, /* 1,5→1 s (igual à descrição): o atordoamento à distância anulava o Arqueiro no Nv10–14 */ color: '#fff6c2',
     desc: 'Raio sagrado que atordoa por 1s.' },
 
   // ---- Habilidades de Maestria (slot s3): nível 25 + missão `maestria` concluída. Recarga longa (35-45 s), efeito decisivo. `vfxLife` = duração do efeito visual (render/skill-vfx.js).

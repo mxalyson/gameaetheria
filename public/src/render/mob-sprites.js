@@ -149,8 +149,20 @@ export function mobPortrait(id) {
   portraits.set(id, res);
   return res;
 }
-// carrega de antemão as criaturas da zona (chamado quando a zona muda)
-export function prepareMobs(zone) { if (!mobSpritesEnabled()) return; for (const [id] of zone.mobs ?? []) load(id); if (zone.boss?.id) load(zone.boss.id); for (const id of zone.preload ?? []) load(id); if (zone.preload?.includes('echolord')) load('echolord_p2'); /* masmorra: criaturas das salas */ }
+// Libera os atlas recoloridos das criaturas que não são desta zona (canvas do tamanho da folha inteira, ~1–3 MB cada): antes ficavam todos na memória
+// e, depois de algumas zonas, o iPhone passava do teto de canvas (monstros invisíveis). Quem voltar a aparecer recarrega sozinho (load()).
+export function releaseMobs(keep = new Set()) {
+  let freed = 0;
+  for (const [id, it] of items) {
+    if (keep.has(id) || it.state === 'loading') continue;
+    if (it.img && 'width' in it.img && it.img.getContext) { it.img.width = it.img.height = 0; freed++; }
+    items.delete(id);
+  }
+  return freed;
+}
+export const mobIdsOf = (zone) => { const s = new Set(); for (const [id] of zone.mobs ?? []) s.add(id); if (zone.boss?.id) s.add(zone.boss.id); for (const id of zone.preload ?? []) s.add(id); if (s.has('echolord')) s.add('echolord_p2'); return s; };
+// carrega de antemão as criaturas da zona (chamado quando a zona muda); antes solta as das outras zonas
+export function prepareMobs(zone) { if (!mobSpritesEnabled()) return; releaseMobs(mobIdsOf(zone)); for (const [id] of zone.mobs ?? []) load(id); if (zone.boss?.id) load(zone.boss.id); for (const id of zone.preload ?? []) load(id); if (zone.preload?.includes('echolord')) load('echolord_p2'); /* masmorra: criaturas das salas */ }
 
 // pesados: o golpe é uma pancada (ergue e bate); aéreos: recolhem e arremetem; os demais agacham e dão o bote
 const HEAVY = new Set(['golem', 'colossus', 'guardian', 'treant', 'echolord_p1']), AIRY = new Set(['wisp', 'wraith']);

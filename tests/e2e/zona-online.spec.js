@@ -143,3 +143,35 @@ test('transações do servidor no jogo real: comprar poção na Vila, abrir baú
   expect(errors).toEqual([]);
   await ctx.close();
 });
+
+// Online igual ao offline (2026-11-05): o abate mostra "+ouro" na hora; item e poção CAEM no chão (com brilho de raridade); passar por cima pega
+// (o servidor confirma) e aparece "Obtido: …" — igual ao jogo offline.
+test('abate online: ouro na hora, itens no chão e coleta confirmada pelo servidor', async ({ browser }) => {
+  const who = await conta('drop@teste.com', 'Drop', 'archer');
+  const ctx = await browser.newContext({ viewport: { width: 1100, height: 760 } });
+  const page = await ctx.newPage();
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(([t]) => localStorage.setItem('aetheria_session', t), [who.token]);
+  await page.goto('/?api=' + encodeURIComponent(apiBase) + '&visual=original');
+  await page.click(`[data-action="char-select"][data-arg="${who.id}"]`);
+  await page.waitForFunction(() => window.game.net?.joined, null, { timeout: 10000 });
+  await page.evaluate(() => { const p = window.game.player; p.x = 1650; p.y = 620; window.game.portalCd = 0; });
+  await page.waitForFunction(() => window.game.mode === 'net' && window.game.netInfo?.mode === 'zone' && window.game.netLast, null, { timeout: 15000 });
+  const room = [...game.hub.zoneRooms.values()].find((r) => [...r.players.values()].some((p) => p.charId === who.id));
+  const me = [...room.players.values()].find((p) => p.charId === who.id);
+  const { makeMobActor } = await import('../../public/src/game/sim.js');
+  const boss = makeMobActor('wolf', 3, me.actor.x + 150, me.actor.y); boss.boss = true;
+  const gold0 = await page.evaluate(() => window.game.char.gold);
+  room.onMobKilled(boss);
+  await page.waitForFunction((g) => window.game.char.gold > g, gold0, { timeout: 5000 }); // "+ouro" na hora
+  await page.waitForFunction(() => window.game.world.drops.filter((d) => d.netId).length >= 3, null, { timeout: 5000 });
+  const drops = await page.evaluate(() => window.game.world.drops.filter((d) => d.netId).map((d) => ({ kind: d.kind, rarity: d.item?.rarity, x: d.x, y: d.y })));
+  expect(drops.some((d) => d.kind === 'item' && d.rarity)).toBe(true);
+  expect(drops.some((d) => d.kind === 'potion')).toBe(true);
+  // o servidor move o herói até cada drop (o cliente só pede); a coleta volta como zone_pickup e o drop some da tela
+  for (const d of [...room.world.drops]) { me.actor.x = d.x; me.actor.y = d.y; d.t = 1; room.collectDrops(me); }
+  await page.waitForFunction(() => window.game.world.drops.filter((d) => d.netId).length === 0, null, { timeout: 5000 });
+  await expect(page.locator('#log')).toContainText('Obtido');
+  expect(errors).toEqual([]);
+  await ctx.close();
+});

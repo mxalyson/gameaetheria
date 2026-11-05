@@ -176,7 +176,7 @@ export class UI {
         <div class="logo"><span>AETHERIA</span><small>Arena dos Ecos</small></div>
         <p class="tagline">Suba de nível, colete itens, desperte spirits e conquiste a arena.</p>
         <div class="title-actions">${cont}${importBtn}</div>
-        <p class="foot">Protótipo v0.1 · PvE + Arena PvP contra ecos (multiplayer em breve)</p>
+        <p class="foot">Protótipo v0.1 · PvE, arena PvP e, com conta online, multiplayer e chat</p>
       </div>`;
     this.screen.className = 'visible';
   }
@@ -225,7 +225,7 @@ export class UI {
     this.screen.className = 'visible';
   }
 
-  showCharacters(list, { email = '', maxCharacters = 4, hasLocalSave = false, msg = '' } = {}) {
+  showCharacters(list, { email = '', maxCharacters = 3, hasLocalSave = false, msg = '' } = {}) {
     $('hud').classList.add('hidden');
     this.closePanels();
     const cards = list.map((c) => `
@@ -452,13 +452,37 @@ export class UI {
     document.body.appendChild(el);
   }
 
-  toast(title, sub = '', tone = '', ms = 2200) { // ms: tempo visível (textos de lore pedem mais)
+  // Aviso PEQUENO na lateral (missão, conquista, item, dica, sistema): no máximo 2 visíveis, o mais antigo sai quando chega um novo; o mesmo aviso
+  // repetido em 3 s não duplica. Antes todos iam empilhados no centro da tela por cima do combate (pedido do dono, 2026-11-05).
+  toast(title, sub = '', tone = '', ms = 3200) { // ms: tempo visível (textos de lore pedem mais)
+    const layer = $('toast-layer'), key = title + '|' + sub, now = Date.now();
+    if (this.lastToast?.key === key && now - this.lastToast.at < 3000) return;
+    this.lastToast = { key, at: now };
     const el = document.createElement('div');
     el.className = 'toast ' + tone;
     el.innerHTML = `<div class="t1">${title}</div>${sub ? `<div class="t2">${sub}</div>` : ''}`;
-    $('toast-layer').appendChild(el);
+    layer.appendChild(el);
+    const live = [...layer.children].filter((x) => !x.classList.contains('out'));
+    for (const old of live.slice(0, Math.max(0, live.length - 2))) { old.classList.add('out'); setTimeout(() => old.remove(), 400); }
     setTimeout(() => el.classList.add('out'), ms);
     setTimeout(() => el.remove(), ms + 600);
+  }
+
+  // Aviso GRANDE no centro (boas-vindas, nome da zona ao entrar, subida de nível, chefe): um por vez, em fila; nunca vários empilhados.
+  announce(title, sub = '', tone = 'gold', ms = 2400) {
+    (this.annQ ??= []).push({ title, sub, tone, ms });
+    if (!this.annBusy) this.announceNext();
+  }
+  announceNext() {
+    const it = this.annQ?.shift(), layer = $('announce-layer');
+    if (!it || !layer) { this.annBusy = false; return; }
+    this.annBusy = true;
+    const el = document.createElement('div');
+    el.className = 'toast announce ' + it.tone;
+    el.innerHTML = `<div class="t1">${it.title}</div>${it.sub ? `<div class="t2">${it.sub}</div>` : ''}`;
+    layer.replaceChildren(el);
+    setTimeout(() => el.classList.add('out'), it.ms);
+    setTimeout(() => { el.remove(); this.announceNext(); }, it.ms + 450);
   }
 
   // Cartão de recompensa (baú): fica ~3,5 s por cima de tudo (até dos painéis); vários na fila aparecem um depois do outro, sem se sobrepor.
@@ -508,6 +532,7 @@ export class UI {
     if (id === 'options') this.open.clear();
     if (id === 'character') this.specMaster = anchor === 'master'; // aberto pelo Mestre de Classe: o Selo de Reespecialização está à venda
     if (id === 'map') this.mapSel = null; // o mapa sempre abre selecionando onde você está
+    if (!this.open.has(id)) this.game.audio?.play('open'); // som de livro abrindo (audio.js)
     this.open.add(id);
     if (id === 'shop') { this.shopAnchor = anchor ?? null; this.selMode = false; this.sel = new Set(); if (anchor === 'smith') this.open.delete('inventory'); else this.open.add('inventory'); } // Ferreiro só aprimora: sem mochila ao lado (tocar nela venderia) // título: Ferreiro Brok (anchor 'smith') ou Mercador do Porto ('harbor')
     if (id === 'bank') this.open.add('inventory'); // mochila ao lado: tocar nela deposita
@@ -516,11 +541,12 @@ export class UI {
   }
   close(id) {
     this.hideTooltip();
+    if (this.open.has(id)) this.game.audio?.play('close');
     this.open.delete(id);
     if (id === 'inventory') { this.open.delete('shop'); this.open.delete('bank'); }
     this.render();
   }
-  closePanels() { this.hideTooltip(); this.open.clear(); this.render(); }
+  closePanels() { this.hideTooltip(); if (this.open.size) this.game.audio?.play('close'); this.open.clear(); this.render(); }
   // Modo venda: loja da Vila ou do Porto aberta (o Ferreiro não compra nem vende itens)
   sellMode() { return this.isOpen('shop') && this.shopAnchor !== 'smith'; }
   // Seleção múltipla para vender vários itens de uma vez (botão Selecionar na mochila ao lado da loja). Equipados nunca estão na mochila, logo nunca entram.
@@ -808,12 +834,13 @@ export class UI {
       <div class="arena-badge" style="--tc:${tier.color}"><div class="tier">${tier.name}</div><div class="rt">${char.arena.rating}</div>
         <div class="wl">${char.arena.wins}V · ${char.arena.losses}D · Melhor onda: ${char.arena.bestWave}</div></div>
       <div class="arena-badge"><div class="wl">${POWER()} Seu poder: <b>${playerPower(char)}</b></div></div>
+      ${this.game.online ? `${this.onlineArenaBlock(char)}
+      <p class="hint">Online valem só as partidas do servidor (rating, ouro e missões gravados na conta). O cooperativo traz as ondas e o chefe.</p>` : `
       ${pvpUnlocked(char) ? Object.entries(MODES).map(([id, md]) => `<button class="btn primary wide" data-action="match" data-arg="${id}">${ARENA()} Grande Arena ${md.label} · rating ${getRating(char, id)}</button>`).join('') : `<p class="hint">${LOCK} O PvP libera no <b>nível ${PVP_MIN_LEVEL}</b> (você está no ${char.level}).</p>`}
       <p class="hint">Times de ecos (aliados e inimigos com classe, itens e spirit próprios) na Grande Arena. Segure o ponto central: 100 pontos vencem; eliminar o outro time também. Cada modo tem seu rating. Poções desativadas.</p>
-      ${this.game.online ? this.onlineArenaBlock(char) : ''}
       <button class="btn wide" data-action="waves">${WAVES} Desafio de Ondas (PvE)</button>
       <p class="hint">Sobreviva a ondas crescentes de monstros. Ouro a cada onda vencida, chefes a cada 10.</p>
-      <p class="soon">${LOCK} Em breve: duelos contra jogadores reais.</p>`);
+      <p class="soon">${LOCK} Em breve: duelos contra jogadores reais.</p>`}`);
   }
 
   // Arena online: partidas com jogadores reais (servidor autoritativo) e cooperativo. Só aparece com conta.
@@ -1035,7 +1062,14 @@ export class UI {
       <div class="opt-row"><b>O que o spirit pega</b>
         <div class="seg wrap">${[['Comum', 0], ['Incomum', 1], ['Raro', 2], ['Épico', 3], ['Lendário', 4], ['Poções', 5], ['Essências', 6]].map(([label, bit]) => `<button class="btn small ${(pr.spiritPick >> bit) & 1 ? 'sel' : ''}" data-action="pref" data-arg="spiritPick:${bit}">${label}</button>`).join('')}
         <button class="btn small" data-action="pref" data-arg="spiritPick:all">Tudo</button><button class="btn small" data-action="pref" data-arg="spiritPick:none">Nada</button></div></div>
-      <p class="hint">O spirit só busca no chão o que estiver marcado; o resto você pega andando por cima. Online, o servidor guarda tudo na hora e o spirit só mostra o que trouxe.</p>
+      <p class="hint">O spirit só busca no chão o que estiver marcado; o resto você pega andando por cima. Vale também online.</p>
+      ${['music', 'sfx'].map((k) => `<div class="opt-row"><b>${k === 'music' ? 'Música' : 'Efeitos sonoros'}</b>
+        <div class="seg"><button class="btn small" data-action="pref" data-arg="${k}:-10" ${pr[k] <= 0 ? 'disabled' : ''}>−</button>
+        <span class="opt-val">${pr[k] ? pr[k] + '%' : 'desligado'}</span>
+        <button class="btn small" data-action="pref" data-arg="${k}:+10" ${pr[k] >= 100 ? 'disabled' : ''}>+</button>
+        <button class="btn small ${pr[k] === 0 ? 'sel' : ''}" data-action="pref" data-arg="${k}:0">Mudo</button></div></div>`).join('')}
+      <div class="opt-row"><b>Som</b><button class="btn small" data-action="sound-test">Testar som</button></div>
+      <p class="hint">Sem som? Aumente o volume do aparelho e toque em Testar som. No iPhone o som só começa depois de um toque na tela.</p>
       <div class="opt-row"><b>Tela cheia</b><button class="btn small" data-action="fullscreen">Alternar</button></div>
       <p class="hint">As opções valem para este aparelho e ficam salvas nele. O personagem é salvo à parte.</p>
       </div><div class="col">

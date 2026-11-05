@@ -33,15 +33,22 @@
       <div id="zone-name"></div>
       <canvas id="minimap" width="170" height="170"></canvas>
       <div class="menu-btns" id="menu-btns">
-        <button data-action="toggle" data-arg="inventory" title="Mochila"><img src="assets/icons/menu/menu-bag.webp?v=7d1ee3d6" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="character" title="Personagem"><img src="assets/icons/menu/menu-hero.webp?v=7d1ee3d6" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="spirits" title="Spirits"><img src="assets/icons/menu/menu-spirits.webp?v=7d1ee3d6" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="journal" title="Diário e missões"><img src="assets/icons/menu/menu-journal.webp?v=7d1ee3d6" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="map" title="Mapa"><img src="assets/icons/menu/menu-map.webp?v=7d1ee3d6" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="party" class="online-only" title="Grupo"><img src="assets/icons/menu/menu-party.webp?v=7d1ee3d6" alt="" draggable="false"></button>
-        <button data-action="toggle" data-arg="options" title="Opções"><img src="assets/icons/menu/menu-settings.webp?v=7d1ee3d6" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="inventory" title="Mochila"><img src="assets/icons/menu/menu-bag.webp?v=c74ca032" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="character" title="Personagem"><img src="assets/icons/menu/menu-hero.webp?v=c74ca032" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="spirits" title="Spirits"><img src="assets/icons/menu/menu-spirits.webp?v=c74ca032" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="journal" title="Diário e missões"><img src="assets/icons/menu/menu-journal.webp?v=c74ca032" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="party" class="online-only" title="Grupo"><img src="assets/icons/menu/menu-party.webp?v=c74ca032" alt="" draggable="false"></button>
         <button data-action="fullscreen" class="txt" title="Tela cheia">⛶</button>
       </div>
+      <!-- Mapa (viagem) e Opções embaixo do minimapa (pedido do dono, 2026-11-04) -->
+      <div class="menu-btns side-btns" id="side-btns">
+        <button data-action="toggle" data-arg="map" title="Mapa"><img src="assets/icons/menu/menu-map.webp?v=c74ca032" alt="" draggable="false"></button>
+        <button data-action="toggle" data-arg="options" title="Opções"><img src="assets/icons/menu/menu-settings.webp?v=c74ca032" alt="" draggable="false"></button>
+      </div>
+    </div>
+    <!-- Chat no canto, embaixo do cartão do herói (só online) -->
+    <div class="menu-btns chat-dock online-only" id="chat-dock">
+        <button data-action="chat" id="chat-btn" class="online-only chat-btn" title="Chat"><img src="assets/icons/menu/menu-chat.webp?v=c74ca032" alt="" draggable="false"></button>
     </div>
     <div id="qtrack" class="hidden"></div>
     <div id="ritual" class="hidden"></div>
@@ -57,6 +64,7 @@
   <div id="panel-layer"></div>
   <div id="tooltip" class="hidden"></div>
   <div id="toast-layer"></div>
+  <div id="announce-layer"></div>
   <div id="reward-layer"></div>
   <div id="screen"></div>
 

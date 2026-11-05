@@ -9,7 +9,8 @@ export const QUALITIES = ['auto', 'high', 'medium', 'low'];
 export const CONTROLS = ['auto', 'touch', 'keyboard'];
 // spiritPick: máscara do que o spirit busca (bits 0-4 = raridade comum..lendário, 5 = poções, 6 = essências; game/sim.js SPIRIT_PICK_ALL = 127)
 export const SPIRIT_PICK_ALL = 0b1111111;
-const DEFAULTS = { scale: 'auto', quality: 'auto', controls: 'auto', spiritPick: SPIRIT_PICK_ALL, autoMount: false };
+const DEFAULTS = { scale: 'auto', quality: 'auto', controls: 'auto', music: 50, sfx: 80, spiritPick: SPIRIT_PICK_ALL, autoMount: false }; // music/sfx: volume 0–100 (0 desliga; audio.js)
+const vol = (v, d) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(100, Math.round(Number(v) / 10) * 10)) : d);
 
 // Escala automática da interface (%): acompanha a viewport (referência 1250×575 pt, piso 60%, teto 100%).
 // Celular deitado (iPhone 874×402) cai para ~70% (84% ainda deixava painéis ocupando a tela toda); tela de 1250×575 ou mais fica em 100%. O tamanho manual (60–150%) continua nas Opções.
@@ -26,6 +27,8 @@ const clean = (p) => ({
   controls: CONTROLS.includes(p.controls) ? p.controls : DEFAULTS.controls,
   spiritPick: Number.isInteger(p.spiritPick) ? p.spiritPick & SPIRIT_PICK_ALL : SPIRIT_PICK_ALL,
   autoMount: p.autoMount === true, // "Montar automático" (decisão 0018): padrão desligado
+  music: vol(p.music, DEFAULTS.music),
+  sfx: vol(p.sfx, DEFAULTS.sfx),
 });
 
 export function loadPrefs() {
@@ -36,7 +39,7 @@ export function savePrefs(p) {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* armazenamento indisponível */ }
 }
 
-// arg: "scale:auto", "scale:+10", "scale:-10", "quality:low", "controls:touch"
+// arg: "scale:auto", "scale:+10", "scale:-10", "quality:low", "controls:touch", "music:-10", "sfx:0"
 export function changePref(prefs, arg, w, h) {
   const [key, val] = arg.split(':');
   const next = { ...prefs };
@@ -45,6 +48,7 @@ export function changePref(prefs, arg, w, h) {
   else if (key === 'quality' || key === 'controls') next[key] = val;
   else if (key === 'autoMount') next.autoMount = val === 'on'; // 'on' | 'off'
   else if (key === 'spiritPick') next.spiritPick = val === 'all' ? SPIRIT_PICK_ALL : val === 'none' ? 0 : prefs.spiritPick ^ (1 << Number(val)); // 'all' | 'none' | número do bit para alternar
+  else if (key === 'music' || key === 'sfx') next[key] = val.startsWith('+') || val.startsWith('-') ? prefs[key] + Number(val) : Number(val); // "music:+10", "sfx:0"
   return clean(next);
 }
 

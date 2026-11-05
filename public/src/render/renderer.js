@@ -45,13 +45,14 @@ export class Renderer {
     this.g = canvas.getContext('2d');
     this.groundCache = new GroundCache((w, ox, oy, tw, th, s) => buildGround(w, ox, oy, tw, th, s)); // terreno em blocos (mapas de 4600×2800 não cabem num canvas só no celular)
     this.dprCap = 2;
+    this.memCap = 3; // teto de densidade por falta de memória (memguard.js → main.js relieveMemory baixa para 2 e depois 1)
     this.quality = 2; // 0 baixa, 1 média, 2 alta
     this.resize();
     addEventListener('resize', () => this.resize());
   }
 
   resize() {
-    this.dpr = Math.min(this.dprCap, devicePixelRatio || 1);
+    this.dpr = Math.min(this.dprCap, this.memCap, devicePixelRatio || 1);
     this.vw = innerWidth;
     this.vh = innerHeight;
     // Celular: a tela é pequena, então o mundo é desenhado menor para caber ~980×520 unidades (antes, 1 unidade = 1 px:
@@ -84,6 +85,7 @@ export class Renderer {
     // rastreador de missão e botões de toque reais (medidos no DOM): nomes e avisos do mundo nunca ficam sob eles
     const vis = (el) => { const r = el?.getBoundingClientRect(); return r && r.width > 0 && r.height > 0 ? r : null; };
     const qt = vis(document.getElementById('qtrack')); if (qt) this.hud.push([qt.left - 4, qt.top - 3, qt.right + 4, qt.bottom + 3]);
+    for (const id of ['side-btns', 'chat-dock']) { const r = vis(document.getElementById(id)); if (r) this.hud.push([r.left - 4, r.top - 3, r.right + 4, r.bottom + 3]); } // Mapa/Opções sob o minimapa e Chat sob o cartão
     const tbs = [...document.querySelectorAll('#tbtns .tbtn:not(.hidden)')].map(vis).filter(Boolean);
     if (tbs.length) { this.hud[3] = [0, 0, 0, 0]; for (const r of tbs) this.hud.push([r.left - 3, r.top - 3, r.right + 3, r.bottom + 3]); } // no lugar da estimativa por escala
   }

@@ -134,14 +134,14 @@ export const DIALOGS = {
 
 // Dicas de onboarding (cada uma 1× por personagem; bits em core/journal.js TIP_BITS). [título, texto]
 export const TIPS = {
-  forest: ['Bosque Verdejante', 'Ataque as criaturas e use as habilidades; as com cadeado liberam com o nível. Toque numa Pedra de Retorno: se cair, você acorda nela.'],
-  chest: ['Primeiro baú', 'O item novo já está na mochila: abra a Mochila no menu e equipe o melhor. Vale abrir todos os baús que encontrar.'],
+  forest: ['Dica', 'Habilidades com cadeado liberam com o nível. Toque numa Pedra de Retorno: se cair, você acorda nela.'],
+  chest: ['Primeiro baú', 'O item já está na Mochila: abra e equipe o melhor.'],
   level: ['Pontos de atributo', 'Abra Personagem no menu e distribua os pontos para ficar mais forte.'],
-  skill: ['Habilidade nova', 'Ela já está num dos botões de habilidade. As ainda bloqueadas mostram o nível em que liberam.'],
-  spirit: ['Seu spirit', 'Spirits crescem com você. Para evoluir, faça a missão do elemento dele com a Sábia Yun (no nível 10 do spirit) e depois use Evoluir em Spirits.'],
-  boss: ['Primeiro chefe', 'O mapa leva você a lugares já visitados. Pergaminhos de viagem são vendidos pela Mercadora Lia.'],
-  crypt: ['Cripta dos Ecos', 'A Cripta dos Ecos está aberta: toque no nó dela no mapa.'],
-  spec: ['Especialização', 'Fale com o Mestre da sua classe ou um mentor no Porto para escolher sua especialização.'],
-  phoenix: ['Amuleto da Fênix', 'O Amuleto da Fênix evita a perda de ouro e XP; vende na Lia e no Porto.'],
-  ritual: ['Cinzas Ardentes', 'Aqui o chefe desperta pelo "Ritual N/40": cada criatura derrotada enche o contador, e o chão estremece ao completar.'],
+  skill: ['Habilidade nova', 'Já está nos botões de habilidade.'],
+  spirit: ['Seu spirit', 'Cresce com você. No nível 10, a Sábia Yun ensina a evoluí-lo.'],
+  boss: ['Primeiro chefe', 'O Mapa leva a lugares já visitados (pergaminhos com a Lia).'],
+  crypt: ['Cripta dos Ecos', 'Aberta: toque no nó dela no mapa.'],
+  spec: ['Especialização', 'Escolha com o Mestre da sua classe ou um mentor no Porto.'],
+  phoenix: ['Amuleto da Fênix', 'Evita perder ouro e XP ao cair; vende na Lia e no Porto.'],
+  ritual: ['Ritual do chefe', 'Cada criatura derrotada enche o "Ritual N/40"; completo, o chefe desperta.'],
 };

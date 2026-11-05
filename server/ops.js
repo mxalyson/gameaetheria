@@ -18,29 +18,36 @@ const int = (v, name, min, max, def) => {
 };
 
 // Valida e normaliza as variáveis de ambiente; erro claro ANTES de abrir portas (em vez de falhar no meio da partida).
+// Modo de PORTA ÚNICA (publicação): com PORT definido, um só servidor HTTP entrega o jogo (public/), a API (/api), a operação (/healthz…)
+// e o WebSocket (/ws). PUBLIC_URL (ex.: https://aetheria.duckdns.org) vira a origem permitida padrão. Serviços de hospedagem definem PORT sozinhos.
 export function readConfig(env = process.env) {
+  const port = int(env.PORT, 'PORT', 1, 65535, null);
+  const publicUrl = (env.PUBLIC_URL || '').replace(/\/+$/, '') || null;
   const cfg = {
+    port, single: port != null, publicUrl,
     dbPath: env.DB_PATH || 'data/aetheria.db',
     host: env.HOST || '127.0.0.1',
     apiPort: int(env.API_PORT, 'API_PORT', 1, 65535, 5176),
     gamePort: int(env.GAME_PORT, 'GAME_PORT', 1, 65535, 5175),
     maxPerIp: int(env.MAX_PER_IP, 'MAX_PER_IP', 1, 10000, 20),
-    origins: (env.ALLOWED_ORIGINS || 'http://localhost:5174').split(',').map((s) => s.trim()).filter(Boolean),
+    origins: (env.ALLOWED_ORIGINS || (port != null ? [publicUrl, `http://localhost:${port}`, `http://127.0.0.1:${port}`].filter(Boolean).join(',') : 'http://localhost:5174')).split(',').map((s) => s.trim()).filter(Boolean),
     googleClientId: env.GOOGLE_CLIENT_ID || null,
-    gameUrl: env.GAME_URL || null,
+    gameUrl: env.GAME_URL || (port != null ? '/ws' : null), // porta única: caminho relativo; o navegador monta ws(s)://<mesmo endereço>/ws
     trustProxy: env.TRUST_PROXY === '1',
     metricsToken: env.METRICS_TOKEN || null,
     logLevel: env.LOG_LEVEL || 'info',
     shutdownGraceMs: int(env.SHUTDOWN_GRACE_MS, 'SHUTDOWN_GRACE_MS', 0, 60000, 3000),
   };
-  if (cfg.apiPort === cfg.gamePort) throw new Error('API_PORT e GAME_PORT não podem ser iguais');
+  if (publicUrl && !/^https?:\/\/[^\s/]+$/.test(publicUrl)) throw new Error(`PUBLIC_URL inválida "${publicUrl}" (use https://host, sem caminho)`);
+  if (!cfg.single && cfg.apiPort === cfg.gamePort) throw new Error('API_PORT e GAME_PORT não podem ser iguais');
   for (const o of cfg.origins) if (!/^https?:\/\/[^\s/]+$/.test(o) || o.endsWith('/')) throw new Error(`ALLOWED_ORIGINS: origem inválida "${o}" (use esquema://host[:porta], sem barra final)`);
   if (cfg.metricsToken && cfg.metricsToken.length < 16) throw new Error('METRICS_TOKEN muito curto (mínimo 16 caracteres)');
   if (!['debug', 'info', 'warn', 'error'].includes(cfg.logLevel)) throw new Error(`LOG_LEVEL inválido: "${cfg.logLevel}"`);
   const publicHost = !['127.0.0.1', 'localhost', '::1'].includes(cfg.host);
   cfg.warnings = [];
-  if (publicHost && !cfg.gameUrl) cfg.warnings.push('HOST público sem GAME_URL: o navegador receberá uma URL ws:// sem TLS');
-  if (publicHost && cfg.gameUrl && !cfg.gameUrl.startsWith('wss://')) cfg.warnings.push('GAME_URL não usa wss://: coloque um proxy com TLS na frente');
+  if (cfg.single) { if (publicHost && !publicUrl?.startsWith('https://')) cfg.warnings.push('porta única sem PUBLIC_URL https://: senhas e sessões trafegariam sem TLS; use HTTPS (proxy/Caddy ou o próprio serviço de hospedagem)'); }
+  else if (publicHost && !cfg.gameUrl) cfg.warnings.push('HOST público sem GAME_URL: o navegador receberá uma URL ws:// sem TLS');
+  if (!cfg.single && publicHost && cfg.gameUrl && !cfg.gameUrl.startsWith('wss://')) cfg.warnings.push('GAME_URL não usa wss://: coloque um proxy com TLS na frente');
   if (cfg.origins.some((o) => o.startsWith('http://') && !/localhost|127\.0\.0\.1/.test(o))) cfg.warnings.push('ALLOWED_ORIGINS contém origem http:// que não é local');
   return cfg;
 }

@@ -102,7 +102,7 @@ test('um personagem não entra duas vezes; reconexão exige a mesma conta', asyn
   await closeAll(srv, a, dup, ladrao, semSessao, volta);
 });
 
-test('fim de partida: ouro, XP e rating são gravados no banco pelo servidor, uma vez só, e cada jogador recebe o resumo', async () => {
+test('fim de partida: ouro e rating são gravados no banco pelo servidor (arena não dá XP), uma vez só, e cada jogador recebe o resumo', async () => {
   const { db, A, B } = world();
   const srv = await start(db);
   const { a, b, wa, wb } = await duel(srv, A, B);
@@ -117,7 +117,7 @@ test('fim de partida: ouro, XP e rating são gravados no banco pelo servidor, um
   assert.equal(dB.gold, B.doc.gold + 10 + 20, 'perdedor: ouro = 10 + nível × 2');
   assert.equal(dA.arena.wins, 1); assert.equal(dA.arena.losses, 0); assert.equal(dB.arena.losses, 1);
   assert.equal(dA.arena.rating, 1016); assert.equal(dB.arena.rating, 984, 'o rating do perdedor não depende da ordem de pagamento');
-  assert.ok(dA.xp > A.doc.xp || dA.level > 10);
+  assert.equal(dA.xp, A.doc.xp, 'arena não dá XP (core/rewards.js › PVP_XP, decisão do dono)'); assert.equal(dA.level, A.doc.level);
   const ra = await a.waitFor((m) => m.t === 'reward'), rb = await b.waitFor((m) => m.t === 'reward');
   assert.equal(ra.won, true); assert.equal(ra.ratingDelta, 16); assert.equal(rb.won, false); assert.equal(rb.ratingDelta, -16); assert.equal(ra.mode, '1v1');
   assert.equal(db.raw.prepare("select count(*) n from operations where kind = '1v1'").get().n, 2);

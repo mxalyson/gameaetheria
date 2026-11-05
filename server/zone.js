@@ -3,9 +3,10 @@
 // envia intenções. Recompensas acumulam por jogador e são gravadas em lote numa operação idempotente (a cada FLUSH_EVERY s, ao sair e ao fechar).
 // Mesma interface das outras salas (o Hub trata todas igual). Loot é individual: cada membro rola o seu (classe própria → arma certa).
 import { randomBytes } from 'node:crypto';
-import { World, makeHeroActor, makeSpiritActor } from '../public/src/game/sim.js';
+import { World, makeHeroActor, makeSpiritActor, PICK_R, PICK_DELAY } from '../public/src/game/sim.js';
+import { INVENTORY_SIZE } from '../public/src/data/items.js';
 import { makeRng } from '../public/src/core/rng.js';
-import { mobXp, createSpirit } from '../public/src/core/progression.js';
+import { mobXp, createSpirit, xpToNext, MAX_LEVEL } from '../public/src/core/progression.js';
 import { rollMobLoot } from '../public/src/core/loot.js';
 import { MOUNT_MUL } from '../public/src/data/mounts.js';
 import { applyZoneBatch } from '../public/src/core/rewards.js';
@@ -43,7 +44,7 @@ export class ZoneRoom {
     this.state = 'fight'; this.countdown = 0; this.winner = 0; this.reason = null; this.closed = false;
     this.clock = 0; this.tick = 0; this.events = []; this.enc = new DeltaEncoder();
     this.players = new Map();
-    this.joined = []; this.left = []; this.flushSeq = 0; this.flushT = FLUSH_EVERY;
+    this.joined = []; this.left = []; this.flushSeq = 0; this.flushT = FLUSH_EVERY; this.dropSeq = 0;
     this.bytes = 0;
   }
 
@@ -94,6 +95,7 @@ export class ZoneRoom {
     if (!p || p.left) return;
     if (m.seq <= p.lastSeq) { this.send.stats.staleInputs++; return; }
     p.lastSeq = m.seq;
+    if (m.pick != null) p.actor.spiritPick = m.pick; // máscara do que o spirit busca (game/sim.js spiritWants); vale por jogador
     p.input = { mx: m.mx, my: m.my, aimX: m.aimX, aimY: m.aimY, attack: m.attack, cast: m.cast ?? p.input.cast, run: m.run === true, mount: m.mount ?? p.input.mount }; // mount: pedido de montar/desmontar, entregue uma vez só (como cast); quem decide é World.applyIntent
   }
   dropped(session) { const p = session.player; if (p && !p.left) { p.dropT = this.clock; p.input = idle(); } }
@@ -129,6 +131,7 @@ export class ZoneRoom {
       if (a.dead) { if (p.deadAt != null && this.clock - p.deadAt >= RESPAWN_AFTER) this.respawn(p); continue; }
       // regeneração fora de combate (mesma do jogo offline)
       if (this.world.time - a.lastCombat > 5) this.world.heal(a, a.maxHp * 0.03 * TICK_DT, true);
+      this.collectDrops(p);
       p.portalCd = Math.max(0, p.portalCd - TICK_DT);
       if (p.portalCd <= 0 && this.onPortal) {
         for (const pt of this.world.zone.portals ?? []) if (Math.hypot(pt.x - a.x, pt.y - a.y) < 50) { this.onPortal(p, pt); break; }
@@ -169,19 +172,52 @@ export class ZoneRoom {
     for (const p of this.alive()) {
       const a = p.actor;
       if (Math.hypot(a.x - m.x, a.y - m.y) > SHARE_RADIUS) continue;
-      if (!m.summoned) p.pend.xp += mobXp(m.level, a.level, mul); // esbirros de chefe não dão XP nem loot
+      const xp = Math.round(mobXp(m.level, a.level, mul));
+      p.pend.xp += xp;
       p.pend.kills.push({ mobId: m.mobId, boss: !!m.boss, mini: !!m.miniboss, spiritType: this.spiritTypeOf(p) });
-      const seen = []; // o que ESTE jogador ganhou, só para o visual (spirit busca no chão); o servidor já gravou no lote
+      // igual ao jogo offline: ouro direto na bolsa (com o "+N" na hora); item, poção e essência CAEM no chão para o dono pegar (ou o spirit buscar)
+      let gold = 0;
       for (const d of rollMobLoot(this.rng, m, p.classId, p.pity, rm)) {
-        if (d.kind === 'item') seen.push(['i', RARITY[d.item.rarity]?.index ?? 0]); else if (d.kind === 'potion') seen.push(['p', 0]); else if (d.kind === 'essence') seen.push(['e', 0]);
-        if (d.kind === 'gold') p.pend.gold += d.amount;
-        else if (d.kind === 'potion') p.pend.potions += d.amount;
-        else if (d.kind === 'whistle') p.pend.whistles += d.amount; // Apito de Montaria
-        else if (d.kind === 'item') p.pend.items.push({ ...d.item, id: 'i' + randomBytes(9).toString('base64url') });
-        else if (d.kind === 'essence') p.pend.essences.push(createSpirit(this.rng, { luck: d.luck, level: Math.max(1, a.level - 2) }));
+        if (d.kind === 'gold') { p.pend.gold += d.amount; gold += d.amount; }
+        else if (d.kind === 'whistle') p.pend.whistles += d.amount; // Apito de Montaria (contador, não cai no chão)
+        else this.dropFor(p, m, d);
       }
-      if (seen.length) this.events.push({ e: 'loot', to: a.id, x: Math.round(m.x), y: Math.round(m.y), d: seen.slice(0, 8) });
+      this.sendTo(p, { t: 'zone_loot', gold, xp }); // aviso imediato (a gravação no banco continua em lote, a cada FLUSH_EVERY s)
+      if (this.wouldLevel(p)) this.flush(p); // subiu de nível: grava já (vida cheia, pontos e o aviso "Nível N!" na hora, como no offline)
     }
+  }
+  sendTo(p, msg) { if (p.session?.ws && p.session.player === p) this.send.to(p.session, msg); }
+  // o XP pendente completa o nível do documento oficial?
+  wouldLevel(p) { const c = p.session?.char; return !!c && c.level < MAX_LEVEL && (c.xp ?? 0) + p.pend.xp >= xpToNext(c.level); }
+
+  // ---- drops no chão (com dono): o mesmo World.drops do jogo; expiram em DROP_LIFE e o spirit do dono busca (game/sim.js) ----
+  dropFor(p, m, loot) {
+    const id = 'd' + (++this.dropSeq).toString(36);
+    const r = this.rng, d = { ...loot, id, owner: p.actor.id, x: m.x + r.range(-26, 26), y: m.y + r.range(-18, 18), vx: 0, vy: 0, t: 0 };
+    if (d.kind === 'item') d.item = { ...d.item, id: 'i' + randomBytes(9).toString('base64url') };
+    this.world.drops.push(d);
+    this.sendTo(p, { t: 'zone_drop', id, kind: d.kind, x: Math.round(d.x), y: Math.round(d.y), amount: d.amount, item: d.item ? { name: d.item.name, rarity: d.item.rarity, opal: !!d.item.opal, slot: d.item.slot, classId: d.item.classId, weaponType: d.item.weaponType, level: d.item.level } : undefined });
+  }
+  // coleta do dono: passou por cima (PICK_R, depois de PICK_DELAY s) ou o spirit trouxe. Mochila cheia: o item fica no chão com aviso (como no offline);
+  // trazido pelo spirit com a mochila cheia vira ouro (também como no offline).
+  collectDrops(p) {
+    const a = p.actor, w = this.world;
+    let changed = false;
+    for (const d of w.drops) {
+      if (d.owner !== a.id || d.taken) continue;
+      if (!d.fetched && (d.t < PICK_DELAY || Math.hypot(d.x - a.x, d.y - a.y) > PICK_R)) continue;
+      const out = { t: 'zone_pickup', id: d.id, kind: d.kind };
+      if (d.kind === 'item') {
+        const full = (p.session?.char?.inventory?.length ?? 0) + p.pend.items.length >= INVENTORY_SIZE;
+        if (full && !d.fetched) { if (!d.warned) { d.warned = true; this.sendTo(p, { t: 'zone_full' }); } continue; }
+        if (full) { p.pend.gold += d.item.value ?? 0; out.gold = d.item.value ?? 0; } else p.pend.items.push(d.item);
+        out.item = { name: d.item.name, rarity: d.item.rarity, opal: !!d.item.opal };
+      } else if (d.kind === 'potion') { p.pend.potions += d.amount; out.amount = d.amount; }
+      else if (d.kind === 'essence') { p.pend.essences.push(createSpirit(this.rng, { luck: d.luck, level: Math.max(1, a.level - 2) })); }
+      d.taken = true; changed = true;
+      this.sendTo(p, out);
+    }
+    if (changed) w.drops = w.drops.filter((d) => !d.taken);
   }
 
   // Tipo do spirit ativo do personagem (a sala de zona não tem o ator do spirit; vale o do documento): conta para a missão de evolução.
@@ -223,6 +259,7 @@ export class ZoneRoom {
     this.flush(p);
     p.left = true;
     this.world.actors = this.world.actors.filter((a) => a !== p.actor && !(a.kind === 'spirit' && a.owner === p.actor.id));
+    this.world.drops = this.world.drops.filter((d) => d.owner !== p.actor.id); // como no offline: sair da zona deixa para trás o que ficou no chão
     this.left.push(p.actor.id);
     if (p.session) { p.session.room = null; p.session.player = null; }
     this.events.push({ e: 'left', actor: p.actor.id });

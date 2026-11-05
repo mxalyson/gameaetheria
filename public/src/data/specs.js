@@ -45,20 +45,21 @@ export const SPECS = {
   archer: {
     sniper: {
       name: 'Franco-atirador', icon: '🎯', color: '#7dffe6', desc: 'Um tiro por vez: mira perfeita, armadilha de gelo, recuo com crítico garantido e o Tiro Letal. Básico lento e longo.',
-      mods: { stats: { critAdd: 8, critMultAdd: 0.2 }, basic: { cd: 0.8, range: 700, mult: 0.85, speed: 900 } },
+      mods: { stats: { critAdd: 8, critMultAdd: 0.2, hpMul: 1.05 }, basic: { cd: 0.8, range: 700, mult: 0.85, speed: 900 } },
     },
     gunslinger: {
       name: 'Pistoleiro', icon: '💥', color: '#ffb23d', desc: 'Besta de repetição: rajada em leque, granada explosiva, rolamento duplo e saraivada. Disparos rápidos de perto.',
-      mods: { basic: { cd: 0.36, range: 430, mult: 0.56, speed: 780 } },
+      mods: { stats: { hpMul: 1.02 }, basic: { cd: 0.36, range: 430, mult: 0.56, speed: 780 } },
     },
   },
   cleric: {
     guardian: {
       name: 'Sentinela', icon: '🛡️', color: '#fff0b0', desc: 'Protetor do grupo: cura em área, escudo para todos os aliados, Palavra de Salvação e Intervenção Celestial.',
+      mods: { stats: { hpMul: 1.02 } },
     },
     inquisitor: {
       name: 'Inquisidor', icon: '⚖️', color: '#ffb36b', desc: 'Dano sagrado: julgamento que queima, marca que amplia o dano, chama purificadora e o Livro do Veredito.',
-      mods: { stats: { powerMul: 1.16, lifesteal: 0.12 } },
+      mods: { stats: { powerMul: 1.16, lifesteal: 0.10 } }, // roubo de vida 12→10% (2026-11-04): o Clérigo não pode vencer o Arqueiro (decisão do dono)
     },
   },
 };

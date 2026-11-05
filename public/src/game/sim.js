@@ -32,6 +32,7 @@ export function spiritWants(mask, d) {
   if (d.kind === 'essence') return ((mask >> 6) & 1) === 1;
   return true;
 }
+export const PICK_R = 44, PICK_DELAY = 0.4; // coleta de drop: distância (px) e tempo mínimo no chão (s) — iguais no jogo offline e no servidor
 export const DROP_LIFE = 120, DROP_BLINK = 10, DROP_MAX = 120; // drops no chão: vida (s), piscar final (s) e teto por mundo
 export const RUN_MUL = 1.3, RUN_COMBAT_GRACE = 3; // correr (sprint): +30% fora de combate (docs/gameplay/sistemas.md)
 export const RUN_ZONES = new Set(['town', 'forest', 'plains', 'harbor', 'ruins', 'glacier', 'ember']); // nunca arena PvP, ondas nem Cripta (equilíbrio do PvP)
@@ -1004,7 +1005,7 @@ export class World {
     if (!d) {
       let best = Infinity;
       for (const c of this.drops) {
-        if (c.taken || c.carried || c.fetched || c.kind === 'gold' || !spiritWants(this.spiritPick, c) || c.t < 0.4 || Math.hypot(c.x - o.x, c.y - o.y) > F.range) continue;
+        if (c.taken || c.carried || c.fetched || c.kind === 'gold' || !spiritWants(o.spiritPick ?? this.spiritPick, c) || c.t < PICK_DELAY || (c.owner != null && c.owner !== o.id) || Math.hypot(c.x - o.x, c.y - o.y) > F.range) continue; // online: só o drop do próprio dono
         const dd = Math.hypot(c.x - s.x, c.y - s.y);
         if (dd < best) { best = dd; d = c; }
       }

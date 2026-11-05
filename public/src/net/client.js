@@ -59,10 +59,16 @@ export class NetClient {
       case 'match_end': this.match = null; this.h.matchEnd?.(m); break;
       case 'zone_joined': this.queue = null; this.match = m; this.h.zoneJoined?.(m); break;
       case 'zone_reward': this.h.zoneReward?.(m); break;
+      case 'zone_loot': this.h.zoneLoot?.(m); break;     // ouro/XP de um abate, na hora (o lote grava depois)
+      case 'zone_drop': this.h.zoneDrop?.(m); break;     // item/poção/essência caiu no chão (só para o dono)
+      case 'zone_pickup': this.h.zonePickup?.(m); break; // o servidor confirmou a coleta
+      case 'zone_full': this.h.zoneFull?.(m); break;     // mochila cheia: o item ficou no chão
       case 'friendly_reward': this.h.friendlyReward?.(m); break; // vitória no duelo amistoso contada pelo servidor (só a missão)
       case 'tx_result': this.h.txResult?.(m); break; // resposta de uma transação do servidor (loja, baú, poção…; server/tx.js)
       case 'zone_exit': this.match = null; this.h.zoneExit?.(m); break;
       case 'notice': this.notes.push(m); this.h.notice?.(m); break;
+      case 'chat': this.h.chat?.(m); break; // chat online (canal global ou do grupo; ui/chat.js)
+      case 'chat_history': this.h.chatHistory?.(m.list); break;
       case 'reject': this.h.reject?.(m); break;
       case 'pong': this.rtt = Math.round(performance.now() - m.ts); break;
     }
@@ -76,7 +82,7 @@ export class NetClient {
   decline(partyId) { this.invites = this.invites.filter((i) => i.partyId !== partyId); this.send({ t: 'party_decline', partyId }); }
   leaveParty() { this.send({ t: 'party_leave' }); }
   kick(name) { this.send({ t: 'party_kick', name }); }
-  sendInput(i) { this.send({ t: 'input', seq: ++this.seq, mx: i.mx, my: i.my, aimX: i.aimX, aimY: i.aimY, attack: !!i.attack, cast: i.cast ?? null, ...(i.run ? { run: true } : {}), ...(i.mount === true || i.mount === false ? { mount: i.mount } : {}) }); }
+  sendInput(i) { this.send({ t: 'input', seq: ++this.seq, mx: i.mx, my: i.my, aimX: i.aimX, aimY: i.aimY, attack: !!i.attack, cast: i.cast ?? null, ...(i.run ? { run: true } : {}), ...(i.pick != null ? { pick: i.pick } : {}), ...(i.mount === true || i.mount === false ? { mount: i.mount } : {}) }); }
   ping() { this.send({ t: 'ping', ts: performance.now() }); }
   close() { this.closing = true; this.ws?.close(); this.connected = false; this.joined = false; this.token = null; }
 }

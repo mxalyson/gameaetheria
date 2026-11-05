@@ -35,6 +35,8 @@ export function createGameServer({
   maxPerIp = 20,             // por endereço (jogadores atrás do mesmo roteador/NAT cabem; inundação a partir de um IP, não)
   helloTimeoutMs = 10000,    // quem não se identifica a tempo é desconectado (conexões ociosas gastam recursos)
   trustProxy = false,        // atrás de proxy reverso: usa X-Forwarded-For para o IP
+  server = null,             // porta única: servidor HTTP já existente (o WebSocket atende em `path`)
+  path = '/ws',
 } = {}) {
   const rng = makeRng(seed);
   const stats = { connections: 0, messages: 0, rejected: 0, kicked: 0, refused: 0, helloTimeouts: 0 };
@@ -70,7 +72,7 @@ export function createGameServer({
   Object.defineProperty(stats, 'staleInputs', { get: () => hub.stats.staleInputs, enumerable: true });
 
   const wss = new WebSocketServer({
-    port, host, maxPayload: 2048, perMessageDeflate: false,
+    ...(server ? { server, path } : { port, host }), maxPayload: 2048, perMessageDeflate: false,
     verifyClient: allowedOrigins ? ({ origin }) => allowedOrigins.includes(origin) : undefined,
   });
 
@@ -108,6 +110,7 @@ export function createGameServer({
     send(ws, { t: 'welcome', token: s.token, name: s.name, level: s.char.level, classId: s.char.classId, account: !!s.accountId, resumed, protocol: PROTOCOL_VERSION,
       tickHz: TICK_HZ, snapEvery: SNAPSHOT_EVERY, pvpMinLevel: PVP_MIN_LEVEL, partyMax: 4 });
     if (s.room && s.player) hub.sendMatchFound(s, s.room, s.player);
+    if (!resumed) hub.sendChatHistory(s); // quem acabou de entrar vê a conversa recente do canal global
   }
 
   function onMessage(ws, data) {

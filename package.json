@@ -12,6 +12,7 @@
     "balance": "node tools/balance.mjs",
     "server:poc": "node server/start-poc.js",
     "server": "node server/start.js",
+    "online": "node server/online-pc.js",
     "db:backup": "node tools/db-backup.mjs",
     "db:restore": "node tools/db-restore.mjs",
     "bench:net": "node tools/net-bench.mjs",

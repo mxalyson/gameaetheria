@@ -6,12 +6,12 @@ import { whenNatureReady } from './render/nature-sprites.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { UI, esc } from './ui/ui.js';
-import { World, makeHeroActor, makeMobActor, makeSpiritActor, SPIRIT_FETCH, SPIRIT_PICK_ALL, spiritWants, RUN_ZONES } from './game/sim.js';
+import { World, makeHeroActor, makeMobActor, makeSpiritActor, SPIRIT_PICK_ALL, RUN_ZONES, PICK_R, PICK_DELAY } from './game/sim.js';
 import { waterWaypoint } from './game/ai.js';
 import { questTarget, guideGoal, pickTracked, trackerText, buildNavGrid, findPath, followPath, lineFree, autoPauseReason } from './core/autopath.js';
 import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore, hasMastery } from './core/stats.js';
-import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit } from './core/progression.js';
+import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit, MAX_LEVEL } from './core/progression.js';
 import { generateItem, rollMobLoot } from './core/loot.js';
 import { generateRivalForPower } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
@@ -20,7 +20,12 @@ import { playerPower, pvpUnlocked, PVP_MIN_LEVEL } from './core/power.js';
 import { chooseSpec, buySeal, specInfo, activeSpec, needsSeal, sealsOf, SEAL_PRICE } from './core/specs.js';
 import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.js';
 import { cleanName } from './core/savedoc.js';
-import { apiUrl, Online, CloudSave } from './online.js';
+import { apiUrl, wsUrl, Online, CloudSave } from './online.js';
+import { ChatBox } from './ui/chat.js';
+import { AudioEngine, musicFor, isIOS } from './audio.js';
+import { installCanvasGuard, onCanvasPressure, canvasFails } from './render/memguard.js';
+import { releaseMobs, mobIdsOf } from './render/mob-sprites.js';
+installCanvasGuard(); // antes de qualquer canvas: detecta o teto de memória do Safari (getContext devolve null em silêncio)
 import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
 import { decodeLook } from './core/aura.js';
@@ -69,9 +74,11 @@ class Game {
   constructor() {
     this.canvas = document.getElementById('game');
     this.renderer = new Renderer(this.canvas);
+    onCanvasPressure((n) => this.relieveMemory(n));
     this.input = new Input(this.canvas);
     this.ui = new UI(this);
     this.prefs = loadPrefs();
+    this.audio = new AudioEngine({ musicVol: this.prefs.music / 100, sfxVol: this.prefs.sfx / 100 }); // só toca depois do 1º toque (regra dos navegadores)
     this.qgov = new QualityGovernor();
     this.autoMountSt = { t: 0, hold: false }; // estado do "montar automático" (touch-logic.js stepAutoMount); antes do TouchControls, que lê mountUiOk
     this.touch = new TouchControls(this);
@@ -138,7 +145,8 @@ class Game {
       if (lowered) { this.applyPrefs(); if (this.qgov.shouldNotify()) this.ui.toast('Qualidade ajustada', 'Efeitos reduzidos para manter a fluidez', ''); } // só efeitos: resolução e arte HD ficam
       const ok = this.guard('quadro', () => this.frameBody(dt));
       this.frameFails = ok ? 0 : (this.frameFails ?? 0) + 1;
-      if (this.frameFails === 20) this.ui.toast('Erro', 'Algo deu errado, recarregue a página.', '');
+      if (this.frameFails === 20 && canvasFails() === this.canvasFailsAtWarn) this.ui.toast('Erro', 'Algo deu errado, recarregue a página.', ''); // falta de memória de canvas tem aviso próprio (relieveMemory)
+      if (this.frameFails === 0) this.canvasFailsAtWarn = canvasFails();
     } finally {
       requestAnimationFrame((t) => this.frame(t));
     }
@@ -166,6 +174,7 @@ class Game {
         this.touch.update(this);
       }) || bad;
     }
+    if ((this.musicT = (this.musicT ?? 0) - dt) <= 0) { this.musicT = 0.5; this.guard('audio', () => this.updateMusic()); } // música por lugar (2 vezes por segundo basta)
     this.guard('rede', () => {
       this.cloud?.tick();
       if (this.net?.connected && (this.netPingT = (this.netPingT ?? 0) - dt) <= 0) { this.net.ping(); this.netPingT = 2; }
@@ -237,6 +246,8 @@ class Game {
       case 'mount-toggle': this.toggleMount(); break;
       case 'mount-set': this.setMount(arg); break;
       case 'mount-whistle': this.useWhistleItem(); break;
+      case 'sound-test': { const st = this.audio.test(); this.ui.toast('Som', st === 'running' ? 'Tocou um sino. Se não ouviu, aumente o volume do aparelho.' : 'O navegador ainda não liberou o som: toque em Testar som de novo.', ''); break; }
+      case 'chat': this.chatBox?.toggle(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'fullscreen': this.toggleFullscreen(); document.getElementById('menu-btns')?.classList.remove('open'); break;
       case 'buy-potion': this.buyPotion(Number(arg)); break;
       case 'buy-scroll': this.buyScroll(Number(arg)); break;
@@ -288,7 +299,7 @@ class Game {
     if (heroSpritesEnabled()) showHeroLoading(Promise.all([preloadHero(char), whenNatureReady()])); // visual novo: espera o herói e o cenário pintado (casas HD) carregarem
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
-      setTimeout(() => this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Fale com a Guarda Ren (marca ❗) para receber sua primeira missão', 'gold'), 2600); // depois da tela "Preparando seu herói" (antes o toast expirava escondido)
+      setTimeout(() => this.ui.announce(`Bem-vindo, ${esc(char.name)}!`, 'Fale com a Guarda Ren (marca ❗) para a primeira missão', 'gold', 3200), 2600); // depois da tela "Preparando seu herói" (antes o toast expirava escondido)
       // o tutorial segue o modo de controle (toque é o padrão; teclado e mouse só se escolhido nas opções)
       if (this.touch?.active) this.ui.log('Arraste à esquerda para andar · botão grande ataca · círculos menores são as habilidades', '#cfe8ff');
       else this.ui.log('Mover: arraste o botão esquerdo do mouse ou use as setas · clique ataca · habilidades nos botões', '#cfe8ff');
@@ -352,7 +363,7 @@ class Game {
     this.cam = this.renderer.camera(this.world, this.player);
     this.ui.banner(null);
     const z = this.world.zone;
-    this.ui.toast(z.name, z.level ? `Nível ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : z.safe ? 'Zona segura' : '');
+    this.ui.announce(z.name, z.level ? `Nível ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : z.safe ? 'Zona segura' : '', '');
     if (zoneId === 'town') this.refreshShop();
     if (zoneId === 'ember') this.tip('ritual'); // explica o "Ritual N/40" na primeira visita
     else if (zoneId === 'forest') this.tip('forest');
@@ -397,7 +408,7 @@ class Game {
     try {
       const cfg = await this.online.loadConfig();
       this.googleClientId = cfg.googleClientId ?? null;
-      this.maxCharacters = cfg.maxCharacters ?? 4;
+      this.maxCharacters = cfg.maxCharacters ?? 3;
       if (this.online.hasSession) { await this.showChars(); return; }
       this.showAuth('login');
     } catch (e) {
@@ -446,7 +457,7 @@ class Game {
     try {
       const me = await this.online.me();
       this.account = me.account;
-      this.ui.showCharacters(me.characters, { email: me.account.email ?? 'conta Google', maxCharacters: this.maxCharacters ?? 4, hasLocalSave: !!loadChar(), msg });
+      this.ui.showCharacters(me.characters, { email: me.account.email ?? 'conta Google', maxCharacters: this.maxCharacters ?? 3, hasLocalSave: !!loadChar(), msg });
     } catch (e) { this.showAuth('login', e.status === 401 ? '' : e.message); }
   }
 
@@ -506,20 +517,29 @@ class Game {
   // ---------------- multiplayer no jogo real (servidor autoritativo) ----------------
   async connectNet() {
     this.disconnectNet();
-    const url = this.online?.config?.gameUrl;
+    // chat online: uma caixa só (fora dos painéis), criada na 1ª conexão; o canal Grupo acompanha o grupo do servidor
+    this.chatBox ??= new ChatBox({ send: (ch, text) => { if (!this.net?.joined) return false; this.net.send({ t: 'chat', ch, text }); return true; }, me: () => this.net?.name ?? null });
+    const url = wsUrl(this.online?.config?.gameUrl, this.online?.base || location.href); // '/ws' (porta única) vira ws(s)://<site>/ws
     if (!url || !this.online.token || this.charId == null) return;
     const refresh = () => { if (this.ui.isOpen('party') || this.ui.isOpen('arena')) this.ui.render(); };
     const net = this.net = new NetClient({
       url, session: this.online.token, characterId: this.charId,
       handlers: {
-        party: refresh,
+        party: (p) => { this.chatBox?.setParty(!!p); refresh(); },
         queue: () => { refresh(); },
         invite: (m) => { this.ui.toast('Convite de grupo', `${m.from} convidou você (botão 👥)`, 'gold'); refresh(); },
         notice: (m) => { this.ui.log(noticeText(m), '#cfe3ff'); refresh(); },
-        reject: (m) => { this.zoneBusy = false; this.teleportPending = false; this.portalCd = 4; /* recusa (ex.: sala cheia): espera antes de tentar o portal de novo, sem laço de pedidos */ if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(CRYPT_REJECT[m.code] ? 'Cripta dos Ecos' : TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', m.reason ?? CRYPT_REJECT[m.code] ?? TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
+        chat: (m) => this.chatBox?.add(m),
+        chatHistory: (list) => this.chatBox?.history(list),
+        reject: (m) => { if (this.chatBox?.rejected(m.code)) return; // recusa do chat (ritmo, sem grupo): aviso na própria caixa
+ this.zoneBusy = false; this.teleportPending = false; this.portalCd = 4; /* recusa (ex.: sala cheia): espera antes de tentar o portal de novo, sem laço de pedidos */ if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(CRYPT_REJECT[m.code] ? 'Cripta dos Ecos' : TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', m.reason ?? CRYPT_REJECT[m.code] ?? TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
+        zoneLoot: (m) => this.onZoneLoot(m),
+        zoneDrop: (m) => this.onZoneDrop(m),
+        zonePickup: (m) => this.onZonePickup(m),
+        zoneFull: () => { if (this.inNetZone()) this.ui.log('Inventário cheio! Venda itens na vila.', '#ffb4a8'); },
         friendlyReward: (m) => { for (const id of m.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold'); this.announceAchievements(m.achievements ?? []); },
         txResult: (m) => this.onTxResult(m),
         zoneExit: (m) => this.leaveNetMatch(m),
@@ -539,7 +559,7 @@ class Game {
     try { await net.connect(); refresh(); }
     catch (e) { this.ui.log(e.message === 'already_online' ? 'Este personagem já está conectado em outro lugar.' : 'Servidor de partidas indisponível: o PvP online e o cooperativo ficam desligados.', '#ffb4a8'); this.net = null; }
   }
-  disconnectNet() { this.net?.close(); this.net = null; this.netBanner = false; }
+  disconnectNet() { this.net?.close(); this.net = null; this.netBanner = false; this.chatBox?.clear(); this.chatBox?.setParty(false); }
 
   async netQueue(mode) {
     if (!this.net?.joined) return this.ui.toast('Servidor de partidas', 'Ainda conectando…', '');
@@ -551,6 +571,15 @@ class Game {
   // exploração dentro de uma instância do servidor (P11)
   inNetZone() { return this.mode === 'net' && this.netInfo?.mode === 'zone'; }
   // equipamento/atributos/spirits mudam o personagem no cliente; na instância o servidor é o dono do personagem (transações de loja/equipar: P11.4)
+  // Vila nas cidades, exploração nos mapas, batalha com chefe vivo por perto ou em partida (arena, ondas, cooperativo, Cripta). audio.js › musicFor
+  updateMusic() {
+    if (this.mode === 'ended') return;
+    const w = this.mode === 'title' ? this.titleWorld : this.world, p = this.player;
+    const netMatch = this.mode === 'net' && this.netInfo?.mode && this.netInfo.mode !== 'zone';
+    const bossNear = !!(w && p && w.actors.some((a) => a.boss && !a.dead && Math.hypot(a.x - p.x, a.y - p.y) < 1100));
+    this.audio.setMusic(musicFor({ mode: netMatch ? 'pvp' : this.mode, zone: w?.zone, bossNear }));
+  }
+
   togglePanel(id) {
     if ((id === 'journal' || id === 'map') && this.mode !== 'explore' && !(id === 'map' && this.inNetZone())) return; // diário e mapa só no mundo normal (o mapa também abre na instância online: lá o nó da Vila é o retorno)
     if (id === 'party' && !this.online) return;
@@ -575,7 +604,7 @@ class Game {
     if (this.cloud) this.cloud.paused = true; // na instância o servidor altera o personagem
     const w = new World(m.zone, { visuals: true });
     this.world = w; this.mode = 'net'; this.netInfo = info; this.netRitual = null; this.netCrypt = null; this.cryptLast = null; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
-    this.netActors = new Map(); this.netMobs = new Map(); this.netSnaps = []; this.netLast = null; this.netPred = null; this.netT = 0; this.netCastPending = null; this.netVProj = [];
+    this.netActors = new Map(); this.netMobs = new Map(); this.netSnaps = []; this.netLast = null; this.netPred = null; this.netT = 0; this.netCastPending = null; this.netVProj = []; this.netPickSent = null;
     for (const p of m.players) this.netAddHero(p, m.you);
     this.player = this.netActors.get(m.you);
     const st = computeStats(this.char);
@@ -585,7 +614,7 @@ class Game {
     this.cam = this.renderer.camera(w, this.player);
     this.ui.banner(null);
     const z = w.zone;
-    this.ui.toast(z.name, `Nível ${z.level[0]}–${z.level[1]} · instância ${this.net?.party ? 'do grupo' : 'solo'} (botão 🏠 volta à vila)`);
+    this.ui.announce(z.name, `Nível ${z.level[0]}–${z.level[1]}${this.net?.party ? ' · com o grupo' : ''}`, '');
   }
   netAddHero(p, you) {
     const doc = newCharacter(p.name, p.classId, makeRng(p.id)); doc.level = p.level ?? 1;
@@ -596,12 +625,38 @@ class Game {
     return a;
   }
   // recompensas gravadas pelo servidor: avisa e adota o personagem oficial (o servidor é quem soma XP/ouro/itens)
+  // ---- online igual ao offline: ouro/XP na hora e itens no chão (o servidor decide; aqui só o que o jogador vê e ouve) ----
+  onZoneLoot(m) {
+    if (!this.inNetZone() || !this.player) return;
+    const c = this.char, p = this.player;
+    if (m.gold) { c.gold += m.gold; this.world.addText({ x: p.x, y: p.y - 34, t: 0, life: 0.8, text: `+${m.gold}`, size: 13, color: '#ffd34d' }); this.audio.play('coins'); }
+    if (m.xp && c.level < MAX_LEVEL) c.xp = Math.min((c.xp ?? 0) + m.xp, xpToNext(c.level) - 1); // barra anda já; o nível novo vem do servidor (grava na hora quando completa)
+  }
+  onZoneDrop(m) {
+    if (!this.inNetZone()) return;
+    const it = m.item ? { ...m.item, kind: 'gear', stats: {} } : undefined;
+    this.world.drops.push({ kind: m.kind, item: it, amount: m.amount, x: m.x, y: m.y, vx: 0, vy: 0, t: 0, netId: m.id });
+    if (it && (it.opal || it.rarity === 'epic' || it.rarity === 'legendary')) { // aviso e brilho para drop raro (igual ao offline)
+      this.world.burst(m.x, m.y, it.opal ? '#bfe9ff' : it.rarity === 'legendary' ? '#ffa53d' : '#b77cff', 30, 260);
+      this.ui.toast(it.opal ? 'Item de Ópalo!' : it.rarity === 'legendary' ? 'Item lendário!' : 'Item épico!', esc(it.name), 'gold');
+    }
+  }
+  onZonePickup(m) {
+    if (!this.inNetZone()) return;
+    const w = this.world;
+    w.drops = w.drops.filter((d) => d.netId !== m.id);
+    if (m.kind === 'item' && m.item) {
+      const R = RARITY[m.item.rarity] ?? RARITY.common;
+      if (m.gold) { this.char.gold += m.gold; w.addText({ x: this.player.x, y: this.player.y - 34, t: 0, life: 0.8, text: `+${m.gold}`, size: 13, color: '#ffd34d' }); this.audio.play('coins'); }
+      else { this.ui.log(`Obtido: <b style="color:${R.color}">${esc(m.item.name)}</b> (${R.name})`, '#e8e6f0'); this.audio.play(R.index >= 3 ? 'levelup' : 'loot'); }
+    } else if (m.kind === 'potion') { this.ui.log(`+${m.amount ?? 1} 🧪 Poção de Vida`, '#ff9aa8'); this.audio.play('loot'); }
+    else if (m.kind === 'essence') { this.ui.log('Essência de spirit obtida! (Spirits)', '#9fe0ff'); this.audio.play('levelup'); }
+  }
+
   async onZoneReward(r) {
     if (!this.inNetZone()) return;
     const parts = [];
-    if (r.gold) parts.push(`${r.gold > 0 ? '+' : ''}${r.gold} ouro`);
-    if (r.xp) parts.push(`+${r.xp} XP`);
-    if (r.items) parts.push(`${r.items} item(ns)`);
+    // ouro, XP, itens e poções já apareceram na hora (zone_loot/zone_pickup); aqui só o que não tem aviso próprio
     if (r.frags) parts.push(`+${r.frags} Fragmento(s) de Eco`);
     if (r.potions) parts.push(`+${r.potions} 🧪`);
     if (r.whistles) { parts.push(`+${r.whistles} ${WHISTLE.name}`); this.ui.toast(WHISTLE.name + '!', 'Use em Personagem > Montarias para chamar uma montaria.', 'gold'); }
@@ -613,7 +668,7 @@ class Game {
         { this.deathCard = performance.now() + 900; this.ui.showResult({ title: 'Você caiu…', sub: ZONES[r.zone]?.name ?? '', lines: [this.deathLine(dr, r.phoenix ?? 0), 'Você renasce no último ponto salvo deste mapa.'], button: 'Renascer no ponto salvo', action: 'respawn-online', tone: 'lose' }); }
       } else this.ui.log('Você caiu.', '#ffb4a8');
     }
-    if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos em Personagem.', 'gold');
+    if (r.levels) this.ui.announce(`Nível ${r.level}!`, '+5 pontos de atributo', 'gold');
     for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     for (const id of r.achievements ?? []) this.announceAchievements([id]);
     try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char, { paused: true }); } } catch { /* tenta no próximo lote */ }
@@ -672,7 +727,7 @@ class Game {
     if (this.cloud) this.cloud.paused = true; // durante a partida o servidor é quem altera o personagem
     const w = new World(m.mode === 'coop' ? 'waves' : 'arena_team', { visuals: true });
     this.world = w; this.mode = 'net'; this.netInfo = m; this.netEnded = false; this.netOver = false; this.netRewardMsg = null;
-    this.netActors = new Map(); this.netMobs = new Map(); this.netSnaps = []; this.netPred = null; this.netT = 0; this.netCastPending = null; this.netVProj = [];
+    this.netActors = new Map(); this.netMobs = new Map(); this.netSnaps = []; this.netPred = null; this.netT = 0; this.netCastPending = null; this.netVProj = []; this.netPickSent = null;
     for (const p of m.players) {
       const doc = newCharacter(p.name, p.classId, makeRng(p.id)); doc.level = p.level ?? 10;
       const mine = p.id === m.you, ally = p.team === m.team;
@@ -707,6 +762,7 @@ class Game {
 
   netEvent(e) {
     const w = this.world, a = e.actor != null ? this.netEntity(e.actor) : null;
+    this.audio.event({ ...e, type: e.e, actor: a, target: e.target != null ? this.netEntity(e.target) : null }, this.player); // mesmo som do jogo offline
     switch (e.e) {
       case 'hit': {
         const t = this.netEntity(e.target); if (!t) break;
@@ -747,16 +803,10 @@ class Game {
         else { w.burst(a.x, a.y, s.color ?? '#fff', 14, 150); }
         break;
       }
-      case 'loot': { // butim do MEU abate (o servidor já gravou): vira drop só visual no chão para o spirit buscar (netSpiritFetch); nada é dado por ele
-        if (!this.player || e.to !== this.player.netId || !this.inNetZone()) break;
-        const KIND = { i: 'item', p: 'potion', e: 'essence' };
-        e.d.forEach(([k, r], i) => { const ang = i * 2.4, v = 60 + (i % 3) * 25; w.drops.push({ kind: KIND[k] ?? 'item', item: { rarity: ['common', 'uncommon', 'rare', 'epic', 'legendary'][r] ?? 'common', name: '' }, amount: 1, x: e.x, y: e.y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, t: 0, cosmetic: true }); });
-        break;
-      }
       case 'death': { const t = this.netEntity(e.actor); if (t) w.burst(t.x, t.y, t.kind === 'mob' ? MOBS[t.mobId]?.color ?? '#fff' : '#ffffff', 26, 220); break; }
       case 'telegraph': w.telegraphs.push({ x: e.x, y: e.y, r: e.r, t: 0, delay: e.delay, color: e.color, done: false, src: { dead: false } }); break;
-      case 'boss_warn': if (e.stage === 'omen') this.ui.toast('O chão estremece…', `${e.name} desperta`, 'gold'); else this.ui.log(`<b>${e.name}</b> surgiu!`, '#ffb4a8'); break;
-      case 'phase': { const m = this.netEntity(e.actor); if (e.phase === 3) this.ui.toast('Enfurecido!', `${m?.name ?? 'O chefe'} entrou em fúria`, 'gold'); else this.ui.log(`${m?.name ?? 'O chefe'} acelera!`, '#ffb4a8'); break; }
+      case 'boss_warn': if (e.stage === 'omen') this.ui.announce('O chão estremece…', `${e.name} desperta`, 'gold'); else this.ui.log(`<b>${e.name}</b> surgiu!`, '#ffb4a8'); break;
+      case 'phase': { const m = this.netEntity(e.actor); if (e.phase === 3) this.ui.announce('Enfurecido!', `${m?.name ?? 'O chefe'} entrou em fúria`, 'gold'); else this.ui.log(`${m?.name ?? 'O chefe'} acelera!`, '#ffb4a8'); break; }
       case 'wave': this.ui.toast(e.boss ? 'Onda final: o chefe!' : `Onda ${e.n}`, '', 'gold'); break;
       case 'crypt': this.onCryptEvent(e); break;
       case 'wave_clear': this.ui.toast(`Onda ${e.n} vencida!`, 'Recuperem o fôlego…', 'gold'); break;
@@ -766,33 +816,6 @@ class Game {
   }
 
   // projétil só VISUAL (o dano vem do servidor): voa em linha reta até o alcance
-  // Spirit na instância online: o loot é gravado pelo servidor na hora, então no chão só há drops VISUAIS (d.cosmetic, evento 'loot'). O spirit voa até o drop
-  // que a opção "o que o spirit pega" aceita, traz ao herói e ele some com o texto do butim; os não aceitos somem quando o herói passa perto (ou em 8 s). Nada vai para a mochila por aqui.
-  netSpiritFetch(s, me, dt) {
-    const w = this.world, F = SPIRIT_FETCH, mask = this.prefs.spiritPick ?? SPIRIT_PICK_ALL;
-    const step = (x, y, sp) => { const d = Math.hypot(x - s.x, y - s.y), m = Math.min(d, sp * dt); if (d > 0) { s.x += (x - s.x) / d * m; s.y += (y - s.y) / d * m; } };
-    const show = (d) => { d.taken = true; const R = d.kind === 'item' ? RARITY[d.item.rarity] : null; w.addText({ x: me.x, y: me.y - 34, t: 0, life: 0.9, text: R ? R.name : d.kind === 'potion' ? '🧪' : '✦', size: 12, color: R ? R.color : '#ff9aa8' }); };
-    for (const d of w.drops) if (d.cosmetic && !d.taken && !d.carried && (d.t > 8 || (!spiritWants(mask, d) && d.t > 0.5 && Math.hypot(d.x - me.x, d.y - me.y) < 60))) d.taken = true;
-    if (me.dead || (me.lastDamaged ?? -99) > w.time - 3 || (me.lastDealt ?? -99) > w.time - 3) { if (s.cf) s.cf.carried = false; s.cf = null; } // em combate o spirit larga tudo e volta (igual ao jogo offline)
-    let d = s.cf;
-    if (d && (d.taken || !w.drops.includes(d))) d = s.cf = null;
-    if (!d) {
-      let best = Infinity;
-      if (!me.dead && !((me.lastDamaged ?? -99) > w.time - 3) && !((me.lastDealt ?? -99) > w.time - 3)) for (const c of w.drops) {
-        if (!c.cosmetic || c.taken || c.carried || c.t < 0.4 || !spiritWants(mask, c) || Math.hypot(c.x - me.x, c.y - me.y) > F.range) continue;
-        const dd = Math.hypot(c.x - s.x, c.y - s.y); if (dd < best) { best = dd; d = c; }
-      }
-      if (!d) { w.drops = w.drops.filter((x) => !x.taken); return false; }
-      s.cf = d;
-    }
-    if (d.carried) {
-      if (Math.hypot(me.x - s.x, me.y - s.y) <= F.hand) { show(d); s.cf = null; w.drops = w.drops.filter((x) => !x.taken); return false; }
-      step(me.x, me.y, F.speed); d.x = s.x; d.y = s.y; return true;
-    }
-    if (Math.hypot(d.x - s.x, d.y - s.y) <= F.grab) { d.carried = true; return true; }
-    step(d.x, d.y, F.speed); return true;
-  }
-
   netShoot(a, ang, spec) {
     this.world.projectiles.push({ x: a.x + Math.cos(ang) * (a.r + 4), y: a.y + Math.sin(ang) * (a.r + 4), vx: Math.cos(ang) * spec.speed, vy: Math.sin(ang) * spec.speed, ang,
       team: a.team, src: a, mult: 0, radius: spec.radius ?? 6, color: spec.color ?? '#fff', range: spec.range ?? 500, traveled: 0, pierce: !!spec.pierce, explode: spec.explode ?? 0, stun: spec.stun ?? 0, hit: new Set(), dead: false, cosmetic: true });
@@ -821,7 +844,8 @@ class Game {
     this.netIntent = intent;
     if (this.netInfo && this.netLast?.state !== 'over' && ((this.netT += dt) >= 1 / 30 || this.netCastPending != null || this.netMountPending != null)) {
       this.netT = 0;
-      net?.sendInput({ ...intent, cast: this.netCastPending, ...(this.netMountPending != null ? { mount: this.netMountPending } : {}) });
+      const pickNow = this.prefs.spiritPick ?? SPIRIT_PICK_ALL, pickMsg = this.netPickSent === pickNow ? {} : { pick: pickNow }; this.netPickSent = pickNow; // só quando muda (e na 1ª vez)
+      net?.sendInput({ ...intent, ...pickMsg, cast: this.netCastPending, ...(this.netMountPending != null ? { mount: this.netMountPending } : {}) });
       this.netCastPending = null; this.netMountPending = null;
     }
     this.updateNet(dt);
@@ -894,7 +918,15 @@ class Game {
       for (const [id, m] of this.netMobs) if (!present.has(id)) { w.actors = w.actors.filter((x) => x !== m); this.netMobs.delete(id); }
     }
     // projéteis visuais e avisos de perigo
-    for (const pr of w.projectiles) { pr.x += pr.vx * dt; pr.y += pr.vy * dt; pr.traveled += Math.hypot(pr.vx, pr.vy) * dt; if (pr.traveled >= pr.range) pr.dead = true; }
+    for (const pr of w.projectiles) {
+      pr.x += pr.vx * dt; pr.y += pr.vy * dt; pr.traveled += Math.hypot(pr.vx, pr.vy) * dt;
+      if (pr.traveled >= pr.range) { pr.dead = true; continue; }
+      // a flecha/bola visual some no 1º inimigo que tocar (antes atravessava todos até o alcance máximo); o dano continua sendo só do servidor
+      if (pr.cosmetic && !pr.pierce) for (const e of w.actors) {
+        if (e.dead || e.team === pr.team || e.kind === 'spirit' || e === pr.src) continue;
+        if (Math.hypot(e.x - pr.x, e.y - pr.y) < (e.r ?? 16) + pr.radius) { pr.dead = true; w.burst(pr.x, pr.y, pr.color, 5, 90); break; }
+      }
+    }
     w.projectiles = w.projectiles.filter((pr) => !pr.dead);
     for (const tg of w.telegraphs) { tg.t += dt; if (tg.t >= tg.delay) tg.done = true; }
     w.telegraphs = w.telegraphs.filter((tg) => !tg.done);
@@ -902,7 +934,7 @@ class Game {
     w.updateVisuals(dt);
     if (this.netInfo.mode === 'zone') {
       const me = this.player, k = Math.min(1, dt * 6);
-      for (const sa of w.actors) if (sa.kind === 'spirit' && sa.owner === me.id) { if (!this.netSpiritFetch(sa, me, dt)) { sa.x += (me.x - 20 - sa.x) * k; sa.y += (me.y - 10 - sa.y) * k; } }
+      for (const sa of w.actors) if (sa.kind === 'spirit' && sa.owner === me.id) { sa.x += (me.x - 20 - sa.x) * k; sa.y += (me.y - 10 - sa.y) * k; }
       this.nearChest = (w.zone.chests ?? []).find((c) => Math.hypot(c.x - me.x, c.y - me.y) < 70)?.id ?? null; // botão de interagir / dica do baú
     }
     if (this.netInfo.mode === 'zone') { if (this.deathCard && !this.player.dead && performance.now() > this.deathCard) { this.deathCard = false; this.ui.hideScreen(); } this.ui.banner(this.player.dead ? 'Você caiu… renasce no ponto salvo em instantes' : null); return; }
@@ -1037,8 +1069,24 @@ class Game {
     this.uiScale = resolveScale(p) / 100; // 'auto' acompanha a viewport (prefs.js autoScale)
     document.documentElement.style.setProperty('--ui', String(this.uiScale));
     const q = resolveQuality(p, this.touch.coarse);
-    this.renderer.setQuality(q, p.quality === 'auto' ? this.qgov.apply(q) : q); // resolução = q; o governador só limita os EFEITOS, e só no modo auto
+    // iPhone no automático: resolução 2× (efeitos continuam altos). Em 3× a tela e os blocos do chão gastavam ~2,25× mais memória de canvas e o Safari,
+    // ao passar do teto, devolvia canvas vazios (chão liso/preto e monstros invisíveis no celular do dono, 2026-11-05). "Alta" nas Opções volta a 3×.
+    const res = p.quality === 'auto' && q === 'high' && isIOS() ? 'medium' : q;
+    this.renderer.setQuality(res, p.quality === 'auto' ? this.qgov.apply(q) : q); // resolução = res; o governador só limita os EFEITOS, e só no modo auto
     this.touch.setMode(p.controls);
+    this.audio?.setVolumes(p.music / 100, p.sfx / 100);
+  }
+
+  // O Safari recusou um canvas (memguard.js): libera o que dá para refazer (blocos do chão, monstros de fora da zona) e baixa a resolução
+  // um degrau (3× → 2× → 1×). O jogo segue; o que faltou é refeito nos próximos quadros com menos memória.
+  relieveMemory(n) {
+    const r = this.renderer;
+    r.groundCache.clear();
+    releaseMobs(this.world ? mobIdsOf(this.world.zone) : new Set());
+    const cur = Math.min(r.dprCap, r.memCap, devicePixelRatio || 1);
+    if (cur > 1) { r.memCap = Math.max(1, Math.floor(cur) - 1); r.resize(); }
+    console.warn(`[memória] canvas recusado pelo navegador (${n}); resolução agora ${r.dpr}×`);
+    if (!this.memWarned) { this.memWarned = true; this.ui.toast('Memória do aparelho', 'Resolução reduzida para o jogo seguir estável.', ''); }
   }
 
   setPref(arg) {
@@ -1130,11 +1178,12 @@ class Game {
   handleEvents() {
     const events = this.world.events.splice(0);
     for (const ev of events) {
+      this.audio.event(ev, this.player); // som do evento (golpe, dano, magia, morte, chefe); só leitura
       if (ev.type === 'cast') { if (ev.actor === this.player) this.gameEvent({ type: 'skill', skillId: ev.skill }); spawnSkillVfx(this.world, ev); continue; } // efeito visual da habilidade (a simulação já decidiu tudo)
       if (ev.type === 'hit' || ev.type === 'heal') { spawnEventVfx(this.world, ev); continue; } // crítico, absorção e cura
-      if (ev.type === 'phase' && ev.phase === 3) { this.ui.toast('Enfurecido!', `${ev.actor.name} entrou em fúria`, 'gold'); continue; }
+      if (ev.type === 'phase' && ev.phase === 3) { this.ui.announce('Enfurecido!', `${ev.actor.name} entrou em fúria`, 'gold'); continue; }
       if (ev.type === 'phase') { this.ui.log(`${ev.actor.name} acelera!`, '#ffb4a8'); continue; }
-      if (ev.type === 'boss_warn') { if (ev.stage === 'omen') this.ui.toast('O chão estremece…', `${ev.name} desperta`, 'gold'); else this.ui.log(`<b>${ev.name}</b> surgiu nas Cinzas Ardentes!`, '#ffb4a8'); continue; }
+      if (ev.type === 'boss_warn') { if (ev.stage === 'omen') this.ui.announce('O chão estremece…', `${ev.name} desperta`, 'gold'); else this.ui.log(`<b>${ev.name}</b> surgiu nas Cinzas Ardentes!`, '#ffb4a8'); continue; }
       if (ev.type !== 'death') continue;
       const a = ev.actor;
       if (a.kind === 'mob') this.onMobKilled(a);
@@ -1338,7 +1387,7 @@ class Game {
     const mv = followPath(a.path, p, 20);
     if (!mv) { a.path = null; if (goal.portal) { intent.mx = Math.sign(goal.x - p.x) * 0.5; intent.my = 0; intent.spd = 1; intent.run = true; } return; } // chegou ao fim do caminho: encosta no portal / recalcula
     intent.mx = mv.mx; intent.my = mv.my; intent.spd = 1; intent.attack = false; intent.cast = null;
-    intent.run = true; // auto-viagem corre como o joystick na borda (a simulação e o servidor só concedem fora de combate e nas zonas permitidas)
+    intent.run = true; // só a auto-viagem da missão corre (+30%; decisão do dono, 2026-11-05: o joystick não corre mais). A simulação e o servidor só concedem fora de combate e nas zonas permitidas
     intent.aimX = p.x + mv.mx * 200; intent.aimY = p.y + mv.my * 200;
     // travado? (sem andar 6 px em 1,3 s): recalcula; 3 vezes seguidas pausa
     a.probe.t += dt;
@@ -1477,13 +1526,14 @@ class Game {
       this.serverTx({ op: 'chest', id }, (m) => {
         this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
         this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${m.gold}`, size: 15, color: '#ffd34d' });
-        this.ui.chestReward({ gold: m.gold, item: m.item, whistle: m.whistle });
+        this.ui.chestReward({ gold: m.gold, item: m.item, whistle: m.whistle }); this.audio.play('chest');
         this.chestsOpen = new Set(Object.keys(this.char.chests ?? {}).filter((k) => !chestReady(this.char, k)));
       });
       return;
     }
     const r = openChest(this.char, chest, this.world.zoneId, this.rng);
     if (!r.ok) return this.ui.log(r.reason, '#ffb4a8');
+    this.audio.play('chest');
     this.world.burst(chest.x, chest.y - 8, '#ffd34d', 26, 200);
     this.world.addText({ x: chest.x, y: chest.y - 30, t: 0, life: 1.1, text: `+${r.gold}`, size: 15, color: '#ffd34d' });
     this.ui.chestReward(r); // cartão por cima de tudo (fila); abrir o baú nunca abre a mochila
@@ -1530,6 +1580,7 @@ class Game {
       if (l.kind === 'gold') { // ouro vai direto para a mochila (sem drop no chão), com texto flutuante
         this.char.gold += l.amount;
         this.world.addText({ x: this.player.x, y: this.player.y - 34, t: 0, life: 0.8, text: `+${l.amount}`, size: 13, color: '#ffd34d' });
+        this.audio.play('coins');
         continue;
       }
       if (l.kind === 'whistle') { // Apito de Montaria: vai direto ao personagem (sem drop no chão), com aviso
@@ -1566,11 +1617,12 @@ class Game {
 
   onLevelUp() {
     const p = this.player;
+    this.audio.play('levelup');
     this.refreshStats();
     p.hp = p.maxHp;
     this.world.addFx({ type: 'ring', x: p.x, y: p.y, r: 120, color: '#ffd34d', t: 0, life: 0.8, follow: p });
     this.world.burst(p.x, p.y, '#ffd34d', 40, 260);
-    this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o Personagem`, 'gold');
+    this.ui.announce(`Nível ${this.char.level}!`, '+5 pontos de atributo', 'gold');
     this.ui.log(`Você alcançou o nível <b>${this.char.level}</b>.`, '#ffd34d');
     this.tip('level');
     for (const u of newlyUnlocked(this.char.classId, this.skillLv ?? this.char.level - 1, this.char.level)) { // habilidades aprendidas neste nível
@@ -1595,7 +1647,7 @@ class Game {
     let changed = false;
     for (const d of w.drops) {
       // d.fetched: o spirit trouxe até o herói (sim.js updateSpiritFetch), vale de qualquer distância
-      if (!d.fetched && (d.t < 0.4 || Math.hypot(d.x - p.x, d.y - p.y) > 44)) continue;
+      if (!d.fetched && (d.t < PICK_DELAY || Math.hypot(d.x - p.x, d.y - p.y) > PICK_R)) continue;
       if (d.kind === 'potion') {
         c.potions += d.amount;
         this.ui.log(`+${d.amount} 🧪 Poção de Vida`, '#ff9aa8');
@@ -1609,6 +1661,7 @@ class Game {
         } else {
           c.inventory.push(d.item);
           const R = RARITY[d.item.rarity];
+          this.audio.play(R.index >= 3 ? 'levelup' : 'loot');
           this.ui.log(`Obtido: <b style="color:${R.color}">${d.item.name}</b> (${R.name})`, '#e8e6f0');
           if (R.index >= 3) this.ui.toast(d.item.name, `Item ${R.name}!`, 'gold');
         }

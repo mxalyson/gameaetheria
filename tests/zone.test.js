@@ -458,3 +458,69 @@ test('Cripta: 3 quedas por herói; na seguinte ele é levado para fora; sem mons
   await c.waitFor((m) => m.t === 'reject' && m.code === 'crypt_wait'); // fracasso não devolve a entrada
   await closeAll(srv, c);
 });
+
+// ---- online igual ao offline (2026-11-05): ouro/XP na hora; item, poção e essência caem no chão com dono; mochila cheia deixa o item no chão ----
+import { INVENTORY_SIZE } from '../public/src/data/items.js';
+import { World, makeHeroActor, makeSpiritActor, PICK_DELAY } from '../public/src/game/sim.js';
+async function bossKill() {
+  const { srv, players } = await setup(1);
+  const { c } = players[0];
+  c.send({ t: 'zone_enter', zone: 'forest', from: 'town' });
+  const j = await c.waitFor((m) => m.t === 'zone_joined');
+  const room = srv.hub.zoneRooms.values().next().value, me = srv.actor(j.you), p = room.players.get(me.id);
+  const boss = makeMobActor('wolf', 3, me.x + 200, me.y); boss.boss = true; // fonte "chefe": sempre 2–3 itens e 3 poções
+  room.onMobKilled(boss);
+  return { srv, c, room, me, p, boss };
+}
+
+test('abate online: ouro e XP avisados na hora (zone_loot); itens e poções CAEM no chão do dono (zone_drop), sem ir direto para o lote', async () => {
+  const { srv, c, room, me, p } = await bossKill();
+  const loot = await c.waitFor((m) => m.t === 'zone_loot');
+  assert.ok(loot.gold > 0 && loot.xp > 0);
+  // o chefe completa o nível 1 → o servidor grava JÁ (subida de nível na hora, como no offline), em vez de esperar o lote de 10 s
+  const rw = await c.waitFor((m) => m.t === 'zone_reward');
+  assert.ok(rw.levels >= 1); assert.equal(p.pend.gold, 0);
+  const drops = room.world.drops;
+  assert.ok(drops.some((d) => d.kind === 'item') && drops.some((d) => d.kind === 'potion'));
+  assert.ok(drops.every((d) => d.owner === me.id));
+  assert.equal(p.pend.items.length, 0, 'item só entra no lote depois de pegar'); assert.equal(p.pend.potions, 0);
+  const dm = await c.waitFor((m) => m.t === 'zone_drop' && m.kind === 'item');
+  assert.ok(dm.item.name && dm.item.rarity && dm.id);
+  await closeAll(srv, c);
+});
+
+test('coleta online: passar por cima pega (zone_pickup) e o item vai para o lote; drop some do chão', async () => {
+  const { srv, c, room, me, p } = await bossKill();
+  const n = room.world.drops.length;
+  for (const d of [...room.world.drops]) { me.x = d.x; me.y = d.y; d.t = PICK_DELAY; room.collectDrops(p); }
+  assert.equal(room.world.drops.length, 0);
+  assert.ok(p.pend.items.length >= 2); assert.equal(p.pend.potions, 3);
+  await c.waitFor((m) => m.t === 'zone_pickup' && m.kind === 'item' && m.item?.name);
+  assert.equal(c.all('zone_pickup').length >= 1, true); void n;
+  await closeAll(srv, c);
+});
+
+test('mochila cheia online: o item fica no chão com UM aviso (zone_full); a poção ainda é pega', async () => {
+  const { srv, c, room, me, p } = await bossKill();
+  p.session.char.inventory = Array.from({ length: INVENTORY_SIZE }, (_, i) => ({ id: 'f' + i }));
+  for (let k = 0; k < 2; k++) for (const d of [...room.world.drops]) { me.x = d.x; me.y = d.y; d.t = PICK_DELAY; room.collectDrops(p); }
+  assert.ok(room.world.drops.every((d) => d.kind === 'item'), 'itens continuam no chão');
+  assert.equal(p.pend.items.length, 0); assert.equal(p.pend.potions, 3);
+  await c.sync();
+  assert.equal(c.all('zone_full').length, room.world.drops.length, 'um aviso por item, sem repetir');
+  // trazido pelo spirit com a mochila cheia: vira ouro (igual ao offline)
+  const d = room.world.drops[0], gold0 = p.pend.gold; d.fetched = true; room.collectDrops(p);
+  assert.equal(p.pend.gold, gold0 + d.item.value);
+  await closeAll(srv, c);
+});
+
+test('spirit só busca drop do próprio dono (online cada drop tem dono; offline os drops não têm dono e seguem iguais)', () => {
+  const w = new World('forest', { seed: 4, visuals: false });
+  const me = w.add(makeHeroActor(newOfficialCharacter('Eu', 'archer'), 1000, 1000, 'player', 1));
+  const sp = w.add(makeSpiritActor({ id: 's1', type: 'zephyr', rarity: 'common', level: 1, xp: 0 }, me));
+  const other = { kind: 'item', item: { value: 1 }, x: 1040, y: 1000, t: 1, owner: 9999 }, mine = { kind: 'potion', amount: 1, x: 1100, y: 1000, t: 1, owner: me.id }, loose = { kind: 'potion', amount: 1, x: 1060, y: 1000, t: 1 };
+  w.drops.push(other);
+  w.updateSpiritFetch(sp, me, 1 / 60); assert.equal(sp.fetch ?? null, null, 'drop de outro jogador: não busca');
+  w.drops.push(mine); w.updateSpiritFetch(sp, me, 1 / 60); assert.equal(sp.fetch, mine);
+  sp.fetch = null; w.drops = [loose]; w.updateSpiritFetch(sp, me, 1 / 60); assert.equal(sp.fetch, loose, 'sem dono (offline): busca como antes');
+});

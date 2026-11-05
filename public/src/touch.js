@@ -6,7 +6,7 @@ import { isSkillUnlocked, skillUnlockLevel, skillIdAt, kitIds } from './core/unl
 import { skillOf, basicOf } from './core/specs.js';
 import { skillImg, attackImg, iconImg, POTION_ICON, skillCategory, CATEGORIES } from './render/skill-icons.js';
 import { asset } from './assets-version.js';
-import { stickVector, stepRun, pickAim, aimModeFor, dragAim, interactTarget, isHold, HOLD_MS, skillLayout, isHeroDoubleTap } from './touch-logic.js';
+import { stickVector, pickAim, aimModeFor, dragAim, interactTarget, isHold, HOLD_MS, skillLayout, isHeroDoubleTap } from './touch-logic.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,7 +16,7 @@ export class TouchControls {
     this.mode = 'auto'; // auto | touch | keyboard
     this.active = false;
     this.move = { x: 0, y: 0, mag: 0 };
-    this.runSt = { t: 0, on: false }; this.stickRaw = 0; this.runAt = 0; // correr: joystick na borda por 0,25 s (touch-logic.js)
+    this.stickRaw = 0;
     this.attack = false;
     this.castQueue = [];
     this.stickId = null;
@@ -52,7 +52,7 @@ export class TouchControls {
   }
 
   reset() {
-    this.move = { x: 0, y: 0, mag: 0 }; this.stickRaw = 0; this.runSt.t = 0; this.runSt.on = false;
+    this.move = { x: 0, y: 0, mag: 0 }; this.stickRaw = 0;
     this.attack = false;
     this.castQueue.length = 0;
     this.stickId = null;
@@ -102,7 +102,7 @@ export class TouchControls {
     const endStick = (e) => {
       if (e.pointerId !== this.stickId) return;
       this.stickId = null;
-      this.move = { x: 0, y: 0, mag: 0 }; this.stickRaw = 0; this.runSt.t = 0; this.runSt.on = false;
+      this.move = { x: 0, y: 0, mag: 0 }; this.stickRaw = 0;
       $('stick').classList.add('hidden');
     };
     // Toque duplo no herói: monta/desmonta (o mesmo pedido do botão). Só conta toque curto e parado (arrastar é o joystick).
@@ -200,9 +200,8 @@ export class TouchControls {
       cast = q.i;
       aim = pickAim({ player, enemies, move: this.move, override: q.aim, mode: aimModeFor(skill), reach: skill.dist ?? 260 });
     } else aim = pickAim({ player, enemies, move: this.move });
-    const now = performance.now(), dt = Math.min(0.1, (now - this.runAt) / 1000); this.runAt = now;
-    const run = stepRun(this.runSt, this.move.mag ? this.stickRaw : 0, dt) && !this.attack && cast == null; // o servidor confere de novo (combate, zona)
-    return { mx: this.move.x, my: this.move.y, spd: this.move.mag ? 0.4 + 0.6 * this.move.mag : 1, aimX: aim.x, aimY: aim.y, attack: this.attack, cast, run };
+    // sem correr pelo joystick (decisão do dono, 2026-11-05): a velocidade extra só vale na auto-viagem da missão (main.js › autoDrive, intent.run)
+    return { mx: this.move.x, my: this.move.y, spd: this.move.mag ? 0.4 + 0.6 * this.move.mag : 1, aimX: aim.x, aimY: aim.y, attack: this.attack, cast };
   }
 
   // Chamado a cada quadro: visibilidade, recargas e botão de interagir.

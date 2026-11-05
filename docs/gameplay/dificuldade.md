@@ -307,3 +307,17 @@ Início do jogo intacto (Guerreiro vs 2 lobos Nv4: 80%). `tests/core.test.js` G4
 
 ### Berserker sem Maestria no Nv30 (2026-11-04)
 Só dados: `specs.js` (powerMul 1,03→1,05; ataque básico ×1,12→×1,20) e `kits.js` (Ira de Brasa +12%/+15% vel. → +8%/+10%). `npm run balance -- --n 60`: Nv30 sem Maestria 27%→40%, com Maestria 47–53%→57%, Nv20 49%→57% (o ganho do Nv30 vem junto com o do Nv20; vida e defesa intactas). Meta de 45% sem Maestria não atingida sem estourar o Nv20.
+
+## Arqueiro × Clérigo (2026-11-04, decisão do dono: o Clérigo não pode vencer o Arqueiro)
+
+Medido com `npm run balance -- --level N --n 100` (Nv30 com `--mastery`). Taxa geral da classe e confronto direto Arqueiro vs Clérigo (média dos dois lados):
+
+| Nível | Arqueiro antes → depois | Clérigo antes → depois | Arqueiro no confronto direto antes → depois |
+|---|---|---|---|
+| 10 | 34% → 56% | 64% → 39% | ~22% → 49% |
+| 15 | 42% → 50% | 42% → 40% | ~40% → 45% |
+| 20 | 46% → 59% | 49% → 43% | ~34% → 54% |
+| 30 (Maestria) | 43% → 52% | 57% → 51% | ~43% → 50% |
+
+Ajustes: Arqueiro vida base 80→170 e Vit por nível 1,2→1,6 (`data/classes.js`); Julgamento atordoa 1,5→1 s, igual à descrição (`data/skills.js`, vale no Nv10–14); Inquisidor roubo de vida 12→10%; Sentinela vida ×1,02; Franco-atirador vida ×1,05; Pistoleiro vida ×1,02 (`data/specs.js`).
+Resultado: o Arqueiro fica igual ou acima do Clérigo na taxa geral em todos os níveis. **Pendente:** no Nv15 a Sentinela ainda vence o Franco-atirador (~45% para o Arqueiro no confronto direto); reduzir raio da Luz Curativa ou o Escudo Reforçado mudou pouco o confronto (dentro do ruído, ±4) e derrubou o Clérigo para ~35%. O Clérigo ficou abaixo da meta no Nv10–20 (39–43%) e o Arqueiro acima no Nv20 (59%); Mago × Arqueiro no Nv10 (7%) já era extremo antes. PvE (`node tools/boss-check.mjs --n 4`): chefes um pouco mais fáceis (0 a +13 pontos em algumas células), pelo Arqueiro mais resistente.
