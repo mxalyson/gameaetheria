@@ -44,13 +44,14 @@ export class Renderer {
     this.g = canvas.getContext('2d');
     this.groundCache = new GroundCache((w, ox, oy, tw, th, s) => buildGround(w, ox, oy, tw, th, s)); // terreno em blocos (mapas de 4600×2800 não cabem num canvas só no celular)
     this.dprCap = 2;
+    this.memCap = 3; // teto de densidade por falta de memória (memguard.js → main.js relieveMemory baixa para 2 e depois 1)
     this.quality = 2; // 0 baixa, 1 média, 2 alta
     this.resize();
     addEventListener('resize', () => this.resize());
   }
 
   resize() {
-    this.dpr = Math.min(this.dprCap, devicePixelRatio || 1);
+    this.dpr = Math.min(this.dprCap, this.memCap, devicePixelRatio || 1);
     this.vw = innerWidth;
     this.vh = innerHeight;
     // Celular: a tela é pequena, então o mundo é desenhado menor para caber ~980×520 unidades (antes, 1 unidade = 1 px:

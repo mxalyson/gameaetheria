@@ -46,7 +46,12 @@ export class GroundCache {
     }
     if (!e) {
       if (soft && !this.canBuild()) { this.stats.deferred++; return null; }
-      const a = performance.now(); e = { cv: mk(), bytes, rdy, used: 0 }; this.map.set(key, e); this.bytes += bytes;
+      const a = performance.now();
+      // canvas recusado (iPhone sem memória de canvas: getContext devolve null e o desenho quebra): o bloco fica liso por enquanto, sem derrubar o quadro;
+      // a guarda (memguard.js) já avisou o jogo, que libera caches e baixa a resolução; a próxima tentativa refaz o bloco com menos memória
+      let cv = null; try { cv = mk(); } catch { cv = null; }
+      if (!cv || !cv.width) { this.stats.failed = (this.stats.failed ?? 0) + 1; if (cv) cv.width = cv.height = 0; return null; }
+      e = { cv, bytes, rdy, used: 0 }; this.map.set(key, e); this.bytes += bytes;
       this.built++; this.stats.built++; this.stats.maxMs = Math.max(this.stats.maxMs, performance.now() - a);
       if (PERF) console.log(`[perf] bloco ${key}: ${(performance.now() - a).toFixed(1)} ms`);
     }
@@ -60,7 +65,8 @@ export class GroundCache {
     const sc = this.scale, T = this.T, wholeBytes = Math.ceil(z.w * sc) * Math.ceil(z.h * sc) * 4;
     if (wholeBytes <= WHOLE_MAX) {
       const e = this.get(world.zoneId + ':all', () => this.build(world, 0, 0, z.w, z.h, sc), wholeBytes, rdy, f);
-      g.drawImage(e.cv, 0, 0, e.cv.width / sc, e.cv.height / sc);
+      if (e) g.drawImage(e.cv, 0, 0, e.cv.width / sc, e.cv.height / sc);
+      else { g.fillStyle = z.palette.ground; g.fillRect(0, 0, z.w, z.h); } // canvas recusado: chão liso até a próxima tentativa
       this.trim(f); return;
     }
     const c0 = Math.max(0, Math.floor(x0 / T)), c1 = Math.min(Math.ceil(z.w / T) - 1, Math.floor(x1 / T));

@@ -22,7 +22,10 @@ import { loadChar, saveChar, takeLoadInfo, parseSave, exportSave } from './save.
 import { cleanName } from './core/savedoc.js';
 import { apiUrl, wsUrl, Online, CloudSave } from './online.js';
 import { ChatBox } from './ui/chat.js';
-import { AudioEngine, musicFor } from './audio.js';
+import { AudioEngine, musicFor, isIOS } from './audio.js';
+import { installCanvasGuard, onCanvasPressure, canvasFails } from './render/memguard.js';
+import { releaseMobs, mobIdsOf } from './render/mob-sprites.js';
+installCanvasGuard(); // antes de qualquer canvas: detecta o teto de memória do Safari (getContext devolve null em silêncio)
 import { NetClient } from './net/client.js';
 import { SnapshotDecoder } from './core/snapshot.js';
 import { decodeLook } from './core/aura.js';
@@ -69,6 +72,7 @@ class Game {
   constructor() {
     this.canvas = document.getElementById('game');
     this.renderer = new Renderer(this.canvas);
+    onCanvasPressure((n) => this.relieveMemory(n));
     this.input = new Input(this.canvas);
     this.ui = new UI(this);
     this.prefs = loadPrefs();
@@ -138,7 +142,8 @@ class Game {
       if (lowered) { this.applyPrefs(); if (this.qgov.shouldNotify()) this.ui.toast('Qualidade ajustada', 'Efeitos reduzidos para manter a fluidez', ''); } // só efeitos: resolução e arte HD ficam
       const ok = this.guard('quadro', () => this.frameBody(dt));
       this.frameFails = ok ? 0 : (this.frameFails ?? 0) + 1;
-      if (this.frameFails === 20) this.ui.toast('Erro', 'Algo deu errado, recarregue a página.', '');
+      if (this.frameFails === 20 && canvasFails() === this.canvasFailsAtWarn) this.ui.toast('Erro', 'Algo deu errado, recarregue a página.', ''); // falta de memória de canvas tem aviso próprio (relieveMemory)
+      if (this.frameFails === 0) this.canvasFailsAtWarn = canvasFails();
     } finally {
       requestAnimationFrame((t) => this.frame(t));
     }
@@ -861,7 +866,15 @@ class Game {
       for (const [id, m] of this.netMobs) if (!present.has(id)) { w.actors = w.actors.filter((x) => x !== m); this.netMobs.delete(id); }
     }
     // projéteis visuais e avisos de perigo
-    for (const pr of w.projectiles) { pr.x += pr.vx * dt; pr.y += pr.vy * dt; pr.traveled += Math.hypot(pr.vx, pr.vy) * dt; if (pr.traveled >= pr.range) pr.dead = true; }
+    for (const pr of w.projectiles) {
+      pr.x += pr.vx * dt; pr.y += pr.vy * dt; pr.traveled += Math.hypot(pr.vx, pr.vy) * dt;
+      if (pr.traveled >= pr.range) { pr.dead = true; continue; }
+      // a flecha/bola visual some no 1º inimigo que tocar (antes atravessava todos até o alcance máximo); o dano continua sendo só do servidor
+      if (pr.cosmetic && !pr.pierce) for (const e of w.actors) {
+        if (e.dead || e.team === pr.team || e.kind === 'spirit' || e === pr.src) continue;
+        if (Math.hypot(e.x - pr.x, e.y - pr.y) < (e.r ?? 16) + pr.radius) { pr.dead = true; w.burst(pr.x, pr.y, pr.color, 5, 90); break; }
+      }
+    }
     w.projectiles = w.projectiles.filter((pr) => !pr.dead);
     for (const tg of w.telegraphs) { tg.t += dt; if (tg.t >= tg.delay) tg.done = true; }
     w.telegraphs = w.telegraphs.filter((tg) => !tg.done);
@@ -1003,9 +1016,24 @@ class Game {
     this.uiScale = resolveScale(p) / 100; // 'auto' acompanha a viewport (prefs.js autoScale)
     document.documentElement.style.setProperty('--ui', String(this.uiScale));
     const q = resolveQuality(p, this.touch.coarse);
-    this.renderer.setQuality(q, p.quality === 'auto' ? this.qgov.apply(q) : q); // resolução = q; o governador só limita os EFEITOS, e só no modo auto
+    // iPhone no automático: resolução 2× (efeitos continuam altos). Em 3× a tela e os blocos do chão gastavam ~2,25× mais memória de canvas e o Safari,
+    // ao passar do teto, devolvia canvas vazios (chão liso/preto e monstros invisíveis no celular do dono, 2026-11-05). "Alta" nas Opções volta a 3×.
+    const res = p.quality === 'auto' && q === 'high' && isIOS() ? 'medium' : q;
+    this.renderer.setQuality(res, p.quality === 'auto' ? this.qgov.apply(q) : q); // resolução = res; o governador só limita os EFEITOS, e só no modo auto
     this.touch.setMode(p.controls);
     this.audio?.setVolumes(p.music / 100, p.sfx / 100);
+  }
+
+  // O Safari recusou um canvas (memguard.js): libera o que dá para refazer (blocos do chão, monstros de fora da zona) e baixa a resolução
+  // um degrau (3× → 2× → 1×). O jogo segue; o que faltou é refeito nos próximos quadros com menos memória.
+  relieveMemory(n) {
+    const r = this.renderer;
+    r.groundCache.clear();
+    releaseMobs(this.world ? mobIdsOf(this.world.zone) : new Set());
+    const cur = Math.min(r.dprCap, r.memCap, devicePixelRatio || 1);
+    if (cur > 1) { r.memCap = Math.max(1, Math.floor(cur) - 1); r.resize(); }
+    console.warn(`[memória] canvas recusado pelo navegador (${n}); resolução agora ${r.dpr}×`);
+    if (!this.memWarned) { this.memWarned = true; this.ui.toast('Memória do aparelho', 'O aparelho chegou ao limite de memória gráfica: reduzimos a resolução para o jogo seguir estável.', ''); }
   }
 
   setPref(arg) {
