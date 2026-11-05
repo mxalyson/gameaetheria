@@ -57,6 +57,14 @@ Na VM com Docker instalado: crie `.env` com `DOMINIO=aetheria-lumen.duckdns.org`
 
 ---
 
+## Opção A2 — AWS (plano grátis de 6 meses para contas novas; usado pelo dono em 2026-11-05)
+Contas criadas depois de 15/07/2025: plano grátis por 6 meses ou até acabar o crédito (~US$ 100), com t3.micro/t3.small/t4g.micro/t4g.small liberadas (docs do EC2: "Track your Free Tier usage"). O IPv4 público é cobrado à parte (~US$ 0,005/h) e sai do crédito. Ao fim do plano a conta precisa virar paga ou fecha: **faça backup antes**.
+1. Console da AWS → região **América do Sul (São Paulo) sa-east-1** (canto de cima à direita).
+2. **Billing → Budgets → Create budget → Zero spend budget** com seu e-mail (aviso se algo começar a cobrar).
+3. **EC2 → Launch instance**: nome `aetheria`; imagem **Ubuntu Server 24.04 LTS**; tipo **t3.small** (ou t3.micro) com o selo *Free tier eligible*; **Key pair → Create new key pair** (RSA, `.pem`, baixe e guarde); **Network settings**: marque *Allow SSH traffic from **My IP***, *Allow HTTPS traffic from the internet* e *Allow HTTP traffic from the internet*; disco 8–10 GB → **Launch instance**.
+4. (Recomendado) **EC2 → Elastic IPs → Allocate → Associate** à instância: o IP não muda quando a máquina reinicia.
+5. DuckDNS com esse IP; depois `ssh -i .\aetheria.pem ubuntu@IP` e o mesmo `instalar-vm.sh` da Opção A (passos 5 e 6). Na AWS não há "Security List": as portas já ficam abertas pelo passo 3.
+
 ## Opção B0 — o seu PC como servidor, na rede de casa (mais simples; **testado aqui**)
 Na pasta do jogo, no seu PC: `npm install` (só na 1ª vez) e depois `npm run online`. Ele mostra dois endereços:
 - `http://localhost:8080` — para jogar no próprio PC;
