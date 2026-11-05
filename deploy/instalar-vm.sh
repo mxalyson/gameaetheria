@@ -116,8 +116,14 @@ cat > /etc/cron.d/aetheria-backup <<EOF
 30 4 * * * aetheria cd $DADOS && DB_PATH=$DADOS/aetheria.db /usr/bin/node $APP/tools/db-backup.mjs >/dev/null 2>&1 && find $DADOS/data/backups -name 'aetheria-*.db' -mtime +14 -delete
 EOF
 
+echo "== Atualização automática (autorizada pelo dono): confere o GitHub a cada 5 min; desligar com AUTO_UPDATE=0 em $ENVF"
+install -m 755 "$APP/deploy/atualizar.sh" /usr/local/bin/aetheria-atualizar
+cat > /etc/cron.d/aetheria-update <<EOF
+*/5 * * * * root BRANCH=$BRANCH APP=$APP /usr/local/bin/aetheria-atualizar >> /var/log/aetheria-update.log 2>&1
+EOF
+
 sleep 2
 if curl -fsS http://127.0.0.1:8080/healthz >/dev/null; then echo "Servidor do jogo: OK"; else echo "Servidor do jogo NÃO respondeu: veja  sudo journalctl -u aetheria -n 50"; fi
 echo
 echo "Pronto. Abra https://$DOMINIO (o certificado pode levar 1–2 minutos na primeira vez)."
-echo "Logs: sudo journalctl -u aetheria -f    ·    Atualizar o jogo: rode este script de novo."
+echo "Logs: sudo journalctl -u aetheria -f    ·    O jogo se atualiza sozinho a cada 5 min (histórico: /var/log/aetheria-update.log)."

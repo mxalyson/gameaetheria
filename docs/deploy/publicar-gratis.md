@@ -41,6 +41,7 @@ Fontes (2026, conferir na página oficial de cada um antes de decidir): [Render 
 6. **Jogar:** abra `https://aetheria-lumen.duckdns.org` no celular (paisagem). O jogo pede **criar conta (e-mail e senha)**; cada conta cria **até 3 personagens**, salvos no servidor; o botão de balão no menu abre o **chat** (Global e Grupo). O certificado HTTPS pode levar 1–2 min na primeira vez.
 
 ### Depois de publicado
+- **Atualização automática (autorizada pelo dono, 2026-11-05):** o instalador agenda `/usr/local/bin/aetheria-atualizar` (`deploy/atualizar.sh`) a cada 5 min: se o `main` do GitHub tem versão nova, baixa, instala as dependências e reinicia o jogo (quem está jogando reconecta); sem novidade, não faz nada. Contas e personagens nunca são tocados. Histórico: `sudo cat /var/log/aetheria-update.log`. **Desligar:** acrescente `AUTO_UPDATE=0` em `/etc/aetheria.env` (ou `sudo rm /etc/cron.d/aetheria-update`). Atualizar na hora: `sudo aetheria-atualizar`. Riscos: tudo que entra no `main` vai direto para os jogadores; proteja a conta do GitHub com verificação em duas etapas.
 - **Atualizar o jogo** (depois de um `git push` no `main`): entre na VM e rode de novo `sudo bash instalar-vm.sh aetheria-lumen.duckdns.org`. Contas, personagens e configuração ficam.
 - **Ver o que está acontecendo:** `sudo journalctl -u aetheria -f` (logs em JSON) · saúde: `curl http://127.0.0.1:8080/healthz`.
 - **Backup:** automático todo dia às 04:30 em `/var/lib/aetheria/data/backups` (guarda 14 dias). **Copie para fora da VM** de vez em quando (no seu PC):
