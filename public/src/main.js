@@ -6,12 +6,12 @@ import { whenNatureReady } from './render/nature-sprites.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { UI, esc } from './ui/ui.js';
-import { World, makeHeroActor, makeMobActor, makeSpiritActor } from './game/sim.js';
+import { World, makeHeroActor, makeMobActor, makeSpiritActor, PICK_R, PICK_DELAY } from './game/sim.js';
 import { waterWaypoint } from './game/ai.js';
 import { questTarget, guideGoal, pickTracked, trackerText, buildNavGrid, findPath, followPath, lineFree, autoPauseReason } from './core/autopath.js';
 import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore, hasMastery } from './core/stats.js';
-import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit } from './core/progression.js';
+import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit, MAX_LEVEL } from './core/progression.js';
 import { generateItem, rollMobLoot } from './core/loot.js';
 import { generateRivalForPower } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
@@ -530,6 +530,10 @@ class Game {
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
+        zoneLoot: (m) => this.onZoneLoot(m),
+        zoneDrop: (m) => this.onZoneDrop(m),
+        zonePickup: (m) => this.onZonePickup(m),
+        zoneFull: () => { if (this.inNetZone()) this.ui.log('Inventário cheio! Venda itens na vila.', '#ffb4a8'); },
         friendlyReward: (m) => { for (const id of m.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold'); this.announceAchievements(m.achievements ?? []); },
         txResult: (m) => this.onTxResult(m),
         zoneExit: (m) => this.leaveNetMatch(m),
@@ -615,14 +619,39 @@ class Game {
     return a;
   }
   // recompensas gravadas pelo servidor: avisa e adota o personagem oficial (o servidor é quem soma XP/ouro/itens)
+  // ---- online igual ao offline: ouro/XP na hora e itens no chão (o servidor decide; aqui só o que o jogador vê e ouve) ----
+  onZoneLoot(m) {
+    if (!this.inNetZone() || !this.player) return;
+    const c = this.char, p = this.player;
+    if (m.gold) { c.gold += m.gold; this.world.addText({ x: p.x, y: p.y - 34, t: 0, life: 0.8, text: `+${m.gold}`, size: 13, color: '#ffd34d' }); this.audio.play('coins'); }
+    if (m.xp && c.level < MAX_LEVEL) c.xp = Math.min((c.xp ?? 0) + m.xp, xpToNext(c.level) - 1); // barra anda já; o nível novo vem do servidor (grava na hora quando completa)
+  }
+  onZoneDrop(m) {
+    if (!this.inNetZone()) return;
+    const it = m.item ? { ...m.item, kind: 'gear', stats: {} } : undefined;
+    this.world.drops.push({ kind: m.kind, item: it, amount: m.amount, x: m.x, y: m.y, vx: 0, vy: 0, t: 0, netId: m.id });
+    if (it && (it.opal || it.rarity === 'epic' || it.rarity === 'legendary')) { // aviso e brilho para drop raro (igual ao offline)
+      this.world.burst(m.x, m.y, it.opal ? '#bfe9ff' : it.rarity === 'legendary' ? '#ffa53d' : '#b77cff', 30, 260);
+      this.ui.toast(it.opal ? 'Item de Ópalo!' : it.rarity === 'legendary' ? 'Item lendário!' : 'Item épico!', esc(it.name), 'gold');
+    }
+  }
+  onZonePickup(m) {
+    if (!this.inNetZone()) return;
+    const w = this.world;
+    w.drops = w.drops.filter((d) => d.netId !== m.id);
+    if (m.kind === 'item' && m.item) {
+      const R = RARITY[m.item.rarity] ?? RARITY.common;
+      if (m.gold) { this.char.gold += m.gold; w.addText({ x: this.player.x, y: this.player.y - 34, t: 0, life: 0.8, text: `+${m.gold}`, size: 13, color: '#ffd34d' }); this.audio.play('coins'); }
+      else { this.ui.log(`Obtido: <b style="color:${R.color}">${esc(m.item.name)}</b> (${R.name})`, '#e8e6f0'); this.audio.play(R.index >= 3 ? 'levelup' : 'loot'); }
+    } else if (m.kind === 'potion') { this.ui.log(`+${m.amount ?? 1} 🧪 Poção de Vida`, '#ff9aa8'); this.audio.play('loot'); }
+    else if (m.kind === 'essence') { this.ui.log('Essência de spirit obtida! (Spirits)', '#9fe0ff'); this.audio.play('levelup'); }
+  }
+
   async onZoneReward(r) {
     if (!this.inNetZone()) return;
     const parts = [];
-    if (r.gold) parts.push(`${r.gold > 0 ? '+' : ''}${r.gold} ouro`);
-    if (r.xp) parts.push(`+${r.xp} XP`);
-    if (r.items) parts.push(`${r.items} item(ns)`);
+    // ouro, XP, itens e poções já apareceram na hora (zone_loot/zone_pickup); aqui só o que não tem aviso próprio
     if (r.frags) parts.push(`+${r.frags} Fragmento(s) de Eco`);
-    if (r.potions) parts.push(`+${r.potions} 🧪`);
     if (parts.length) this.ui.log(parts.join(' · '), '#ffd27a');
     if (r.deaths) { // queda na instância: o servidor já cobrou (ou gastou o Amuleto da Fênix)
       const dr = { saved: (r.deathsSaved ?? 0) >= r.deaths, gold: r.lostGold ?? 0, xp: r.lostXp ?? 0 };
@@ -1533,7 +1562,7 @@ class Game {
     let changed = false;
     for (const d of w.drops) {
       // d.fetched: o spirit trouxe até o herói (sim.js updateSpiritFetch), vale de qualquer distância
-      if (!d.fetched && (d.t < 0.4 || Math.hypot(d.x - p.x, d.y - p.y) > 44)) continue;
+      if (!d.fetched && (d.t < PICK_DELAY || Math.hypot(d.x - p.x, d.y - p.y) > PICK_R)) continue;
       if (d.kind === 'potion') {
         c.potions += d.amount;
         this.ui.log(`+${d.amount} 🧪 Poção de Vida`, '#ff9aa8');

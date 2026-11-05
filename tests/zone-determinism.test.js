@@ -13,7 +13,7 @@ import { makeRng } from '../public/src/core/rng.js';
 // 2026-11-04: so o digest de ruins mudou (vida/dano do Guardiao das Ruinas em data/mobs.js, devolvendo a dificuldade dos chefes).
 // 2026-11-03: as Pedras de Retorno (data/zones.js `checkpoints`) entraram no layout como obstáculos pequenos (mudou a regra, não uma otimização): digests recalculados.
 const GOLDEN = {
-  forest: '7c5c2a66765969628180456009d15987cb62f79e',
+  forest: 'f073dd8e43c8c6c03ba10d49f647fd108bbb2ac0', // 2026-11-05: itens/poções caem no chão com dono (o spirit busca) e XP arredondado por abate (zone_loot) — mudança intencional; planície/ruínas (sem abates) iguais
   plains: '99eaf80813515543e6dea8769acf92dce0dfc93a',
   ruins: 'c2c6574fb22d73151646fdd44ca9503ba0369309',
 };
