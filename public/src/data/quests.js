@@ -33,14 +33,40 @@ export const QUESTS = {
     objectives: [{ type: 'spirit', count: 2, label: 'Tenha 2 spirits' }],
     reward: { gold: 120, xp: 400 },
   },
+  // Bosque mais longo (2026-11-05): o herói chegava ao Carvalho (Nv 7) no nível 4–5 e, depois dele, a próxima missão já era na Planície.
+  // Agora: Lobos → Cogumelos → Acampamentos → Carvalho → Alfa da Matilha → Planície; e a Herbalista tem as Geleias depois das Ervas.
+  cogumelos_esporentos: {
+    id: 'cogumelos_esporentos', name: 'Esporos no Vento', giver: 'guard', level: 3, after: 'caca_aos_lobos',
+    text: { offer: 'Os cogumelos do bosque andam soltando esporos na estrada: quem respira fica tonto dias. Derrube oito Cogumelos Esporentos.', progress: 'Os Cogumelos Esporentos crescem nos acampamentos do bosque. Não fique parado na nuvem de esporos.', done: 'O ar já está mais limpo. Esses cogumelos só brotam assim perto de raízes muito velhas. Alguma coisa embaixo do bosque está acordando.' },
+    objectives: [{ type: 'kill', mob: 'shroom', zone: 'forest', count: 8, label: 'Derrote 8 Cogumelos Esporentos' }],
+    reward: { gold: 110, xp: 520, potions: 2 },
+  },
+  acampamentos_do_bosque: {
+    id: 'acampamentos_do_bosque', name: 'Acampamentos do Bosque', giver: 'guard', level: 4, after: 'cogumelos_esporentos',
+    text: { offer: 'As criaturas se juntam em acampamentos, e alguns têm guardas mais fortes. Limpe a área: doze criaturas do bosque e abra um dos baús deles. Ganhe força antes de ir ao fundo do bosque.', progress: 'Os acampamentos ficam espalhados pelo Bosque Verdejante. Vá com calma: os guardas batem forte.', done: 'Agora sim você está pronto para o que mora no fundo do bosque. Só não vá com pressa.' },
+    objectives: [{ type: 'kill', mob: 'any', zone: 'forest', count: 12, label: 'Derrote 12 criaturas do Bosque Verdejante' }, { type: 'chest', zone: 'forest', count: 1, label: 'Abra 1 baú no Bosque Verdejante' }],
+    reward: { gold: 150, xp: 700, potions: 2, items: [{ rarity: 'uncommon' }] },
+  },
+  geleias_da_herbalista: {
+    id: 'geleias_da_herbalista', name: 'Geleia para Poções', giver: 'herbalist', level: 3, after: 'ervas_do_bosque',
+    text: { offer: 'As ervas sozinhas não seguram a poção, querido. A Geleia do bosque dá o ponto certo. Traga a geleia de dez delas?', progress: 'As Geleias pulam pelo Bosque Verdejante, perto da entrada. Dez, querido.', done: 'Que maravilha, que consistência! Leve estas poções, são da fornada nova.' },
+    objectives: [{ type: 'kill', mob: 'slime', zone: 'forest', count: 10, label: 'Derrote 10 Geleias' }],
+    reward: { gold: 90, xp: 450, potions: 3 },
+  },
   carvalho_ancestral: {
-    id: 'carvalho_ancestral', name: 'O Carvalho Ancestral', giver: 'guard', level: 4, after: 'caca_aos_lobos',
+    id: 'carvalho_ancestral', name: 'O Carvalho Ancestral', giver: 'guard', level: 5, after: 'acampamentos_do_bosque',
     text: { offer: 'Há um carvalho antigo no fundo do bosque, e ele despertou. Leve poções e fuja se precisar: raízes não perdoam. Derrube-o antes que cheguem à vila.', progress: 'O Carvalho Ancestral fica no extremo leste do bosque. Leve poções.', done: 'Ele caiu sussurrando: "não sou o primeiro". Leve essa frase à Sábia Yun. Tome esta peça.' },
     objectives: [{ type: 'boss', mob: 'treant', count: 1, label: 'Derrote o Carvalho Ancestral' }],
     reward: { gold: 200, xp: 750, items: [{ rarity: 'rare' }] },
   },
+  alfa_da_matilha: {
+    id: 'alfa_da_matilha', name: 'O Alfa da Matilha', giver: 'guard', level: 6, after: 'carvalho_ancestral',
+    text: { offer: 'Com o Carvalho caído, o líder dos lobos ficou sem o que temia e agora caça na clareira do sul do bosque. Derrube o Alfa da Matilha. É forte: leve poções e chame alguém se puder.', progress: 'O Alfa da Matilha ronda o sul do Bosque Verdejante. Ele volta depois de um tempo se você recuar.', done: 'Sem o Alfa, a matilha se espalha e a estrada fica segura. Agora a Planície de Cristal te espera.' },
+    objectives: [{ type: 'miniboss', mob: 'any', count: 1, label: 'Derrote o Alfa da Matilha (mini-chefe do Bosque)' }],
+    reward: { gold: 260, xp: 1100, potions: 2, items: [{ rarity: 'rare' }] },
+  },
   cristais_vivos: {
-    id: 'cristais_vivos', name: 'Cristais Vivos', giver: 'guard', level: 6, after: 'carvalho_ancestral',
+    id: 'cristais_vivos', name: 'Cristais Vivos', giver: 'guard', level: 6, after: 'alfa_da_matilha',
     text: { offer: 'Depois do bosque, a Planície de Cristal. As pedras andam por lá. Abata doze criaturas.', progress: 'A Planície de Cristal é logo depois do bosque. Siga o portal.', done: 'Doze a menos. A rota agradece. Mas pedra não anda sozinha: algo as chama, do coração da planície.' },
     objectives: [{ type: 'kill', mob: 'any', zone: 'plains', count: 12, label: 'Derrote 12 criaturas da Planície de Cristal' }],
     reward: { gold: 250, xp: 1500 },
