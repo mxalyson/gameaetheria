@@ -1002,3 +1002,25 @@ body.online #hud-gold, body.online #qtrack { left: calc(8px + 44px + 8px + env(s
 body:not(.touch) #side-btns.menu-btns { top: calc(100% + 22px); }
 body:not(.touch) #menu-btns.menu-btns { top: calc(100% + 22px + 44px + 6px); }
 body:not(.touch) #ritual { top: calc(var(--map) + 200px); }
+
+/* ---------- Avisos (pedido do dono, 2026-11-05): pequenos na lateral; só boas-vindas/zona/nível/chefe no centro, um por vez ---------- */
+#toast-layer { position: fixed; z-index: 15; left: calc(8px + env(safe-area-inset-left, 0px)); right: auto; transform: none;
+  top: calc(8px + var(--card-w, 150px) * .637 + 8px + 44px + 10px + var(--sat, 0px));
+  width: min(250px, 38vw); display: flex; flex-direction: column; align-items: flex-start; gap: 5px; pointer-events: none; }
+body.boss-on #toast-layer, body.panel-open #toast-layer { top: calc(8px + var(--card-w, 150px) * .637 + 8px + 44px + 10px + var(--sat, 0px)); }
+#toast-layer .toast { --tb: 0px; border: 1px solid rgba(214,170,90,.5); border-left: 3px solid #e0b866; border-image: none; border-radius: 8px;
+  background: rgba(14,16,30,.84); padding: 5px 9px 6px; text-align: left; max-width: 100%; filter: none; box-shadow: 0 3px 10px rgba(0,0,0,.35);
+  animation: notice-in .22s ease; transition: opacity .35s, transform .35s; }
+#toast-layer .toast.gold { border-left-color: #ffd34d; box-shadow: 0 0 10px rgba(255,211,77,.25), 0 3px 10px rgba(0,0,0,.35); }
+#toast-layer .toast .t1 { font-family: Cinzel, serif; font-size: 12px; font-weight: 800; color: #fff0c8; text-shadow: none; line-height: 1.2; }
+#toast-layer .toast .t2 { font-family: Nunito, sans-serif; font-size: 11px; font-weight: 600; color: #e6dcc0; margin-top: 1px; text-shadow: none; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+#toast-layer .toast.out { opacity: 0; transform: translateX(-14px); }
+@keyframes notice-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+/* centro: a moldura pintada de antes (.toast), uma de cada vez */
+#announce-layer { position: fixed; z-index: 16; top: 16%; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; pointer-events: none; max-width: min(560px, 80vw); }
+body.boss-on #announce-layer { top: 17%; } /* logo abaixo da barra do chefe/elite, sem descer até o herói */
+body.panel-open #announce-layer { top: 6%; }
+#announce-layer .toast { text-align: center; }
+/* o resumo do chat (caixa fechada) desce para não encostar nos avisos */
+.chat-feed { top: auto; bottom: 22%; }

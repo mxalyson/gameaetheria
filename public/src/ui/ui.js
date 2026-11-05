@@ -450,13 +450,37 @@ export class UI {
     document.body.appendChild(el);
   }
 
-  toast(title, sub = '', tone = '', ms = 2200) { // ms: tempo visível (textos de lore pedem mais)
+  // Aviso PEQUENO na lateral (missão, conquista, item, dica, sistema): no máximo 2 visíveis, o mais antigo sai quando chega um novo; o mesmo aviso
+  // repetido em 3 s não duplica. Antes todos iam empilhados no centro da tela por cima do combate (pedido do dono, 2026-11-05).
+  toast(title, sub = '', tone = '', ms = 3200) { // ms: tempo visível (textos de lore pedem mais)
+    const layer = $('toast-layer'), key = title + '|' + sub, now = Date.now();
+    if (this.lastToast?.key === key && now - this.lastToast.at < 3000) return;
+    this.lastToast = { key, at: now };
     const el = document.createElement('div');
     el.className = 'toast ' + tone;
     el.innerHTML = `<div class="t1">${title}</div>${sub ? `<div class="t2">${sub}</div>` : ''}`;
-    $('toast-layer').appendChild(el);
+    layer.appendChild(el);
+    const live = [...layer.children].filter((x) => !x.classList.contains('out'));
+    for (const old of live.slice(0, Math.max(0, live.length - 2))) { old.classList.add('out'); setTimeout(() => old.remove(), 400); }
     setTimeout(() => el.classList.add('out'), ms);
     setTimeout(() => el.remove(), ms + 600);
+  }
+
+  // Aviso GRANDE no centro (boas-vindas, nome da zona ao entrar, subida de nível, chefe): um por vez, em fila; nunca vários empilhados.
+  announce(title, sub = '', tone = 'gold', ms = 2400) {
+    (this.annQ ??= []).push({ title, sub, tone, ms });
+    if (!this.annBusy) this.announceNext();
+  }
+  announceNext() {
+    const it = this.annQ?.shift(), layer = $('announce-layer');
+    if (!it || !layer) { this.annBusy = false; return; }
+    this.annBusy = true;
+    const el = document.createElement('div');
+    el.className = 'toast announce ' + it.tone;
+    el.innerHTML = `<div class="t1">${it.title}</div>${it.sub ? `<div class="t2">${it.sub}</div>` : ''}`;
+    layer.replaceChildren(el);
+    setTimeout(() => el.classList.add('out'), it.ms);
+    setTimeout(() => { el.remove(); this.announceNext(); }, it.ms + 450);
   }
 
   // Cartão de recompensa (baú): fica ~3,5 s por cima de tudo (até dos painéis); vários na fila aparecem um depois do outro, sem se sobrepor.

@@ -293,7 +293,7 @@ class Game {
     if (heroSpritesEnabled()) showHeroLoading(Promise.all([preloadHero(char), whenNatureReady()])); // visual novo: espera o herói e o cenário pintado (casas HD) carregarem
     this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
-      setTimeout(() => this.ui.toast(`Bem-vindo, ${esc(char.name)}!`, 'Fale com a Guarda Ren (marca ❗) para receber sua primeira missão', 'gold'), 2600); // depois da tela "Preparando seu herói" (antes o toast expirava escondido)
+      setTimeout(() => this.ui.announce(`Bem-vindo, ${esc(char.name)}!`, 'Fale com a Guarda Ren (marca ❗) para a primeira missão', 'gold', 3200), 2600); // depois da tela "Preparando seu herói" (antes o toast expirava escondido)
       // o tutorial segue o modo de controle (toque é o padrão; teclado e mouse só se escolhido nas opções)
       if (this.touch?.active) this.ui.log('Arraste à esquerda para andar · botão grande ataca · círculos menores são as habilidades', '#cfe8ff');
       else this.ui.log('Mover: arraste o botão esquerdo do mouse ou use as setas · clique ataca · habilidades nos botões', '#cfe8ff');
@@ -357,7 +357,7 @@ class Game {
     this.cam = this.renderer.camera(this.world, this.player);
     this.ui.banner(null);
     const z = this.world.zone;
-    this.ui.toast(z.name, z.level ? `Nível ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : z.safe ? 'Zona segura' : '');
+    this.ui.announce(z.name, z.level ? `Nível ${z.level[0]}–${z.level[1]}${z.scale ? '+' : ''}` : z.safe ? 'Zona segura' : '', '');
     if (zoneId === 'town') this.refreshShop();
     if (zoneId === 'ember') this.tip('ritual'); // explica o "Ritual N/40" na primeira visita
     else if (zoneId === 'forest') this.tip('forest');
@@ -604,7 +604,7 @@ class Game {
     this.cam = this.renderer.camera(w, this.player);
     this.ui.banner(null);
     const z = w.zone;
-    this.ui.toast(z.name, `Nível ${z.level[0]}–${z.level[1]} · instância ${this.net?.party ? 'do grupo' : 'solo'} (botão 🏠 volta à vila)`);
+    this.ui.announce(z.name, `Nível ${z.level[0]}–${z.level[1]}${this.net?.party ? ' · com o grupo' : ''}`, '');
   }
   netAddHero(p, you) {
     const doc = newCharacter(p.name, p.classId, makeRng(p.id)); doc.level = p.level ?? 1;
@@ -631,7 +631,7 @@ class Game {
         { this.deathCard = performance.now() + 900; this.ui.showResult({ title: 'Você caiu…', sub: ZONES[r.zone]?.name ?? '', lines: [this.deathLine(dr, r.phoenix ?? 0), 'Você renasce no último ponto salvo deste mapa.'], button: 'Renascer no ponto salvo', action: 'respawn-online', tone: 'lose' }); }
       } else this.ui.log('Você caiu.', '#ffb4a8');
     }
-    if (r.levels) this.ui.toast(`Nível ${r.level}!`, 'Sua vida foi restaurada. Distribua os pontos em Personagem.', 'gold');
+    if (r.levels) this.ui.announce(`Nível ${r.level}!`, '+5 pontos de atributo', 'gold');
     for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     for (const id of r.achievements ?? []) this.announceAchievements([id]);
     try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char, { paused: true }); } } catch { /* tenta no próximo lote */ }
@@ -760,8 +760,8 @@ class Game {
       }
       case 'death': { const t = this.netEntity(e.actor); if (t) w.burst(t.x, t.y, t.kind === 'mob' ? MOBS[t.mobId]?.color ?? '#fff' : '#ffffff', 26, 220); break; }
       case 'telegraph': w.telegraphs.push({ x: e.x, y: e.y, r: e.r, t: 0, delay: e.delay, color: e.color, done: false, src: { dead: false } }); break;
-      case 'boss_warn': if (e.stage === 'omen') this.ui.toast('O chão estremece…', `${e.name} desperta`, 'gold'); else this.ui.log(`<b>${e.name}</b> surgiu!`, '#ffb4a8'); break;
-      case 'phase': { const m = this.netEntity(e.actor); if (e.phase === 3) this.ui.toast('Enfurecido!', `${m?.name ?? 'O chefe'} entrou em fúria`, 'gold'); else this.ui.log(`${m?.name ?? 'O chefe'} acelera!`, '#ffb4a8'); break; }
+      case 'boss_warn': if (e.stage === 'omen') this.ui.announce('O chão estremece…', `${e.name} desperta`, 'gold'); else this.ui.log(`<b>${e.name}</b> surgiu!`, '#ffb4a8'); break;
+      case 'phase': { const m = this.netEntity(e.actor); if (e.phase === 3) this.ui.announce('Enfurecido!', `${m?.name ?? 'O chefe'} entrou em fúria`, 'gold'); else this.ui.log(`${m?.name ?? 'O chefe'} acelera!`, '#ffb4a8'); break; }
       case 'wave': this.ui.toast(e.boss ? 'Onda final: o chefe!' : `Onda ${e.n}`, '', 'gold'); break;
       case 'crypt': this.onCryptEvent(e); break;
       case 'wave_clear': this.ui.toast(`Onda ${e.n} vencida!`, 'Recuperem o fôlego…', 'gold'); break;
@@ -1033,7 +1033,7 @@ class Game {
     const cur = Math.min(r.dprCap, r.memCap, devicePixelRatio || 1);
     if (cur > 1) { r.memCap = Math.max(1, Math.floor(cur) - 1); r.resize(); }
     console.warn(`[memória] canvas recusado pelo navegador (${n}); resolução agora ${r.dpr}×`);
-    if (!this.memWarned) { this.memWarned = true; this.ui.toast('Memória do aparelho', 'O aparelho chegou ao limite de memória gráfica: reduzimos a resolução para o jogo seguir estável.', ''); }
+    if (!this.memWarned) { this.memWarned = true; this.ui.toast('Memória do aparelho', 'Resolução reduzida para o jogo seguir estável.', ''); }
   }
 
   setPref(arg) {
@@ -1125,9 +1125,9 @@ class Game {
       this.audio.event(ev, this.player); // som do evento (golpe, dano, magia, morte, chefe); só leitura
       if (ev.type === 'cast') { if (ev.actor === this.player) this.gameEvent({ type: 'skill', skillId: ev.skill }); spawnSkillVfx(this.world, ev); continue; } // efeito visual da habilidade (a simulação já decidiu tudo)
       if (ev.type === 'hit' || ev.type === 'heal') { spawnEventVfx(this.world, ev); continue; } // crítico, absorção e cura
-      if (ev.type === 'phase' && ev.phase === 3) { this.ui.toast('Enfurecido!', `${ev.actor.name} entrou em fúria`, 'gold'); continue; }
+      if (ev.type === 'phase' && ev.phase === 3) { this.ui.announce('Enfurecido!', `${ev.actor.name} entrou em fúria`, 'gold'); continue; }
       if (ev.type === 'phase') { this.ui.log(`${ev.actor.name} acelera!`, '#ffb4a8'); continue; }
-      if (ev.type === 'boss_warn') { if (ev.stage === 'omen') this.ui.toast('O chão estremece…', `${ev.name} desperta`, 'gold'); else this.ui.log(`<b>${ev.name}</b> surgiu nas Cinzas Ardentes!`, '#ffb4a8'); continue; }
+      if (ev.type === 'boss_warn') { if (ev.stage === 'omen') this.ui.announce('O chão estremece…', `${ev.name} desperta`, 'gold'); else this.ui.log(`<b>${ev.name}</b> surgiu nas Cinzas Ardentes!`, '#ffb4a8'); continue; }
       if (ev.type !== 'death') continue;
       const a = ev.actor;
       if (a.kind === 'mob') this.onMobKilled(a);
@@ -1508,7 +1508,7 @@ class Game {
     p.hp = p.maxHp;
     this.world.addFx({ type: 'ring', x: p.x, y: p.y, r: 120, color: '#ffd34d', t: 0, life: 0.8, follow: p });
     this.world.burst(p.x, p.y, '#ffd34d', 40, 260);
-    this.ui.toast(`Nível ${this.char.level}!`, `+5 pontos de atributo — abra o Personagem`, 'gold');
+    this.ui.announce(`Nível ${this.char.level}!`, '+5 pontos de atributo', 'gold');
     this.ui.log(`Você alcançou o nível <b>${this.char.level}</b>.`, '#ffd34d');
     this.tip('level');
     for (const u of newlyUnlocked(this.char.classId, this.skillLv ?? this.char.level - 1, this.char.level)) { // habilidades aprendidas neste nível
