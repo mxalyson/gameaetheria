@@ -96,7 +96,7 @@ export function abandonQuest(doc, id) { delete doc.quests.active[id]; }
 
 function matches(o, ev, doc) {
   switch (o.type) {
-    case 'miniboss': return ev.type === 'kill' && !!ev.mini;
+    case 'miniboss': return ev.type === 'kill' && !!ev.mini && (!o.zone || o.zone === 'any' || o.zone === ev.zoneId); // `zone` opcional: o mini-chefe daquele mapa
     case 'spiritKill': return ev.type === 'kill' && ev.spiritType === o.spirit;
     case 'skillUse': return ev.type === 'skill' && (o.skill !== 'signature' || ev.skillId === skillIdAt(doc.classId, 0, kitSpec(doc)) || ev.skillId === CLASSES[doc.classId]?.skills[0]);
     case 'kill': return ev.type === 'kill' && (o.mob === 'any' || o.mob === ev.mobId) && (o.zone === 'any' || o.zone === ev.zoneId);

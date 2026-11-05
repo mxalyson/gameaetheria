@@ -1,7 +1,7 @@
 // Missões (dados). Cada objetivo tem um `type`:
 //   kill  {mob:'any'|id, zone:'any'|id}   boss {mob:'any'|id}   chest {zone:'any'|id}   spirit (ter N spirits)   level (alcançar o nível N)
 //   pvp {mode:'any'|1v1|2v2|4v4}   coop   ← estes dois são do SERVIDOR (só o servidor soma progresso; o cliente não consegue marcá-los)
-//   miniboss (abater mini-chefe)   skillUse {skill:'signature'|'any'}   spiritKill {spirit:id} (abates com aquele spirit ativo)
+//   miniboss {zone?} (abater mini-chefe; com `zone`, só o daquele mapa)   skillUse {skill:'signature'|'any'}   spiritKill {spirit:id} (abates com aquele spirit ativo)
 //   talk {count} (conversar com os mentores de especialização da própria classe, no Porto: bits em stats.mentors, core/journal.js; o servidor conta)
 //   teleport (usar o teletransporte do mapa)   upgrade (aprimorar um equipamento no Ferreiro)   spiritStage (ter N spirits evoluídos, forma 2)
 // Cânone do arco final: 3 guardiões originais (Carvalho, Colosso, Guardião) e 2 reflexos (Ancião Gélido = gelo, Cavaleiro Rubro = brasa). `text.done` pode ser lista de falas (epílogo).
@@ -62,7 +62,7 @@ export const QUESTS = {
   alfa_da_matilha: {
     id: 'alfa_da_matilha', name: 'O Alfa da Matilha', giver: 'guard', level: 6, after: 'carvalho_ancestral',
     text: { offer: 'Com o Carvalho caído, o líder dos lobos ficou sem o que temia e agora caça na clareira do sul do bosque. Derrube o Alfa da Matilha. É forte: leve poções e chame alguém se puder.', progress: 'O Alfa da Matilha ronda o sul do Bosque Verdejante. Ele volta depois de um tempo se você recuar.', done: 'Sem o Alfa, a matilha se espalha e a estrada fica segura. Agora a Planície de Cristal te espera.' },
-    objectives: [{ type: 'miniboss', mob: 'any', count: 1, label: 'Derrote o Alfa da Matilha (mini-chefe do Bosque)' }],
+    objectives: [{ type: 'miniboss', mob: 'any', zone: 'forest', count: 1, label: 'Derrote o Alfa da Matilha (mini-chefe do Bosque)' }],
     reward: { gold: 260, xp: 1100, potions: 2, items: [{ rarity: 'rare' }] },
   },
   cristais_vivos: {
@@ -71,8 +71,52 @@ export const QUESTS = {
     objectives: [{ type: 'kill', mob: 'any', zone: 'plains', count: 12, label: 'Derrote 12 criaturas da Planície de Cristal' }],
     reward: { gold: 250, xp: 1500 },
   },
+  // Planície mais longa (2026-11-05): antes eram só Cristais Vivos e o Colosso (Nv 13) logo no nível 8. Agora a Guarda leva até o Golem Ancestral
+  // e o Colosso fica para o fim; Herbalista, Sábia, Ferreiro e Mercadora têm missões paralelas na Planície.
+  lobos_de_cristal: {
+    id: 'lobos_de_cristal', name: 'Uivo de Vidro', giver: 'guard', level: 7, after: 'cristais_vivos',
+    text: { offer: 'Na planície os lobos têm pele de cristal e dentes que cortam escudo. Vêm em bando para cima de quem anda sozinho. Derrube dez Lobos de Cristal.', progress: 'Os Lobos de Cristal correm pela Planície em bando. Não deixe que te cerquem.', done: 'Dez. Os lobos daqui não fogem de nada: são feitos do mesmo cristal que anda sozinho. Alguém os chama.' },
+    objectives: [{ type: 'kill', mob: 'crystalwolf', zone: 'plains', count: 10, label: 'Derrote 10 Lobos de Cristal' }],
+    reward: { gold: 280, xp: 1700, potions: 2 },
+  },
+  acampamentos_de_cristal: {
+    id: 'acampamentos_de_cristal', name: 'Acampamentos de Cristal', giver: 'guard', level: 8, after: 'lobos_de_cristal',
+    text: { offer: 'As criaturas da planície se juntam em volta de pedras que brilham, como sentinelas. Desfaça esses acampamentos: quinze criaturas e um dos baús que guardam.', progress: 'Os acampamentos brilham longe na Planície. Quinze criaturas e um baú.', done: 'Os acampamentos caíram. No maior deles havia um golem velho, coberto de musgo de cristal, que não se mexeu. Ainda.' },
+    objectives: [{ type: 'kill', mob: 'any', zone: 'plains', count: 15, label: 'Derrote 15 criaturas da Planície de Cristal' }, { type: 'chest', zone: 'plains', count: 1, label: 'Abra 1 baú na Planície de Cristal' }],
+    reward: { gold: 320, xp: 1900, potions: 2, items: [{ rarity: 'uncommon' }] },
+  },
+  golem_ancestral: {
+    id: 'golem_ancestral', name: 'O Golem Ancestral', giver: 'guard', level: 10, after: 'acampamentos_de_cristal',
+    text: { offer: 'O golem velho acordou. Ele guarda o caminho até o coração da planície, onde mora o Colosso. Derrube o Golem Ancestral: é lento, mas cada golpe dele derruba uma casa. Leve poções.', progress: 'O Golem Ancestral fica no sul da Planície de Cristal. Golpeie e saia da frente.', done: 'O caminho para o Colosso está aberto. A Herbalista Mel quer falar com você sobre o núcleo dele.' },
+    objectives: [{ type: 'miniboss', mob: 'any', zone: 'plains', count: 1, label: 'Derrote o Golem Ancestral (mini-chefe da Planície)' }],
+    reward: { gold: 450, xp: 2600, potions: 2, items: [{ rarity: 'rare' }] },
+  },
+  fogos_fatuos: {
+    id: 'fogos_fatuos', name: 'Luz que Engana', giver: 'herbalist', level: 7, after: 'cristais_vivos',
+    text: { offer: 'Os Fogos-fátuos da planície levam viajantes para longe da trilha, querido. E a luz deles, presa num frasco, faz um tônico ótimo. Apague dez para mim?', progress: 'Os Fogos-fátuos flutuam pela Planície de Cristal. Dez, querido, e não siga a luz deles.', done: 'Que brilho bonito no frasco! Leve estas poções, já com o tônico novo.' },
+    objectives: [{ type: 'kill', mob: 'wisp', zone: 'plains', count: 10, label: 'Derrote 10 Fogos-fátuos' }],
+    reward: { gold: 240, xp: 1600, potions: 3 },
+  },
+  quartzo_da_forja: {
+    id: 'quartzo_da_forja', name: 'Quartzo para a Forja', giver: 'smith', level: 8, after: 'fogo_de_forja',
+    text: { offer: 'Quartzo de golem endurece o aço como nada. Derrube oito Golens de Quartzo na planície. Eu cuido do resto.', progress: 'Os Golens de Quartzo andam devagar pela Planície. Oito.', done: 'Isto é quartzo bom. Uma peça para você. Volte para aprimorar.' },
+    objectives: [{ type: 'kill', mob: 'golem', zone: 'plains', count: 8, label: 'Derrote 8 Golens de Quartzo' }],
+    reward: { gold: 300, xp: 1800, items: [{ rarity: 'uncommon' }] },
+  },
+  ecos_de_cristal: {
+    id: 'ecos_de_cristal', name: 'O Canto do Cristal', giver: 'sage', level: 9, after: 'carvalho_ancestral',
+    text: { offer: '"Não sou o primeiro", disse o Carvalho. Na planície, os cristais cantam a mesma nota. Abra dois baús de lá e derrube doze criaturas: quero saber o que elas guardam.', progress: 'Dois baús e doze criaturas na Planície de Cristal. Escute o canto enquanto isso.', done: 'A mesma nota, sim. O Carvalho e os cristais são pedaços de uma voz só. Ainda não sei de quem.' },
+    objectives: [{ type: 'chest', zone: 'plains', count: 2, label: 'Abra 2 baús na Planície de Cristal' }, { type: 'kill', mob: 'any', zone: 'plains', count: 12, label: 'Derrote 12 criaturas da Planície de Cristal' }],
+    reward: { gold: 300, xp: 2000, items: [{ rarity: 'uncommon' }] },
+  },
+  rota_das_caravanas: {
+    id: 'rota_das_caravanas', name: 'Rota das Caravanas', giver: 'merchant', level: 10, after: 'pergaminho_de_cortesia',
+    text: { offer: 'Minhas caravanas para o Porto passam pela planície, freguês, e voltam sem metade da carga. Limpe a estrada: vinte criaturas da Planície de Cristal. Pago bem.', progress: 'A rota corta a Planície de Cristal inteira. Vinte criaturas.', done: 'A caravana chegou inteira! Tome o combinado. E a próxima vez que for ao Porto, diga que vai em meu nome.' },
+    objectives: [{ type: 'kill', mob: 'any', zone: 'plains', count: 20, label: 'Derrote 20 criaturas da Planície de Cristal' }],
+    reward: { gold: 500, xp: 2200, potions: 2 },
+  },
   coracao_de_cristal: {
-    id: 'coracao_de_cristal', name: 'Coração de Cristal', giver: 'herbalist', level: 8, after: 'cristais_vivos',
+    id: 'coracao_de_cristal', name: 'Coração de Cristal', giver: 'herbalist', level: 11, after: 'golem_ancestral',
     text: { offer: 'O núcleo do Colosso de Cristal, moído, rende as melhores poções que conheço. Derrube-o e me traga os cacos: a vila lhe deve um favor.', progress: 'O Colosso fica no coração da planície.', done: 'O núcleo canta baixinho, do mesmo jeito que o Carvalho cantava. Fique com esta recompensa, querido.' },
     objectives: [{ type: 'boss', mob: 'colossus', count: 1, label: 'Derrote o Colosso de Cristal' }],
     reward: { gold: 400, xp: 2250, items: [{ rarity: 'rare' }], potions: 3 },

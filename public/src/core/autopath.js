@@ -90,7 +90,7 @@ export function questTarget(doc, qid, ctx = {}) {
       return { kind: 'boss', zone, x: b.x, y: b.y, reach: ARRIVE.boss, label: `Chefe de ${ZONES[zone].name}`, why: o.label };
     }
     case 'miniboss': {
-      const zone = ZONES[ctx.zoneId]?.miniboss ? ctx.zoneId : FARM.filter((id) => ZONES[id].miniboss && ZONES[id].level[0] <= doc.level).pop() ?? 'forest';
+      const zone = o.zone && o.zone !== 'any' && ZONES[o.zone]?.miniboss ? o.zone : ZONES[ctx.zoneId]?.miniboss ? ctx.zoneId : FARM.filter((id) => ZONES[id].miniboss && ZONES[id].level[0] <= doc.level).pop() ?? 'forest';
       const m = ZONES[zone].miniboss;
       return { kind: 'boss', zone, x: m.x, y: m.y, reach: ARRIVE.boss, label: m.name, why: o.label };
     }
