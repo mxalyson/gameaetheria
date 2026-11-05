@@ -908,7 +908,12 @@ export class UI {
     if (ready) { const q = QUESTS[ready]; text = q.text.done; body = `<h3>✔ ${q.name}</h3>`; foot = `${rewardLine(q)}<button class="btn primary wide" data-action="quest-turnin" data-arg="${q.id}">Entregar missão</button>`; }
     else if (offer) { const q = offer; text = q.text.offer; body = `<h3>${q.name} <span class="pts">Nv ${q.level}+</span></h3><ul>${q.objectives.map((o) => `<li>${esc(o.label)}</li>`).join('')}</ul>`; foot = `${rewardLine(q)}<button class="btn primary wide" data-action="quest-accept" data-arg="${q.id}">Aceitar missão</button>`; }
     else if (active) { const q = QUESTS[active]; text = q.text.progress; body = `<h3>${q.name}</h3>${this.questLines(char, active)}`; }
-    const more = (offeredBy(char, npc.id, { server: !!g.online }).length > (offer ? 1 : 0)) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
+    // as outras missões que este NPC oferece agora aparecem todas, cada uma com o botão de aceitar (antes ficavam escondidas atrás da primeira)
+    const offers = offeredBy(char, npc.id, { server: !!g.online });
+    const extra = offer && !ready ? offers.slice(1) : [];
+    const more = extra.length ? `<h3>Também tenho <span class="pts">${extra.length}</span></h3>${extra.map((q) => `<div class="shop-item quest-card"><div class="qtxt"><div class="nm">${esc(q.name)} <span class="pts">Nv ${q.level}+</span></div><div class="sub">${q.objectives.map((o) => esc(o.label)).join(' · ')}</div></div>
+      <div class="btn-col"><button class="btn small primary" data-action="quest-accept" data-arg="${q.id}">Aceitar</button></div></div>`).join('')}`
+      : offers.length > (offer ? 1 : 0) ? '<p class="hint">Tenho mais trabalho para você depois desta.</p>' : '';
     const S = serviceFor(char, D); // serviço do Mestre de Classe só aparece para a própria classe
     const svc = S ? `<button class="btn wide" data-action="dialog-service" data-arg="${S.panel}">${S.label}</button>` : '';
     const mentor = MENTOR_BY_ID[npc.id];
@@ -954,6 +959,11 @@ export class UI {
       <div class="btn-col"><button class="btn small primary" data-action="quest-go" data-arg="${id}">Ir até lá</button>
       <button class="btn small${g.trackId === id || (!g.trackId && g.guide?.id === id) ? ' on' : ''}" data-action="quest-track" data-arg="${id}">${g.trackId === id || (!g.trackId && g.guide?.id === id) ? 'Rastreada ✔' : 'Rastrear'}</button>
       <button class="btn small" data-action="quest-abandon" data-arg="${id}">Abandonar</button></div></div>`).join('') : `<p class="hint">Nenhuma missão ativa. Converse com ${this.questGiverNames()}.</p>`;
+    // missões que já dá para pegar: o diálogo do NPC mostra uma por vez, então aqui ficam todas, com quem as dá e onde
+    const npcs = [...(ZONES.town.npcs ?? []).map((n) => [n, 'Vila']), ...(ZONES.harbor.npcs ?? []).map((n) => [n, 'Porto'])];
+    const avail = npcs.flatMap(([n, where]) => offeredBy(char, n.id, { server: !!g.online }).map((q) => ({ q, n, where })));
+    const availHtml = avail.length ? avail.map(({ q, n, where }) => `<div class="shop-item quest-card"><div class="qtxt"><div class="nm">${esc(q.name)} <span class="pts">Nv ${q.level}+</span></div><div class="sub">Com ${esc(n.name)} (${where}) · ${q.objectives.map((o) => esc(o.label)).join(' · ')}</div></div></div>`).join('')
+      : '<p class="hint">Nenhuma missão nova agora. Suba de nível ou conclua as que estão ativas.</p>';
     const done = Object.keys(char.quests.done).length;
     const ach = ACHIEVEMENTS.map((a) => { const p = achievementProgress(char, a); return `<div class="shop-item ${p.earned ? '' : 'locked'}"><div class="cell ${p.earned ? 'r-epic' : ''}"><span class="ic">${p.earned ? TROPHY : LOCK_CELL}</span></div>
       <div><div class="nm">${esc(a.name)}</div><div class="sub">${esc(a.desc)} ${p.earned ? '' : `(${p.value}/${p.min})`}</div></div>
@@ -962,7 +972,7 @@ export class UI {
     const lore = LORE_ZONES.map((id) => { const l = (ZONES[id].lore ?? [])[0]; return l && loreSeen(char, id) ? `<p class="hint"><b>${esc(ZONES[id].name)}:</b> “${esc(l.text)}”</p>` : ''; }).join('');
     const tips = Object.keys(TIPS).filter((k) => tipSeen(char, k)).map((k) => `<p class="hint"><b>${esc(TIPS[k][0])}:</b> ${esc(TIPS[k][1])}</p>`).join('');
     const notes = `<h3>Inscrições <span class="pts">${loreCount(char)}/${LORE_ZONES.length}</span></h3>${lore || '<p class="hint">Placas e estátuas nas zonas guardam frases dos ecos. Chegue perto e toque no pergaminho.</p>'}${tips ? `<h3>Dicas vistas</h3>${tips}` : ''}`;
-    return this.frame('journal', 'Diário', `<h3>Missões ativas <span class="pts">${act.length}/5</span></h3>${missions}<p class="hint">Concluídas: ${done} · Baús abertos: ${char.stats.chests} · Criaturas derrotadas: ${char.stats.kills}</p>
+    return this.frame('journal', 'Diário', `<h3>Missões ativas <span class="pts">${act.length}/5</span></h3>${missions}<h3>Disponíveis para pegar <span class="pts">${avail.length}</span></h3>${availHtml}<p class="hint">Concluídas: ${done} · Baús abertos: ${char.stats.chests} · Criaturas derrotadas: ${char.stats.kills}</p>
       ${notes}
       <h3>Conquistas <span class="pts">${Object.keys(char.achievements).length}/${ACHIEVEMENTS.length}</span></h3>${ach}
       ${char.title ? '<button class="btn small" data-action="set-title" data-arg="">Remover título</button>' : ''}`);
