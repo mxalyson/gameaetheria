@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, statSync } from 'node:fs';
 import http from 'node:http';
+import { fileURLToPath } from 'node:url';
 import { soundFor, musicFor, SFX, MUSIC } from '../public/src/audio.js';
 import { changePref, loadPrefs } from '../public/src/prefs.js';
 import { createStatic } from '../server/static.js';
@@ -60,7 +61,7 @@ test('prefs: volumes de música e efeitos de 0 a 100 em passos de 10; "Mudo" = 0
 });
 
 test('servidor estático: música inteira (200) e por partes (206/416), como o <audio> do Safari pede', async () => {
-  const srv = http.createServer(createStatic(new URL('../public', import.meta.url).pathname)).listen(0);
+  const srv = http.createServer(createStatic(fileURLToPath(new URL('../public', import.meta.url)))).listen(0);
   await new Promise((r) => srv.once('listening', r));
   const base = `http://127.0.0.1:${srv.address().port}/assets/audio/music/town.mp3`;
   const full = await fetch(base); const total = (await full.arrayBuffer()).byteLength;
