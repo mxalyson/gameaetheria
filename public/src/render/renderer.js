@@ -4,7 +4,7 @@ import { safeBoxScreen, placeBoxes } from './safe-box.js';
 import { asset } from '../assets-version.js';
 import { heroSpritesEnabled, drawHeroSprite } from './hero-sprites.js';
 import { drawAuraBack, drawAuraMotes } from './aura.js';
-import { drawMountBack, drawMountFront, mountLift, mountBaseLift } from './mount-sprites.js';
+import { drawMountBack, drawMountFront, mountLift, mountBaseLift, mountLegs } from './mount-sprites.js';
 
 let auraQ = 2; // qualidade para a aura de evolução (0 só halo, 1 meio, 2 cheio); atualizada em setQuality
 import { drawSkillVfx, drawSkillProjectile, drawBasicSlash, vfxShake, trackActors } from './skill-vfx.js';
@@ -533,6 +533,7 @@ function drawDecor(g, d, t, z, player) {
 }
 
 // ---------------- personagens ----------------
+const LEG_W = 11; // meia-largura (px) da faixa das pernas do herói montado (renderer › drawActorHero)
 function drawActorHero(g, a, t) {
   const cls = CLASSES[a.classId];
   g.save();
@@ -543,10 +544,24 @@ function drawActorHero(g, a, t) {
   if (a.spec) drawAuraBack(g, a, t, auraQ, feetY); // aura de evolução (luz procedural atrás do herói)
   // montado (a.mounted/a.mountId, também de outros jogadores): montaria atrás, herói sentado na sela (sobe por mountLift) e a frente da montaria cobrindo as pernas
   const mnt = !!a.mounted && !a.dead;
-  if (mnt) { drawMountBack(g, a, t, auraQ, feetY); g.save(); g.translate(0, -mountLift(a)); }
-  const r = heroSpritesEnabled() ? drawHeroSprite(g, a, t) : false;
-  if (r === false) drawHero(g, a, a.classId, t, cls.color, cls.accent); // 'wait' = carregando: não desenha (a tela de carregamento cobre)
-  if (mnt) { g.restore(); drawMountFront(g, a, t, auraQ, feetY); }
+  const body = () => { const r = heroSpritesEnabled() ? drawHeroSprite(g, a, t) : false; if (r === false) drawHero(g, a, a.classId, t, cls.color, cls.accent); }; // 'wait' = carregando: não desenha
+  if (mnt) drawMountBack(g, a, t, auraQ, feetY);
+  const legs = mnt ? mountLegs(a) : null;
+  if (legs) {
+    // montado de pernas abertas: o tronco vai inteiro; abaixo do quadril (linha da sela) cada metade do herói gira para fora, por cima dos flancos.
+    // Antes a montaria era redesenhada por cima de tudo abaixo da sela e o herói parecia cortado na cintura.
+    const lift = mountLift(a), hip = feetY - legs.hip; // quadril no sistema do herói (antes de subir)
+    g.save(); g.translate(0, -lift);
+    // tudo menos a faixa das pernas (capa e mochila que descem abaixo do quadril ficam como estão, sem emenda)
+    g.save(); g.beginPath(); g.rect(a.x - 90, hip - 200, 180, 200); g.rect(a.x - 90, hip, 90 - LEG_W, 90); g.rect(a.x + LEG_W, hip, 90 - LEG_W, 90); g.clip(); body(); g.restore();
+    for (const side of [-1, 1]) { // cada perna gira para fora a partir do quadril e desce um pouco (pendurada no flanco)
+      g.save(); g.beginPath(); g.rect(side < 0 ? a.x - LEG_W : a.x, hip, LEG_W, 90); g.clip();
+      g.translate(a.x, hip + 2); g.rotate(-side * legs.open); g.translate(-a.x, -hip);
+      body(); g.restore();
+    }
+    g.restore();
+    drawMountFront(g, a, t, auraQ, feetY);
+  } else body(); // a pé, ou montaria ainda carregando (o herói fica no chão)
   if (a.spec) drawAuraMotes(g, a, t, auraQ, feetY);
   g.restore();
   drawStatus(g, a, t);

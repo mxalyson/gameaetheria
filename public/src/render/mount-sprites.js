@@ -15,6 +15,7 @@ const DEF = {
   gryphon: { w: 168, hip: 14, hover: 9, w2d: 138, hip2d: 14 },
 };
 export const stats = { drawn: 0, loaded: 0, texBytes: 0, evicted: 0 };
+const FRONT_BAND = 7; // meia-largura (px) da faixa da montaria redesenhada por cima do herói, entre as pernas
 const TAU = Math.PI * 2;
 
 const cache = new Map();          // id -> { id, tag, d3, d2, used }  (no máx. 2: a do jogador local e a dos vizinhos)
@@ -23,6 +24,8 @@ const FRAME_ORDER = [2, 0, 1];    // arte 2D do grifo: posição p do bater de a
 
 const isMounted = (a) => !!(a && a.mounted && DEF[a.mountId]);
 // mesma regra de hero-sprites/mob-sprites: S = 0, SE = 1, L = 2, NE = 3, N = 4, NO = 5, O = 6, SO = 7 (cópia local: este módulo não importa o do herói)
+const viewAngle = (v) => Math.atan2(Math.cos(v * Math.PI / 4), Math.sin(v * Math.PI / 4)); // inverso de viewOf (ângulo do centro da vista)
+const angDiff = (x, y) => Math.atan2(Math.sin(x - y), Math.cos(x - y));
 const viewOf = (face) => (((Math.round(Math.atan2(Math.cos(face), Math.sin(face)) / (Math.PI / 4)) % 8) + 8) % 8);
 
 // Carrega json + imagem de uma camada de arte (3D ou 2D). `layer` guarda o estado; sem arte ela vira 'error' e a outra (ou nada) é usada.
@@ -79,7 +82,7 @@ function stateOf(a, t) {
   let s = states.get(a);
   if (!s) {
     s = { lastT: t, px: a.x, py: a.y, v: 0, ma: 0, gait: 0, flap: 0, side: 1, vy: 0, face: a.facing ?? 0, seed: ((a.x * 12.9898 + a.y * 78.233) % 6.28 + 6.28) % 6.28,
-      lift: 0, base: 0, bounce: 0, float: 0, pitch: 0, sx: 1, sy: 1, p: 0, view: 0, fr: 0, art: null, ready: false };
+      lift: 0, base: 0, bounce: 0, rider: 0, float: 0, pitch: 0, view3: null, sx: 1, sy: 1, p: 0, view: 0, fr: 0, art: null, ready: false };
     states.set(a, s);
   }
   return s;
@@ -90,6 +93,15 @@ export function mountBaseLift(a) {
   if (!isMounted(a)) return 0;
   const s = states.get(a);
   return s?.ready ? s.base : 0; // montaria ainda carregando: o herói fica no chão (não levita sem ela)
+}
+// Pernas do herói montado: `hip` = quanto da perna desce abaixo da sela (px); `open` = abertura (rad) de cada perna para fora,
+// maior de frente/costas (as duas pernas aparecem dos lados) e menor de lado (descem pelo flanco). null se não está montado/pronto.
+export function mountLegs(a) {
+  if (!isMounted(a)) return null;
+  const s = states.get(a);
+  if (!s?.ready) return null;
+  const sideK = s.art === '3d' ? Math.abs(Math.sin(s.view * Math.PI / 4)) : 1;
+  return { hip: s.art === '3d' ? DEF[a.mountId].hip : DEF[a.mountId].hip2d, open: 0.55 - 0.3 * sideK };
 }
 // Deslocamento (px, para cima) do herói neste quadro: sela + balanço do passo/voo sincronizado com a montaria. Chame depois de drawMountBack.
 export function mountLift(a) {
@@ -115,9 +127,12 @@ function update3d(a, t, e) {
   const d = DEF[a.mountId], m = e.d3.meta, s = stateOf(a, t), dt = motion(a, t, s), ma = s.ma, vk = clamp(s.v / 300, 0, 1.6); // 300 px/s ~ galope de referência
   const cw = e.d3.img.naturalWidth / m.cols, ch = e.d3.img.naturalHeight / 8;
   const H = d.w * ch / cw;
-  const view = viewOf(s.face), n = m.frames;
+  // direção com folga: só troca de vista quando o ângulo passa bem da metade do setor (sem isso o joystick fazia a montaria piscar entre 2 vistas)
+  const want = viewOf(s.face);
+  if (s.view3 == null || (want !== s.view3 && Math.abs(angDiff(s.face, viewAngle(s.view3))) > Math.PI / 8 * 1.35)) s.view3 = want;
+  const view = s.view3, n = m.frames;
   s.view = view; s.art = '3d';
-  s.side = 1; s.pitch = 0;
+  s.side = 1;
   let fr;
   if (a.mountId === 'gryphon') {
     // voo: bate asas sempre (mais rápido ao se mover); o corpo flutua com uma leve oscilação própria
@@ -131,15 +146,21 @@ function update3d(a, t, e) {
     s.gait += dt * (1.15 + vk * 1.6) * (1 + 0.07 * Math.sin(t * 1.3 + s.seed)) * TAU * ma;
     const ph = s.gait + s.seed, stride = Math.abs(Math.sin(ph)) ** 0.75 + 0.22 * Math.sin(2 * ph + 0.6), breath = Math.sin(t * 2.1 + s.seed);
     fr = ma > 0.3 || !m.idle ? Math.floor((((s.gait / TAU) % 1) + 1) % 1 * n) % n : n; // n = índice do quadro parado
-    s.bounce = ma * (0.8 + 1.5 * vk) * stride; // o ciclo assado já traz o balanço; aqui só um resto para não ficar rígido
-    s.sy = 1 + (1 - ma) * 0.014 * breath; s.sx = 1 - (1 - ma) * 0.005 * breath;
+    // corpo vivo: sobe e desce com a passada, balança de frente para trás (mais visto de lado) e estica/encolhe um pouco; parado, respira
+    const sideK = Math.abs(Math.sin(view * Math.PI / 4));
+    s.bounce = ma * (1.6 + 2.6 * vk) * stride;
+    s.pitch = (ma * 0.045 * Math.sin(ph - 0.9) * sideK + (1 - ma) * 0.004 * breath) * (view >= 1 && view <= 3 ? 1 : -1);
+    s.sy = 1 + ma * 0.022 * Math.cos(2 * ph) + (1 - ma) * 0.014 * breath; s.sx = 1 - ma * 0.012 * Math.cos(2 * ph) - (1 - ma) * 0.005 * breath;
     s.float = 0;
+    // o cavaleiro não é rígido: acompanha o balanço com um pequeno atraso e um pouco mais de amplitude (como quem segura nas rédeas)
+    s.rider = ma * (1.9 + 2.8 * vk) * (Math.abs(Math.sin(ph - 0.55)) ** 0.75 + 0.22 * Math.sin(2 * ph)) + (1 - ma) * 0.6 * breath;
   }
+  if (a.mountId === 'gryphon') { s.pitch = -0.02 * ma; s.rider = s.bounce; }
   s.fr = fr;
   const sdl = (m.saddleF[view][fr] ?? m.saddle[view]), sd0 = m.saddle[view];
   s.sdx = sdl[0]; s.sdy = sdl[1];
   s.base = (m.feet[1] - sd0[1]) * H - d.hip;                        // altura estável (nome/barra)
-  s.lift = (m.feet[1] - sdl[1]) * H * s.sy - d.hip + s.bounce;       // altura deste quadro (herói acompanha o balanço)
+  s.lift = (m.feet[1] - sdl[1]) * H * s.sy - d.hip + s.rider;        // altura deste quadro (herói acompanha o balanço, com atraso)
   s.ready = true;
   return s;
 }
@@ -208,6 +229,7 @@ export function drawMountBack(g, a, t, q, feetY) {
     g.beginPath(); g.ellipse(a.x + feetDx, feetY + 1, m.shadow[2] * W * k * wide * 1.1, Math.max(5, m.shadow[3] * H * 1.1) * k, 0, 0, TAU); g.fill();
     g.save();
     g.translate(a.x, feetY - s.bounce);
+    g.rotate(s.pitch);
     g.scale(s.sx, s.sy);
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'low';
     blit3d(g, e.d3.img, m, s, W, H, -sdx * W, -m.feet[1] * H);
@@ -239,9 +261,12 @@ export function drawMountFront(g, a, t, q, feetY) {
   if (art === '3d') {
     const m = e.d3.meta, W = d.w, H = W * (e.d3.img.naturalHeight / 8) / (e.d3.img.naturalWidth / m.cols);
     g.translate(a.x, feetY - s.bounce);
+    g.rotate(s.pitch);
     g.scale(s.sx, s.sy);
     const seatY = (s.sdy - m.feet[1]) * H; // linha da sela (local, acima do pé = negativo)
-    g.beginPath(); g.rect(-W, seatY, 2 * W, H); g.clip();
+    // só uma faixa estreita no meio, abaixo da sela: some o "encaixe" do quadril, e as pernas abertas (renderer) ficam à vista nos flancos
+    const bx = (s.sdx - 0.5) * W; // a sela pode não estar no meio da célula
+    g.beginPath(); g.rect(bx - FRONT_BAND, seatY, 2 * FRONT_BAND, H); g.clip();
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'low';
     blit3d(g, e.d3.img, m, s, W, H, -s.sdx * W, -m.feet[1] * H);
   } else {
@@ -249,7 +274,7 @@ export function drawMountFront(g, a, t, q, feetY) {
     g.translate(a.x, feetY - (a.mountId === 'gryphon' ? s.float : s.bounce));
     g.rotate(s.pitch);
     g.scale(s.side * s.sx, s.sy);
-    g.beginPath(); g.rect(-W, (m.seat[1] - m.feet[1]) * H, 2 * W, H); g.clip();
+    g.beginPath(); g.rect(-FRONT_BAND, (m.seat[1] - m.feet[1]) * H, 2 * FRONT_BAND, H); g.clip();
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'low';
     blit2d(g, e, m, s, W, H, -m.seat[0] * W, -m.feet[1] * H);
   }
