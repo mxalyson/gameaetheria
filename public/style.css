@@ -839,6 +839,7 @@ body:not(.touch) #ritual { top: calc(var(--map) + 150px); }
 /* Confirmação do jogo (ui.confirm): no lugar da janela do sistema do navegador */
 .confirm-veil { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(6,8,18,.6); padding: 16px; }
 .confirm-box { max-width: min(420px, 90vw); padding: 18px 20px; border-radius: 14px; background: linear-gradient(180deg, #1c2440, #121830); border: 2px solid #b98f3c; box-shadow: 0 0 0 2px #2a2010, 0 16px 40px rgba(0,0,0,.6); color: var(--text); text-align: center; }
+.confirm-html { text-align: left; margin: 0 0 12px; padding: 10px; border-radius: 10px; background: rgba(0,0,0,.25); max-height: 50vh; overflow-y: auto; }
 .confirm-box p { margin: 0 0 14px; font-size: 15px; line-height: 1.4; }
 .confirm-btns { display: flex; gap: 10px; justify-content: center; }
 

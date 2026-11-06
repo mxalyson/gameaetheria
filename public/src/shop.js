@@ -15,7 +15,7 @@ export const PRICES = {
   prism: (level) => 1500 + level * 60,
   itemMarkup: 6,        // G2: era 4 (item raro custava ~1 min de renda)
   featuredMarkup: 25,   // item épico de destaque (1 por nível)
-  sellRate: 0.5,        // G13: venda paga 50% do valor (economia.md)
+  sellRate: 2,          // 2026-11-06: era 0,5 (um item raro Nv 10 rendia ~30 de ouro, menos que 2 abates); agora 2× o valor = 1/3 do preço de compra (economia.md)
 };
 
 // Venda que pede confirmação: épico ou melhor (épico, lendário), opala e qualquer item Eco/forjado. Abaixo disso vende direto.
@@ -52,7 +52,7 @@ export function buildShopStock(char, opts = {}) {
 // Preços diferentes da loja da Vila: itens comuns saem mais baratos (×5,2 em vez de ×6), épicos mais caros (×30 em vez de ×25) e o porto paga mais na venda (60%).
 // Mesma convenção do destaque da Vila: `value` já vem inflado (preço/itemMarkup) para a UI exibir valor·itemMarkup; `baseValue` é o valor real, restaurado na compra
 // (main.js › compra). `price` é o preço final em ouro, para quem preferir exibi-lo direto. Ids estáveis `hb-<semente>-<i>`.
-export const HARBOR = { markup: 5.2, epicMarkup: 30, sellRate: 0.6, discount: 0.15 }; // discount: poções e pergaminhos (harborPrice, no fim do arquivo)
+export const HARBOR = { markup: 5.2, epicMarkup: 30, sellRate: 2.4, discount: 0.15 }; // sellRate: 20% acima da Vila (era 0,6) // discount: poções e pergaminhos (harborPrice, no fim do arquivo)
 export const harborSellValue = (it) => Math.max(1, Math.floor(it.value * HARBOR.sellRate));
 export function buildHarborStock(char, { day = Math.floor(Date.now() / 86400000) } = {}) {
   const seed = hashString(`harbor|${char.name}|${char.classId}|${char.created}|${char.level}|${day}`);

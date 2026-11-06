@@ -34,8 +34,8 @@ export function entryPoint(zoneId, from) {
 }
 
 export class ZoneRoom {
-  constructor({ id, key, zoneId, seed, db = null, reconnectSec = 30, send, onPortal = null }) {
-    Object.assign(this, { id, key, zoneId, mode: 'zone', db, reconnectSec, send, onPortal });
+  constructor({ id, key, zoneId, seed, db = null, reconnectSec = 30, send, onPortal = null, onLeave = null }) {
+    Object.assign(this, { id, key, zoneId, mode: 'zone', db, reconnectSec, send, onPortal, onLeave });
     this.matchId = randomBytes(9).toString('base64url');
     this.rng = makeRng(seed);
     this.bossState = {}; // ritual e recarga do chefe valem para a instância inteira (sobrevivem enquanto houver gente)
@@ -263,7 +263,8 @@ export class ZoneRoom {
     this.left.push(p.actor.id);
     if (p.session) { p.session.room = null; p.session.player = null; }
     this.events.push({ e: 'left', actor: p.actor.id });
-    void reason;
+    // saiu sem portal (fechou o jogo, caiu a rede, recarregou): o Hub guarda o ponto para o herói voltar ali ao entrar de novo
+    if ((reason === 'timeout' || reason === 'replaced') && !p.actor.dead) this.onLeave?.(p, { zone: this.zoneId, x: Math.round(p.actor.x), y: Math.round(p.actor.y) });
     this.players.delete(p.actor.id);
   }
   // para o Hub: fechar a sala (desligamento do servidor) grava tudo

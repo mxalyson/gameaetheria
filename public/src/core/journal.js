@@ -252,7 +252,7 @@ export function openChest(doc, chest, zoneId, rng, now = Date.now()) {
     item = generateItem(rng, lvl, { classId: doc.classId, luck: 0.25 * tier });
     if (doc.inventory.length < INVENTORY_SIZE) doc.inventory.push(item); else { doc.gold += item.value; item = { ...item, converted: true }; }
   }
-  const whistle = rng.chance(WHISTLE.chest * tier) && addWhistles(doc, 1) > 0; // Apito de Montaria (core/mounts.js): chance baixa fixa, sem pity
+  const whistle = rng.chance(WHISTLE.chest * tier) && addWhistles(doc, 1) > 0; // Apito de Montaria: baú não dá mais (WHISTLE.chest = 0 desde 2026-11-06)
   const out = recordEvent(doc, { type: 'chest', zoneId }, now);
   return { ok: true, gold, item, whistle, quests: out.quests, achievements: out.achievements };
 }

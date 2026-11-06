@@ -108,7 +108,7 @@ export function createGameServer({
     }
     c.session = s;
     send(ws, { t: 'welcome', token: s.token, name: s.name, level: s.char.level, classId: s.char.classId, account: !!s.accountId, resumed, protocol: PROTOCOL_VERSION,
-      tickHz: TICK_HZ, snapEvery: SNAPSHOT_EVERY, pvpMinLevel: PVP_MIN_LEVEL, partyMax: 4 });
+      tickHz: TICK_HZ, snapEvery: SNAPSHOT_EVERY, pvpMinLevel: PVP_MIN_LEVEL, partyMax: 4, ...(!resumed && s.resume ? { resume: s.resume.zone } : {}), ...(!resumed && s.hubAt ? { hubAt: s.hubAt } : {}) });
     if (s.room && s.player) hub.sendMatchFound(s, s.room, s.player);
     if (!resumed) hub.sendChatHistory(s); // quem acabou de entrar vê a conversa recente do canal global
   }

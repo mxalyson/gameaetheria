@@ -439,11 +439,12 @@ export class UI {
   }
 
   // Confirmação do próprio jogo (no lugar do confirm() do navegador, que no celular abre a janela do sistema). `onYes` roda só se o jogador aceitar.
-  confirm(text, onYes, yesLabel = 'Confirmar') {
+  // html (opcional): bloco já escapado pelo próprio jogo (ex.: ficha do item na compra), mostrado acima da pergunta
+  confirm(text, onYes, yesLabel = 'Confirmar', html = null) {
     this.confirmEl?.remove();
     const el = this.confirmEl = document.createElement('div');
     el.className = 'confirm-veil';
-    el.innerHTML = `<div class="confirm-box" role="alertdialog"><p></p><div class="confirm-btns"><button class="btn" data-no>Cancelar</button><button class="btn primary" data-yes></button></div></div>`;
+    el.innerHTML = `<div class="confirm-box" role="alertdialog">${html ? `<div class="confirm-html">${html}</div>` : ''}<p></p><div class="confirm-btns"><button class="btn" data-no>Cancelar</button><button class="btn primary" data-yes></button></div></div>`;
     el.querySelector('p').textContent = text;
     el.querySelector('[data-yes]').textContent = yesLabel;
     const close = () => { el.remove(); if (this.confirmEl === el) this.confirmEl = null; };
@@ -772,7 +773,7 @@ export class UI {
     if (this.shopAnchor === 'smith') return this.panel_smith();
     const harbor = this.shopAnchor === 'harbor';
     return this.frame('shop', harbor ? 'Mercador do Porto' : 'Mercadora Lia', `
-      <p class="npc-line">${npcEmblem(harbor ? 'dealer' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e compro seus itens por 60% do valor."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
+      <p class="npc-line">${npcEmblem(harbor ? 'dealer' : 'merchant')}${harbor ? '"Do cais para a sua mochila! O estoque muda todo dia, e pago 20% a mais que a Vila pelos seus itens."' : '"Poções fresquinhas e equipamentos de viajantes! Vendo e compro."'}</p>
       ${this.buyTab(harbor)}`);
   }
 
@@ -782,7 +783,7 @@ export class UI {
     const stock = shopStock.map((it, i) => `
       <div class="shop-item">${this.itemCell(it, 'buy-item', i)}
         <div><div class="nm${it.opal ? ' opal-name' : ''}" style="color:${RARITY[it.rarity].color}">${esc(it.name)}</div><div class="sub">${SLOT_NAMES[it.slot]} · Nv ${it.level}</div></div>
-        <button class="btn small" data-action="buy-item" data-arg="${i}">${COIN} ${itemPrice(it)}</button></div>`).join('') || `<p class="empty-msg">${harbor ? 'Estoque do dia esgotado. O cais traz mercadoria nova amanhã.' : 'Estoque esgotado. Volte após subir de nível.'}</p>`;
+        <button class="btn small" data-action="buy-item" data-arg="${i}">Ver · ${COIN} ${itemPrice(it)}</button></div>`).join('') || `<p class="empty-msg">${harbor ? 'Estoque do dia esgotado. O cais traz mercadoria nova amanhã.' : 'Estoque esgotado. Volte após subir de nível.'}</p>`;
     const price = (k) => (harbor ? harborPrice(k, char.level) : PRICES[k](char.level)); // Porto: -15% em poções e pergaminhos (o servidor cobra assim)
     const potion = price('potion');
     return `<h3>Materiais</h3>

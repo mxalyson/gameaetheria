@@ -14,7 +14,7 @@ Atualizado em 2026-10-31. Os números abaixo saem de `npm run economy` (`tools/e
 | Missões | fixo por missão (60 a 1 200) | fixo (0 a 2 500) | até 1 item raro/épico | cliente, **objetivos de PvP/cooperativo só pelo servidor** |
 | Arena real (1×1, 2×2, 4×4) | vitória `40 + nível×8` (×1,2 / ×1,6), derrota `10 + nível×2` | 6% / 2% do nível (× mesmo fator); sem teto por hora (decisão do dono); 0 se o mesmo adversário aparece pela 3ª vez seguida em 30 min (G3; era 12% / 4%) | 35% de um item na arena offline | **servidor** |
 | Cooperativo (5 ondas + chefe) | ondas × 0,5 + `4 × nível` do chefe (derrota paga 60%) | **teto de 30% de um nível** (+10% por jogador extra) | itens do chefe (rolados no servidor), 3 poções | **servidor** |
-| Venda de itens | 50% do valor na Vila (`sellValue` em `shop.js`); 60% na loja do Porto (`harborSellValue`) | — | — | cliente |
+| Venda de itens | 2× o valor na Vila (`sellValue` em `shop.js`, 1/3 do preço de compra); 2,4× na loja do Porto (`harborSellValue`) — subiu em 2026-11-06 (antes 50%/60%) | — | — | cliente |
 
 ## Destinos (ralos de ouro)
 | Ralo | Custo |
@@ -50,7 +50,7 @@ DESTINOS (ralos de ouro)
   nv 25: poção 90 · essência 750 · prismática 3000 · item na loja ≈ 548 (raro) · trocar de especialização 775 · morte no PvE: -10% do ouro
   Ouro necessário para 1 essência ≈ abates: forest: 19 · plains: 12 · ruins: 10
 
-Nível máximo 30. Itens: só entram por abates, chefes, baús, missões, cooperativo e prêmios de arena; saem por venda (50% do valor), conversão (inventário cheio).
+Nível máximo 30. Itens: só entram por abates, chefes, baús, missões, cooperativo e prêmios de arena; saem por venda (2× o valor na Vila, 2,4× no Porto desde 2026-11-06), conversão (inventário cheio).
 ```
 
 ```
@@ -63,7 +63,7 @@ APRIMORAMENTO (ferreiro): ouro por item vestido, +0 → +8, e quantos abates iss
 ## Rodada de balanceamento (G1–G13, 2026-11-02)
 - Baús (`tools/chest-check.mjs`, 48 baús/h): épico+/h Bosque 6,3→0,9, Planície 8,3→1,3, Ruínas 10,9→1,6, Cume 13,9→2,0, Cinzas 18,5→2,8; lendário/h Cinzas 6,0→0,5.
 - Loja: raro custa valor×6 (≈ 210 / 516 / 822 ouro no nv 5/15/25, era 140 / 344 / 548); o épico de destaque custa valor×25 (nv 20 ≈ 3,7 mil ouro ≈ 9 min de renda). Sem lendário na loja.
-- Venda: Vila de Lúmen 50% do valor (`sellValue`, `PRICES.sellRate` em `shop.js`); loja do Porto de Marfim 60% (`harborSellValue`, `HARBOR.sellRate`). A UI mostra o preço real via `game.sellPrice(it)` (escolhe a loja pela âncora aberta) e a venda em lote soma o mesmo valor. Conferido no código em 2026-11-03: o código já paga 50%/60% (a nota antiga de "100%" estava obsoleta).
+- Venda (2026-11-06, pedido do dono: vender quase não rendia): Vila de Lúmen 2× o valor (`sellValue`, `PRICES.sellRate` em `shop.js`); loja do Porto de Marfim 2,4× (`harborSellValue`, `HARBOR.sellRate`). Antes 50%/60%. A UI mostra o preço real via `game.sellPrice(it)` (escolhe a loja pela âncora aberta) e a venda em lote soma o mesmo valor. Conferido no código em 2026-11-03: o código já paga 50%/60% (a nota antiga de "100%" estava obsoleta).
 - PvP (`npm run economy`): XP/h nv 20 de 71 149 → 22 231 com o teto por hora (≈ 0,5 nível/h contra 1,6); o teto por hora foi REMOVIDO por decisão do dono (2026-11-02), então hoje vale a % de 6%/2% sem teto (conferir com `npm run economy`). Contadores nas chaves `pvpFoe`, `pvpFoeN`, `pvpFoeMin` de `stats` (todas em `SERVER_STATS`; minutos, não ms, para caber no limite de 1e8 do savedoc). O servidor deve passar `foeId` (e opcionalmente `now`) a `applyMatchResult`; sem `foeId` vale só a %. Só o último adversário é lembrado (alternar entre dois adversários escapa do limite de repetição; sem teto por hora, nada mais cobre isso).
 - Ferreiro: 6 lendários nv 30 +8 de 543 mil → 396 mil de ouro (carreira ≈ 440 mil). Opalino: +10–12% → +29–31% de pontuação sobre o lendário comum (`tools/opal-check.mjs`).
 

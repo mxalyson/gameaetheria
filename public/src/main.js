@@ -71,6 +71,10 @@ const TELEPORT_REJECT = { not_visited: 'Você ainda não visitou esse mapa.', no
 // papel do NPC → painel do serviço (Porto de Marfim; ver docs/gameplay/porto.md)
 const SERVICE_OF_ROLE = { bank: 'bank', board: 'board', harborshop: 'shop:harbor', duel: 'arena:friendly' };
 
+// Lugar salvo válido: cidade ou mapa de caça já visitado (sem Cripta nem arenas), dentro do mapa.
+const placeOk = (char, pl) => !!pl && !!ZONES[pl.zone] && !ZONES[pl.zone].dungeon && !!(ZONES[pl.zone].hub || ZONES[pl.zone].mobs)
+  && (pl.zone === 'town' || !!char.visited?.[pl.zone]) && pl.x > 0 && pl.y > 0 && pl.x < ZONES[pl.zone].w && pl.y < ZONES[pl.zone].h;
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('game');
@@ -119,7 +123,7 @@ class Game {
     }
     addEventListener('beforeunload', () => { if (this.online) { this.cloud?.flush({ keepalive: true }); } else this.save(); });
     // celular não dispara beforeunload: grava ao esconder/fechar a página (recompensa pendente não se perde)
-    const flushHide = () => { if (this.online) this.cloud?.flush({ keepalive: true }); else if (this.char) this.save(); };
+    const flushHide = () => { if (this.char) this.save(); if (this.online) this.cloud?.flush({ keepalive: true }); }; // save() anota o lugar (volta ali ao entrar de novo)
     addEventListener('pagehide', flushHide);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushHide(); });
     this.last = performance.now();
@@ -301,7 +305,10 @@ class Game {
     this.ui.setupHud(char);
     this.touch.setup(char);
     if (heroSpritesEnabled()) showHeroLoading(Promise.all([preloadHero(char), whenNatureReady()])); // visual novo: espera o herói e o cenário pintado (casas HD) carregarem
-    this.enterZone('town', TOWN.x, TOWN.y);
+    // volta onde parou (char.place, gravado em save()); online só cidades aqui: o mapa de caça vem do servidor (welcome.resume)
+    const pl = !fresh && placeOk(char, char.place) ? char.place : null;
+    if (pl && (!this.online || ZONES[pl.zone].hub)) this.enterZone(pl.zone, pl.x, pl.y);
+    else this.enterZone('town', TOWN.x, TOWN.y);
     if (fresh) {
       setTimeout(() => this.ui.announce(`Bem-vindo, ${esc(char.name)}!`, 'Fale com a Guarda Ren (marca ❗) para a primeira missão', 'gold', 3200), 2600); // depois da tela "Preparando seu herói" (antes o toast expirava escondido)
       // o tutorial segue o modo de controle (toque é o padrão; teclado e mouse só se escolhido nas opções)
@@ -400,11 +407,19 @@ class Game {
   }
 
   save() {
+    this.notePlace();
     if (this.online) { this.cloud?.markDirty(); return; } // online: o servidor é a fonte oficial; o localStorage não guarda o personagem
     if (!this.char) return;
     const ok = saveChar(this.char);
     if (!ok && !this.saveWarned) { this.saveWarned = true; this.ui.toast('Não foi possível salvar', 'O armazenamento do aparelho está cheio ou bloqueado. Libere espaço ou exporte o personagem nas Opções.', ''); }
     if (ok) this.saveWarned = false;
+  }
+
+  // Onde o herói está (cidade ou mapa de caça, explorando): é para lá que ele volta ao entrar de novo. Arena, ondas e Cripta não contam.
+  notePlace() {
+    if (!this.char || this.mode !== 'explore' || !this.world || !this.player) return;
+    const pl = { zone: this.world.zoneId, x: Math.round(this.player.x), y: Math.round(this.player.y) };
+    if (placeOk(this.char, pl)) this.char.place = pl;
   }
 
   // ---------------- modo online ----------------
@@ -537,6 +552,8 @@ class Game {
         chatHistory: (list) => this.chatBox?.history(list),
         reject: (m) => { if (this.chatBox?.rejected(m.code)) return; // recusa do chat (ritmo, sem grupo): aviso na própria caixa
  this.zoneBusy = false; this.teleportPending = false; this.portalCd = 4; /* recusa (ex.: sala cheia): espera antes de tentar o portal de novo, sem laço de pedidos */ if (!['bad_message', 'bad_version', 'rate_limit'].includes(m.code)) this.ui.toast(CRYPT_REJECT[m.code] ? 'Cripta dos Ecos' : TELEPORT_REJECT[m.code] ? 'Teletransporte' : 'Servidor de partidas', m.reason ?? CRYPT_REJECT[m.code] ?? TELEPORT_REJECT[m.code] ?? noticeText({ ...m, t: 'reject' }), ''); },
+        // ao entrar: se o servidor guardou o ponto num mapa de caça (saiu sem portal), volta para lá
+        welcome: (m) => { if (m.resume && this.mode === 'explore' && ZONES[m.resume]) this.enterZoneOnline(m.resume, 'resume'); },
         matchFound: (m) => this.enterNetMatch(m),
         zoneJoined: (m) => this.enterNetZone(m),
         zoneReward: (m) => this.onZoneReward(m),
@@ -1977,7 +1994,18 @@ class Game {
     this.save();
   }
 
+  // Comprar: primeiro mostra a ficha do item (atributos e comparação com o equipado) e o preço; só compra no "Comprar".
   buyItem(i) {
+    const harbor = this.ui.shopAnchor === 'harbor', stock = harbor ? this.harborStock : this.shopStock, it = stock[i];
+    if (!it) return;
+    const price = it.price ?? it.value * PRICES.itemMarkup;
+    this.ui.confirm(`Comprar ${it.name} por ${price} de ouro? Você tem ${this.char.gold}.`, () => {
+      const at = stock.indexOf(it); // o estoque pode ter mudado enquanto a ficha estava aberta
+      if (at >= 0) this.buyItemNow(at);
+    }, 'Comprar', this.ui.itemTooltip(it));
+  }
+
+  buyItemNow(i) {
     const harbor = this.ui.shopAnchor === 'harbor', stock = harbor ? this.harborStock : this.shopStock, it = stock[i];
     if (!it) return;
     if (this.char.inventory.length >= INVENTORY_SIZE) return this.ui.log('Inventário cheio.', '#ffb4a8');

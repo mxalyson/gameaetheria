@@ -1,5 +1,5 @@
 // Regras puras das montarias (sem DOM): posse, recusas de montar, Apito, queda do Apito e código de rede. Dados em data/mounts.js; velocidade e desmontar em game/sim.js.
-import { MOUNTS, MOUNT_IDS, WHISTLE, WHISTLE_MOUNTS, MOUNT_COMBAT_GRACE } from '../data/mounts.js';
+import { MOUNTS, MOUNT_IDS, WHISTLE, WHISTLE_MOUNTS, MOUNT_COMBAT_GRACE, MOUNT_MIN_LEVEL } from '../data/mounts.js';
 import { QUESTS } from '../data/quests.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 
@@ -27,6 +27,7 @@ export function activeMount(doc) {
 // Pode montar agora? Devolve o código de recusa (data/mounts.js MOUNT_REASONS) ou null. `a` = ator; `ctx.zoneOk` = zona permitida (RUN_ZONES), `ctx.time` = relógio do mundo.
 export function mountProblem(a, { zoneOk, time }) {
   if (!a.mounts?.length || !a.mountId) return 'none';
+  if ((a.level ?? MOUNT_MIN_LEVEL) < MOUNT_MIN_LEVEL) return 'level';
   if (a.dead) return 'dead';
   if (a.stunT > 0) return 'stun';
   if (!zoneOk) return 'zone';
@@ -41,6 +42,7 @@ export const mountFromCode = (c) => MOUNT_IDS[c - 1] ?? null;
 // Usar um Apito: gasta 1 e concede uma montaria de `WHISTLE_MOUNTS` que o personagem ainda não tem (sorteio com o RNG de quem decide: o servidor online). Altera `doc`.
 export function useWhistle(doc, rng) {
   if ((doc.whistles ?? 0) < 1) return { ok: false, reason: 'Você não tem Apito de Montaria.' };
+  if ((doc.level ?? 1) < MOUNT_MIN_LEVEL) return { ok: false, reason: `O Apito só funciona a partir do nível ${MOUNT_MIN_LEVEL}.` };
   const own = new Set(ownedMounts(doc)), free = WHISTLE_MOUNTS.filter((m) => !own.has(m));
   if (!free.length) return { ok: false, reason: 'Você já tem todas as montarias que o Apito chama.' };
   const mount = rng.pick(free);

@@ -32,6 +32,8 @@ export const PORTAL_REACH = 80;          // px: distância máxima do ator ao po
 export const CHAT = { gap: 1.2, burst: 5, window: 10, repeatSec: 15, history: 30 };
 const RATING_WIN = [50, 400], POWER_WIN = [0.15, 0.5], WIDEN_SEC = 40; // a janela abre linearmente com a espera
 
+export const RESUME_SEC = 12 * 3600; // até 12 h depois de sair, o herói volta ao ponto do mapa de caça (reiniciar o servidor esquece)
+
 export class Hub {
   constructor({ db = null, seed = 1, reconnectSec = 30, out, log = null }) {
     Object.assign(this, { db, reconnectSec, out });
@@ -41,6 +43,7 @@ export class Hub {
     this.sessions = new Map();   // token -> sessão
     this.byName = new Map();     // nome em minúsculas -> sessão (conectada)
     this.byChar = new Map();     // charId -> sessão
+    this.lastSpot = new Map();   // charId -> { zone, x, y, at }: onde o herói estava num mapa de caça ao sair sem portal (volta ali ao entrar de novo)
     this.parties = new Map();    // id -> { id, leader, members:[sessão], invites: Map(sessão -> expira) }
     this.queue = [];             // entradas { id, mode, members:[sessão], since, rating, power }
     this.rooms = new Map();
@@ -64,6 +67,11 @@ export class Hub {
     }
     const s = { id: randomBytes(4).toString('hex'), token: randomBytes(18).toString('base64url'), ws, name, charId: identity.charId ?? null, accountId: identity.accountId ?? null,
       char: doc, partyId: null, queued: null, room: null, player: null, dropT: null };
+    // Voltar onde parou: num mapa de caça (ponto guardado pelo servidor, até RESUME_SEC) ou no Porto (onde o personagem foi gravado por último)
+    const spot = s.charId ? this.lastSpot.get(s.charId) : null;
+    if (spot && Date.now() - spot.at < RESUME_SEC * 1000 && doc.visited?.[spot.zone]) s.resume = spot;
+    else if (s.charId) this.lastSpot.delete(s.charId);
+    if (!s.resume && doc.place?.zone === 'harbor' && doc.visited?.harbor) s.hubAt = 'harbor';
     this.sessions.set(s.token, s);
     this.byName.set(name.toLowerCase(), s);
     if (s.charId) this.byChar.set(s.charId, s);
@@ -336,6 +344,13 @@ export class Hub {
   zoneEnter(s, zoneId, _from, no) {
     if (s.queued) return no(REJECT.ALREADY_QUEUED);
     if (s.room && s.room.mode !== 'zone') return no(REJECT.IN_MATCH);
+    if (_from === 'resume') { // ao entrar no jogo: volta ao ponto guardado pelo PRÓPRIO servidor (o cliente não escolhe lugar)
+      const r = s.resume;
+      if (s.room || !r || r.zone !== zoneId) return no(REJECT.BAD_ZONE);
+      if (this.zoneRoomFor(s, zoneId).room?.size >= MAX_PARTY) return no(REJECT.ROOM_FULL);
+      s.resume = null; this.lastSpot.delete(s.charId);
+      return this.joinZoneRoom(s, zoneId, { x: r.x, y: r.y });
+    }
     // fora de sala: vale o hub de onde saiu (Porto) e, se o cliente voltou à vila por conta própria, a vila
     const cur = s.room ? s.room.zoneId : [s.hubAt, 'town'].find((f) => f && entryPoint(zoneId, f));
     const at = cur && entryPoint(zoneId, cur);
@@ -361,7 +376,8 @@ export class Hub {
     if (!room) {
       const id = this.nextRoom++;
       const Room = ZONES[zoneId].dungeon ? CryptRoom : ZoneRoom; // masmorra (Cripta dos Ecos): sala própria com ondas e chefe
-      room = new Room({ id, key, zoneId, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession, onPortal: (p, pt) => this.zonePortal(room, p, pt) });
+      const onLeave = ZONES[zoneId].dungeon ? null : (p, spot) => { if (p.charId) this.lastSpot.set(p.charId, { ...spot, at: Date.now() }); }; // Cripta não: ela tem entrada e espera próprias
+      room = new Room({ id, key, zoneId, seed: this.rng.int(1, 0x3fffffff), db: this.db, reconnectSec: this.reconnectSec, send: this.toSession, onPortal: (p, pt) => this.zonePortal(room, p, pt), onLeave });
       this.rooms.set(id, room); this.zoneRooms.set(key, room);
     }
     this.refreshChar(s);

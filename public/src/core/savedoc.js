@@ -213,8 +213,11 @@ export function validate(doc) {
   if (!isObj(doc.visited)) for (const [id, z] of Object.entries(ZONES)) if (z.mobs && z.level[0] <= level) visited[id] = 1; // saves antigos: libera o que o nível já alcança
   if (visited.ruins) visited.harbor = 1; // o Porto fica no caminho das Ruínas: quem já chegou lá passou por ele
 
+  // onde o herói parou (cidade ou mapa de caça visitado); main.js volta ali ao carregar
+  const pz = isObj(doc.place) && ZONES[doc.place.zone] && !ZONES[doc.place.zone].dungeon && (ZONES[doc.place.zone].hub || ZONES[doc.place.zone].mobs) ? ZONES[doc.place.zone] : null;
+  const place = pz ? { zone: doc.place.zone, x: int(doc.place.x, 1, pz.w - 1, 1), y: int(doc.place.y, 1, pz.h - 1, 1) } : null;
   const char = {
-    version: SAVE_VERSION, visited, name: cleanName(doc.name), quests, stats, achievements, title, chests, daily, classId: doc.classId, level,
+    version: SAVE_VERSION, visited, ...(place ? { place } : {}), name: cleanName(doc.name), quests, stats, achievements, title, chests, daily, classId: doc.classId, level,
     xp: int(doc.xp, 0, 1e9, 0), statPoints, alloc,
     seals: int(doc.seals, 0, SEAL_MAX, 0), specChanges: int(doc.specChanges, 0, 9999, 0), // Selos de Reespecialização e trocas pagas (histórico)
     gold: int(doc.gold, 0, 1e9, 0), potions: int(doc.potions, 0, 999, 0), scrolls: int(doc.scrolls, 0, 99, 0), phoenix: int(doc.phoenix, 0, PHOENIX.max, 0), // Amuletos da Fênix (core/phoenix.js)
