@@ -197,7 +197,7 @@ class Game {
       case 'continue': this.loadGame(loadChar()); break;
       case 'quest-accept': this.questAccept(arg); break;
       case 'quest-turnin': this.questTurnIn(arg); break;
-      case 'quest-abandon': abandonQuest(this.char, arg); if (this.trackId === arg) this.setTrack(null); this.save(); this.ui.render(); break;
+      case 'quest-abandon': if (this.inNetZone()) { this.ui.toast('Diário', 'Para abandonar uma missão, volte à Vila.', ''); break; } abandonQuest(this.char, arg); if (this.trackId === arg) this.setTrack(null); this.save(); this.ui.render(); break;
       case 'quest-track': this.setTrack(arg); this.ui.render(); break;
       case 'quest-go': this.setTrack(arg); this.autoGo(); break;
       case 'auto-go': this.autoGo(); break;
@@ -602,7 +602,7 @@ class Game {
   }
 
   togglePanel(id) {
-    if ((id === 'journal' || id === 'map') && this.mode !== 'explore' && !(id === 'map' && this.inNetZone())) return; // diário e mapa só no mundo normal (o mapa também abre na instância online: lá o nó da Vila é o retorno)
+    if ((id === 'journal' || id === 'map') && this.mode !== 'explore' && !this.inNetZone()) return; // diário e mapa: no mundo normal e nos mapas de caça online (no mapa, lá o nó da Vila é o retorno); fora disso (arena, ondas) não
     if (id === 'party' && !this.online) return;
     this.ui.toggle(id);
   }
@@ -1145,7 +1145,7 @@ class Game {
     if (inp.hit('h')) this.hearth();
     if (inp.hit('g') && this.online) this.ui.toggle('party');
     if (inp.hit('e')) this.interact();
-    if (inp.hit('j') && this.mode === 'explore') this.ui.toggle('journal');
+    if (inp.hit('j') && (this.mode === 'explore' || this.inNetZone())) this.ui.toggle('journal');
     if (inp.hit('m') && this.mode === 'explore') this.ui.toggle('map');
 
     if (this.mode === 'net') { this.netStep(dt); return; }
