@@ -1,5 +1,5 @@
 // Recompensas de partida (regras puras, usadas pelo servidor autoritativo). O cliente NUNCA calcula nem envia isto.
-import { addXp, xpToNext } from './progression.js';
+import { addXp, xpToNext, feedSpirit } from './progression.js';
 import { eloDelta, tierFor } from './combat.js';
 import { getRating, setRating, MODES } from './match.js';
 import { validate } from './savedoc.js';
@@ -46,12 +46,13 @@ export function applyMatchResult(doc, { mode, result, foeRating, foeId = null, n
   const xpFactor = pvpXpFactor(c.stats, foeId, now);
   const xp = Math.round(xpToNext(c.level) * (won ? PVP_XP.win : PVP_XP.loss) * mul * xpFactor);
   const levels = addXp(c, xp);
+  const spirit = feedSpirit(c, xp); // o spirit ativo cresce junto (antes só no jogo offline)
   const prog = recordEvent(c, { type: 'pvp', mode, won }); // contador de PvP, missão de arena e conquistas: só o servidor registra
   recordEvent(c, { type: 'level', level: c.level });
   const v = validate(c);
   if (!v.ok) throw new Error('documento inválido após recompensa: ' + v.reason);
   const rating = getRating(v.char, mode);
-  return { doc: v.char, summary: { mode, result, won, gold, xp, levels, level: v.char.level, ratingDelta: delta, rating, tier: tierFor(rating).name, was: before, achievements: prog.achievements, quests: prog.quests.filter((q) => q.complete).map((q) => q.id) } };
+  return { doc: v.char, summary: { mode, result, won, gold, xp, levels, level: v.char.level, ratingDelta: delta, rating, tier: tierFor(rating).name, was: before, spirit, achievements: prog.achievements, quests: prog.quests.filter((q) => q.complete).map((q) => q.id) } };
 }
 
 
@@ -62,6 +63,7 @@ export function applyCoopResult(doc, { gold = 0, xp = 0, items = [], potions = 0
   const before = { level: c.level, gold: c.gold };
   c.gold += gold;
   const levels = addXp(c, xp);
+  const spirit = feedSpirit(c, xp);
   const kept = [], converted = [];
   for (const it of items) {
     if (c.inventory.length < INVENTORY_SIZE) { c.inventory.push(it); kept.push(it.id); } else { c.gold += it.value; converted.push(it.value); }
@@ -72,7 +74,7 @@ export function applyCoopResult(doc, { gold = 0, xp = 0, items = [], potions = 0
   recordEvent(c, { type: 'level', level: c.level });
   const v = validate(c);
   if (!v.ok) throw new Error('documento inválido após recompensa coop: ' + v.reason);
-  return { doc: v.char, summary: { mode: 'coop', gold: v.char.gold - before.gold, xp, levels, level: v.char.level, items: kept.length, converted: converted.length, potions, achievements: prog.achievements, quests: prog.quests.filter((q) => q.complete).map((q) => q.id) } };
+  return { doc: v.char, summary: { mode: 'coop', gold: v.char.gold - before.gold, xp, levels, level: v.char.level, items: kept.length, converted: converted.length, potions, ...(spirit ? { spirit } : {}), achievements: prog.achievements, quests: prog.quests.filter((q) => q.complete).map((q) => q.id) } };
 }
 
 // Lote de recompensas da EXPLORAÇÃO (PvE no servidor): abates acumulados pela sala de zona e gravados em operação idempotente.
@@ -83,6 +85,7 @@ export function applyZoneBatch(doc, batch) {
   const before = { level: c.level, gold: c.gold };
   c.gold += batch.gold ?? 0;
   const levels = addXp(c, batch.xp ?? 0);
+  const spirit = feedSpirit(c, batch.xp ?? 0); // o spirit ativo sobe com os abates (antes online ele nunca ganhava XP e travava no nível em que estava)
   // Quedas (só zonas de farm): cada uma gasta 1 Amuleto da Fênix, se houver; senão perde 10% do ouro e 10% do XP do nível (nunca desce de nível). Cripta e arenas: nada.
   const dead = { saved: 0, gold: 0, xp: 0 };
   if (hasDeathPenalty(batch.zoneId)) for (let i = 0; i < (batch.deaths ?? 0); i++) { const r = applyDeath(c); if (r.saved) dead.saved++; dead.gold += r.gold; dead.xp += r.xp; }
@@ -106,5 +109,5 @@ export function applyZoneBatch(doc, batch) {
   if (c.spirits.length) recordEvent(c, { type: 'spirit', count: c.spirits.length });
   const v = validate(c);
   if (!v.ok) throw new Error('documento inválido após recompensa de zona: ' + v.reason);
-  return { doc: v.char, summary: { mode: 'zone', zone: batch.zoneId, gold: v.char.gold - before.gold, xp: batch.xp ?? 0, levels, level: v.char.level, items: kept, converted, potions: batch.potions ?? 0, ...(batch.whistles ? { whistles: batch.whistles } : {}), frags: batch.frags ?? 0, kills: (batch.kills ?? []).length, deaths: batch.deaths ?? 0, deathsSaved: dead.saved, lostGold: dead.gold, lostXp: dead.xp, phoenix: v.char.phoenix ?? 0, achievements: ach, quests } };
+  return { doc: v.char, summary: { mode: 'zone', zone: batch.zoneId, gold: v.char.gold - before.gold, xp: batch.xp ?? 0, levels, level: v.char.level, items: kept, converted, potions: batch.potions ?? 0, ...(batch.whistles ? { whistles: batch.whistles } : {}), frags: batch.frags ?? 0, kills: (batch.kills ?? []).length, deaths: batch.deaths ?? 0, deathsSaved: dead.saved, lostGold: dead.gold, lostXp: dead.xp, phoenix: v.char.phoenix ?? 0, ...(spirit ? { spirit } : {}), achievements: ach, quests } };
 }

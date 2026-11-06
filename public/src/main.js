@@ -12,7 +12,7 @@ import { waterWaypoint } from './game/ai.js';
 import { questTarget, guideGoal, pickTracked, trackerText, buildNavGrid, findPath, followPath, lineFree, autoPauseReason } from './core/autopath.js';
 import { makeRng } from './core/rng.js';
 import { computeStats, canEquip, itemScore, hasMastery } from './core/stats.js';
-import { addXp, mobXp, newCharacter, createSpirit, addSpiritXp, spiritPower, xpToNext, evolveSpirit, MAX_LEVEL } from './core/progression.js';
+import { addXp, mobXp, newCharacter, createSpirit, feedSpirit, spiritPower, xpToNext, evolveSpirit, MAX_LEVEL } from './core/progression.js';
 import { generateItem, rollMobLoot } from './core/loot.js';
 import { generateRivalForPower } from './core/rival.js';
 import { eloDelta, tierFor } from './core/combat.js';
@@ -690,6 +690,7 @@ class Game {
       } else this.ui.log('Você caiu.', '#ffb4a8');
     }
     if (r.levels) this.ui.announce(`Nível ${r.level}!`, '+5 pontos de atributo', 'gold');
+    if (r.spirit && SPIRITS[r.spirit.type]) this.ui.log(`${SPIRITS[r.spirit.type].name} subiu para o nível ${r.spirit.level}!`, SPIRITS[r.spirit.type].color);
     for (const id of r.quests ?? []) this.ui.toast('Missão pronta!', QUESTS[id]?.name ?? '', 'gold');
     for (const id of r.achievements ?? []) this.announceAchievements([id]);
     try { const c = await this.online.getCharacter(this.charId); if (this.inNetZone()) { this.char = c.character; this.cloud.attach(this.charId, c.rev, () => this.char, { paused: true }); } } catch { /* tenta no próximo lote */ }
@@ -1633,7 +1634,7 @@ class Game {
     const c = this.char;
     const gained = addXp(c, amount);
     const sp = c.spirits.find((s) => s.id === c.activeSpirit);
-    if (sp && addSpiritXp(sp, amount * 0.6, c.level)) {
+    if (sp && feedSpirit(c, amount)) {
       const actor = this.world.actors.find((a) => a.kind === 'spirit' && a.owner === this.player.id);
       if (actor) { actor.stats.power = spiritPower(sp); actor.level = sp.level; }
       this.ui.log(`${SPIRITS[sp.type].name} subiu para o nível ${sp.level}!`, SPIRITS[sp.type].color);

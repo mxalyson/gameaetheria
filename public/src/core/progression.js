@@ -80,6 +80,15 @@ export function evolveSpirit(char, id) {
 }
 
 // O spirit não ultrapassa o nível do dono.
+// O spirit ATIVO ganha SPIRIT_XP_SHARE do XP do herói (até o nível do herói). Mesma regra offline (main.js grantXp) e online
+// (core/rewards.js: lotes de exploração, cooperativo e partidas). Devolve { type, level } se subiu, senão null. Altera `c`.
+export const SPIRIT_XP_SHARE = 0.6;
+export function feedSpirit(c, xp) {
+  const sp = (c.spirits ?? []).find((s) => s.id === c.activeSpirit);
+  if (!sp || !(xp > 0)) return null;
+  return addSpiritXp(sp, xp * SPIRIT_XP_SHARE, c.level) ? { type: sp.type, level: sp.level } : null;
+}
+
 export function addSpiritXp(sp, amount, capLevel) {
   if (sp.level >= capLevel) { sp.xp = 0; return 0; }
   sp.xp += Math.round(amount);

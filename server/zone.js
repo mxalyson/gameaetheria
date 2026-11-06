@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { World, makeHeroActor, makeSpiritActor, PICK_R, PICK_DELAY } from '../public/src/game/sim.js';
 import { INVENTORY_SIZE } from '../public/src/data/items.js';
 import { makeRng } from '../public/src/core/rng.js';
-import { mobXp, createSpirit, xpToNext, MAX_LEVEL } from '../public/src/core/progression.js';
+import { mobXp, createSpirit, xpToNext, MAX_LEVEL, spiritPower } from '../public/src/core/progression.js';
 import { rollMobLoot } from '../public/src/core/loot.js';
 import { MOUNT_MUL } from '../public/src/data/mounts.js';
 import { applyZoneBatch } from '../public/src/core/rewards.js';
@@ -252,6 +252,9 @@ export class ZoneRoom {
     const fresh = makeHeroActor(doc, p.actor.x, p.actor.y, 'player', 1);
     const levelUp = fresh.level !== p.actor.level;
     Object.assign(p.actor, { level: fresh.level, spec: fresh.spec, mastery: fresh.mastery, mounts: fresh.mounts, mountId: fresh.mountId, stats: fresh.stats, maxHp: fresh.maxHp, hp: levelUp ? fresh.maxHp : Math.min(p.actor.hp, fresh.maxHp) });
+    // spirit ativo: nível e poder do documento (sobe com o XP do lote); sem isso ele lutava com o poder da entrada na sala
+    const sp = (doc.spirits ?? []).find((x) => x.id === doc.activeSpirit), sa = sp && this.world.actors.find((a) => a.kind === 'spirit' && a.owner === p.actor.id);
+    if (sa && sa.spiritType === sp.type) { sa.level = sp.level; sa.stats.power = spiritPower(sp); }
   }
 
   leave(p, reason = 'left') {
