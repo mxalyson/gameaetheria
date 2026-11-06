@@ -15,7 +15,7 @@ const pos = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const [file, id, part = '-1', style = 'trot', frames = '6', max = '176', elev = '40'] = pos;
 if (!file || !id) { console.log('uso: node tools/mount-bake.mjs <pasta/arquivo.glb> <id> [parte] [estilo] [quadros] [px] [elev] [--saddle=fx,fy,fz] [--idle] [--lo=112] [--list]'); process.exit(1); }
 const OUT = 'public/assets/mounts', TMP = 'test-results/mount-bake';
-const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] }); // PW_CHROMIUM: navegador já instalado (versão do Playwright diferente)
 const p = await b.newPage({ viewport: { width: 400, height: 300 } }); p.on('pageerror', (e) => console.log('pageerror', e.message));
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.webp': 'image/webp', '.png': 'image/png', '.wasm': 'application/wasm' };
 await p.route('http://localhost:5174/**', (route) => { // serve public/ do disco (sem servidor no ar)

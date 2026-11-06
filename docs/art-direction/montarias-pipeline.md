@@ -5,9 +5,11 @@ Status (2026-11-05): **v2 3D em 8 direções implementada e testada** (testes po
 ## v2: atlas 3D em 8 direções (Meshy → `tools/mount-bake.mjs`)
 - GLB do dono (fora do Git, `public/labs/iso-poc/art-local/meshy-cenario/`): `mount-frostpack-scout.glb` (lobo, 1 peça), `mount-royal-companions.glb` (2 peças: **índice 0 = cavalo branco**, índice 1 = grifo de asas abertas, **não usado**; o cavalo olha 45° fora de +Z, corrigido com `--yaw=45`), `mount-gryphon-rising.glb` (grifo de asas erguidas = Grifo Dourado), `mount-gryphon-saddle.glb` (grifo de asas dobradas: **reserva, não usado**).
 - Comandos usados (rodar na raiz; depois `node tools/bump-assets.mjs`):
-  - `node tools/mount-bake.mjs meshy-cenario/mount-frostpack-scout.glb wolf -1 trot 6 192 40 --idle --saddle=0,0.68,0.0`
-  - `node tools/mount-bake.mjs meshy-cenario/mount-royal-companions.glb horse 0 trot 6 192 40 --idle --yaw=45 --saddle=0,0.7,0`
-  - `node tools/mount-bake.mjs meshy-cenario/mount-gryphon-rising.glb gryphon -1 flap 8 192 40 --saddle=0,0.44,0.1`
+  - v3 (2026-11-06, passada nova "trot v2" em `labs/nature/glb.html`: pernas em pêndulo a partir do quadril, pares diagonais sem cortar a barriga, cabeça acena, cauda com atraso; mais quadros):
+  - `node tools/mount-bake.mjs meshy-cenario/mount-frostpack-scout.glb wolf -1 trot 10 176 40 --idle --saddle=0,0.68,0.0`
+  - `node tools/mount-bake.mjs meshy-cenario/mount-royal-companions.glb horse 0 trot 10 176 40 --idle --yaw=45 --saddle=0,0.7,0`
+  - `node tools/mount-bake.mjs meshy-cenario/mount-gryphon-rising.glb gryphon -1 flap 12 176 40 --saddle=0,0.44,0.1`
+  - Se o Playwright do projeto não achar o navegador: `PW_CHROMIUM=/caminho/do/chrome node tools/mount-bake.mjs ...`. Os GLB do Meshy NÃO têm esqueleto nem animação (estátua): a passada é sempre deformação por código.
 - `tools/mount-bake.mjs` reaproveita `public/labs/nature/glb.html` (`bakeAnim`; acrescentados `--idle`, `track`, `yawParts` e o estilo `flap`) mas grava em `public/assets/mounts/<id>-3d.webp` (alta), `<id>-3d-lo.webp` (baixa, ~112 px no maior lado) e `<id>-3d.json`; **não toca em `public/assets/mobs` nem no índice de mobs**.
 - Layout: linha = direção (0 S, 1 SE, 2 L, 3 NE, 4 N, 5 NO, 6 O, 7 SO, para onde a montaria olha; mesma numeração do herói, `viewFromFacing`), coluna = quadro. Lobo/cavalo: 6 quadros de trote + 1 quadro parado SEM deformação (índice 6); grifo: 8 quadros de bater de asas (as asas giram em torno do ombro, corpo sobe na batida), sem quadro parado (paira batendo asas mais devagar). Mesma janela e âncora em todas as vistas, recorte justo comum.
 - json: `frames`, `idle`, `cols`, `rows` = 8, `feet` (âncora no chão), `shadow`, `saddle[8]` (sela no quadro parado/0, por vista) e `saddleF[8][quadros]` (sela projetada em CADA vista e quadro, a partir do ponto 3D passado por deformação), tudo em fração da célula. O ponto 3D da sela (`--saddle=fx,fy,fz`, fração da caixa do modelo) foi achado olhando a sobreposição do marcador nas 8 vistas.

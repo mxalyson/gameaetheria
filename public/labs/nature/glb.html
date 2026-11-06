@@ -170,13 +170,19 @@ function deformFor(style, Hm, Dz, Dx) {
     const T = 2 * Math.PI * t, s = Math.sin(T), c = Math.cos(T), h = y / Hm;
     if (style === 'hop') { const sy = 1 + 0.15 * s, sxz = 1 - 0.09 * s; return [x * sxz + 0.05 * Hm * h * c, y * sy, z * sxz]; }
     if (style === 'waddle') { const a = 0.1 * s, ca = Math.cos(a), sa = Math.sin(a), yy = y * (1 + 0.04 * Math.cos(2 * T)); return [x * ca - yy * sa + 0.03 * Hm * h * h * c, x * sa + yy * ca, z]; }
-    // trot
-    const low = clamp01(1 - h / 0.38), ph = ((x > 0) !== (z > 0)) ? Math.PI : 0, sp = Math.sin(T + ph);
-    const tail = clamp01((-z / Dz - 0.25) / 0.75) * clamp01((h - 0.2) / 0.3);
-    const bob = 0.03 * Hm * Math.sin(2 * T), pitch = 0.035 * Math.sin(2 * T + 1);
-    let yy = y + low * 0.08 * Hm * Math.max(0, Math.cos(T + ph)) + bob, zz = z + low * 0.17 * Hm * sp;
-    const cp = Math.cos(pitch), sn = Math.sin(pitch); const y2 = yy * cp - zz * sn, z2 = yy * sn + zz * cp;
-    return [x + tail * 0.14 * Hm * Math.sin(2 * T + 1), y2, z2];
+    // trot v2 (2026-11-06): cada perna é um pêndulo a partir do quadril (o pé anda mais, a coxa quase nada) com o casco subindo na volta;
+    // pares diagonais com transição SUAVE pelo meio do corpo (antes o sinal de x/z cortava a barriga em 4 e as pernas deslizavam como patins);
+    // a cabeça acena, o corpo sobe 2× por ciclo e balança de lado; a cauda abana com atraso.
+    const low = clamp01(1 - h / 0.4) ** 1.3, wx = Math.tanh(x / (Dx * 0.22)), wz = Math.tanh(z / (Dz * 0.25)), pair = wx * wz; // -1..1: qual par diagonal
+    const leg = low * Math.min(1, Math.abs(wz) * 1.4); // barriga (z perto de 0) quase não se mexe
+    const swing = Math.sin(T) * pair, lift = Math.max(0, Math.cos(T) * Math.sign(pair || 1)) * Math.abs(pair);
+    const tail = clamp01((-z / Dz - 0.25) / 0.75) * clamp01((h - 0.2) / 0.3), head = clamp01((z / Dz - 0.4) / 0.45) * clamp01((h - 0.5) / 0.35);
+    const bob = 0.028 * Hm * Math.sin(2 * T - 0.4), pitch = 0.03 * Math.sin(2 * T + 1), roll = 0.02 * Math.sin(T);
+    let yy = y + leg * 0.09 * Hm * lift + bob + head * 0.035 * Hm * Math.sin(2 * T + 0.6), zz = z + leg * 0.2 * Hm * swing + head * 0.02 * Hm * Math.sin(2 * T);
+    const cp = Math.cos(pitch), sn = Math.sin(pitch); let y2 = yy * cp - zz * sn; const z2 = yy * sn + zz * cp;
+    let x2 = x + tail * 0.16 * Hm * Math.sin(2 * T - 0.8);
+    const cr = Math.cos(roll), sr = Math.sin(roll); [x2, y2] = [x2 * cr - y2 * sr * h, x2 * sr * h + y2 * cr]; // balanço lateral só no alto (pés ficam no chão)
+    return [x2, y2, z2];
   };
 }
 window.bakeAnim = async (idx, { style = 'hop', frames = 6, el = 40, max = 128, aa = 2, pad = 0.05, idle = false, track = null } = {}) => {
