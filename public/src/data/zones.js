@@ -68,6 +68,8 @@ export const ZONES = {
       { id: 'guard', name: 'Guarda Ren', x: 1380, y: 720, color: '#7a8fb0', accent: '#e4ecff', role: 'quest' },
       { id: 'herbalist', name: 'Herbalista Mel', x: 540, y: 720, color: '#6fae5c', accent: '#e8ffd9', role: 'quest' },
       { id: 'smith', name: 'Ferreiro Brok', x: 700, y: 940, color: '#8a6a4a', accent: '#f0d8b8', role: 'smith' },
+      // Aurion, grifo ancião que guarda as montarias da vila (arte: GLB Saddlewing Gryphon do dono, parado); dá a missão da primeira montaria
+      { id: 'gryphon', name: 'Aurion, o Grifo', x: 1480, y: 450, color: '#d9a441', accent: '#fff0c8', role: 'quest' },
       // Praça dos Mestres de Classe: lado a lado (facilita o multiplayer). Cada um só ensina a própria classe; ver core/journal.js masterNpcId.
       { id: 'master_warrior', name: 'Mestre Guerreiro', x: 900, y: 1060, color: '#e0635a', accent: '#f4c7a1', role: 'master' },
       { id: 'master_mage', name: 'Mestre Mago', x: 1015, y: 1060, color: '#6a7cf0', accent: '#d5dbff', role: 'master' },

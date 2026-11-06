@@ -4,7 +4,7 @@ import { mobSpritesEnabled, tint } from './mob-sprites.js';
 import { MENTOR_BY_ID } from '../data/mentors.js';
 
 // NPCs que têm arte (evita pedir arquivos que não existem)
-export const NPC_ART = new Set(['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith', 'master_warrior', 'master_mage', 'master_archer', 'master_cleric',
+export const NPC_ART = new Set(['merchant', 'arena', 'sage', 'guard', 'herbalist', 'smith', 'gryphon', 'master_warrior', 'master_mage', 'master_archer', 'master_cleric',
   // mentores de especialização (Porto): quadro de frente do atlas Nv 25 de cada uma, recortado por tools/npc-from-heroes.py mentors
   'mentor_paladin', 'mentor_berserker', 'mentor_arcane', 'mentor_warlock', 'mentor_sniper', 'mentor_gunslinger', 'mentor_guardian', 'mentor_inquisitor']);
 // NPCs sem arte própria (Porto de Marfim) usam a arte pintada do papel parecido, com tinta leve para se distinguirem. Arte nova: docs/roadmap/pendencias.md.

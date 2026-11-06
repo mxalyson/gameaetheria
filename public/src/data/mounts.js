@@ -8,7 +8,7 @@ export const MOUNT_AUTO_DELAY = 1.5;   // s andando fora de combate até "Montar
 // `how`: texto de como obter. `source`: quest | whistle | achievement (o Apito só concede as de `whistle`).
 // O código de rede é o índice + 1 em MOUNT_IDS (0 = sem montaria): a ORDEM desta lista é protocolo, só acrescente no fim.
 export const MOUNTS = {
-  wolf: { id: 'wolf', name: 'Lobo Cinzento', rarity: 'rare', source: 'quest', desc: 'Cinza, lobo da antiga guarda da fronteira. Rápido e leal; corre colado ao chão.', how: 'Missão "A Matilha da Estrada" com a Guarda Ren (nível 15).' },
+  wolf: { id: 'wolf', name: 'Lobo Cinzento', rarity: 'rare', source: 'quest', desc: 'Cinza, lobo da antiga guarda da fronteira. Rápido e leal; corre colado ao chão.', how: 'Missão "A Matilha da Estrada" com Aurion, o Grifo, na Vila (nível 15).' },
   horse: { id: 'horse', name: 'Corcel Prateado', rarity: 'epic', source: 'whistle', desc: 'Corcel de crina de luar. Galopa sem cansar pelas estradas de Aetheria.', how: 'Apito de Montaria (raro: cai de chefes e do chefe da Cripta; usa a partir do nível 15).' },
   gryphon: { id: 'gryphon', name: 'Grifo Dourado', rarity: 'legendary', source: 'whistle', desc: 'Grifo de penas de ouro. Voo só de enfeite: não atravessa muros nem árvores.', how: 'Conquista "Veterano" (nível 20) ou Apito de Montaria.' },
 };

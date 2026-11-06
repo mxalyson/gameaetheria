@@ -141,8 +141,8 @@ export const QUESTS = {
   },
   // Montaria inicial (decisão 0018): a Guarda Ren entrega o Lobo Cinzento "Cinza", da antiga guarda de fronteira. `mount` na recompensa é lido por core/mounts.js (derivedMounts).
   matilha_da_estrada: {
-    id: 'matilha_da_estrada', name: 'A Matilha da Estrada', giver: 'guard', level: 15, after: 'coracao_de_cristal',
-    text: { offer: 'A guarda de fronteira tinha lobos de patrulha. Dispensaram os guardas e a matilha voltou a ser selvagem. Reduza o bando antes que ataque as caravanas: doze lobos. Depois, apresento-lhe uma velha amiga.', progress: 'Os lobos ainda rondam as estradas. Doze, sem se deixar cercar.', done: 'Doze. Boa conta. Esta é Cinza, a última lobo da patrulha: só aceita quem não a teme. Monte-a fora de combate, pelo botão ou com dois toques em si. Cuide dela.' },
+    id: 'matilha_da_estrada', name: 'A Matilha da Estrada', giver: 'gryphon', level: 15, after: 'coracao_de_cristal',
+    text: { offer: 'Hum. Você cresceu, pequeno herói. Eu guardo as montarias desta vila desde antes do primeiro eco. Os lobos da antiga patrulha voltaram a ser selvagens e caçam nas estradas. Reduza o bando: doze lobos. Uma delas, Cinza, ainda lembra do cheiro de gente. Prove que não a teme e ela será sua.', progress: 'Doze lobos nas estradas. Sem se deixar cercar. Eu sinto daqui quando a matilha recua.', done: 'Doze. A matilha entendeu. Cinza veio sozinha até o meu ninho e escolheu você. Monte fora de combate, pelo botão ou com dois toques em si. Montaria não luta: se alguém a ferir, ela se solta. Cuide dela, e um dia talvez eu deixe você voar comigo.' },
     objectives: [{ type: 'kill', mob: 'wolf', zone: 'any', count: 12, label: 'Derrote 12 Lobos Cinzentos' }],
     reward: { gold: 400, xp: 2500, mount: 'wolf' },
   },
