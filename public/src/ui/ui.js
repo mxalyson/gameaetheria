@@ -183,7 +183,7 @@ export class UI {
   }
 
   // ---- modo online: login, cadastro, recuperação, códigos e lista de personagens ----
-  showLogin(mode = 'login', msg = '', googleOn = false) {
+  showLogin(mode = 'login', msg = '', googleOn = false, emailValue = '') {
     $('hud').classList.add('hidden');
     this.closePanels();
     const titles = { login: 'Entrar', register: 'Criar conta', recover: 'Recuperar acesso' };
@@ -198,12 +198,12 @@ export class UI {
       <div class="title-wrap">
         <div class="logo"><span>AETHERIA</span><small>Arena dos Ecos</small></div>
         <p class="tagline">${titles[mode]} para jogar: seu herói fica salvo na sua conta.</p>
+        ${msg ? `<p class="auth-err" role="alert">${esc(msg)}</p>` : ''}
         <form class="auth-form" onsubmit="return false">
-          <input id="acc-email" type="email" placeholder="E-mail" autocomplete="email" />
+          <input id="acc-email" type="email" placeholder="E-mail" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(emailValue)}" />
           ${pass}
           <button class="btn primary big" type="button" data-action="${go}">${titles[mode]}</button>
           <div id="google-btn" class="google-btn ${googleOn && mode !== 'recover' ? '' : 'hidden'}"></div>
-          ${msg ? `<p class="auth-err" role="alert">${esc(msg)}</p>` : ''}
         </form>
         <div class="title-actions">${links}</div>
         <p class="foot">Conta obrigatória · seus dados ficam no servidor do jogo</p>
@@ -212,7 +212,7 @@ export class UI {
     const email = $('acc-email'), pw = $('acc-pass');
     const enter = (e) => { if (e.key === 'Enter') this.game.act(go); };
     email.addEventListener('keydown', enter); pw.addEventListener('keydown', enter);
-    email.focus();
+    if (!msg) email.focus(); // com erro, não abre o teclado por cima do aviso (celular deitado)
   }
 
   showRecoveryCodes(codes, next = 'chars-refresh') {

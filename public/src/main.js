@@ -435,8 +435,8 @@ class Game {
     }
   }
 
-  showAuth(mode = 'login', msg = '') {
-    this.ui.showLogin(mode, msg, !!this.googleClientId);
+  showAuth(mode = 'login', msg = '', email = '') {
+    this.ui.showLogin(mode, msg, !!this.googleClientId, email);
     if (this.googleClientId && mode !== 'recover') this.loadGoogleButton();
   }
 
@@ -456,7 +456,12 @@ class Game {
   }
 
   async submitAuth(action) {
-    const email = document.getElementById('acc-email')?.value ?? '', pass = document.getElementById('acc-pass')?.value ?? '';
+    const email = (document.getElementById('acc-email')?.value ?? '').trim(), pass = document.getElementById('acc-pass')?.value ?? '';
+    const mode = action === 'auth-login' ? 'login' : action === 'auth-register' ? 'register' : 'recover';
+    // confere o óbvio antes de enviar (mesmas regras do servidor): o jogador vê o motivo na hora
+    const local = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'Digite um e-mail válido (ex.: nome@gmail.com).'
+      : action !== 'auth-login' && pass.length < 8 ? 'A senha precisa ter pelo menos 8 caracteres.' : '';
+    if (local) return this.showAuth(mode, local, email);
     try {
       if (action === 'auth-login') { await this.online.login(email, pass); await this.showChars(); }
       else if (action === 'auth-register') { const r = await this.online.register(email, pass); this.ui.showRecoveryCodes(r.recoveryCodes); }
@@ -464,7 +469,7 @@ class Game {
         const r = await this.online.recover(email, document.getElementById('acc-code')?.value ?? '', pass);
         this.ui.showRecoveryCodes(r.recoveryCodes, 'auth-back-login');
       }
-    } catch (e) { this.showAuth(action === 'auth-login' ? 'login' : action === 'auth-register' ? 'register' : 'recover', e.message); }
+    } catch (e) { this.showAuth(mode, e.status === 409 ? 'Este e-mail já tem conta. Toque em "Voltar ao login" e entre com ele (ou use "Esqueci a senha").' : e.message, email); }
   }
 
   async authGoogle(idToken) {
